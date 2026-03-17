@@ -20,6 +20,46 @@ class HttpError extends Error {
   }
 }
 
+let refreshPromise: Promise<boolean> | null = null
+
+async function attemptRefresh(): Promise<boolean> {
+  try {
+    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    })
+    if (!response.ok) return false
+    const result = await response.json()
+    const newToken = result?.data?.access_token
+    if (!newToken) return false
+    localStorage.setItem('auth_token', newToken)
+    authChannel.postMessage({ type: 'token_updated', token: newToken })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function handleUnauthorized(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = attemptRefresh().finally(() => { refreshPromise = null })
+  return refreshPromise
+}
+
+// Multi-tab sync
+const authChannel = new BroadcastChannel('auth_token_sync')
+authChannel.addEventListener('message', (event) => {
+  if (event.data?.type === 'token_updated') {
+    localStorage.setItem('auth_token', event.data.token)
+  } else if (event.data?.type === 'logged_out') {
+    localStorage.removeItem('auth_token')
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+  }
+})
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers: extraHeaders = {} } = options
 
@@ -43,6 +83,34 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   })
 
   if (response.status === 401) {
+    const refreshed = await handleUnauthorized()
+    if (refreshed) {
+      // Retry with new token
+      const newToken = localStorage.getItem('auth_token')
+      if (newToken) {
+        headers['Authorization'] = `Bearer ${newToken}`
+      }
+      const retryResponse = await fetch(url, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      })
+
+      let retryData: unknown
+      const retryContentType = retryResponse.headers.get('content-type')
+      if (retryContentType && retryContentType.includes('application/json')) {
+        retryData = await retryResponse.json()
+      } else {
+        retryData = await retryResponse.text()
+      }
+
+      if (!retryResponse.ok) {
+        throw new HttpError(retryResponse.status, `Request failed with status ${retryResponse.status}`, retryData)
+      }
+
+      return retryData as T
+    }
+
     localStorage.removeItem('auth_token')
     if (window.location.pathname !== '/login') {
       window.location.href = '/login'
@@ -84,6 +152,34 @@ async function uploadRequest<T>(endpoint: string, formData: FormData, method: Ht
   })
 
   if (response.status === 401) {
+    const refreshed = await handleUnauthorized()
+    if (refreshed) {
+      // Retry with new token
+      const newToken = localStorage.getItem('auth_token')
+      if (newToken) {
+        headers['Authorization'] = `Bearer ${newToken}`
+      }
+      const retryResponse = await fetch(url, {
+        method,
+        headers,
+        body: formData,
+      })
+
+      let retryData: unknown
+      const retryContentType = retryResponse.headers.get('content-type')
+      if (retryContentType && retryContentType.includes('application/json')) {
+        retryData = await retryResponse.json()
+      } else {
+        retryData = await retryResponse.text()
+      }
+
+      if (!retryResponse.ok) {
+        throw new HttpError(retryResponse.status, `Request failed with status ${retryResponse.status}`, retryData)
+      }
+
+      return retryData as T
+    }
+
     localStorage.removeItem('auth_token')
     if (window.location.pathname !== '/login') {
       window.location.href = '/login'

@@ -143,14 +143,20 @@ router.beforeEach(async (to) => {
     try {
       await authStore.fetchUser()
     } catch {
-      authStore.logout()
-      return { name: RouteNames.LOGIN }
+      const refreshed = await authStore.silentRefresh()
+      if (!refreshed) {
+        authStore.logout()
+        return { name: RouteNames.LOGIN }
+      }
     }
   }
 
   // Not authenticated → LOGIN
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return { name: RouteNames.LOGIN }
+    const refreshed = await authStore.silentRefresh()
+    if (!refreshed) {
+      return { name: RouteNames.LOGIN }
+    }
   }
 
   // Authenticated on auth pages → redirect based on state

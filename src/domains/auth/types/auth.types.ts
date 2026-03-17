@@ -1,6 +1,7 @@
 export interface LoginCredentials {
   email: string
   password: string
+  remember_me?: boolean
 }
 
 export interface SignupCredentials {
@@ -78,4 +79,8 @@ export type SelectClinicResponse = {
 export type MeResponse = {
   data: User
   meta: { memberships: Membership[] }
+}
+
+export interface RefreshResponse {
+  data: TokenResponse
 }

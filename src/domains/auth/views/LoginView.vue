@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Card,
@@ -31,13 +33,14 @@ const { value: password, errorMessage: passwordError } = useField<string>('passw
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
+const rememberMe = ref(true)
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
   isLoading.value = true
 
   try {
-    await authStore.login({ email: values.email, password: values.password })
+    await authStore.login({ email: values.email, password: values.password, remember_me: rememberMe.value })
     router.push({ name: RouteNames.HOME })
   } catch (err) {
     if (err instanceof HttpError) {
@@ -114,10 +117,9 @@ const onSubmit = handleSubmit(async (values) => {
                 <Lock class="size-3.5 text-muted-foreground" />
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
                 v-model="password"
-                type="password"
                 placeholder="••••••••"
                 autocomplete="current-password"
                 :disabled="isLoading"
@@ -127,6 +129,11 @@ const onSubmit = handleSubmit(async (values) => {
               <p v-if="passwordError" class="text-xs text-destructive">
                 {{ passwordError }}
               </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <Checkbox id="remember-me" :checked="rememberMe" @update:checked="rememberMe = $event" :disabled="isLoading" />
+              <Label for="remember-me" class="text-sm font-normal cursor-pointer">Remember me</Label>
             </div>
 
             <Button type="submit" class="w-full" :disabled="isLoading">

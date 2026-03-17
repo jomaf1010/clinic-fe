@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, PasswordInput } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -78,7 +78,7 @@ const onSubmit = handleSubmit(async (values) => {
             <Lock class="size-3.5 text-muted-foreground" />
             Current password
           </Label>
-          <Input id="current-password" v-model="currentPassword" type="password" placeholder="Enter your current password" autocomplete="current-password" :disabled="isLoading" :aria-invalid="!!currentPasswordError" />
+          <PasswordInput id="current-password" v-model="currentPassword" placeholder="Enter your current password" autocomplete="current-password" :disabled="isLoading" :aria-invalid="!!currentPasswordError" />
           <p v-if="currentPasswordError" class="text-xs text-destructive">{{ currentPasswordError }}</p>
         </div>
 
@@ -88,7 +88,7 @@ const onSubmit = handleSubmit(async (values) => {
               <KeyRound class="size-3.5 text-muted-foreground" />
               New password
             </Label>
-            <Input id="new-password" v-model="newPassword" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" :disabled="isLoading" :aria-invalid="!!newPasswordError" />
+            <PasswordInput id="new-password" v-model="newPassword" placeholder="Minimum 8 characters" autocomplete="new-password" :disabled="isLoading" :aria-invalid="!!newPasswordError" />
             <p v-if="newPasswordError" class="text-xs text-destructive">{{ newPasswordError }}</p>
           </div>
 
@@ -97,7 +97,7 @@ const onSubmit = handleSubmit(async (values) => {
               <KeyRound class="size-3.5 text-muted-foreground" />
               Confirm new password
             </Label>
-            <Input id="new-password-confirmation" v-model="newPasswordConfirmation" type="password" placeholder="Repeat your new password" autocomplete="new-password" :disabled="isLoading" :aria-invalid="!!newPasswordConfirmationError" />
+            <PasswordInput id="new-password-confirmation" v-model="newPasswordConfirmation" placeholder="Repeat your new password" autocomplete="new-password" :disabled="isLoading" :aria-invalid="!!newPasswordConfirmationError" />
             <p v-if="newPasswordConfirmationError" class="text-xs text-destructive">{{ newPasswordConfirmationError }}</p>
           </div>
         </div>

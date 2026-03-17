@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, PasswordInput } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Card,
@@ -146,10 +146,9 @@ const onSubmit = handleSubmit(async (values) => {
                 <Lock class="size-3.5 text-muted-foreground" />
                 Password
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
                 v-model="password"
-                type="password"
                 placeholder="••••••••"
                 autocomplete="new-password"
                 :disabled="isLoading"

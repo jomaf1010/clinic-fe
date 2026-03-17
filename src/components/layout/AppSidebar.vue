@@ -130,8 +130,8 @@ const userData = computed(() => ({
 
 const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Clinic App')
 
-function handleLogout() {
-  authStore.logout()
+async function handleLogout() {
+  await authStore.logout()
   router.push({ name: RouteNames.LOGIN })
 }
 </script>

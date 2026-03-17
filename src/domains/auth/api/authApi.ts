@@ -1,5 +1,5 @@
 import { http } from '@/lib/http'
-import type { LoginCredentials, LoginResponse, MeResponse, MessageResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
+import type { LoginCredentials, LoginResponse, MeResponse, MessageResponse, RefreshResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
 
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
@@ -48,5 +48,36 @@ export const authApi = {
     const formData = new FormData()
     formData.append('avatar', file)
     return http.upload('/auth/avatar', formData)
+  },
+
+  async refresh(): Promise<RefreshResponse> {
+    const BASE_URL = import.meta.env.VITE_API_URL as string
+    const response = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      throw new Error('Refresh failed')
+    }
+    return response.json()
+  },
+
+  async logout(): Promise<void> {
+    const BASE_URL = import.meta.env.VITE_API_URL as string
+    const token = localStorage.getItem('auth_token')
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    try {
+      await fetch(`${BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      })
+    } catch {
+      // Best-effort — server might be unreachable
+    }
   },
 }

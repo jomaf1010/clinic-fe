@@ -76,12 +76,31 @@ export const useAuthStore = defineStore('auth', () => {
     await authApi.signup(credentials)
   }
 
-  function logout(): void {
+  async function logout(): Promise<void> {
+    await authApi.logout()
     useCentrifugo().disconnect()
+    try {
+      const channel = new BroadcastChannel('auth_token_sync')
+      channel.postMessage({ type: 'logged_out' })
+      channel.close()
+    } catch {
+      // BroadcastChannel not supported — fine
+    }
     token.value = null
     user.value = null
     memberships.value = []
     localStorage.removeItem(TOKEN_KEY)
+  }
+
+  async function silentRefresh(): Promise<boolean> {
+    try {
+      const response = await authApi.refresh()
+      setToken(response.data.access_token)
+      await fetchUser()
+      return true
+    } catch {
+      return false
+    }
   }
 
   return {
@@ -101,5 +120,6 @@ export const useAuthStore = defineStore('auth', () => {
     signup,
     selectClinic,
     logout,
+    silentRefresh,
   }
 })
