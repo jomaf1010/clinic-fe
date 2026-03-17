@@ -12,7 +12,10 @@ export function useCentrifugo() {
   function connect(): void {
     if (client) return
 
-    const wsUrl = `ws://${window.location.host}${import.meta.env.VITE_CENTRIFUGO_URL}`
+    const centrifugoUrl = import.meta.env.VITE_CENTRIFUGO_URL as string
+    const wsUrl = centrifugoUrl.startsWith('wss://') || centrifugoUrl.startsWith('ws://')
+      ? centrifugoUrl
+      : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${centrifugoUrl}`
 
     client = new Centrifuge(wsUrl, {
       getToken: async () => {
