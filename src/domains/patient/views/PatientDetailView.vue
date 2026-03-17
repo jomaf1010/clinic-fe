@@ -1,0 +1,593 @@
+<script setup lang="ts">
+import { computed, ref, watch, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  User,
+  UserRound,
+  MapPin,
+  CalendarDays,
+  Phone,
+  Mail,
+  ShieldAlert,
+  HeartPulse,
+  StickyNote,
+  LoaderCircle,
+  Stethoscope,
+  Plus,
+  Pencil,
+  PlayCircle,
+  Filter,
+  X,
+  FlaskConical,
+  CheckCircle2,
+  Clock,
+  Info,
+  ArrowLeft,
+} from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import EditPatientDialog from '../components/EditPatientDialog.vue'
+import { patientApi } from '../api/patientApi'
+import type { PatientResponse } from '../types/patient.types'
+import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import { RouteNames } from '@/router/routeNames'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
+
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+const consultationStore = useConsultationStore()
+const patient = ref<PatientResponse | null>(null)
+const isLoading = ref(false)
+const error = ref<string | null>(null)
+
+const isFemale = computed(() => patient.value?.sex === 'female')
+const avatarBg = computed(() => isFemale.value ? 'bg-pink-100 dark:bg-pink-950' : 'bg-blue-100 dark:bg-blue-950')
+const avatarColor = computed(() => isFemale.value ? 'text-pink-500' : 'text-blue-500')
+
+const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
+const currentUserId = computed(() => authStore.user?.id)
+
+const visibleConsultations = computed(() =>
+  consultationStore.patientConsultations.filter(c =>
+    c.status !== 'draft' || isOwner.value || c.created_by === currentUserId.value,
+  ),
+)
+
+const draftConsultation = computed(() =>
+  visibleConsultations.value.find(c => c.status === 'draft') ?? null,
+)
+
+const age = computed(() => {
+  if (!patient.value) return null
+  const dob = new Date(patient.value.date_of_birth)
+  const today = new Date()
+  let years = today.getFullYear() - dob.getFullYear()
+  const monthDiff = today.getMonth() - dob.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    years--
+  }
+  return years
+})
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+async function fetchPatient() {
+  isLoading.value = true
+  error.value = null
+
+  try {
+    const response = await patientApi.get(route.params.id as string)
+    patient.value = response.data
+
+    await consultationStore.loadForPatient(response.data.id)
+  } catch {
+    error.value = 'Failed to load patient details. Please try again.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+watch(() => route.params.id, () => fetchPatient(), { immediate: true })
+
+const editDialogOpen = ref(false)
+
+const labOrderDialogOpen = ref(false)
+const labOrderDialogData = ref<LabOrderSummary | null>(null)
+
+function showLabOrderDialog(summary: LabOrderSummary, e: Event) {
+  e.stopPropagation()
+  labOrderDialogData.value = summary
+  labOrderDialogOpen.value = true
+}
+
+const filterMonth = ref<string>('')
+const filterYear = ref<string>('')
+
+const months = [
+  { value: '1', label: 'January' },
+  { value: '2', label: 'February' },
+  { value: '3', label: 'March' },
+  { value: '4', label: 'April' },
+  { value: '5', label: 'May' },
+  { value: '6', label: 'June' },
+  { value: '7', label: 'July' },
+  { value: '8', label: 'August' },
+  { value: '9', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+]
+
+const years = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const startYear = patient.value ? new Date(patient.value.created_at).getFullYear() : currentYear
+  const result: string[] = []
+  for (let y = currentYear; y >= startYear; y--) {
+    result.push(String(y))
+  }
+  return result
+})
+
+const hasActiveFilter = computed(() => filterMonth.value !== '' || filterYear.value !== '')
+
+function applyFilter() {
+  if (!patient.value) return
+  const filters: { month?: number; year?: number } = {}
+  if (filterMonth.value) filters.month = Number(filterMonth.value)
+  if (filterYear.value) filters.year = Number(filterYear.value)
+  consultationStore.loadForPatient(patient.value.id, filters)
+}
+
+function clearFilter() {
+  filterMonth.value = ''
+  filterYear.value = ''
+  if (!patient.value) return
+  consultationStore.loadForPatient(patient.value.id)
+}
+
+watch([filterMonth, filterYear], () => {
+  applyFilter()
+})
+
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+watch(sentinel, (el) => {
+  if (observer) observer.disconnect()
+  if (!el) return
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && patient.value) {
+        consultationStore.loadMoreForPatient(patient.value.id)
+      }
+    },
+    { rootMargin: '100px' },
+  )
+  observer.observe(el)
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+  consultationStore.clearPatientConsultations()
+})
+</script>
+
+<template>
+  <div v-if="isLoading" class="flex flex-1 items-center justify-center pt-16">
+    <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
+  </div>
+
+  <div
+    v-else-if="error"
+    role="alert"
+    class="mx-auto max-w-md rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+  >
+    {{ error }}
+  </div>
+
+  <div
+    v-else-if="patient"
+    class="-mx-4 -mt-4 -mb-4 flex min-h-0 flex-1 flex-col gap-0 md:flex-row"
+  >
+    <!-- Left panel -->
+    <div class="shrink-0 overflow-y-auto border-b p-4 md:w-80 md:border-b-0 md:border-r md:p-6">
+      <Button
+        variant="ghost"
+        size="sm"
+        class="-ml-2 mb-3 gap-1.5 text-muted-foreground"
+        @click="router.back()"
+      >
+        <ArrowLeft class="size-3.5" />
+        Back to Patients
+      </Button>
+
+      <!-- Header -->
+      <div class="flex flex-col items-center text-center">
+        <div class="flex size-16 items-center justify-center rounded-full" :class="avatarBg">
+          <UserRound class="size-8" :class="avatarColor" />
+        </div>
+        <h2 class="mt-2 text-lg font-semibold">{{ patient.full_name }}</h2>
+        <p v-if="patient.address" class="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+          <MapPin class="size-3.5 shrink-0" />
+          {{ patient.address }}
+        </p>
+        <div class="mt-3 flex flex-col gap-2">
+          <Button
+            v-if="draftConsultation"
+            size="sm"
+            variant="secondary"
+            @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+          >
+            <PlayCircle class="size-3.5" />
+            Continue Draft
+          </Button>
+          <Button
+            v-else
+            size="sm"
+            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
+          >
+            <Plus class="size-3.5" />
+            New Consultation
+          </Button>
+          <Button variant="outline" size="sm" @click="editDialogOpen = true">
+            <Pencil class="size-3.5" />
+            Edit Profile
+          </Button>
+        </div>
+      </div>
+
+      <!-- Basic Info -->
+      <div class="mt-5 border-t pt-4">
+        <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Basic Info
+        </h3>
+        <div class="space-y-2.5">
+          <div v-if="age !== null" class="flex items-start gap-2 text-sm">
+            <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <div>
+              <span class="text-muted-foreground">Age: </span>
+              {{ age }} yrs old
+            </div>
+          </div>
+          <div class="flex items-start gap-2 text-sm">
+            <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <div>
+              <span class="text-muted-foreground">DOB: </span>
+              {{ formatDate(patient.date_of_birth) }}
+            </div>
+          </div>
+          <div class="flex items-start gap-2 text-sm">
+            <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <div>
+              <span class="text-muted-foreground">Gender: </span>
+              {{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}
+            </div>
+          </div>
+          <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
+            <Phone class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <div>
+              <span class="text-muted-foreground">Phone: </span>
+              {{ patient.contact_number }}
+            </div>
+          </div>
+          <div v-if="patient.email" class="flex items-start gap-2 text-sm">
+            <Mail class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <div>
+              <span class="text-muted-foreground">Email: </span>
+              {{ patient.email }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Medical -->
+      <div
+        v-if="patient.allergies.length > 0 || patient.chronic_conditions.length > 0"
+        class="mt-5 border-t pt-4"
+      >
+        <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Medical
+        </h3>
+        <div class="space-y-3">
+          <div v-if="patient.allergies.length > 0">
+            <div class="mb-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <ShieldAlert class="size-3.5 shrink-0" />
+              Allergies
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="allergy in patient.allergies"
+                :key="allergy"
+                class="rounded-md bg-muted px-2 py-0.5 text-xs"
+              >
+                {{ allergy }}
+              </span>
+            </div>
+          </div>
+          <div v-if="patient.chronic_conditions.length > 0">
+            <div class="mb-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+              <HeartPulse class="size-3.5 shrink-0" />
+              Conditions
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="condition in patient.chronic_conditions"
+                :key="condition"
+                class="rounded-md bg-muted px-2 py-0.5 text-xs"
+              >
+                {{ condition }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div v-if="patient.note" class="mt-5 border-t pt-4">
+        <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Notes
+        </h3>
+        <div class="flex items-start gap-2 text-sm">
+          <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          <p class="whitespace-pre-wrap">{{ patient.note }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <Stethoscope class="size-4 text-muted-foreground" />
+          <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Consultations
+          </h3>
+          <span class="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+            {{ visibleConsultations.length }}
+          </span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <Select v-model="filterMonth">
+            <SelectTrigger class="h-7 w-[120px] text-xs">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="m in months" :key="m.value" :value="m.value">
+                {{ m.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Select v-model="filterYear">
+            <SelectTrigger class="h-7 w-[80px] text-xs">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="y in years" :key="y" :value="y">
+                {{ y }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <button
+            v-if="hasActiveFilter"
+            aria-label="Clear filter"
+            class="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            @click="clearFilter"
+          >
+            <X class="size-3" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Skeleton loading state -->
+      <div v-if="consultationStore.isLoadingConsultations" class="mt-4">
+        <div
+          v-for="n in 5"
+          :key="n"
+          class="flex gap-3"
+        >
+          <div class="flex flex-col items-center">
+            <Skeleton class="mt-3.5 size-2 shrink-0 rounded-full" />
+            <div v-if="n < 5" class="mt-1 flex-1 w-px bg-border" />
+          </div>
+          <div
+            class="min-w-0 flex-1 rounded-lg border bg-card p-3"
+            :class="n < 5 ? 'mb-3' : ''"
+          >
+            <Skeleton class="h-3 w-20 mb-2" />
+            <Skeleton class="h-4 w-3/4 mb-2" />
+            <div class="flex gap-1.5">
+              <Skeleton class="h-5 w-20 rounded-md" />
+              <Skeleton class="h-5 w-16 rounded-md" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div
+        v-else-if="visibleConsultations.length === 0"
+        class="flex flex-1 flex-col items-center justify-center py-12 text-muted-foreground"
+      >
+        <Stethoscope class="size-10 mb-3 opacity-50" />
+        <p class="text-sm">No consultations yet</p>
+      </div>
+
+      <!-- Timeline -->
+      <div v-else class="mt-4">
+        <div
+          v-for="(consultation, index) in visibleConsultations"
+          :key="consultation.id"
+          class="flex gap-3"
+        >
+          <div class="flex flex-col items-center">
+            <div
+              class="mt-3.5 size-2 shrink-0 rounded-full"
+              :class="consultation.status === 'draft' ? 'bg-amber-400' : 'bg-primary'"
+            />
+            <div
+              v-if="index < visibleConsultations.length - 1 || consultationStore.hasMore"
+              class="mt-1 flex-1 w-px bg-border"
+            />
+          </div>
+          <div
+            class="min-w-0 flex-1 cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-primary/5 hover:border-primary/30"
+            :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
+            @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: consultation.id } })"
+          >
+            <div class="flex items-center gap-2">
+              <p class="text-xs text-muted-foreground">
+                {{ formatDate(consultation.created_at) }}
+              </p>
+              <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
+                &middot; Dr. {{ consultation.doctor_name }}
+              </span>
+              <span
+                v-if="consultation.status === 'draft'"
+                class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
+              >
+                Draft
+              </span>
+            </div>
+            <p v-if="consultation.triage.chief_complaint" class="mt-1 text-sm font-medium">
+              {{ consultation.triage.chief_complaint }}
+            </p>
+            <template v-if="authStore.hasPermission('consultations.edit-assessment')">
+              <span
+                v-for="(diagnosis, dIdx) in (consultation.assessment?.diagnoses ?? [])"
+                :key="dIdx"
+                class="mt-1 mr-1 inline-block rounded-md bg-muted px-2 py-0.5 text-xs"
+              >
+                <span v-if="diagnosis.code" class="mr-0.5 font-mono text-muted-foreground">{{ diagnosis.code }}</span>
+                {{ diagnosis.description }}
+              </span>
+            </template>
+            <p v-if="authStore.hasPermission('consultations.edit-treatment-plan') && consultation.treatment_plan?.advice" class="mt-1.5 text-sm text-muted-foreground">
+              {{ consultation.treatment_plan.advice }}
+            </p>
+            <TooltipProvider v-if="consultation.lab_order_summary" :delay-duration="200">
+              <div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <FlaskConical class="size-3 shrink-0" />
+                <span>Lab Orders:</span>
+                <Tooltip v-if="consultation.lab_order_summary.completed">
+                  <TooltipTrigger as-child>
+                    <span class="flex cursor-help items-center gap-0.5 text-green-600">
+                      <CheckCircle2 class="size-3" />
+                      {{ consultation.lab_order_summary.completed }} completed
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" class="max-w-64 text-xs">
+                    <ul class="list-disc pl-3.5">
+                      <li v-for="name in consultation.lab_order_summary.completed_items" :key="name">{{ name }}</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip v-if="consultation.lab_order_summary.pending">
+                  <TooltipTrigger as-child>
+                    <span class="flex cursor-help items-center gap-0.5 text-amber-600">
+                      <Clock class="size-3" />
+                      {{ consultation.lab_order_summary.pending }} pending
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" class="max-w-64 text-xs">
+                    <ul class="list-disc pl-3.5">
+                      <li v-for="name in consultation.lab_order_summary.pending_items" :key="name">{{ name }}</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+                <button
+                  type="button"
+                  class="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  @click="showLabOrderDialog(consultation.lab_order_summary!, $event)"
+                >
+                  <Info class="size-3.5" />
+                </button>
+              </div>
+            </TooltipProvider>
+          </div>
+        </div>
+
+        <!-- Infinite scroll sentinel -->
+        <!-- Infinite scroll sentinel (skeleton card) -->
+        <div
+          v-if="consultationStore.hasMore"
+          ref="sentinel"
+          class="flex gap-3"
+        >
+          <div class="flex flex-col items-center">
+            <Skeleton class="mt-3.5 size-2 shrink-0 rounded-full" />
+          </div>
+          <div class="mt-3 min-w-0 flex-1 rounded-lg border bg-card p-3">
+            <Skeleton class="h-3 w-24 mb-2" />
+            <Skeleton class="h-4 w-3/4 mb-2" />
+            <Skeleton class="h-3 w-1/2 mb-3" />
+            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+              <LoaderCircle class="size-3.5 animate-spin" />
+              Loading more...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lab Order Summary Dialog -->
+    <Dialog v-model:open="labOrderDialogOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <FlaskConical class="size-4" />
+            Lab Order Summary
+          </DialogTitle>
+          <DialogDescription class="sr-only">Lab order items breakdown</DialogDescription>
+        </DialogHeader>
+        <div v-if="labOrderDialogData" class="flex flex-col gap-4">
+          <div v-if="labOrderDialogData.completed_items.length">
+            <p class="mb-2 flex items-center gap-1.5 text-sm font-medium text-green-600">
+              <CheckCircle2 class="size-3.5" />
+              Completed ({{ labOrderDialogData.completed }})
+            </p>
+            <ul class="ml-5 list-disc space-y-1 text-sm">
+              <li v-for="name in labOrderDialogData.completed_items" :key="name">{{ name }}</li>
+            </ul>
+          </div>
+          <div v-if="labOrderDialogData.pending_items.length">
+            <p class="mb-2 flex items-center gap-1.5 text-sm font-medium text-amber-600">
+              <Clock class="size-3.5" />
+              Pending ({{ labOrderDialogData.pending }})
+            </p>
+            <ul class="ml-5 list-disc space-y-1 text-sm">
+              <li v-for="name in labOrderDialogData.pending_items" :key="name">{{ name }}</li>
+            </ul>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Edit Patient Dialog -->
+    <EditPatientDialog
+      v-if="patient"
+      :open="editDialogOpen"
+      :patient="patient"
+      @update:open="editDialogOpen = $event"
+      @updated="fetchPatient()"
+    />
+  </div>
+</template>

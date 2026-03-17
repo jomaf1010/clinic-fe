@@ -1,0 +1,31 @@
+export const FREQUENCIES = [
+  { value: 'OD', label: 'OD - Once daily' },
+  { value: 'BID', label: 'BID - Twice daily' },
+  { value: 'TID', label: 'TID - Three times daily' },
+  { value: 'QID', label: 'QID - Four times daily' },
+  { value: 'Q4H', label: 'Q4H - Every 4 hours' },
+  { value: 'Q6H', label: 'Q6H - Every 6 hours' },
+  { value: 'Q8H', label: 'Q8H - Every 8 hours' },
+  { value: 'Q12H', label: 'Q12H - Every 12 hours' },
+  { value: 'PRN', label: 'PRN - As needed' },
+  { value: 'STAT', label: 'STAT - Immediately' },
+  { value: 'QHS', label: 'QHS - At bedtime' },
+  { value: 'QAM', label: 'QAM - Every morning' },
+  { value: 'QPM', label: 'QPM - Every evening' },
+  { value: 'QOD', label: 'QOD - Every other day' },
+  { value: 'Weekly', label: 'Weekly' },
+] as const
+
+export const ROUTES = [
+  'Oral',
+  'Sublingual',
+  'Topical',
+  'Intravenous',
+  'Intramuscular',
+  'Subcutaneous',
+  'Inhalation',
+  'Rectal',
+  'Ophthalmic',
+  'Otic',
+  'Nasal',
+] as const

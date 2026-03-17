@@ -1,0 +1,134 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { ArrowLeft, LoaderCircle, MessageSquare, Plus } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useMessageStore } from '../stores/messageStore'
+import { useTypingIndicator } from '../composables/useTypingIndicator'
+import ConversationList from './ConversationList.vue'
+import MessageThread from './MessageThread.vue'
+import MessageInput from './MessageInput.vue'
+import NewConversationDialog from './NewConversationDialog.vue'
+
+const props = defineProps<{
+  mode: 'full' | 'panel'
+}>()
+
+const authStore = useAuthStore()
+const messageStore = useMessageStore()
+
+const newDialogOpen = ref(false)
+
+const { onInput: onTypingInput } = useTypingIndicator(() => messageStore.activeConversationId)
+
+const otherParticipantName = computed(() => {
+  const conv = messageStore.activeConversation
+  if (!conv) return ''
+  const userId = authStore.user?.id
+  const other = conv.participants.find((p) => p.id !== userId)
+  return other?.name ?? 'Unknown'
+})
+
+const showThread = computed(() => messageStore.activeConversationId !== null)
+
+async function handleSelectConversation(id: string) {
+  messageStore.setActiveConversation(id)
+}
+
+function handleBack() {
+  messageStore.setActiveConversation(null)
+}
+
+async function handleSend(body: string) {
+  const id = messageStore.activeConversationId
+  if (!id) return
+  await messageStore.sendMessage(id, body)
+}
+
+async function handleNewConversation(userId: string) {
+  const conv = await messageStore.startConversation(userId)
+  messageStore.setActiveConversation(conv.id)
+}
+
+onMounted(() => {
+  messageStore.fetchConversations()
+})
+</script>
+
+<template>
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden" :class="mode === 'full' ? 'md:flex-row' : ''">
+    <!-- Conversation list -->
+    <div
+      class="flex min-h-0 flex-col border-r overflow-hidden"
+      :class="[
+        mode === 'full' ? 'md:w-80 lg:w-96 md:shrink-0' : 'w-full',
+        showThread && mode === 'panel' ? 'hidden' : '',
+        showThread && mode === 'full' ? 'hidden md:flex' : 'flex',
+      ]"
+    >
+      <div class="flex items-center justify-between border-b px-4 py-3">
+        <h2 class="text-sm font-semibold">Messages</h2>
+        <Button variant="ghost" size="icon" class="size-8" @click="newDialogOpen = true">
+          <Plus class="size-4" />
+        </Button>
+      </div>
+
+      <div v-if="messageStore.isLoading && messageStore.conversations.length === 0" class="flex flex-1 items-center justify-center">
+        <LoaderCircle class="size-5 animate-spin text-muted-foreground" />
+      </div>
+
+      <ConversationList
+        v-else
+        :conversations="messageStore.sortedConversations"
+        :active-id="messageStore.activeConversationId"
+        class="flex-1"
+        @select="handleSelectConversation"
+      />
+    </div>
+
+    <!-- Message thread -->
+    <div
+      class="flex min-h-0 flex-1 flex-col overflow-hidden"
+      :class="[
+        !showThread && mode === 'panel' ? 'hidden' : '',
+        !showThread && mode === 'full' ? 'hidden md:flex' : 'flex',
+      ]"
+    >
+      <template v-if="showThread">
+        <!-- Thread header -->
+        <div class="flex items-center gap-2 border-b px-4 py-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-8 md:hidden"
+            :class="mode === 'full' ? 'md:hidden' : ''"
+            @click="handleBack"
+          >
+            <ArrowLeft class="size-4" />
+          </Button>
+          <span class="text-sm font-semibold">{{ otherParticipantName }}</span>
+        </div>
+
+        <MessageThread />
+
+        <MessageInput
+          @send="handleSend"
+          @typing="onTypingInput"
+        />
+      </template>
+
+      <!-- Empty state (full mode desktop) -->
+      <div v-else class="flex flex-1 items-center justify-center">
+        <div class="text-center">
+          <MessageSquare class="mx-auto size-12 text-muted-foreground/30" />
+          <p class="mt-3 text-sm text-muted-foreground">Select a conversation to start messaging</p>
+        </div>
+      </div>
+    </div>
+
+    <NewConversationDialog
+      v-model:open="newDialogOpen"
+      @select="handleNewConversation"
+    />
+  </div>
+</template>

@@ -1,0 +1,26 @@
+export const RouteNames = {
+  HOME: 'home',
+  LOGIN: 'login',
+  SIGNUP: 'signup',
+  VERIFY_EMAIL_NOTICE: 'verify-email-notice',
+  VERIFY_EMAIL: 'verify-email',
+  ONBOARDING_CREATE_CLINIC: 'onboarding-create-clinic',
+  SELECT_CLINIC: 'select-clinic',
+  PATIENT_LIST: 'patient-list',
+  PATIENT_DETAIL: 'patient-detail',
+  AUDIT_LOG_LIST: 'audit-log-list',
+  AUDIT_LOG_DETAIL: 'audit-log-detail',
+  CONSULTATION_NEW: 'consultation-new',
+  CONSULTATION_DETAIL: 'consultation-detail',
+  MEDICINE_LIST: 'medicine-list',
+  APPOINTMENT_LIST: 'appointment-list',
+  SCHEDULE: 'schedule',
+  QUEUE: 'queue',
+  TEAM: 'team',
+  ROLES: 'roles',
+  MESSAGES: 'messages',
+  ACCOUNT: 'account',
+  COMPONENTS: 'components',
+} as const
+
+export type RouteName = (typeof RouteNames)[keyof typeof RouteNames]

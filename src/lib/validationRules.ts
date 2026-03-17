@@ -1,0 +1,190 @@
+/**
+ * Reusable vee-validate rule functions.
+ *
+ * Each rule is a plain function that accepts the field value and returns
+ * `true` when valid or an error string when invalid. These can be composed
+ * into a `validationSchema` object passed directly to `useForm`, with no
+ * third-party schema adapter (no yup / zod) required.
+ *
+ * Usage in a component:
+ *
+ *   import { useForm } from 'vee-validate'
+ *   import { loginSchema } from '@/lib/validationRules'
+ *
+ *   const { handleSubmit, setFieldError } = useForm({ validationSchema: loginSchema })
+ */
+
+// ---------------------------------------------------------------------------
+// Primitive rule factories
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a rule that fails when the value is empty.
+ * @param label - Human-readable field label used in the error message.
+ */
+export function required(label: string) {
+  return (value: unknown): true | string => {
+    if (value === null || value === undefined) return `${label} is required.`
+    if (typeof value === 'string' && value.trim() === '') return `${label} is required.`
+    return true
+  }
+}
+
+/**
+ * Returns a rule that fails when the value is not a well-formed e-mail address.
+ * Intended to be combined with `required`; an empty value passes this rule so
+ * that the "required" message takes precedence.
+ * @param label - Human-readable field label used in the error message.
+ */
+export function email(label: string) {
+  return (value: unknown): true | string => {
+    if (!value || typeof value !== 'string') return true
+    const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return pattern.test(value) || `${label} must be a valid email address.`
+  }
+}
+
+/**
+ * Returns a rule that fails when the value is shorter than `min` characters.
+ * @param label - Human-readable field label used in the error message.
+ * @param min   - Minimum character count (inclusive).
+ */
+export function minLength(label: string, min: number) {
+  return (value: unknown): true | string => {
+    if (!value || typeof value !== 'string') return true
+    return value.length >= min || `${label} must be at least ${min} characters.`
+  }
+}
+
+/**
+ * Returns a rule that fails when the value exceeds `max` characters.
+ * @param label - Human-readable field label used in the error message.
+ * @param max   - Maximum character count (inclusive).
+ */
+export function maxLength(label: string, max: number) {
+  return (value: unknown): true | string => {
+    if (!value || typeof value !== 'string') return true
+    return value.length <= max || `${label} must be no more than ${max} characters.`
+  }
+}
+
+/**
+ * Returns a rule that fails when the value is not a valid number.
+ * @param label - Human-readable field label used in the error message.
+ */
+export function numeric(label: string) {
+  return (value: unknown): true | string => {
+    if (value === null || value === undefined || value === '') return true
+    return !isNaN(Number(value)) || `${label} must be a valid number.`
+  }
+}
+
+/**
+ * Returns a rule that fails when the value is not a valid PH mobile number.
+ * Accepts `09XXXXXXXXX` or `+639XXXXXXXXX`. Empty values pass (field is optional).
+ * @param label - Human-readable field label used in the error message.
+ */
+export function phoneNumberPH(label: string) {
+  return (value: unknown): true | string => {
+    if (!value || typeof value !== 'string' || value.trim() === '') return true
+    const pattern = /^(09|\+639)\d{9}$/
+    return pattern.test(value) || `${label} must be a valid Philippine mobile number.`
+  }
+}
+
+/**
+ * Returns a rule that fails when the value is not in the allowed list.
+ * @param label   - Human-readable field label used in the error message.
+ * @param options - Allowed values.
+ */
+export function oneOf(label: string, options: string[]) {
+  return (value: unknown): true | string => {
+    if (!value || typeof value !== 'string') return true
+    return options.includes(value) || `${label} must be one of: ${options.join(', ')}.`
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composed schemas
+// ---------------------------------------------------------------------------
+
+/**
+ * Validation schema for the login form.
+ * Pass directly to `useForm({ validationSchema: loginSchema })`.
+ */
+export const loginSchema = {
+  email: required('Email'),
+  password: required('Password'),
+}
+
+/**
+ * Validation schema for the signup form.
+ * Pass directly to `useForm({ validationSchema: signupSchema })`.
+ */
+export const signupSchema = {
+  email: [required('Email'), email('Email')],
+  password: [required('Password'), minLength('Password', 8)],
+  name: [maxLength('Name', 255)],
+}
+
+/**
+ * Validation schema for the clinic creation (onboarding) form.
+ * Pass directly to `useForm({ validationSchema: createClinicSchema })`.
+ */
+export const createClinicSchema = {
+  clinic_name: [required('Clinic name'), maxLength('Clinic name', 255)],
+  address: [maxLength('Address', 500)],
+  default_fee: [numeric('Default fee')],
+  rx_header: [maxLength('Prescription header', 1000)],
+  rx_footer: [maxLength('Prescription footer', 1000)],
+}
+
+/**
+ * Validation schema for the create patient form.
+ * Pass directly to `useForm({ validationSchema: createPatientSchema })`.
+ */
+export const createPatientSchema = {
+  full_name: [required('Full name'), maxLength('Full name', 255)],
+  address: [required('Address'), maxLength('Address', 500)],
+  date_of_birth: [required('Date of birth')],
+  sex: [required('Gender'), oneOf('Gender', ['male', 'female'])],
+  contact_number: [phoneNumberPH('Contact number')],
+  email: [email('Email'), maxLength('Email', 255)],
+  note: [maxLength('Note', 2000)],
+}
+
+/**
+ * Validation schema for the edit patient form.
+ * Same rules as create — all required fields stay required on edit.
+ */
+export const editPatientSchema = createPatientSchema
+
+/**
+ * Validation schema for the account personal information form.
+ */
+export const updateProfileSchema = {
+  name: [required('Name'), maxLength('Name', 255)],
+  contact_number: [phoneNumberPH('Contact number')],
+  date_of_birth: [],
+}
+
+/**
+ * Validation schema for the professional credentials form (doctors).
+ */
+export const credentialsSchema = {
+  prc_license_number: [maxLength('PRC license number', 50)],
+  ptr_number: [maxLength('PTR number', 50)],
+  s2_license_number: [maxLength('S2 license number', 50)],
+  specialty: [maxLength('Specialty', 255)],
+  sub_specialty: [maxLength('Sub-specialty', 255)],
+}
+
+/**
+ * Validation schema for the change password form.
+ * Pass directly to `useForm({ validationSchema: changePasswordSchema })`.
+ */
+export const changePasswordSchema = {
+  current_password: [required('Current password')],
+  new_password: [required('New password'), minLength('New password', 8)],
+  new_password_confirmation: [required('Password confirmation')],
+}
