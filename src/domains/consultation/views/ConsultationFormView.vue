@@ -15,13 +15,24 @@ import {
   WifiOff,
   Eye,
   ArrowLeft,
+  PercentCircle,
 } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useOfflineSync } from '@/composables/useOfflineSync'
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { consultationApi } from '../api/consultationApi'
 import { useConsultationStore } from '../stores/consultationStore'
 import TriageTab from '../components/tabs/TriageTab.vue'
 import AssessmentTab from '../components/tabs/AssessmentTab.vue'
@@ -50,7 +61,48 @@ const canFinalize = computed(() => authStore.hasPermission('consultations.finali
 const activeTab = ref('triage')
 const showPreviewModal = ref(false)
 const showFinalizeModal = ref(false)
+const showFeeDiscountModal = ref(false)
 const loadError = ref<string | null>(null)
+
+// Fee discount state
+const feeDiscountType = ref<'percentage' | 'fixed'>('percentage')
+const feeDiscountValue = ref('')
+const isSavingDiscount = ref(false)
+
+function openFeeDiscountModal() {
+  const payment = store.current?.payment
+  feeDiscountType.value = (payment?.fee_discount_type as 'percentage' | 'fixed') ?? 'percentage'
+  feeDiscountValue.value = payment?.fee_discount_value ? String(payment.fee_discount_value) : ''
+  showFeeDiscountModal.value = true
+}
+
+async function saveFeeDiscount() {
+  if (!store.current) return
+  isSavingDiscount.value = true
+  try {
+    const val = parseFloat(feeDiscountValue.value) || 0
+    await consultationApi.saveFeeDiscount(store.current.id, {
+      fee_discount_type: val > 0 ? feeDiscountType.value : null,
+      fee_discount_value: val > 0 ? val : null,
+    })
+    // Update local state
+    if (store.current) {
+      store.current = {
+        ...store.current,
+        payment: {
+          ...store.current.payment,
+          fee_discount_type: val > 0 ? feeDiscountType.value : null,
+          fee_discount_value: val > 0 ? val : null,
+        },
+      }
+    }
+    showFeeDiscountModal.value = false
+  } catch {
+    // silent
+  } finally {
+    isSavingDiscount.value = false
+  }
+}
 
 onMounted(async () => {
   loadError.value = null
@@ -108,6 +160,13 @@ async function handleFinalizeConfirm(): Promise<void> {
     showFinalizeModal.value = false
   }
 }
+
+async function handleFinalizeAndPay(): Promise<void> {
+  await store.finalize()
+  if (!store.saveError) {
+    activeTab.value = 'payment'
+  }
+}
 </script>
 
 <template>
@@ -126,6 +185,7 @@ async function handleFinalizeConfirm(): Promise<void> {
   <Tabs
     v-else-if="store.current"
     v-model="activeTab"
+    size="lg"
     class="-mx-4 flex flex-1 flex-col"
   >
     <!-- Patient name + actions (sticky) -->
@@ -198,33 +258,20 @@ async function handleFinalizeConfirm(): Promise<void> {
     </div>
 
     <!-- Tabs row -->
-    <TabsList class="h-auto w-full rounded-none border-b bg-transparent p-0">
-      <TabsTrigger
-        value="triage"
-        class="h-auto gap-2 rounded-none border-0 border-b-[3px] border-transparent bg-transparent py-2 text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:border-b-primary dark:data-[state=active]:bg-transparent"
-      >
+    <TabsList class="w-full justify-start px-4">
+      <TabsTrigger value="triage">
         <Activity class="size-4" />
         Triage
       </TabsTrigger>
-      <TabsTrigger
-        v-if="canEditAssessment"
-        value="assessment"
-        class="h-auto gap-2 rounded-none border-0 border-b-[3px] border-transparent bg-transparent py-2 text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:border-b-primary dark:data-[state=active]:bg-transparent"
-      >
+      <TabsTrigger v-if="canEditAssessment" value="assessment">
         <Stethoscope class="size-4" />
         Assessment
       </TabsTrigger>
-      <TabsTrigger
-        value="treatment-plan"
-        class="h-auto gap-2 rounded-none border-0 border-b-[3px] border-transparent bg-transparent py-2 text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:border-b-primary dark:data-[state=active]:bg-transparent"
-      >
+      <TabsTrigger value="treatment-plan">
         <ClipboardPlus class="size-4" />
         Treatment Plan
       </TabsTrigger>
-      <TabsTrigger
-        value="payment"
-        class="h-auto gap-2 rounded-none border-0 border-b-[3px] border-transparent bg-transparent py-2 text-muted-foreground shadow-none hover:text-foreground focus-visible:ring-0 focus-visible:outline-none data-[state=active]:border-b-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none dark:data-[state=active]:border-b-primary dark:data-[state=active]:bg-transparent"
-      >
+      <TabsTrigger value="payment">
         <DollarSign class="size-4" />
         Payment
       </TabsTrigger>
@@ -264,6 +311,7 @@ async function handleFinalizeConfirm(): Promise<void> {
             :disabled="store.isFinalized || !canEditTriage"
             @save="handleSave"
             @patient-updated="store.loadConsultation(store.current!.id)"
+            @lab-updated="store.loadConsultation(store.current!.id)"
           />
           <div class="mt-8 flex justify-end border-t pt-4">
             <Button variant="outline" @click="goToTab('next')">
@@ -274,7 +322,15 @@ async function handleFinalizeConfirm(): Promise<void> {
         </TabsContent>
 
         <TabsContent v-if="canEditAssessment" value="assessment" class="mt-0 flex flex-col gap-6">
-          <VitalsSummary :triage="store.current.triage" />
+          <VitalsSummary
+              :triage="store.current.triage"
+              :allergies="store.current.patient_allergies ?? []"
+              :conditions="store.current.patient_conditions ?? []"
+              :patient-id="store.current.patient_id"
+              :consultation-id="store.current.id"
+              :lab-order-summary="store.current.lab_order_summary"
+              show-trends-button
+            />
           <AssessmentTab
             :assessment="store.current.assessment"
             :disabled="store.isFinalized"
@@ -293,32 +349,66 @@ async function handleFinalizeConfirm(): Promise<void> {
         </TabsContent>
 
         <TabsContent value="treatment-plan" class="mt-0 flex flex-col gap-6">
-          <VitalsSummary :triage="store.current.triage" />
           <TreatmentPlanTab
             :treatment-plan="store.current.treatment_plan ?? { advice: null, follow_up: null }"
             :consultation-id="store.current.id"
             :patient-id="store.current.patient_id"
             :doctor-id="store.current.created_by"
+            :consumables="store.current.consumables ?? []"
             :disabled="store.isFinalized || !canEditTreatmentPlan"
             :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create')"
             :prescription-update="prescriptionUpdate"
             :lab-order-update="labOrderUpdate"
             @save="handleSave"
+            @update:consumables="(c) => { if (store.current) store.current.consumables = c }"
+            @lab-updated="store.loadConsultation(store.current!.id)"
           />
-          <div class="mt-8 flex justify-between border-t pt-4">
+          <div class="mt-8 flex items-center justify-between border-t pt-4">
             <Button variant="outline" @click="goToTab('prev')">
               <ChevronLeft class="mr-1 size-4" />
               {{ prevTabLabel }}
             </Button>
-            <Button variant="outline" @click="goToTab('next')">
-              {{ nextTabLabel }}
-              <ChevronRight class="ml-1 size-4" />
-            </Button>
+            <div class="flex items-center gap-2">
+              <Button
+                v-if="store.isDraft"
+                variant="outline"
+                size="sm"
+                @click="openFeeDiscountModal"
+              >
+                <PercentCircle class="size-3.5" />
+                <span class="hidden sm:inline">Fee Discount</span>
+              </Button>
+              <Badge
+                v-if="store.current?.payment?.fee_discount_value"
+                variant="outline"
+                class="border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
+              >
+                {{ store.current.payment.fee_discount_type === 'percentage' ? `${store.current.payment.fee_discount_value}% off` : `₱${store.current.payment.fee_discount_value} off` }}
+              </Badge>
+              <Button
+                v-if="store.isDraft && canFinalize"
+                @click="handleFinalizeAndPay"
+                :disabled="store.isSaving"
+              >
+                <LoaderCircle v-if="store.isSaving" class="size-3.5 animate-spin" />
+                <CheckCircle2 v-else class="size-3.5" />
+                Finalize & Payment
+                <ChevronRight class="ml-1 size-4" />
+              </Button>
+              <Button v-else variant="outline" @click="goToTab('next')">
+                {{ nextTabLabel }}
+                <ChevronRight class="ml-1 size-4" />
+              </Button>
+            </div>
           </div>
         </TabsContent>
 
         <TabsContent value="payment" class="mt-0">
-          <PaymentTab :disabled="store.isFinalized" />
+          <PaymentTab
+              :disabled="store.isFinalized"
+              :consultation-id="store.current.id"
+              :status="store.current.status"
+            />
           <div class="mt-8 flex justify-start border-t pt-4">
             <Button variant="outline" @click="goToTab('prev')">
               <ChevronLeft class="mr-1 size-4" />
@@ -348,5 +438,65 @@ async function handleFinalizeConfirm(): Promise<void> {
       @update:open="showFinalizeModal = $event"
       @confirm="handleFinalizeConfirm"
     />
+
+    <!-- Fee Discount Modal -->
+    <Dialog v-model:open="showFeeDiscountModal">
+      <DialogContent class="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <PercentCircle class="size-5 text-primary" />
+            Consultation Fee Discount
+          </DialogTitle>
+          <DialogDescription>
+            Set a discount on the consultation fee for this visit.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="flex flex-col gap-4">
+          <div class="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              :variant="feeDiscountType === 'percentage' ? 'default' : 'outline'"
+              @click="feeDiscountType = 'percentage'"
+            >
+              Percentage (%)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              :variant="feeDiscountType === 'fixed' ? 'default' : 'outline'"
+              @click="feeDiscountType = 'fixed'"
+            >
+              Fixed (₱)
+            </Button>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-muted-foreground">
+              {{ feeDiscountType === 'percentage' ? 'Discount %' : 'Discount Amount (₱)' }}
+            </label>
+            <Input
+              v-model="feeDiscountValue"
+              type="number"
+              min="0"
+              :max="feeDiscountType === 'percentage' ? '100' : undefined"
+              step="0.01"
+              :placeholder="feeDiscountType === 'percentage' ? 'e.g. 20' : 'e.g. 100'"
+              :disabled="isSavingDiscount"
+            />
+          </div>
+        </div>
+
+        <DialogFooter class="gap-2 sm:gap-0">
+          <Button variant="outline" :disabled="isSavingDiscount" @click="showFeeDiscountModal = false">
+            Cancel
+          </Button>
+          <Button :disabled="isSavingDiscount" @click="saveFeeDiscount">
+            <LoaderCircle v-if="isSavingDiscount" class="size-3.5 animate-spin" />
+            Save Discount
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </Tabs>
 </template>

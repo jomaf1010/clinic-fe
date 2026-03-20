@@ -13,7 +13,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useAuthStore } from '../stores/authStore'
-import { UserPlus, User, Mail, Lock, LoaderCircle } from 'lucide-vue-next'
+import { User, Mail, Lock, LoaderCircle } from 'lucide-vue-next'
+import AppLogo from '@/components/AppLogo.vue'
 import { HttpError } from '@/lib/http'
 import { signupSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
@@ -78,16 +79,12 @@ const onSubmit = handleSubmit(async (values) => {
 <template>
   <div class="flex min-h-screen items-center justify-center bg-background px-4">
     <div class="w-full max-w-sm">
-      <div class="mb-8 text-center">
-        <h1 class="text-2xl font-bold tracking-tight text-foreground">Clinic App</h1>
-        <p class="mt-1 text-sm text-muted-foreground">Patient management system</p>
+      <div class="mb-4 flex justify-center">
+        <AppLogo class="h-24 w-auto" />
       </div>
 
       <Card>
         <CardHeader class="text-center">
-          <div class="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
-            <UserPlus class="size-6 text-primary" />
-          </div>
           <CardTitle class="text-xl">Create an account</CardTitle>
           <CardDescription>Enter your details to get started</CardDescription>
         </CardHeader>

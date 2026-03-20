@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from '../stores/authStore'
 import { Badge } from '@/components/ui/badge'
 import { Building2, ChevronRight, Clock, LoaderCircle } from 'lucide-vue-next'
+import AppLogo from '@/components/AppLogo.vue'
 import { RouteNames } from '@/router/routeNames'
 
 const router = useRouter()
@@ -38,7 +39,7 @@ async function handleSelectClinic(clinicId: string) {
   <div class="flex min-h-screen items-center justify-center bg-background px-4 py-8">
     <div class="w-full max-w-sm">
       <div class="mb-4 flex justify-center">
-        <img src="@/assets/logo.svg" alt="MediFlow" class="h-48 w-auto" />
+        <AppLogo class="h-24 w-auto" />
       </div>
 
       <Card>

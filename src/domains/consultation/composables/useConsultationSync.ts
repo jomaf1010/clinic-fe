@@ -2,6 +2,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { PublicationContext } from 'centrifuge'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { consultationApi } from '../api/consultationApi'
 import { useConsultationStore } from '../stores/consultationStore'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ConsultationRealtimeEvent } from '../types/realtime.types'
@@ -28,6 +29,14 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
       prescriptionUpdate.value = event.data as PrescriptionResponse
     } else if (event.type.startsWith('lab_order.')) {
       labOrderUpdate.value = event.data as LabOrderResponse
+      // Silently refresh consultation to update lab_order_summary in the vitals card
+      if (consultationId.value) {
+        consultationApi.get(consultationId.value).then((res) => {
+          if (consultationStore.current?.id === consultationId.value) {
+            consultationStore.current = res.data
+          }
+        }).catch(() => {})
+      }
     }
   }
 
@@ -36,8 +45,12 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
     return `clinic:${clinicId.value}:consultation:${consultationId.value}`
   })
 
-  watch(channel, (newCh, oldCh) => {
-    if (oldCh) unsubscribe(oldCh)
+  let currentChannel: string | null = null
+
+  watch(channel, (newCh) => {
+    if (newCh === currentChannel) return
+    if (currentChannel) unsubscribe(currentChannel)
+    currentChannel = newCh
     if (newCh) {
       connect()
       subscribe(newCh, onEvent)
@@ -45,7 +58,7 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
   }, { immediate: true })
 
   onUnmounted(() => {
-    if (channel.value) unsubscribe(channel.value)
+    if (currentChannel) unsubscribe(currentChannel)
   })
 
   return { prescriptionUpdate, labOrderUpdate }

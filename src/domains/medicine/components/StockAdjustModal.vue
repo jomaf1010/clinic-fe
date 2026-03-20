@@ -61,7 +61,7 @@ defineExpose({ isSaving })
       <DialogHeader>
         <DialogTitle>Adjust Stock</DialogTitle>
         <DialogDescription>
-          {{ medicine?.name }}{{ medicine?.strength ? ` ${medicine.strength}` : '' }}
+          {{ medicine?.display_name }}{{ medicine?.dosage_strength ? ` ${medicine.dosage_strength}` : '' }}
         </DialogDescription>
       </DialogHeader>
 

@@ -45,9 +45,9 @@ const router = createRouter({
           component: () => import('@/domains/appointment/views/AppointmentListView.vue'),
         },
         {
-          path: 'medicines',
-          name: RouteNames.MEDICINE_LIST,
-          component: () => import('@/domains/medicine/views/MedicineListView.vue'),
+          path: 'clinic',
+          name: RouteNames.CLINIC,
+          component: () => import('@/domains/clinic/views/ClinicCatalogView.vue'),
         },
         {
           path: 'schedule',
@@ -73,6 +73,11 @@ const router = createRouter({
           path: 'messages',
           name: RouteNames.MESSAGES,
           component: () => import('@/domains/message/views/MessagesView.vue'),
+        },
+        {
+          path: 'billing',
+          name: RouteNames.BILLING,
+          component: () => import('@/domains/billing/views/BillingView.vue'),
         },
         {
           path: 'logs',
@@ -131,6 +136,12 @@ const router = createRouter({
       name: RouteNames.SELECT_CLINIC,
       component: () => import('@/domains/auth/views/SelectClinicView.vue'),
       meta: { requiresAuth: true },
+    },
+    {
+      path: '/queue-display/:token',
+      name: RouteNames.QUEUE_DISPLAY,
+      component: () => import('@/domains/queue/views/QueueDisplayView.vue'),
+      meta: { requiresAuth: false },
     },
   ],
 })

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/card'
 import { useAuthStore } from '../stores/authStore'
 import { Mail, Lock, LoaderCircle } from 'lucide-vue-next'
+import AppLogo from '@/components/AppLogo.vue'
 import { HttpError } from '@/lib/http'
 import { loginSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
@@ -73,7 +74,7 @@ const onSubmit = handleSubmit(async (values) => {
   <div class="flex min-h-screen items-center justify-center bg-background px-4">
     <div class="w-full max-w-sm">
       <div class="mb-4 flex justify-center">
-        <img src="@/assets/logo.svg" alt="MediFlow" class="h-48 w-auto" />
+        <AppLogo class="h-24 w-auto" />
       </div>
 
       <Card>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { Search, LoaderCircle } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +21,17 @@ const searchResults = ref<MedicineSearchResult[]>([])
 const isSearching = ref(false)
 const showDropdown = ref(false)
 const highlightedIndex = ref(-1)
+const dropdownRef = ref<HTMLElement | null>(null)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function scrollToHighlighted() {
+  nextTick(() => {
+    const container = dropdownRef.value
+    if (!container) return
+    const el = container.children[highlightedIndex.value] as HTMLElement | undefined
+    el?.scrollIntoView({ block: 'nearest' })
+  })
+}
 
 function onInput(val: string | number) {
   const value = String(val)
@@ -50,7 +60,7 @@ function onInput(val: string | number) {
 }
 
 function selectResult(result: MedicineSearchResult) {
-  emit('update:modelValue', result.name)
+  emit('update:modelValue', result.display_name)
   emit('select', result)
   searchResults.value = []
   showDropdown.value = false
@@ -70,6 +80,7 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault()
     if (showDropdown.value && totalItems > 0) {
       highlightedIndex.value = (highlightedIndex.value + 1) % totalItems
+      scrollToHighlighted()
     }
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
@@ -77,6 +88,7 @@ function onKeydown(e: KeyboardEvent) {
       highlightedIndex.value = highlightedIndex.value <= 0
         ? totalItems - 1
         : highlightedIndex.value - 1
+      scrollToHighlighted()
     }
   } else if (e.key === 'Enter') {
     e.preventDefault()
@@ -97,7 +109,9 @@ function onKeydown(e: KeyboardEvent) {
 function hasExactMatch(): boolean {
   const q = props.modelValue.trim().toLowerCase()
   return searchResults.value.some(
-    (r) => r.name.toLowerCase() === q,
+    (r) => r.display_name.toLowerCase() === q
+      || (r.generic_name && r.generic_name.toLowerCase() === q)
+      || (r.brand_name && r.brand_name.toLowerCase() === q),
   )
 }
 
@@ -125,6 +139,7 @@ function onBlur() {
     />
 
     <div
+      ref="dropdownRef"
       v-if="showDropdown && (searchResults.length > 0 || modelValue.trim().length >= 2)"
       class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-popover shadow-md"
     >
@@ -145,11 +160,15 @@ function onBlur() {
         >
           {{ result.source === 'clinic' ? 'Clinic' : 'FDA' }}
         </Badge>
-        <span class="truncate font-medium">{{ result.name }}</span>
-        <span v-if="result.strength" class="shrink-0 text-xs text-muted-foreground">{{ result.strength }}</span>
-        <span v-if="result.generic_name" class="truncate text-xs text-muted-foreground">
-          ({{ result.generic_name }})
-        </span>
+        <span class="truncate font-medium">{{ result.display_name }}</span>
+        <span v-if="result.dosage_strength" class="shrink-0 text-xs text-muted-foreground">{{ result.dosage_strength }}</span>
+        <Badge
+          v-if="result.source === 'clinic' && result.inventory_enabled && result.stock_quantity <= 0"
+          variant="outline"
+          class="shrink-0 text-[10px] border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400"
+        >
+          Out of stock
+        </Badge>
       </button>
 
       <!-- Create new option -->

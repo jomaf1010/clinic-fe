@@ -37,3 +37,23 @@ export interface QueueListResponse {
 export interface SingleQueueVisitResponse {
   data: QueueVisitResponse
 }
+
+export interface QueueDisplayData {
+  clinic_name: string
+  visits: QueueVisitResponse[]
+  centrifugo: {
+    connection_token: string
+    subscription_token: string
+    channel: string
+  }
+}
+
+export interface QueueDisplayCentrifugoTokens {
+  connection_token: string
+  subscription_token: string
+}
+
+export interface QueueDisplayTokenStatus {
+  token: string | null
+  created_at: string | null
+}

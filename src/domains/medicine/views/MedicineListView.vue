@@ -6,8 +6,6 @@ import {
   Pill,
   Plus,
   LoaderCircle,
-  ChevronRight,
-  ChevronLeft,
   Search,
   Pencil,
   Package,
@@ -17,6 +15,22 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +45,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 import { medicineApi } from '../api/medicineApi'
 import MedicineFormModal from '../components/MedicineFormModal.vue'
 import StockAdjustModal from '../components/StockAdjustModal.vue'
@@ -42,7 +57,7 @@ const route = useRoute()
 const medicines = ref<ClinicMedicine[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-const searchQuery = ref('')
+const searchQuery = ref((route.query.search as string) || '')
 const pagination = ref({ page: 1, per_page: 20, total: 0, last_page: 1 })
 const currentPage = ref(Number(route.query.page) || 1)
 
@@ -81,6 +96,7 @@ function onSearchInput(val: string | number) {
   if (searchDebounce) clearTimeout(searchDebounce)
   searchDebounce = setTimeout(() => {
     currentPage.value = 1
+    router.replace({ query: { search: searchQuery.value || undefined, page: '1' } })
     fetchMedicines(1)
   }, 300)
 }
@@ -170,141 +186,219 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="-mx-4 -mb-4 flex min-h-0 flex-1 flex-col gap-0 md:flex-row">
-    <!-- Left panel -->
-    <div class="flex shrink-0 flex-col gap-4 border-b p-4 md:w-64 md:gap-6 md:border-b-0 md:border-r md:p-6">
-      <div class="flex items-center gap-3 md:block">
-        <div class="flex size-10 items-center justify-center rounded-full bg-primary/10 md:mb-3">
-          <Pill class="size-5 text-primary" />
-        </div>
-        <div>
-          <h1 class="text-lg font-semibold">Medicines</h1>
-          <p class="text-sm text-muted-foreground">
-            {{ pagination.total }} medicine{{ pagination.total !== 1 ? 's' : '' }} in catalog
-          </p>
-        </div>
+  <div class="flex flex-1 flex-col gap-4">
+    <!-- Header -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-semibold">Medicines</h1>
+        <Badge variant="secondary" class="text-xs">
+          {{ pagination.total }}
+        </Badge>
       </div>
 
-      <Button class="w-full" @click="openCreateModal">
-        <Plus class="size-4" />
-        Add Medicine
+      <div class="flex items-center gap-2">
+        <div class="relative flex-1 sm:w-64 sm:flex-none">
+          <Search class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            :model-value="searchQuery"
+            placeholder="Search medicines..."
+            class="pl-8"
+            @update:model-value="onSearchInput"
+          />
+        </div>
+
+        <Button class="shrink-0" @click="openCreateModal">
+          <Plus class="size-4" />
+          <span class="hidden sm:inline">Add Medicine</span>
+        </Button>
+      </div>
+    </div>
+
+    <!-- Loading skeleton -->
+    <div v-if="isLoading" class="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Medicine</TableHead>
+            <TableHead class="hidden md:table-cell">Form</TableHead>
+            <TableHead class="hidden md:table-cell">Classification</TableHead>
+            <TableHead class="hidden lg:table-cell">Price</TableHead>
+            <TableHead class="hidden lg:table-cell">Stock</TableHead>
+            <TableHead class="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-for="i in 8" :key="i">
+            <TableCell>
+              <div class="space-y-1.5">
+                <Skeleton class="h-4 w-40" />
+                <Skeleton class="h-3 w-24" />
+              </div>
+            </TableCell>
+            <TableCell class="hidden md:table-cell"><Skeleton class="h-4 w-16" /></TableCell>
+            <TableCell class="hidden md:table-cell"><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
+            <TableCell class="hidden lg:table-cell"><Skeleton class="h-4 w-16" /></TableCell>
+            <TableCell class="hidden lg:table-cell"><Skeleton class="h-5 w-20 rounded-full" /></TableCell>
+            <TableCell><Skeleton class="h-4 w-4" /></TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+
+    <!-- Error -->
+    <div
+      v-else-if="error"
+      role="alert"
+      class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+    >
+      {{ error }}
+      <Button variant="outline" size="sm" class="mt-2" @click="fetchMedicines(currentPage)">Try again</Button>
+    </div>
+
+    <!-- Empty -->
+    <div
+      v-else-if="medicines.length === 0 && !searchQuery"
+      class="flex flex-1 flex-col items-center justify-center py-12 text-muted-foreground"
+    >
+      <Pill class="mb-3 size-10 opacity-50" />
+      <p>No medicines yet.</p>
+      <Button variant="link" class="mt-2" @click="openCreateModal">
+        Add your first medicine
       </Button>
     </div>
 
-    <!-- Right panel -->
-    <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-8">
-      <!-- Search -->
-      <div class="relative mb-4">
-        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-          <Search class="size-3.5 text-muted-foreground" />
-        </div>
-        <Input
-          :model-value="searchQuery"
-          placeholder="Search medicines..."
-          class="pl-9"
-          @update:model-value="onSearchInput"
-        />
-      </div>
-
-      <div v-if="isLoading" class="flex flex-1 items-center justify-center py-12">
-        <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
-      </div>
-
-      <div
-        v-else-if="error"
-        role="alert"
-        class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-      >
-        {{ error }}
-        <Button variant="outline" size="sm" class="mt-2" @click="fetchMedicines(currentPage.value)">Try again</Button>
-      </div>
-
-      <div v-else-if="medicines.length === 0" class="flex flex-1 flex-col items-center justify-center py-12 text-muted-foreground">
-        <Pill class="size-10 mb-3 opacity-50" />
-        <p>{{ searchQuery ? 'No medicines found.' : 'No medicines yet.' }}</p>
-        <Button v-if="!searchQuery" variant="link" class="mt-2" @click="openCreateModal">
-          Add your first medicine
-        </Button>
-      </div>
-
-      <template v-else>
-        <div class="flex flex-col divide-y">
-          <div
-            v-for="medicine in medicines"
-            :key="medicine.id"
-            class="flex items-center gap-3 px-3 py-3"
-          >
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span class="font-medium">{{ medicine.name }}</span>
-                <span v-if="medicine.strength" class="text-sm text-muted-foreground">{{ medicine.strength }}</span>
-              </div>
-              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                <span v-if="medicine.dosage_form">{{ medicine.dosage_form }}</span>
-                <span v-if="medicine.generic_name" class="before:mr-2 before:content-['·']">{{ medicine.generic_name }}</span>
-                <span v-if="medicine.default_price != null" class="before:mr-2 before:content-['·']">
-                  &#8369;{{ medicine.default_price.toFixed(2) }}
-                </span>
-              </div>
-            </div>
-
-            <Badge
-              v-if="medicine.inventory_enabled"
-              variant="outline"
-              class="shrink-0"
-              :class="medicine.stock_quantity > 0
-                ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400'
-                : 'border-red-300 bg-red-100 text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400'"
-            >
-              {{ medicine.stock_quantity }} in stock
-            </Badge>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <button
-                  type="button"
-                  :aria-label="`${medicine.name} options`"
-                  class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                >
-                  <EllipsisVertical class="size-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-40">
-                <DropdownMenuItem @click="openEditModal(medicine)">
-                  <Pencil class="size-3.5" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem @click="openStockModal(medicine)">
-                  <Package class="size-3.5" />
-                  Adjust Stock
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="text-destructive focus:text-destructive"
-                  @click="confirmDeactivate(medicine)"
-                >
-                  <Ban class="size-3.5" />
-                  Deactivate
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        <div v-if="pagination.last_page > 1" class="mt-6 flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
-            <ChevronLeft class="size-4" />
-            Previous
-          </Button>
-          <span class="px-3 text-sm text-muted-foreground">
-            Page {{ currentPage }} of {{ pagination.last_page }}
-          </span>
-          <Button variant="outline" size="sm" :disabled="currentPage >= pagination.last_page" @click="goToPage(currentPage + 1)">
-            Next
-            <ChevronRight class="size-4" />
-          </Button>
-        </div>
-      </template>
+    <!-- No results -->
+    <div
+      v-else-if="medicines.length === 0"
+      class="flex flex-1 flex-col items-center justify-center py-12 text-muted-foreground"
+    >
+      <Search class="mb-3 size-10 opacity-50" />
+      <p>No medicines match your search.</p>
     </div>
+
+    <!-- Data table -->
+    <template v-else>
+      <div class="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Medicine</TableHead>
+              <TableHead class="hidden md:table-cell">Form</TableHead>
+              <TableHead class="hidden md:table-cell">Classification</TableHead>
+              <TableHead class="hidden lg:table-cell">Price</TableHead>
+              <TableHead class="hidden lg:table-cell">Stock</TableHead>
+              <TableHead class="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow
+              v-for="medicine in medicines"
+              :key="medicine.id"
+              class="cursor-pointer hover:bg-muted/50"
+              @click="openEditModal(medicine)"
+            >
+              <TableCell>
+                <div class="min-w-0">
+                  <p class="font-medium">{{ medicine.display_name }}</p>
+                  <div class="flex items-center gap-2">
+                    <span v-if="medicine.dosage_strength" class="text-xs text-muted-foreground">
+                      {{ medicine.dosage_strength }}
+                    </span>
+                    <span v-if="medicine.prescription_count" class="text-xs text-muted-foreground">
+                      {{ medicine.dosage_strength ? '·' : '' }} Prescribed {{ medicine.prescription_count }} {{ medicine.prescription_count === 1 ? 'time' : 'times' }}
+                    </span>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell class="hidden md:table-cell">
+                <span v-if="medicine.dosage_form" class="text-sm">{{ medicine.dosage_form }}</span>
+                <span v-else class="text-sm text-muted-foreground">&mdash;</span>
+              </TableCell>
+              <TableCell class="hidden md:table-cell">
+                <Badge v-if="medicine.classification" variant="outline" class="text-[10px]">
+                  {{ medicine.classification }}
+                </Badge>
+                <span v-else class="text-sm text-muted-foreground">&mdash;</span>
+              </TableCell>
+              <TableCell class="hidden lg:table-cell">
+                <div v-if="medicine.price_per_piece != null || medicine.price_per_pack != null" class="flex flex-col text-sm">
+                  <span v-if="medicine.price_per_piece != null">&#8369;{{ medicine.price_per_piece.toFixed(2) }} <span class="text-xs text-muted-foreground">/ pc</span></span>
+                  <span v-if="medicine.price_per_pack != null">&#8369;{{ medicine.price_per_pack.toFixed(2) }} <span class="text-xs text-muted-foreground">/ pack</span></span>
+                </div>
+                <span v-else class="text-sm text-muted-foreground">&mdash;</span>
+              </TableCell>
+              <TableCell class="hidden lg:table-cell">
+                <Badge
+                  v-if="medicine.inventory_enabled"
+                  variant="outline"
+                  :class="medicine.stock_quantity > 0
+                    ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400'
+                    : 'border-red-300 bg-red-100 text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400'"
+                >
+                  {{ medicine.stock_quantity }} in stock
+                </Badge>
+                <span v-else class="text-sm text-muted-foreground">&mdash;</span>
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <button
+                      type="button"
+                      :aria-label="`${medicine.display_name} options`"
+                      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      <EllipsisVertical class="size-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" class="w-40">
+                    <DropdownMenuItem @click="openEditModal(medicine)">
+                      <Pencil class="size-3.5" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem @click="openStockModal(medicine)">
+                      <Package class="size-3.5" />
+                      Adjust Stock
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      class="text-destructive focus:text-destructive"
+                      @click="confirmDeactivate(medicine)"
+                    >
+                      <Ban class="size-3.5" />
+                      Deactivate
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="pagination.last_page > 1" class="flex justify-center">
+        <Pagination
+          :total="pagination.total"
+          :items-per-page="pagination.per_page"
+          :page="currentPage"
+          :sibling-count="1"
+          :show-edges="true"
+          @update:page="goToPage"
+        >
+          <PaginationContent v-slot="{ items }">
+            <PaginationPrevious />
+
+            <template v-for="(item, index) in items" :key="item.type === 'page' ? item.value : `ellipsis-${index}`">
+              <PaginationItem v-if="item.type === 'page'" :value="item.value" :is-active="item.value === currentPage">
+                {{ item.value }}
+              </PaginationItem>
+              <PaginationEllipsis v-else :index="index" />
+            </template>
+
+            <PaginationNext />
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </template>
 
     <!-- Deactivate Confirmation -->
     <Dialog v-model:open="showDeactivateDialog">
@@ -312,7 +406,7 @@ onUnmounted(() => {
         <DialogHeader>
           <DialogTitle>Deactivate Medicine</DialogTitle>
           <DialogDescription>
-            Are you sure you want to deactivate <strong>{{ deactivateTarget?.name }}</strong>?
+            Are you sure you want to deactivate <strong>{{ deactivateTarget?.display_name }}</strong>?
             It will be removed from the prescription catalog.
           </DialogDescription>
         </DialogHeader>

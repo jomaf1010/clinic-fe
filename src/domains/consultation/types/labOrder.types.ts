@@ -20,4 +20,5 @@ export interface LabOrderResponse {
 export interface SystemLabItem {
   name: string
   category: string
+  source?: 'clinic' | 'system'
 }

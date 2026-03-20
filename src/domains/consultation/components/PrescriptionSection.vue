@@ -2,6 +2,8 @@
 import { ref, watch, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import {
+  AlertTriangle,
+  Calculator,
   Pill,
   Plus,
   Pencil,
@@ -40,7 +42,7 @@ import { prescriptionApi } from '../api/prescriptionApi'
 import type { PrescriptionResponse, PrescriptionItem } from '../types/prescription.types'
 import MedicineAutocomplete from '@/domains/medicine/components/MedicineAutocomplete.vue'
 import { medicineApi } from '@/domains/medicine/api/medicineApi'
-import { FREQUENCIES, ROUTES } from '@/domains/medicine/constants'
+import { FREQUENCIES, FREQUENCY_DOSES_PER_DAY, ROUTES } from '@/domains/medicine/constants'
 import type { MedicineSearchResult } from '@/domains/medicine/types/medicine.types'
 
 const props = defineProps<{
@@ -70,6 +72,68 @@ const modalMode = ref<'create' | 'add' | 'edit'>('create')
 const editingItemId = ref<string | null>(null)
 const isSaving = ref(false)
 const durationWarning = ref(false)
+
+// --- Calculator state ---
+const showCalc = ref<Record<string, boolean>>({})
+const calcDisplay = ref<Record<string, string>>({})
+
+function toggleCalc(key: string) {
+  showCalc.value[key] = !showCalc.value[key]
+  if (showCalc.value[key] && !calcDisplay.value[key]) {
+    calcDisplay.value[key] = ''
+  }
+}
+
+function calcInput(key: string, val: string) {
+  const current = calcDisplay.value[key] ?? ''
+  if (val === 'C') {
+    calcDisplay.value[key] = ''
+  } else if (val === '⌫') {
+    calcDisplay.value[key] = current.slice(0, -1)
+  } else if (val === '=') {
+    try {
+      // Safe eval: only allow numbers and basic operators
+      const sanitized = current.replace(/[^0-9+\-*/.()]/g, '')
+      if (sanitized) {
+        const result = Function('"use strict"; return (' + sanitized + ')')() as number
+        calcDisplay.value[key] = String(Math.round(result * 100) / 100)
+      }
+    } catch {
+      // ignore invalid expression
+    }
+  } else {
+    calcDisplay.value[key] = current + val
+  }
+}
+
+function evalCalcExpression(expr: string): number | null {
+  try {
+    const sanitized = expr.replace(/[^0-9+\-*/.()]/g, '')
+    if (!sanitized) return null
+    const result = Function('"use strict"; return (' + sanitized + ')')() as number
+    return typeof result === 'number' && isFinite(result) ? result : null
+  } catch {
+    return null
+  }
+}
+
+function applyCalcResult(key: string, target: ReturnType<typeof emptyItem>) {
+  const expr = calcDisplay.value[key] ?? ''
+  const result = evalCalcExpression(expr)
+  if (result !== null && result > 0) {
+    target.doses_per_unit = Math.ceil(result)
+    calcDisplay.value[key] = String(Math.round(result * 100) / 100)
+    showCalc.value[key] = false
+  }
+}
+
+const calcButtons = ['7','8','9','÷','4','5','6','×','1','2','3','-','0','.','C','+','⌫','(',')','='] as const
+
+function calcButtonToOp(btn: string): string {
+  if (btn === '÷') return '/'
+  if (btn === '×') return '*'
+  return btn
+}
 
 // --- Modal form (single item) ---
 const modalForm = ref(emptyItem())
@@ -102,25 +166,50 @@ function emptyItem() {
     instructions: '',
     medicine_id: null as string | null,
     unit_price: null as number | null,
+    quantity: null as number | null,
+    is_multi_dose: false,
+    doses_per_unit: null as number | null,
+    out_of_stock: false,
   }
 }
 
+function isManualQtyFrequency(freq: string): boolean {
+  return FREQUENCY_DOSES_PER_DAY[freq] === null || FREQUENCY_DOSES_PER_DAY[freq] === undefined
+}
+
+function durationToDays(value: string, unit: string): number {
+  const v = parseFloat(value) || 0
+  if (unit === 'weeks') return v * 7
+  if (unit === 'months') return v * 30
+  return v
+}
+
+function computeQuantity(item: ReturnType<typeof emptyItem>): number | null {
+  if (isManualQtyFrequency(item.frequency)) return item.quantity
+  const dosesPerDay = FREQUENCY_DOSES_PER_DAY[item.frequency]
+  if (dosesPerDay == null || !item.duration_value) return null
+  const days = durationToDays(item.duration_value, item.duration_unit)
+  return Math.ceil(dosesPerDay * days)
+}
+
 async function handleMedicineSelect(result: MedicineSearchResult, target: ReturnType<typeof emptyItem>) {
-  target.drug_name = result.name
-  if (result.default_dose) target.dose = result.default_dose
+  target.drug_name = result.display_name
+  target.out_of_stock = result.inventory_enabled && result.stock_quantity <= 0
+  if (result.dosage_strength) target.dose = result.dosage_strength
   if (result.default_frequency) target.frequency = result.default_frequency
   if (result.default_route) target.route = result.default_route
   if (result.default_instructions) target.instructions = result.default_instructions
-  if (result.default_price != null) target.unit_price = result.default_price
+  if (result.price_per_piece != null) target.unit_price = result.price_per_piece
+  target.is_multi_dose = result.is_multi_dose ?? false
 
   if (result.source === 'clinic') {
     target.medicine_id = result.id
   } else if (result.source === 'system') {
     try {
       const res = await medicineApi.create({
-        name: result.name,
-        generic_name: result.generic_name,
-        strength: result.strength,
+        generic_name: result.generic_name ?? result.display_name,
+        brand_name: result.brand_name,
+        dosage_strength: result.dosage_strength,
         dosage_form: result.dosage_form,
         system_medicine_id: result.id,
       })
@@ -135,7 +224,7 @@ async function handleMedicineCreateNew(name: string, target: ReturnType<typeof e
   target.drug_name = name
   target.medicine_id = null
   try {
-    const res = await medicineApi.create({ name })
+    const res = await medicineApi.create({ generic_name: name })
     target.medicine_id = res.data.id
   } catch {
     // fallback: save without medicine_id
@@ -198,6 +287,9 @@ function openEditModal(item: PrescriptionItem) {
     instructions: item.instructions ?? '',
     medicine_id: item.medicine_id ?? null,
     unit_price: item.unit_price ?? null,
+    quantity: item.quantity ?? null,
+    is_multi_dose: item.is_multi_dose ?? false,
+    doses_per_unit: item.doses_per_unit ?? null,
   }
   durationWarning.value = false
   showModal.value = true
@@ -219,9 +311,13 @@ function removeCreateFormRow(index: number) {
   createFormItems.value.splice(index, 1)
 }
 
-// --- Duration check ---
+// --- Duration/quantity check ---
 function hasMissingDuration(items: ReturnType<typeof emptyItem>[]): boolean {
-  return items.some((i) => i.drug_name.trim() && i.dose.trim() && !i.duration_value)
+  return items.some((i) => {
+    if (!i.drug_name.trim() || !i.dose.trim()) return false
+    if (isManualQtyFrequency(i.frequency)) return !i.quantity
+    return !i.duration_value
+  })
 }
 
 // --- Save handler ---
@@ -266,6 +362,9 @@ async function doCreate() {
       instructions: i.instructions.trim() || undefined,
       medicine_id: i.medicine_id || undefined,
       unit_price: i.unit_price ?? undefined,
+      quantity: (isManualQtyFrequency(i.frequency) ? i.quantity : computeQuantity(i)) ?? undefined,
+      is_multi_dose: i.is_multi_dose || undefined,
+      doses_per_unit: i.is_multi_dose ? (i.doses_per_unit ?? undefined) : undefined,
     }))
 
   if (!validItems.length) return
@@ -287,6 +386,7 @@ async function doAddItem() {
   if (!prescription.value) return
   isSaving.value = true
   try {
+    const qty = isManualQtyFrequency(modalForm.value.frequency) ? modalForm.value.quantity : computeQuantity(modalForm.value)
     const res = await prescriptionApi.addItem(prescription.value.id, {
       drug_name: modalForm.value.drug_name.trim(),
       dose: modalForm.value.dose.trim(),
@@ -296,6 +396,9 @@ async function doAddItem() {
       instructions: modalForm.value.instructions.trim() || undefined,
       medicine_id: modalForm.value.medicine_id || undefined,
       unit_price: modalForm.value.unit_price ?? undefined,
+      quantity: qty ?? undefined,
+      is_multi_dose: modalForm.value.is_multi_dose || undefined,
+      doses_per_unit: modalForm.value.is_multi_dose ? (modalForm.value.doses_per_unit ?? undefined) : undefined,
     })
     prescription.value = res.data
     closeModal()
@@ -311,6 +414,7 @@ async function doEditItem() {
   if (!prescription.value || !editingItemId.value) return
   isSaving.value = true
   try {
+    const qty = isManualQtyFrequency(modalForm.value.frequency) ? modalForm.value.quantity : computeQuantity(modalForm.value)
     const res = await prescriptionApi.updateItem(prescription.value.id, editingItemId.value, {
       drug_name: modalForm.value.drug_name.trim(),
       dose: modalForm.value.dose.trim(),
@@ -320,6 +424,9 @@ async function doEditItem() {
       instructions: modalForm.value.instructions.trim() || undefined,
       medicine_id: modalForm.value.medicine_id || undefined,
       unit_price: modalForm.value.unit_price ?? undefined,
+      quantity: qty ?? undefined,
+      is_multi_dose: modalForm.value.is_multi_dose || undefined,
+      doses_per_unit: modalForm.value.is_multi_dose ? (modalForm.value.doses_per_unit ?? undefined) : undefined,
     })
     prescription.value = res.data
     closeModal()
@@ -374,6 +481,7 @@ const canSave = () => {
   }
   return modalForm.value.drug_name.trim() && modalForm.value.dose.trim()
 }
+
 </script>
 
 <template>
@@ -448,10 +556,26 @@ const canSave = () => {
                 <span v-if="frequencyShortDesc(item.frequency)"> ({{ frequencyShortDesc(item.frequency) }})</span>
               </span>
               <span v-if="item.duration" class="before:mr-2 before:content-['·']">{{ item.duration }}</span>
+              <span v-if="item.is_multi_dose && item.doses_per_unit && item.quantity" class="before:mr-2 before:content-['·']">
+                {{ item.quantity }} doses ({{ Math.ceil(item.quantity / item.doses_per_unit) }} {{ Math.ceil(item.quantity / item.doses_per_unit) === 1 ? 'unit' : 'units' }})
+              </span>
+              <span v-else-if="item.quantity" class="before:mr-2 before:content-['·']">{{ item.quantity }} pcs</span>
+              <span
+                v-if="item.dispensed_quantity != null && item.quantity && item.dispensed_quantity < item.quantity"
+                class="before:mr-2 before:content-['·'] text-amber-600 dark:text-amber-400"
+              >{{ item.dispensed_quantity }}/{{ item.quantity }} dispensed</span>
+              <span
+                v-else-if="item.dispensed_quantity != null && item.quantity && item.dispensed_quantity >= item.quantity"
+                class="before:mr-2 before:content-['·'] text-green-600 dark:text-green-400"
+              >fully dispensed</span>
               <span v-if="item.route !== 'Oral'" class="before:mr-2 before:content-['·']">{{ item.route }}</span>
             </div>
             <span v-if="item.instructions" class="text-xs italic text-muted-foreground">
               {{ item.instructions }}
+            </span>
+            <span v-if="item.out_of_stock" class="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle class="size-3 shrink-0" />
+              Out of stock
             </span>
           </div>
 
@@ -521,6 +645,7 @@ const canSave = () => {
         <Plus class="size-3.5" />
         Add More
       </Button>
+
     </template>
 
     <!-- Medicine Modal -->
@@ -566,6 +691,10 @@ const canSave = () => {
                   <Input v-model="row.dose" placeholder="e.g. 500mg" />
                 </div>
               </div>
+              <div v-if="row.out_of_stock" class="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                <AlertTriangle class="size-3.5 shrink-0" />
+                This medicine is currently out of stock.
+              </div>
 
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div class="flex flex-col gap-1">
@@ -577,7 +706,8 @@ const canSave = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div class="flex flex-col gap-1">
+                <!-- Duration: shown for computable frequencies -->
+                <div v-if="!isManualQtyFrequency(row.frequency)" class="flex flex-col gap-1">
                   <label class="text-xs text-muted-foreground">Duration</label>
                   <div class="flex gap-1.5">
                     <Input v-model="row.duration_value" type="number" placeholder="7" min="1" class="w-16" />
@@ -589,6 +719,17 @@ const canSave = () => {
                     </Select>
                   </div>
                 </div>
+                <!-- Manual qty for PRN/STAT -->
+                <div v-if="isManualQtyFrequency(row.frequency)" class="flex flex-col gap-1">
+                  <label class="text-xs text-muted-foreground">Total Qty (pcs) *</label>
+                  <Input
+                    :model-value="row.quantity ?? ''"
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 10"
+                    @update:model-value="row.quantity = $event ? Number($event) : null"
+                  />
+                </div>
                 <div class="flex flex-col gap-1">
                   <label class="text-xs text-muted-foreground">Route</label>
                   <Select v-model="row.route">
@@ -598,6 +739,71 @@ const canSave = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <!-- Multi-dose: doses per unit input -->
+              <div v-if="row.is_multi_dose" class="flex flex-col gap-2">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div class="flex flex-col gap-1">
+                    <div class="flex items-center gap-1.5">
+                      <label class="text-xs text-muted-foreground">Doses per unit *</label>
+                      <button
+                        type="button"
+                        class="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Dosage calculator"
+                        @click="toggleCalc('create-' + index)"
+                      >
+                        <Calculator class="size-3.5" />
+                      </button>
+                    </div>
+                    <Input
+                      :model-value="row.doses_per_unit ?? ''"
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 12"
+                      @update:model-value="row.doses_per_unit = $event ? Number($event) : null"
+                    />
+                  </div>
+                  <div v-if="computeQuantity(row) && row.doses_per_unit" class="flex flex-col gap-1">
+                    <label class="text-xs text-muted-foreground">Units needed</label>
+                    <div class="flex h-9 items-center rounded-md border bg-muted/50 px-3 text-sm tabular-nums">
+                      {{ Math.ceil(computeQuantity(row)! / row.doses_per_unit) }}
+                      {{ Math.ceil(computeQuantity(row)! / row.doses_per_unit) === 1 ? 'unit' : 'units' }}
+                      <span class="ml-1 text-xs text-muted-foreground">({{ computeQuantity(row) }} doses)</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Calculator panel -->
+                <div v-if="showCalc['create-' + index]" class="rounded-md border bg-muted/30 p-3">
+                  <p class="mb-2 text-xs text-muted-foreground">e.g. bottle 60ml ÷ 5ml per dose = 12 doses/unit</p>
+                  <div class="mb-2 flex h-9 items-center rounded-md border bg-background px-3 text-sm font-mono tabular-nums">
+                    {{ calcDisplay['create-' + index] || '0' }}
+                  </div>
+                  <div class="grid grid-cols-4 gap-1">
+                    <button
+                      v-for="btn in calcButtons"
+                      :key="btn"
+                      type="button"
+                      class="flex h-8 items-center justify-center rounded-md border text-sm transition-colors hover:bg-accent"
+                      :class="btn === '=' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''"
+                      @click="calcInput('create-' + index, calcButtonToOp(btn))"
+                    >
+                      {{ btn }}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    class="mt-2 w-full rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                    :disabled="!calcDisplay['create-' + index]"
+                    @click="applyCalcResult('create-' + index, row)"
+                  >
+                    Apply as doses per unit
+                  </button>
+                </div>
+              </div>
+
+              <!-- Computed qty display for regular frequencies (non-multi-dose) -->
+              <div v-else-if="!isManualQtyFrequency(row.frequency) && computeQuantity(row)" class="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                Total: <span class="font-medium tabular-nums text-foreground">{{ computeQuantity(row) }} pcs</span>
               </div>
 
               <div class="flex flex-col gap-1">
@@ -644,6 +850,10 @@ const canSave = () => {
                 <Input v-model="modalForm.dose" placeholder="e.g. 500mg" />
               </div>
             </div>
+            <div v-if="modalForm.out_of_stock" class="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle class="size-3.5 shrink-0" />
+              This medicine is currently out of stock.
+            </div>
 
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div class="flex flex-col gap-1">
@@ -655,7 +865,8 @@ const canSave = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div class="flex flex-col gap-1">
+              <!-- Duration: shown for computable frequencies -->
+              <div v-if="!isManualQtyFrequency(modalForm.frequency)" class="flex flex-col gap-1">
                 <label class="text-xs text-muted-foreground">Duration</label>
                 <div class="flex gap-1.5">
                   <Input v-model="modalForm.duration_value" type="number" placeholder="7" min="1" class="w-16" />
@@ -667,6 +878,17 @@ const canSave = () => {
                   </Select>
                 </div>
               </div>
+              <!-- Manual qty for PRN/STAT -->
+              <div v-if="isManualQtyFrequency(modalForm.frequency)" class="flex flex-col gap-1">
+                <label class="text-xs text-muted-foreground">Total Qty (pcs) *</label>
+                <Input
+                  :model-value="modalForm.quantity ?? ''"
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 10"
+                  @update:model-value="modalForm.quantity = $event ? Number($event) : null"
+                />
+              </div>
               <div class="flex flex-col gap-1">
                 <label class="text-xs text-muted-foreground">Route</label>
                 <Select v-model="modalForm.route">
@@ -676,6 +898,71 @@ const canSave = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <!-- Multi-dose: doses per unit input -->
+            <div v-if="modalForm.is_multi_dose" class="flex flex-col gap-2">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-1.5">
+                    <label class="text-xs text-muted-foreground">Doses per unit *</label>
+                    <button
+                      type="button"
+                      class="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      title="Dosage calculator"
+                      @click="toggleCalc('modal')"
+                    >
+                      <Calculator class="size-3.5" />
+                    </button>
+                  </div>
+                  <Input
+                    :model-value="modalForm.doses_per_unit ?? ''"
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 12"
+                    @update:model-value="modalForm.doses_per_unit = $event ? Number($event) : null"
+                  />
+                </div>
+                <div v-if="computeQuantity(modalForm) && modalForm.doses_per_unit" class="flex flex-col gap-1">
+                  <label class="text-xs text-muted-foreground">Units needed</label>
+                  <div class="flex h-9 items-center rounded-md border bg-muted/50 px-3 text-sm tabular-nums">
+                    {{ Math.ceil(computeQuantity(modalForm)! / modalForm.doses_per_unit) }}
+                    {{ Math.ceil(computeQuantity(modalForm)! / modalForm.doses_per_unit) === 1 ? 'unit' : 'units' }}
+                    <span class="ml-1 text-xs text-muted-foreground">({{ computeQuantity(modalForm) }} doses)</span>
+                  </div>
+                </div>
+              </div>
+              <!-- Calculator panel -->
+              <div v-if="showCalc['modal']" class="rounded-md border bg-muted/30 p-3">
+                <p class="mb-2 text-xs text-muted-foreground">e.g. bottle 60ml ÷ 5ml per dose = 12 doses/unit</p>
+                <div class="mb-2 flex h-9 items-center rounded-md border bg-background px-3 text-sm font-mono tabular-nums">
+                  {{ calcDisplay['modal'] || '0' }}
+                </div>
+                <div class="grid grid-cols-4 gap-1">
+                  <button
+                    v-for="btn in calcButtons"
+                    :key="btn"
+                    type="button"
+                    class="flex h-8 items-center justify-center rounded-md border text-sm transition-colors hover:bg-accent"
+                    :class="btn === '=' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''"
+                    @click="calcInput('modal', calcButtonToOp(btn))"
+                  >
+                    {{ btn }}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="mt-2 w-full rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                  :disabled="!calcDisplay['modal']"
+                  @click="applyCalcResult('modal', modalForm)"
+                >
+                  Apply as doses per unit
+                </button>
+              </div>
+            </div>
+
+            <!-- Computed qty display for regular frequencies (non-multi-dose) -->
+            <div v-else-if="!isManualQtyFrequency(modalForm.frequency) && computeQuantity(modalForm)" class="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+              Total: <span class="font-medium tabular-nums text-foreground">{{ computeQuantity(modalForm) }} pcs</span>
             </div>
 
             <div class="flex flex-col gap-1">
@@ -697,7 +984,7 @@ const canSave = () => {
 
           <!-- Duration warning -->
           <div v-if="durationWarning" class="flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
-            <span>{{ modalMode === 'create' ? 'Some medicines have no duration.' : 'No duration specified.' }} Save anyway?</span>
+            <span>{{ modalMode === 'create' ? 'Some medicines have no duration/quantity.' : 'No duration or quantity specified.' }} Save anyway?</span>
             <Button type="button" size="sm" variant="outline" class="h-7 text-xs" @click="handleSave(true)">
               Yes, save
             </Button>

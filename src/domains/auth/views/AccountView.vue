@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Camera, LoaderCircle, User, Lock, Stethoscope } from 'lucide-vue-next'
+import { Camera, LoaderCircle, User, Lock, Stethoscope, Banknote } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../api/authApi'
@@ -12,6 +12,7 @@ import { HttpError } from '@/lib/http'
 import ProfileForm from '../components/ProfileForm.vue'
 import PasswordForm from '../components/PasswordForm.vue'
 import CredentialsForm from '../components/CredentialsForm.vue'
+import ConsultationFeeForm from '../components/ConsultationFeeForm.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -140,7 +141,7 @@ onUnmounted(() => {
       </CardContent>
     </Card>
 
-    <Tabs default-value="profile">
+    <Tabs default-value="profile" size="lg">
       <TabsList>
         <TabsTrigger value="profile" class="gap-1.5">
           <User class="size-3.5" />
@@ -154,6 +155,10 @@ onUnmounted(() => {
           <Stethoscope class="size-3.5" />
           Credentials
         </TabsTrigger>
+        <TabsTrigger v-if="isDoctor" value="financial" class="gap-1.5">
+          <Banknote class="size-3.5" />
+          Financial/Billing
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="profile" class="mt-4">
@@ -166,6 +171,10 @@ onUnmounted(() => {
 
       <TabsContent v-if="isDoctor" value="credentials" class="mt-4">
         <CredentialsForm />
+      </TabsContent>
+
+      <TabsContent v-if="isDoctor" value="financial" class="mt-4">
+        <ConsultationFeeForm />
       </TabsContent>
     </Tabs>
   </div>

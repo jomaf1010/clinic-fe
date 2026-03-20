@@ -27,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   save: [payload: { triage: ConsultationTriage }]
   'patient-updated': []
+  'lab-updated': []
 }>()
 
 const local = reactive<ConsultationTriage>({
@@ -37,6 +38,7 @@ const local = reactive<ConsultationTriage>({
     rr: props.triage.vitals?.rr ?? null,
     temp: props.triage.vitals?.temp ?? null,
     spo2: props.triage.vitals?.spo2 ?? null,
+    blood_sugar: props.triage.vitals?.blood_sugar ?? null,
   },
   weight: props.triage.weight,
   height: props.triage.height,
@@ -53,6 +55,7 @@ watch(
     local.vitals.rr = t.vitals?.rr ?? null
     local.vitals.temp = t.vitals?.temp ?? null
     local.vitals.spo2 = t.vitals?.spo2 ?? null
+    local.vitals.blood_sugar = t.vitals?.blood_sugar ?? null
     local.weight = t.weight
     local.height = t.height
     local.pain_score = t.pain_score
@@ -274,6 +277,8 @@ function validate(): boolean {
     e.rr = 'Must be between 4 and 60 breaths/min'
   if (local.vitals.spo2 !== null && (local.vitals.spo2 < 50 || local.vitals.spo2 > 100))
     e.spo2 = 'Must be between 50 and 100%'
+  if (local.vitals.blood_sugar !== null && (local.vitals.blood_sugar < 20 || local.vitals.blood_sugar > 600))
+    e.blood_sugar = 'Must be between 20 and 600 mg/dL'
   if (local.weight !== null && (local.weight < 0.5 || local.weight > 500))
     e.weight = 'Must be between 0.5 and 500 kg'
   if (local.height !== null && (local.height < 30 || local.height > 300))
@@ -305,7 +310,7 @@ function emitSave() {
   })
 }
 
-function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2', val: string | number) {
+function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2' | 'blood_sugar', val: string | number) {
   const num = Number(val)
   local.vitals[field] = isNaN(num) ? null : num
 }
@@ -423,6 +428,24 @@ function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2', val: string | numb
           />
           <p v-if="errors.spo2" class="text-xs text-destructive">{{ errors.spo2}}</p>
         </div>
+
+        <!-- Blood Sugar -->
+        <div class="flex flex-col gap-1.5">
+          <Label for="blood_sugar" class="flex items-center gap-1.5">
+            <Droplets class="size-3.5 text-muted-foreground" />
+            Blood Sugar (mg/dL)
+          </Label>
+          <Input
+            id="blood_sugar"
+            :model-value="local.vitals.blood_sugar ?? undefined"
+            type="number"
+            placeholder="100"
+            :disabled="disabled"
+            @update:model-value="(v: string | number) => onUpdateNumber('blood_sugar', v)"
+            @blur="onBlur"
+          />
+          <p v-if="errors.blood_sugar" class="text-xs text-destructive">{{ errors.blood_sugar }}</p>
+        </div>
       </div>
     </div>
 
@@ -531,7 +554,7 @@ function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2', val: string | numb
     </div>
 
     <!-- Lab Orders -->
-    <LabOrderSection :consultation-id="consultationId" :disabled="disabled" />
+    <LabOrderSection :consultation-id="consultationId" :disabled="disabled" @lab-updated="emit('lab-updated')" />
 
     <!-- Notes -->
     <div class="flex flex-col gap-2">

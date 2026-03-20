@@ -1,11 +1,19 @@
 export type ConsultationStatus = 'draft' | 'finalized'
 
+export interface ConsultationConsumable {
+  consumable_id: string
+  name: string
+  quantity: number
+  unit_price: number | null
+}
+
 export interface TriageVitals {
   bp: string | null
   hr: number | null
   rr: number | null
   temp: number | null
   spo2: number | null
+  blood_sugar: number | null
 }
 
 export interface ConsultationTriage {
@@ -34,7 +42,11 @@ export interface ConsultationTreatmentPlan {
   follow_up: string | null
 }
 
-export interface ConsultationPayment {}
+export interface ConsultationPayment {
+  invoice_id?: string | null
+  fee_discount_type?: 'percentage' | 'fixed' | null
+  fee_discount_value?: number | null
+}
 
 export interface LabOrderSummary {
   status: string
@@ -64,9 +76,11 @@ export interface ConsultationResponse {
   patient_conditions: string[]
   assessment: ConsultationAssessment
   treatment_plan: ConsultationTreatmentPlan
+  consumables: ConsultationConsumable[]
   payment: ConsultationPayment
   lab_order_summary: LabOrderSummary | null
   prescription_summary: PrescriptionSummary | null
+  invoice_id: string | null
   finalized_at: string | null
   created_at: string
   updated_at: string

@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { labOrderApi } from '../api/labOrderApi'
+import { labServiceApi } from '@/domains/labService/api/labServiceApi'
 import { cacheLabOrder, getCachedLabOrder } from '@/lib/offlineDb'
 import type { LabOrderResponse, LabOrderItem, SystemLabItem } from '../types/labOrder.types'
 
@@ -37,6 +38,10 @@ const props = defineProps<{
   consultationId: string
   disabled: boolean
   realtimeUpdate?: LabOrderResponse | null
+}>()
+
+const emit = defineEmits<{
+  'lab-updated': []
 }>()
 
 // --- State ---
@@ -129,10 +134,28 @@ function onSearchInput(val: string | number, row: { description: string; instruc
   }
   searchDebounce = setTimeout(async () => {
     try {
-      const res = await labOrderApi.searchSystemItems(q)
-      suggestions.value = res.data
-      highlightedIndex.value = res.data.length > 0 ? 0 : -1
-      showSuggestions.value = res.data.length > 0
+      const [clinicRes, systemRes] = await Promise.all([
+        labServiceApi.list(1, 20, q),
+        labOrderApi.searchSystemItems(q),
+      ])
+
+      // Clinic items first
+      const clinicItems: SystemLabItem[] = clinicRes.data.map((s) => ({
+        name: s.name,
+        category: s.category || 'Clinic',
+        source: 'clinic' as const,
+      }))
+
+      // System items, excluding ones already in clinic (by normalized name)
+      const clinicNames = new Set(clinicItems.map((i) => i.name.toLowerCase()))
+      const systemItems: SystemLabItem[] = systemRes.data
+        .filter((s) => !clinicNames.has(s.name.toLowerCase()))
+        .map((s) => ({ ...s, source: 'system' as const }))
+
+      const merged = [...clinicItems, ...systemItems]
+      suggestions.value = merged
+      highlightedIndex.value = merged.length > 0 ? 0 : -1
+      showSuggestions.value = merged.length > 0
     } catch {
       suggestions.value = []
     }
@@ -148,6 +171,13 @@ function selectSuggestion(item: SystemLabItem) {
   suggestions.value = []
   showSuggestions.value = false
   highlightedIndex.value = -1
+
+  // Auto-add to clinic lab services only for system items (clinic items already exist)
+  if (item.source !== 'clinic') {
+    labServiceApi.findOrCreate({ name: item.name, category: item.category }).catch(() => {
+      // silent — clinic lab service creation is best-effort
+    })
+  }
 }
 
 function onSearchKeydown(e: KeyboardEvent) {
@@ -222,6 +252,7 @@ async function handleCreate() {
     await cacheCurrentLabOrder()
     showCreateForm.value = false
     createFormItems.value = [{ description: '', instruction: '' }]
+    emit('lab-updated')
   } finally {
     isCreating.value = false
   }
@@ -276,6 +307,7 @@ async function handleAddItem() {
     labOrder.value = res.data
     await cacheCurrentLabOrder()
     cancelAddForm()
+    emit('lab-updated')
   } finally {
     isAddingItem.value = false
   }
@@ -322,6 +354,7 @@ async function saveEdit(item: LabOrderItem) {
     labOrder.value = res.data
     await cacheCurrentLabOrder()
     cancelEdit()
+    emit('lab-updated')
   } finally {
     isSavingEdit.value = false
   }
@@ -334,6 +367,7 @@ async function handleRemoveItem(itemId: string) {
     const res = await labOrderApi.removeItem(labOrder.value.id, itemId)
     labOrder.value = res.data
     await cacheCurrentLabOrder()
+    emit('lab-updated')
   } catch {
     // silent
   }
@@ -364,6 +398,7 @@ async function onFilesSelected(e: Event) {
       await cacheCurrentLabOrder()
     }
     toast.success(`${fileList.length} file${fileList.length > 1 ? 's' : ''} uploaded successfully`)
+    emit('lab-updated')
   } catch {
     toast.error('Failed to upload result. Please try again.')
   } finally {
@@ -553,6 +588,12 @@ function cancelAddForm() {
                     @mouseenter="highlightedIndex = flatIndexOf(item)"
                     @mousedown.prevent="selectSuggestion(item)"
                   >
+                    <span
+                      v-if="item.source === 'clinic'"
+                      class="shrink-0 rounded-full border border-green-300 bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
+                    >
+                      Clinic
+                    </span>
                     {{ item.name }}
                   </button>
                 </template>
@@ -638,6 +679,12 @@ function cancelAddForm() {
                 @mouseenter="highlightedIndex = flatIndexOf(item)"
                 @mousedown.prevent="selectSuggestion(item)"
               >
+                <span
+                  v-if="item.source === 'clinic'"
+                  class="shrink-0 rounded-full border border-green-300 bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
+                >
+                  Clinic
+                </span>
                 {{ item.name }}
               </button>
             </template>

@@ -16,6 +16,25 @@ export const FREQUENCIES = [
   { value: 'Weekly', label: 'Weekly' },
 ] as const
 
+/** Maps frequency codes to doses per day. null = not computable (doctor must specify quantity). */
+export const FREQUENCY_DOSES_PER_DAY: Record<string, number | null> = {
+  OD: 1,
+  BID: 2,
+  TID: 3,
+  QID: 4,
+  Q4H: 6,
+  Q6H: 4,
+  Q8H: 3,
+  Q12H: 2,
+  QHS: 1,
+  QAM: 1,
+  QPM: 1,
+  QOD: 0.5,
+  Weekly: 1 / 7,
+  PRN: null,
+  STAT: null,
+}
+
 export const ROUTES = [
   'Oral',
   'Sublingual',

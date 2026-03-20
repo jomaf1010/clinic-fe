@@ -48,6 +48,9 @@ export interface User {
   s2_license_number: string | null
   specialty: string | null
   sub_specialty: string | null
+  consultation_fee: number | null
+  follow_up_fee: number | null
+  emergency_fee: number | null
   avatar_url: string | null
   onboarding_completed: boolean
   current_clinic: ClinicContext | null

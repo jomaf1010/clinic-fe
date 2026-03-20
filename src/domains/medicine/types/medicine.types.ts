@@ -1,10 +1,14 @@
 export interface SystemMedicine {
   id: string
-  name: string
   generic_name: string | null
-  strength: string | null
+  brand_name: string | null
+  display_name: string
+  dosage_strength: string | null
   dosage_form: string | null
+  classification: string | null
+  pharmacologic_category: string | null
   manufacturer: string | null
+  country_of_origin: string | null
   registration_number: string | null
 }
 
@@ -13,18 +17,27 @@ export interface ClinicMedicine {
   clinic_id: string
   system_medicine_id: string | null
   source: 'system' | 'custom'
-  name: string
   generic_name: string | null
-  strength: string | null
+  brand_name: string | null
+  display_name: string
+  dosage_strength: string | null
   dosage_form: string | null
-  default_dose: string | null
+  classification: string | null
+  pharmacologic_category: string | null
+  manufacturer: string | null
+  country_of_origin: string | null
+  registration_number: string | null
   default_frequency: string | null
   default_route: string | null
   default_instructions: string | null
-  default_price: number | null
+  price_per_piece: number | null
+  price_per_pack: number | null
+  quantity_per_pack: number | null
   unit: string | null
+  is_multi_dose: boolean
   inventory_enabled: boolean
   stock_quantity: number
+  prescription_count: number
   is_active: boolean
   created_by: string
   created_at: string
@@ -33,15 +46,20 @@ export interface ClinicMedicine {
 
 export interface MedicineSearchResult {
   id: string
-  name: string
   generic_name: string | null
-  strength: string | null
+  brand_name: string | null
+  display_name: string
+  dosage_strength: string | null
   dosage_form: string | null
-  default_dose: string | null
   default_frequency: string | null
   default_route: string | null
   default_instructions: string | null
-  default_price: number | null
+  price_per_piece: number | null
+  price_per_pack: number | null
+  quantity_per_pack: number | null
+  is_multi_dose: boolean
+  inventory_enabled: boolean
+  stock_quantity: number
   source: 'clinic' | 'system'
 }
 
@@ -62,32 +80,46 @@ export interface MedicineSearchResponse {
 }
 
 export interface CreateMedicinePayload {
-  name: string
-  generic_name?: string | null
-  strength?: string | null
+  generic_name: string
+  brand_name?: string | null
+  dosage_strength?: string | null
   dosage_form?: string | null
-  default_dose?: string | null
+  classification?: string | null
+  pharmacologic_category?: string | null
+  manufacturer?: string | null
+  country_of_origin?: string | null
+  registration_number?: string | null
   default_frequency?: string | null
   default_route?: string | null
   default_instructions?: string | null
-  default_price?: number | null
+  price_per_piece?: number | null
+  price_per_pack?: number | null
+  quantity_per_pack?: number | null
   unit?: string | null
+  is_multi_dose?: boolean
   inventory_enabled?: boolean
   stock_quantity?: number
   system_medicine_id?: string | null
 }
 
 export interface UpdateMedicinePayload {
-  name?: string
-  generic_name?: string | null
-  strength?: string | null
+  generic_name?: string
+  brand_name?: string | null
+  dosage_strength?: string | null
   dosage_form?: string | null
-  default_dose?: string | null
+  classification?: string | null
+  pharmacologic_category?: string | null
+  manufacturer?: string | null
+  country_of_origin?: string | null
+  registration_number?: string | null
   default_frequency?: string | null
   default_route?: string | null
   default_instructions?: string | null
-  default_price?: number | null
+  price_per_piece?: number | null
+  price_per_pack?: number | null
+  quantity_per_pack?: number | null
   unit?: string | null
+  is_multi_dose?: boolean
   inventory_enabled?: boolean
   stock_quantity?: number
 }

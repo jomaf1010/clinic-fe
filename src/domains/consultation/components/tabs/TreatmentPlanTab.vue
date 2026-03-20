@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import type { ConsultationTreatmentPlan } from '../../types/consultation.types'
+import type { ConsultationTreatmentPlan, ConsultationConsumable } from '../../types/consultation.types'
 import type { PrescriptionResponse } from '../../types/prescription.types'
 import type { LabOrderResponse } from '../../types/labOrder.types'
 import type { DaySchedule, Slot } from '@/domains/schedule/types/schedule.types'
@@ -24,12 +24,14 @@ import { scheduleApi } from '@/domains/schedule/api/scheduleApi'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import LabOrderSection from '../LabOrderSection.vue'
 import PrescriptionSection from '../PrescriptionSection.vue'
+import ConsumableSection from '../ConsumableSection.vue'
 
 const props = defineProps<{
   treatmentPlan: ConsultationTreatmentPlan
   consultationId: string
   patientId: string
   doctorId: string
+  consumables: ConsultationConsumable[]
   disabled: boolean
   labOrderDisabled: boolean
   prescriptionUpdate?: PrescriptionResponse | null
@@ -38,6 +40,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   save: [payload: { treatment_plan: Partial<ConsultationTreatmentPlan> }]
+  'update:consumables': [consumables: ConsultationConsumable[]]
+  'lab-updated': []
 }>()
 
 const local = reactive({
@@ -225,7 +229,7 @@ function applyPreset(days: number): void {
     <hr class="border-border" />
 
     <!-- Lab Orders -->
-    <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" />
+    <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" @lab-updated="emit('lab-updated')" />
 
     <hr class="border-border" />
 
@@ -352,5 +356,15 @@ function applyPreset(days: number): void {
       </p>
       <p v-else class="text-sm text-muted-foreground">No follow-up scheduled</p>
     </div>
+
+    <hr class="border-border" />
+
+    <!-- Consumables -->
+    <ConsumableSection
+      :consultation-id="consultationId"
+      :consumables="consumables"
+      :disabled="disabled"
+      @update="emit('update:consumables', $event)"
+    />
   </div>
 </template>

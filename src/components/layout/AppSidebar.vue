@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   ListOrdered,
   MessageSquare,
-  Pill,
+  Receipt,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -59,10 +59,10 @@ const allNavItems = [
     permission: 'appointments.view',
   },
   {
-    title: 'Medicines',
-    url: '/medicines',
-    icon: Pill,
-    permission: 'medicines.view',
+    title: 'Clinic',
+    url: '/clinic',
+    icon: Stethoscope,
+    permission: ['medicines.view', 'consumables.view', 'lab-services.view'],
   },
   {
     title: 'Schedule',
@@ -75,6 +75,12 @@ const allNavItems = [
     url: '/queue',
     icon: ListOrdered,
     permission: 'queue.view',
+  },
+  {
+    title: 'Billing',
+    url: '/billing',
+    icon: Receipt,
+    permission: 'billing.view',
   },
   {
     title: 'Messages',
@@ -117,6 +123,9 @@ const allNavItems = [
 const navMain = computed(() =>
   allNavItems.filter((item) => {
     if (!item.permission) return true
+    if (Array.isArray(item.permission)) {
+      return item.permission.some((p) => authStore.hasPermission(p))
+    }
     return authStore.hasPermission(item.permission)
   }),
 )

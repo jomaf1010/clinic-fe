@@ -8,6 +8,11 @@ export interface PrescriptionItem {
   instructions: string | null
   medicine_id: string | null
   unit_price: number | null
+  quantity: number | null
+  is_multi_dose: boolean
+  doses_per_unit: number | null
+  dispensed_quantity: number | null
+  out_of_stock: boolean
 }
 
 export interface PrescriptionResponse {

@@ -38,7 +38,15 @@ function formatValue(val: string | number | null | undefined): string {
       <DialogHeader>
         <DialogTitle>{{ previewOnly ? 'Consultation Preview' : 'Finalize Consultation' }}</DialogTitle>
         <DialogDescription>
-          {{ previewOnly ? 'Review the current consultation summary.' : 'Review the consultation before finalizing. This action cannot be undone.' }}
+          <template v-if="previewOnly">
+            <span v-if="consultation.patient_name" class="font-medium text-foreground">{{ consultation.patient_name }}</span>
+            <span v-if="consultation.doctor_name"> &middot; Dr. {{ consultation.doctor_name }}</span>
+            <span v-if="consultation.finalized_at"> &middot; {{ new Date(consultation.finalized_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}</span>
+            <span v-else-if="consultation.created_at"> &middot; {{ new Date(consultation.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}</span>
+          </template>
+          <template v-else>
+            Review the consultation before finalizing. This action cannot be undone.
+          </template>
         </DialogDescription>
       </DialogHeader>
 
@@ -79,6 +87,12 @@ function formatValue(val: string | number | null | undefined): string {
               <span class="text-muted-foreground">SpO2</span>
               <span class="font-medium">
                 {{ consultation.triage.vitals?.spo2 !== null ? `${consultation.triage.vitals?.spo2}%` : '—' }}
+              </span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="text-muted-foreground">BS</span>
+              <span class="font-medium">
+                {{ consultation.triage.vitals?.blood_sugar !== null && consultation.triage.vitals?.blood_sugar !== undefined ? `${consultation.triage.vitals.blood_sugar} mg/dL` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">

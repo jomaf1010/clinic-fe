@@ -12,6 +12,7 @@ export const RouteNames = {
   AUDIT_LOG_DETAIL: 'audit-log-detail',
   CONSULTATION_NEW: 'consultation-new',
   CONSULTATION_DETAIL: 'consultation-detail',
+  CLINIC: 'clinic',
   MEDICINE_LIST: 'medicine-list',
   APPOINTMENT_LIST: 'appointment-list',
   SCHEDULE: 'schedule',
@@ -21,6 +22,8 @@ export const RouteNames = {
   MESSAGES: 'messages',
   ACCOUNT: 'account',
   COMPONENTS: 'components',
+  QUEUE_DISPLAY: 'queue-display',
+  BILLING: 'billing',
 } as const
 
 export type RouteName = (typeof RouteNames)[keyof typeof RouteNames]

@@ -57,10 +57,11 @@ const avatarColor = computed(() => isFemale.value ? 'text-pink-500' : 'text-blue
 
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
 const currentUserId = computed(() => authStore.user?.id)
+const canSeeDrafts = computed(() => isOwner.value || authStore.hasPermission('consultations.edit-triage'))
 
 const visibleConsultations = computed(() =>
   consultationStore.patientConsultations.filter(c =>
-    c.status !== 'draft' || isOwner.value || c.created_by === currentUserId.value,
+    c.status !== 'draft' || canSeeDrafts.value || c.created_by === currentUserId.value,
   ),
 )
 

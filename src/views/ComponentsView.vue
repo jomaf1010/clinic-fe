@@ -368,16 +368,47 @@ const textareaVal = ref('')
       <h2 class="text-lg font-semibold">Tabs</h2>
       <Separator />
 
-      <Tabs default-value="tab1" class="max-w-md">
-        <TabsList>
-          <TabsTrigger value="tab1">Account</TabsTrigger>
-          <TabsTrigger value="tab2">Password</TabsTrigger>
-          <TabsTrigger value="tab3">Settings</TabsTrigger>
-        </TabsList>
-        <TabsContent value="tab1" class="rounded-md border p-4 text-sm">Account settings content.</TabsContent>
-        <TabsContent value="tab2" class="rounded-md border p-4 text-sm">Password settings content.</TabsContent>
-        <TabsContent value="tab3" class="rounded-md border p-4 text-sm">General settings content.</TabsContent>
-      </Tabs>
+      <div class="space-y-3">
+        <h3 class="text-sm font-medium text-muted-foreground">Small</h3>
+        <Tabs default-value="tab1" size="sm" class="max-w-md">
+          <TabsList>
+            <TabsTrigger value="tab1">Account</TabsTrigger>
+            <TabsTrigger value="tab2">Password</TabsTrigger>
+            <TabsTrigger value="tab3">Settings</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tab1" class="rounded-md border p-4 text-sm">Account settings content.</TabsContent>
+          <TabsContent value="tab2" class="rounded-md border p-4 text-sm">Password settings content.</TabsContent>
+          <TabsContent value="tab3" class="rounded-md border p-4 text-sm">General settings content.</TabsContent>
+        </Tabs>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-medium text-muted-foreground">Default</h3>
+        <Tabs default-value="tab1" class="max-w-md">
+          <TabsList>
+            <TabsTrigger value="tab1">Account</TabsTrigger>
+            <TabsTrigger value="tab2">Password</TabsTrigger>
+            <TabsTrigger value="tab3">Settings</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tab1" class="rounded-md border p-4 text-sm">Account settings content.</TabsContent>
+          <TabsContent value="tab2" class="rounded-md border p-4 text-sm">Password settings content.</TabsContent>
+          <TabsContent value="tab3" class="rounded-md border p-4 text-sm">General settings content.</TabsContent>
+        </Tabs>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-medium text-muted-foreground">Large</h3>
+        <Tabs default-value="tab1" size="lg" class="max-w-md">
+          <TabsList>
+            <TabsTrigger value="tab1">Account</TabsTrigger>
+            <TabsTrigger value="tab2">Password</TabsTrigger>
+            <TabsTrigger value="tab3">Settings</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tab1" class="rounded-md border p-4 text-sm">Account settings content.</TabsContent>
+          <TabsContent value="tab2" class="rounded-md border p-4 text-sm">Password settings content.</TabsContent>
+          <TabsContent value="tab3" class="rounded-md border p-4 text-sm">General settings content.</TabsContent>
+        </Tabs>
+      </div>
     </section>
 
     <!-- Dialog -->

@@ -6,12 +6,16 @@ import { toast } from 'vue-sonner'
 import {
   AlertTriangle,
   Columns3,
+  Copy,
+  ExternalLink,
   List,
   ListOrdered,
   LoaderCircle,
+  Monitor,
   RefreshCw,
   Search,
   Stethoscope,
+  Trash2,
   UserPlus,
   Users,
   X,
@@ -34,9 +38,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useQueueStore } from '../stores/queueStore'
+import { queueApi } from '../api/queueApi'
+import type { QueueDisplayTokenStatus } from '../types/queue.types'
 import QueueCard from '../components/QueueCard.vue'
 import QueueKanban from '../components/QueueKanban.vue'
 import WalkInDialog from '../components/WalkInDialog.vue'
@@ -57,6 +68,12 @@ const isCompleting = ref(false)
 const error = ref<string | null>(null)
 const statusFilter = ref<string>('all')
 const viewMode = ref<'list' | 'kanban'>('kanban')
+
+const displayToken = ref<QueueDisplayTokenStatus>({ token: null, created_at: null })
+const isLoadingDisplayToken = ref(false)
+const isGeneratingDisplayToken = ref(false)
+const isRevokingDisplayToken = ref(false)
+const showDisplayPopover = ref(false)
 
 // Doctor filter: doctors only see their own queue; non-doctors (owner, secretary, etc.) can toggle
 const isDoctor = computed(() => authStore.currentClinic?.role === 'doctor')
@@ -162,6 +179,60 @@ async function confirmCancel() {
   }
 }
 
+const displayUrl = computed(() => {
+  if (!displayToken.value.token) return null
+  return `${window.location.origin}/queue-display/${displayToken.value.token}`
+})
+
+async function loadDisplayToken() {
+  isLoadingDisplayToken.value = true
+  try {
+    displayToken.value = await queueApi.getDisplayTokenStatus()
+  } catch {
+    // silently fail
+  } finally {
+    isLoadingDisplayToken.value = false
+  }
+}
+
+async function generateDisplayToken() {
+  isGeneratingDisplayToken.value = true
+  try {
+    displayToken.value = await queueApi.generateDisplayToken()
+    toast.success('Display link generated')
+  } catch {
+    toast.error('Failed to generate display link')
+  } finally {
+    isGeneratingDisplayToken.value = false
+  }
+}
+
+async function revokeDisplayToken() {
+  isRevokingDisplayToken.value = true
+  try {
+    await queueApi.revokeDisplayToken()
+    displayToken.value = { token: null, created_at: null }
+    toast.success('Display link revoked')
+  } catch {
+    toast.error('Failed to revoke display link')
+  } finally {
+    isRevokingDisplayToken.value = false
+  }
+}
+
+function copyDisplayUrl() {
+  if (displayUrl.value) {
+    navigator.clipboard.writeText(displayUrl.value)
+    toast.success('Link copied to clipboard')
+  }
+}
+
+function openDisplayInNewTab() {
+  if (displayUrl.value) {
+    window.open(displayUrl.value, '_blank')
+  }
+}
+
 watch(doctorFilter, () => {
   loadQueue()
   if (!isConnected.value) {
@@ -172,6 +243,7 @@ watch(doctorFilter, () => {
 
 onMounted(async () => {
   await loadQueue()
+  if (canManageQueue.value) loadDisplayToken()
 
   // Try WebSocket connection
   try {
@@ -221,10 +293,80 @@ onUnmounted(() => {
             {{ inProgressCount }} in progress
           </Badge>
         </div>
-        <Button v-if="canManageQueue" size="sm" class="h-8" @click="showWalkIn = true">
-          <UserPlus class="size-3.5" />
-          <span class="hidden sm:inline">Walk-in</span>
-        </Button>
+        <div class="flex items-center gap-2">
+          <Popover v-if="canManageQueue" v-model:open="showDisplayPopover">
+            <PopoverTrigger as-child>
+              <Button variant="outline" size="sm" class="h-8">
+                <Monitor class="size-3.5" />
+                <span class="hidden sm:inline">Display</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-80" align="end">
+              <div class="flex flex-col gap-3">
+                <div>
+                  <h4 class="text-sm font-medium">Queue Display Screen</h4>
+                  <p class="text-xs text-muted-foreground">
+                    Generate a link to show the queue on a TV or tablet in your waiting room.
+                  </p>
+                </div>
+
+                <!-- Loading state -->
+                <div v-if="isLoadingDisplayToken" class="flex items-center justify-center py-4">
+                  <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
+                </div>
+
+                <!-- Has active token -->
+                <template v-else-if="displayToken.token">
+                  <div class="rounded-md border bg-muted/50 p-2">
+                    <p class="break-all text-xs font-mono text-muted-foreground">
+                      {{ displayUrl }}
+                    </p>
+                  </div>
+                  <div class="flex gap-2">
+                    <Button variant="outline" size="sm" class="flex-1 h-8" @click="copyDisplayUrl">
+                      <Copy class="size-3.5" />
+                      Copy
+                    </Button>
+                    <Button variant="outline" size="sm" class="flex-1 h-8" @click="openDisplayInNewTab">
+                      <ExternalLink class="size-3.5" />
+                      Open
+                    </Button>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    class="h-8 w-full"
+                    :disabled="isRevokingDisplayToken"
+                    @click="revokeDisplayToken"
+                  >
+                    <LoaderCircle v-if="isRevokingDisplayToken" class="size-3.5 animate-spin" />
+                    <Trash2 v-else class="size-3.5" />
+                    Revoke Link
+                  </Button>
+                </template>
+
+                <!-- No active token -->
+                <template v-else>
+                  <Button
+                    size="sm"
+                    class="h-8 w-full"
+                    :disabled="isGeneratingDisplayToken"
+                    @click="generateDisplayToken"
+                  >
+                    <LoaderCircle v-if="isGeneratingDisplayToken" class="size-3.5 animate-spin" />
+                    <Monitor v-else class="size-3.5" />
+                    Generate Display Link
+                  </Button>
+                </template>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Button v-if="canManageQueue" size="sm" class="h-8" @click="showWalkIn = true">
+            <UserPlus class="size-3.5" />
+            <span class="hidden sm:inline">Walk-in</span>
+          </Button>
+        </div>
       </div>
 
       <!-- Row 2: Search + filters -->

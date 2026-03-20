@@ -33,6 +33,20 @@ export const consultationApi = {
     return http.post<FinalizeConsultationResponse>(`/consultations/${id}/finalize`)
   },
 
+  saveConsumables(
+    id: string,
+    consumables: { consumable_id: string; name: string; quantity: number; unit_price: number | null }[],
+  ): Promise<ConsultationDetailResponse> {
+    return http.put<ConsultationDetailResponse>(`/consultations/${id}/consumables`, { consumables })
+  },
+
+  saveFeeDiscount(
+    id: string,
+    payload: { fee_discount_type: string | null; fee_discount_value: number | null },
+  ): Promise<ConsultationDetailResponse> {
+    return http.put<ConsultationDetailResponse>(`/consultations/${id}/fee-discount`, payload)
+  },
+
   searchDiagnoses(query: string): Promise<DiagnosisSearchResponse> {
     return http.get<DiagnosisSearchResponse>(`/diagnoses/search?q=${encodeURIComponent(query)}`)
   },
