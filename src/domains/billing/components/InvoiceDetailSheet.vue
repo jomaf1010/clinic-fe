@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBillingStore } from '../stores/billingStore'
+import { documentApi } from '@/domains/consultation/api/documentApi'
 import InvoiceStatusBadge from './InvoiceStatusBadge.vue'
 import type { InvoiceResponse } from '../types/billing.types'
 
@@ -89,17 +90,58 @@ async function saveItemQty(itemId: string) {
   const original = props.invoice.line_items.find((i) => i.id === itemId)
   if (!original || editedQuantities.value[itemId] === original.quantity) return
 
+  const isMedicine = original.type === 'medicine'
+
   try {
     await billingStore.updateInvoice(props.invoice.id, [
       { id: itemId, quantity: editedQuantities.value[itemId] },
     ])
     emit('updated')
+
+    if (isMedicine && props.invoice.consultation_id) {
+      const settings = authStore.currentClinic?.settings
+      const isAdjustedMode = settings?.prescription_quantity_mode === 'adjusted'
+      const autoRegen = isAdjustedMode && settings?.auto_regenerate_pdf_on_qty_change !== false
+
+      if (autoRegen) {
+        silentRegenerate(props.invoice.consultation_id)
+      } else if (isAdjustedMode) {
+        promptRegenerate(props.invoice.consultation_id)
+      }
+    }
   } catch (err: unknown) {
     // Revert on failure
     editedQuantities.value[itemId] = original.quantity
     const msg = err instanceof Error ? err.message : 'Failed to update invoice.'
     toast.error(msg)
   }
+}
+
+async function silentRegenerate(consultationId: string) {
+  try {
+    await documentApi.generate(consultationId, 'prescription')
+    toast.success('Prescription PDF regenerated')
+  } catch {
+    toast.error('Failed to regenerate prescription PDF')
+  }
+}
+
+function promptRegenerate(consultationId: string) {
+  toast('Prescription quantities changed', {
+    description: 'Would you like to regenerate the prescription PDF?',
+    action: {
+      label: 'Regenerate',
+      onClick: async () => {
+        try {
+          await documentApi.generate(consultationId, 'prescription')
+          toast.success('Prescription PDF is being regenerated')
+        } catch {
+          toast.error('Failed to regenerate prescription PDF')
+        }
+      },
+    },
+    duration: 8000,
+  })
 }
 
 function formatCurrency(amount: number): string {

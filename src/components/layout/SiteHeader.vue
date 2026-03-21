@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { MessageSquare, SearchIcon, LoaderCircle, MapPin, UserPlus, Wifi, WifiOff } from 'lucide-vue-next'
+import { MessageSquare, SearchIcon, LoaderCircle, MapPin, UserPlus, Wifi, WifiOff, Bell } from 'lucide-vue-next'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import {
@@ -19,7 +19,9 @@ import {
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useMessageStore } from '@/domains/message/stores/messageStore'
+import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import MessagePanel from '@/domains/message/components/MessagePanel.vue'
+import NotificationPanel from '@/components/layout/NotificationPanel.vue'
 import { patientApi } from '@/domains/patient/api/patientApi'
 import type { PatientSearchResult } from '@/domains/patient/types/patient.types'
 import { RouteNames } from '@/router/routeNames'
@@ -27,6 +29,8 @@ import { RouteNames } from '@/router/routeNames'
 const { isConnected } = useCentrifugo()
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
+const notificationStore = useNotificationStore()
+const notificationSheetOpen = ref(false)
 
 const router = useRouter()
 const messageSheetOpen = ref(false)
@@ -211,8 +215,30 @@ function onFocus() {
         </Tooltip>
       </div>
 
-      <!-- WebSocket status indicator -->
+      <!-- Notifications button -->
       <div class="shrink-0" :class="!hasMessagesPermission ? 'ml-auto' : ''">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="relative flex items-center justify-center rounded-md p-1.5 hover:bg-accent"
+              @click="notificationSheetOpen = true"
+            >
+              <Bell class="size-4 text-muted-foreground" />
+              <Badge
+                v-if="notificationStore.unreadCount > 0"
+                class="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full p-0 text-[9px]"
+              >
+                {{ notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount }}
+              </Badge>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Notifications</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <!-- WebSocket status indicator -->
+      <div class="shrink-0">
         <Tooltip>
           <TooltipTrigger as-child>
             <div
@@ -249,6 +275,16 @@ function onFocus() {
         <SheetTitle>Messages</SheetTitle>
       </SheetHeader>
       <MessagePanel mode="panel" class="flex-1" />
+    </SheetContent>
+  </Sheet>
+
+  <!-- Notifications Sheet -->
+  <Sheet v-model:open="notificationSheetOpen">
+    <SheetContent side="right" class="flex w-full flex-col p-0 sm:max-w-sm">
+      <SheetHeader class="sr-only">
+        <SheetTitle>Notifications</SheetTitle>
+      </SheetHeader>
+      <NotificationPanel @close="notificationSheetOpen = false" />
     </SheetContent>
   </Sheet>
 </template>

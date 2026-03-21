@@ -41,7 +41,6 @@ const onSubmit = handleSubmit(async (values) => {
   isLoading.value = true
   try {
     await authApi.updateProfile({
-      name: authStore.user?.name ?? '',
       prc_license_number: values.prc_license_number || null,
       ptr_number: values.ptr_number || null,
       s2_license_number: values.s2_license_number || null,

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ConsultationRealtimeEvent } from '../types/realtime.types'
 import type { PrescriptionResponse } from '../types/prescription.types'
 import type { LabOrderResponse } from '../types/labOrder.types'
+import type { GeneratedDocumentResponse } from '../api/documentApi'
 
 export function useConsultationSync(consultationId: Ref<string | undefined>, clinicId: Ref<string | undefined>) {
   const { connect, subscribe, unsubscribe } = useCentrifugo()
@@ -16,18 +17,20 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
 
   const prescriptionUpdate = ref<PrescriptionResponse | null>(null)
   const labOrderUpdate = ref<LabOrderResponse | null>(null)
+  const documentUpdate = ref<GeneratedDocumentResponse | null>(null)
 
   function onEvent(ctx: PublicationContext) {
     const event = ctx.data as ConsultationRealtimeEvent
 
-    // Self-echo prevention
-    if (event.actor_id === authStore.user?.id) return
-
     if (event.type.startsWith('consultation.')) {
+      // Self-echo prevention
+      if (event.actor_id === authStore.user?.id) return
       consultationStore.handleRealtimeEvent(event)
     } else if (event.type.startsWith('prescription.')) {
+      if (event.actor_id === authStore.user?.id) return
       prescriptionUpdate.value = event.data as PrescriptionResponse
     } else if (event.type.startsWith('lab_order.')) {
+      if (event.actor_id === authStore.user?.id) return
       labOrderUpdate.value = event.data as LabOrderResponse
       // Silently refresh consultation to update lab_order_summary in the vitals card
       if (consultationId.value) {
@@ -37,6 +40,9 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
           }
         }).catch(() => {})
       }
+    } else if (event.type.startsWith('document.')) {
+      // Document events should be received by the same user (no self-echo prevention)
+      documentUpdate.value = event.data as GeneratedDocumentResponse
     }
   }
 
@@ -61,5 +67,5 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
     if (currentChannel) unsubscribe(currentChannel)
   })
 
-  return { prescriptionUpdate, labOrderUpdate }
+  return { prescriptionUpdate, labOrderUpdate, documentUpdate }
 }

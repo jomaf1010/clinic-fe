@@ -1,0 +1,119 @@
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { Bell, Check, CheckCheck, FileText, AlertCircle } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
+import { RouteNames } from '@/router/routeNames'
+
+const emit = defineEmits<{
+  close: []
+}>()
+
+const router = useRouter()
+const store = useNotificationStore()
+
+onMounted(() => {
+  store.fetchNotifications()
+})
+
+function getIcon(type: string) {
+  switch (type) {
+    case 'document.generated': return FileText
+    default: return Bell
+  }
+}
+
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function handleClick(notification: typeof store.notifications[number]) {
+  store.markRead(notification.id)
+
+  // Navigate based on type
+  const data = notification.data
+  if (notification.type === 'document.generated' && data.consultation_id) {
+    // Find patient_id from the notification data if available
+    if (data.patient_id) {
+      router.push({
+        name: RouteNames.CONSULTATION_DETAIL,
+        params: { patientId: data.patient_id as string, id: data.consultation_id as string },
+      })
+    }
+  }
+
+  emit('close')
+}
+</script>
+
+<template>
+  <div class="flex h-full flex-col">
+    <!-- Header -->
+    <div class="flex items-center justify-between border-b px-4 py-3">
+      <h3 class="text-sm font-semibold">Notifications</h3>
+      <Button
+        v-if="store.unreadCount > 0"
+        variant="ghost"
+        size="sm"
+        class="h-7 gap-1.5 text-xs"
+        @click="store.markAllRead()"
+      >
+        <CheckCheck class="size-3" />
+        Mark all read
+      </Button>
+    </div>
+
+    <!-- List -->
+    <div class="flex-1 overflow-y-auto">
+      <div v-if="store.isLoading && store.notifications.length === 0" class="flex items-center justify-center py-12">
+        <div class="size-5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+      </div>
+
+      <div
+        v-else-if="store.notifications.length === 0"
+        class="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground"
+      >
+        <Bell class="size-8 opacity-50" />
+        <p class="text-sm">No notifications yet</p>
+      </div>
+
+      <div v-else>
+        <button
+          v-for="notification in store.notifications"
+          :key="notification.id"
+          type="button"
+          class="flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-colors hover:bg-accent/50"
+          :class="notification.read_at ? 'opacity-60' : 'bg-primary/5'"
+          @click="handleClick(notification)"
+        >
+          <div
+            class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full"
+            :class="notification.read_at ? 'bg-muted' : 'bg-primary/10'"
+          >
+            <component
+              :is="getIcon(notification.type)"
+              class="size-4"
+              :class="notification.read_at ? 'text-muted-foreground' : 'text-primary'"
+            />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <p class="truncate text-sm font-medium">{{ notification.title }}</p>
+              <div v-if="!notification.read_at" class="size-1.5 shrink-0 rounded-full bg-primary" />
+            </div>
+            <p class="mt-0.5 text-xs text-muted-foreground line-clamp-2">{{ notification.body }}</p>
+            <p class="mt-1 text-[10px] text-muted-foreground">{{ timeAgo(notification.created_at) }}</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</template>

@@ -13,6 +13,12 @@ export const RouteNames = {
   CONSULTATION_NEW: 'consultation-new',
   CONSULTATION_DETAIL: 'consultation-detail',
   CLINIC: 'clinic',
+  CLINIC_PROFILE: 'clinic-profile',
+  CLINIC_SETTINGS: 'clinic-settings',
+  CLINIC_MEDICINES: 'clinic-medicines',
+  CLINIC_CONSUMABLES: 'clinic-consumables',
+  CLINIC_LAB_SERVICES: 'clinic-lab-services',
+  CLINIC_TEMPLATES: 'clinic-templates',
   MEDICINE_LIST: 'medicine-list',
   APPOINTMENT_LIST: 'appointment-list',
   SCHEDULE: 'schedule',
@@ -24,6 +30,7 @@ export const RouteNames = {
   COMPONENTS: 'components',
   QUEUE_DISPLAY: 'queue-display',
   BILLING: 'billing',
+  TEMPLATE_EDITOR: 'template-editor',
 } as const
 
 export type RouteName = (typeof RouteNames)[keyof typeof RouteNames]

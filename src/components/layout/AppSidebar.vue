@@ -8,7 +8,6 @@ import {
   MessageSquare,
   Receipt,
   ScrollText,
-  Settings2,
   ShieldCheck,
   Stethoscope,
   Users,
@@ -106,12 +105,6 @@ const allNavItems = [
     url: '/logs',
     icon: ScrollText,
     permission: 'audit-logs.view',
-  },
-  {
-    title: 'Settings',
-    url: '#',
-    icon: Settings2,
-    comingSoon: true,
   },
   {
     title: 'Components',

@@ -6,10 +6,16 @@ import SiteHeader from '@/components/layout/SiteHeader.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useDmRealtime } from '@/domains/message/composables/useDmRealtime'
 import { useMessageStore } from '@/domains/message/stores/messageStore'
+import { useNotificationRealtime } from '@/domains/notification/composables/useNotificationRealtime'
+import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
+const notificationStore = useNotificationStore()
 const { start: startDmRealtime, stop: stopDmRealtime } = useDmRealtime()
+const { start: startNotificationRealtime, stop: stopNotificationRealtime } = useNotificationRealtime()
+
+let notificationPollTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   if (authStore.hasPermission('messages.view')) {
@@ -17,10 +23,21 @@ onMounted(() => {
     messageStore.fetchConversations()
     messageStore.fetchUnreadCounts()
   }
+
+  // Notifications — always enabled for all users
+  startNotificationRealtime()
+  notificationStore.fetchUnreadCount()
+  notificationPollTimer = setInterval(() => {
+    notificationStore.fetchUnreadCount()
+  }, 60000)
 })
 
 onUnmounted(() => {
   stopDmRealtime()
+  stopNotificationRealtime()
+  if (notificationPollTimer) {
+    clearInterval(notificationPollTimer)
+  }
 })
 </script>
 

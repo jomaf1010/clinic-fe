@@ -62,6 +62,13 @@ export interface PrescriptionSummary {
   items: { drug_name: string; dose: string; frequency: string; duration: string }[]
 }
 
+export interface ConsultationDocument {
+  id: string
+  type: string
+  status: string
+  download_url: string | null
+}
+
 export interface ConsultationResponse {
   id: string
   patient_id: string
@@ -70,6 +77,7 @@ export interface ConsultationResponse {
   clinic_id: string
   created_by: string
   doctor_name: string | null
+  doctor_avatar_url: string | null
   status: ConsultationStatus
   triage: ConsultationTriage
   patient_allergies: string[]
@@ -80,6 +88,7 @@ export interface ConsultationResponse {
   payment: ConsultationPayment
   lab_order_summary: LabOrderSummary | null
   prescription_summary: PrescriptionSummary | null
+  documents: ConsultationDocument[]
   invoice_id: string | null
   finalized_at: string | null
   created_at: string

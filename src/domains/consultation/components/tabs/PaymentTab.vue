@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   DollarSign,
@@ -18,8 +18,10 @@ import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
 import Separator from '@/components/ui/separator/Separator.vue'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
+import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBillingStore } from '@/domains/billing/stores/billingStore'
+import { documentApi } from '../../api/documentApi'
 import InvoiceStatusBadge from '@/domains/billing/components/InvoiceStatusBadge.vue'
 import RecordPaymentDialog from '@/domains/billing/components/RecordPaymentDialog.vue'
 import type { InvoiceResponse } from '@/domains/billing/types/billing.types'
@@ -78,14 +80,49 @@ async function saveItemQty(itemId: string) {
   const original = invoice.value.line_items.find((i) => i.id === itemId)
   if (!original || editedQuantities.value[itemId] === original.quantity) return
 
+  const isMedicine = original.type === 'medicine'
+
   try {
     await billingStore.updateInvoice(invoice.value.id, [
       { id: itemId, quantity: editedQuantities.value[itemId] },
     ])
     invoice.value = billingStore.currentInvoice
+
+    // If a medicine quantity changed, handle PDF regeneration based on clinic settings
+    if (isMedicine) {
+      const settings = authStore.currentClinic?.settings
+      const isAdjustedMode = settings?.prescription_quantity_mode === 'adjusted'
+      const autoRegen = isAdjustedMode && settings?.auto_regenerate_pdf_on_qty_change !== false
+
+      if (autoRegen) {
+        regeneratePdf()
+      } else if (isAdjustedMode) {
+        promptRegenerate()
+      }
+    }
   } catch {
     // Revert on failure
     editedQuantities.value[itemId] = original.quantity
+  }
+}
+
+function promptRegenerate() {
+  toast('Prescription quantities changed', {
+    description: 'Would you like to regenerate the prescription PDF?',
+    action: {
+      label: 'Regenerate',
+      onClick: () => regeneratePdf(),
+    },
+    duration: 8000,
+  })
+}
+
+async function regeneratePdf() {
+  try {
+    await documentApi.generate(props.consultationId, 'prescription')
+    toast.success('Prescription PDF is being regenerated')
+  } catch {
+    toast.error('Failed to regenerate prescription PDF')
   }
 }
 

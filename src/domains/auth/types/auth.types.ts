@@ -29,9 +29,20 @@ export interface Membership {
   status: string
 }
 
+export interface ClinicSettings {
+  auto_generate_prescription_pdf?: boolean
+  prescription_quantity_mode?: 'absolute' | 'adjusted'
+  auto_regenerate_pdf_on_qty_change?: boolean
+}
+
 export interface ClinicContext {
   id: string
   clinic_name: string
+  address: string | null
+  contact_number: string | null
+  email: string | null
+  logo_url: string | null
+  settings: ClinicSettings
   role: string
   membership_id: string
   permissions: string[]
@@ -40,6 +51,7 @@ export interface ClinicContext {
 export interface User {
   id: string
   name: string | null
+  title_prefix: string | null
   email: string
   contact_number: string | null
   date_of_birth: string | null

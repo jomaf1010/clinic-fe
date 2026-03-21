@@ -35,7 +35,6 @@ async function onSubmit() {
 
   try {
     await authApi.updateProfile({
-      name: authStore.user?.name ?? '',
       consultation_fee: consultationFee.value ? parseFloat(consultationFee.value) : null,
       follow_up_fee: followUpFee.value ? parseFloat(followUpFee.value) : null,
       emergency_fee: emergencyFee.value ? parseFloat(emergencyFee.value) : null,

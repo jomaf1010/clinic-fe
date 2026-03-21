@@ -46,8 +46,49 @@ const router = createRouter({
         },
         {
           path: 'clinic',
-          name: RouteNames.CLINIC,
-          component: () => import('@/domains/clinic/views/ClinicCatalogView.vue'),
+          component: () => import('@/domains/clinic/views/ClinicLayout.vue'),
+          children: [
+            {
+              path: '',
+              name: RouteNames.CLINIC,
+              redirect: { name: RouteNames.CLINIC_PROFILE },
+            },
+            {
+              path: 'profile',
+              name: RouteNames.CLINIC_PROFILE,
+              component: () => import('@/domains/clinic/views/ClinicProfileView.vue'),
+            },
+            {
+              path: 'settings',
+              name: RouteNames.CLINIC_SETTINGS,
+              component: () => import('@/domains/clinic/views/ClinicSettingsView.vue'),
+            },
+            {
+              path: 'medicines',
+              name: RouteNames.CLINIC_MEDICINES,
+              component: () => import('@/domains/medicine/views/MedicineListView.vue'),
+            },
+            {
+              path: 'consumables',
+              name: RouteNames.CLINIC_CONSUMABLES,
+              component: () => import('@/domains/consumable/views/ConsumableListView.vue'),
+            },
+            {
+              path: 'lab-services',
+              name: RouteNames.CLINIC_LAB_SERVICES,
+              component: () => import('@/domains/labService/views/LabServiceListView.vue'),
+            },
+            {
+              path: 'templates',
+              name: RouteNames.CLINIC_TEMPLATES,
+              component: () => import('@/domains/template/views/TemplateListView.vue'),
+            },
+          ],
+        },
+        {
+          path: 'clinic/templates/:category/:variation',
+          name: RouteNames.TEMPLATE_EDITOR,
+          component: () => import('@/domains/template/views/TemplateEditorView.vue'),
         },
         {
           path: 'schedule',

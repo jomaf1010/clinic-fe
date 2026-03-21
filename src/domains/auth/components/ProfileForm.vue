@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { HttpError } from '@/lib/http'
 import { toast } from 'vue-sonner'
 import DateOfBirthPicker from '@/components/DateOfBirthPicker.vue'
@@ -21,12 +22,14 @@ const { handleSubmit, setFieldError } = useForm({
   validationSchema: updateProfileSchema,
   initialValues: {
     name: authStore.user?.name ?? '',
+    title_prefix: authStore.user?.title_prefix ?? '',
     contact_number: authStore.user?.contact_number ?? '',
     date_of_birth: authStore.user?.date_of_birth ?? '',
   },
 })
 
 const { value: name, errorMessage: nameError } = useField<string>('name')
+const { value: titlePrefix } = useField<string>('title_prefix')
 const { value: contactNumber, errorMessage: contactNumberError } = useField<string>('contact_number')
 const { value: dateOfBirth, errorMessage: dateOfBirthError } = useField<string>('date_of_birth')
 
@@ -39,6 +42,7 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     await authApi.updateProfile({
       name: values.name,
+      title_prefix: values.title_prefix && values.title_prefix !== 'none' ? values.title_prefix : null,
       contact_number: values.contact_number || null,
       date_of_birth: values.date_of_birth || null,
     })
@@ -82,7 +86,20 @@ const onSubmit = handleSubmit(async (values) => {
               <User class="size-3.5 text-muted-foreground" />
               Full name
             </Label>
-            <Input id="profile-name" v-model="name" type="text" placeholder="Dr. Maria Santos" :disabled="isLoading" :aria-invalid="!!nameError" />
+            <div class="flex gap-2">
+              <Select v-model="titlePrefix" :disabled="isLoading">
+                <SelectTrigger class="w-24 shrink-0">
+                  <SelectValue placeholder="Title" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="Dr.">Dr.</SelectItem>
+                  <SelectItem value="Dra.">Dra.</SelectItem>
+                  <SelectItem value="Prof.">Prof.</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input id="profile-name" v-model="name" type="text" placeholder="Maria Santos" :disabled="isLoading" :aria-invalid="!!nameError" class="flex-1" />
+            </div>
             <p v-if="nameError" class="text-xs text-destructive">{{ nameError }}</p>
           </div>
 

@@ -36,6 +36,7 @@ const props = defineProps<{
   labOrderDisabled: boolean
   prescriptionUpdate?: PrescriptionResponse | null
   labOrderUpdate?: LabOrderResponse | null
+  documentUpdate?: { type: string; status: string; download_url?: string | null } | null
 }>()
 
 const emit = defineEmits<{
@@ -206,7 +207,7 @@ function applyPreset(days: number): void {
 <template>
   <div class="flex flex-col gap-6">
     <!-- Prescription -->
-    <PrescriptionSection :consultation-id="consultationId" :disabled="disabled" :realtime-update="prescriptionUpdate" />
+    <PrescriptionSection :consultation-id="consultationId" :disabled="disabled" :realtime-update="prescriptionUpdate" :document-update="documentUpdate" />
 
     <hr class="border-border" />
 

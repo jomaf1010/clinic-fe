@@ -23,6 +23,8 @@ import {
   Clock,
   Info,
   ArrowLeft,
+  FileDown,
+  ChevronDown,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -40,6 +42,7 @@ import { patientApi } from '../api/patientApi'
 import type { PatientResponse } from '../types/patient.types'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
+import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
 
@@ -109,6 +112,7 @@ async function fetchPatient() {
 watch(() => route.params.id, () => fetchPatient(), { immediate: true })
 
 const editDialogOpen = ref(false)
+const mobileCardExpanded = ref(false)
 
 const labOrderDialogOpen = ref(false)
 const labOrderDialogData = ref<LabOrderSummary | null>(null)
@@ -206,149 +210,167 @@ onUnmounted(() => {
 
   <div
     v-else-if="patient"
-    class="-mx-4 -mt-4 -mb-4 flex min-h-0 flex-1 flex-col gap-0 md:flex-row"
+    class="-mx-4 -mt-4 -mb-4 flex flex-1 flex-col gap-0 overflow-y-auto md:min-h-0 md:flex-row md:overflow-y-hidden"
   >
     <!-- Left panel -->
-    <div class="shrink-0 overflow-y-auto border-b p-4 md:w-80 md:border-b-0 md:border-r md:p-6">
+    <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-6">
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
-        class="-ml-2 mb-3 gap-1.5 text-muted-foreground"
+        class="-ml-2 mb-3 gap-1.5"
         @click="router.back()"
       >
         <ArrowLeft class="size-3.5" />
-        Back to Patients
+        Back
       </Button>
 
-      <!-- Header -->
-      <div class="flex flex-col items-center text-center">
-        <div class="flex size-16 items-center justify-center rounded-full" :class="avatarBg">
-          <UserRound class="size-8" :class="avatarColor" />
+      <!-- Header — always visible -->
+      <div class="flex items-center gap-3 md:flex-col md:items-center md:text-center">
+        <div class="flex size-12 shrink-0 items-center justify-center rounded-full md:size-16" :class="avatarBg">
+          <UserRound class="size-6 md:size-8" :class="avatarColor" />
         </div>
-        <h2 class="mt-2 text-lg font-semibold">{{ patient.full_name }}</h2>
-        <p v-if="patient.address" class="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
-          <MapPin class="size-3.5 shrink-0" />
-          {{ patient.address }}
-        </p>
-        <div class="mt-3 flex flex-col gap-2">
-          <Button
-            v-if="draftConsultation"
-            size="sm"
-            variant="secondary"
-            @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
-          >
-            <PlayCircle class="size-3.5" />
-            Continue Draft
-          </Button>
-          <Button
-            v-else
-            size="sm"
-            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
-          >
-            <Plus class="size-3.5" />
-            New Consultation
-          </Button>
-          <Button variant="outline" size="sm" @click="editDialogOpen = true">
-            <Pencil class="size-3.5" />
-            Edit Profile
-          </Button>
+        <div class="min-w-0 flex-1 md:mt-2 md:flex-none">
+          <h2 class="text-base font-semibold md:text-lg">{{ patient.full_name }}</h2>
+          <p v-if="patient.address" class="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground md:justify-center">
+            <MapPin class="size-3.5 shrink-0" />
+            <span class="truncate">{{ patient.address }}</span>
+          </p>
         </div>
       </div>
 
-      <!-- Basic Info -->
-      <div class="mt-5 border-t pt-4">
-        <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Basic Info
-        </h3>
-        <div class="space-y-2.5">
-          <div v-if="age !== null" class="flex items-start gap-2 text-sm">
-            <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <div>
-              <span class="text-muted-foreground">Age: </span>
-              {{ age }} yrs old
-            </div>
-          </div>
-          <div class="flex items-start gap-2 text-sm">
-            <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <div>
-              <span class="text-muted-foreground">DOB: </span>
-              {{ formatDate(patient.date_of_birth) }}
-            </div>
-          </div>
-          <div class="flex items-start gap-2 text-sm">
-            <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <div>
-              <span class="text-muted-foreground">Gender: </span>
-              {{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}
-            </div>
-          </div>
-          <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
-            <Phone class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <div>
-              <span class="text-muted-foreground">Phone: </span>
-              {{ patient.contact_number }}
-            </div>
-          </div>
-          <div v-if="patient.email" class="flex items-start gap-2 text-sm">
-            <Mail class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <div>
-              <span class="text-muted-foreground">Email: </span>
-              {{ patient.email }}
-            </div>
-          </div>
-        </div>
+      <!-- Action buttons — always visible -->
+      <div class="mt-3 flex gap-2">
+        <Button
+          v-if="draftConsultation"
+          size="sm"
+          variant="secondary"
+          class="flex-1"
+          @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+        >
+          <PlayCircle class="size-3.5" />
+          Continue Draft
+        </Button>
+        <Button
+          v-else
+          size="sm"
+          class="flex-1"
+          @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
+        >
+          <Plus class="size-3.5" />
+          New Consultation
+        </Button>
+        <Button variant="outline" size="sm" @click="editDialogOpen = true">
+          <Pencil class="size-3.5" />
+        </Button>
       </div>
 
-      <!-- Medical -->
-      <div
-        v-if="patient.allergies.length > 0 || patient.chronic_conditions.length > 0"
-        class="mt-5 border-t pt-4"
+      <!-- Mobile expand toggle -->
+      <button
+        type="button"
+        class="mt-3 flex w-full items-center justify-center gap-1 text-xs text-muted-foreground md:hidden"
+        @click="mobileCardExpanded = !mobileCardExpanded"
       >
-        <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Medical
-        </h3>
-        <div class="space-y-3">
-          <div v-if="patient.allergies.length > 0">
-            <div class="mb-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <ShieldAlert class="size-3.5 shrink-0" />
-              Allergies
+        {{ mobileCardExpanded ? 'Show less' : 'Show more details' }}
+        <ChevronDown class="size-3.5 transition-transform" :class="mobileCardExpanded ? 'rotate-180' : ''" />
+      </button>
+
+      <!-- Expandable sections — hidden on mobile unless expanded, always visible on desktop -->
+      <div :class="mobileCardExpanded ? '' : 'hidden md:block'">
+        <!-- Medical (top priority) -->
+        <div
+          v-if="patient.allergies.length > 0 || patient.chronic_conditions.length > 0"
+          class="mt-5 border-t pt-4"
+        >
+          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Medical
+          </h3>
+          <div class="space-y-3">
+            <div v-if="patient.allergies.length > 0">
+              <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
+                <ShieldAlert class="size-4 shrink-0" />
+                Allergies
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="allergy in patient.allergies"
+                  :key="allergy"
+                  class="rounded-md border border-red-300 bg-red-100 px-2.5 py-1 text-sm font-medium text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400"
+                >
+                  {{ allergy }}
+                </span>
+              </div>
             </div>
-            <div class="flex flex-wrap gap-1">
-              <span
-                v-for="allergy in patient.allergies"
-                :key="allergy"
-                class="rounded-md bg-muted px-2 py-0.5 text-xs"
-              >
-                {{ allergy }}
-              </span>
-            </div>
-          </div>
-          <div v-if="patient.chronic_conditions.length > 0">
-            <div class="mb-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <HeartPulse class="size-3.5 shrink-0" />
-              Conditions
-            </div>
-            <div class="flex flex-wrap gap-1">
-              <span
-                v-for="condition in patient.chronic_conditions"
-                :key="condition"
-                class="rounded-md bg-muted px-2 py-0.5 text-xs"
-              >
-                {{ condition }}
-              </span>
+            <div v-if="patient.chronic_conditions.length > 0">
+              <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+                <HeartPulse class="size-4 shrink-0" />
+                Conditions
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="condition in patient.chronic_conditions"
+                  :key="condition"
+                  class="rounded-md border border-amber-300 bg-amber-100 px-2.5 py-1 text-sm font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                >
+                  {{ condition }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Notes -->
-      <div v-if="patient.note" class="mt-5 border-t pt-4">
-        <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Notes
-        </h3>
-        <div class="flex items-start gap-2 text-sm">
-          <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-          <p class="whitespace-pre-wrap">{{ patient.note }}</p>
+        <!-- Basic Info -->
+        <div class="mt-5 border-t pt-4">
+          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Basic Info
+          </h3>
+          <div class="space-y-2.5">
+            <div v-if="age !== null" class="flex items-start gap-2 text-sm">
+              <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div>
+                <span class="text-muted-foreground">Age: </span>
+                {{ age }} yrs old
+              </div>
+            </div>
+            <div class="flex items-start gap-2 text-sm">
+              <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div>
+                <span class="text-muted-foreground">DOB: </span>
+                {{ formatDate(patient.date_of_birth) }}
+              </div>
+            </div>
+            <div class="flex items-start gap-2 text-sm">
+              <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div>
+                <span class="text-muted-foreground">Gender: </span>
+                {{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}
+              </div>
+            </div>
+            <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
+              <Phone class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div>
+                <span class="text-muted-foreground">Phone: </span>
+                {{ patient.contact_number }}
+              </div>
+            </div>
+            <div v-if="patient.email" class="flex items-start gap-2 text-sm">
+              <Mail class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div>
+                <span class="text-muted-foreground">Email: </span>
+                {{ patient.email }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div v-if="patient.note" class="mt-5 border-t pt-4">
+          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Notes
+          </h3>
+          <div class="flex items-start gap-2 text-sm">
+            <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <p class="whitespace-pre-wrap">{{ patient.note }}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -441,15 +463,27 @@ onUnmounted(() => {
         >
           <div class="flex flex-col items-center">
             <div
-              class="mt-3.5 size-2 shrink-0 rounded-full"
-              :class="consultation.status === 'draft' ? 'bg-amber-400' : 'bg-primary'"
+              class="mt-3.5 shrink-0 rounded-full"
+              :class="consultation.status === 'draft' ? 'size-3 bg-amber-400 animate-pulse' : 'size-2 bg-primary'"
             />
             <div
               v-if="index < visibleConsultations.length - 1 || consultationStore.hasMore"
               class="mt-1 flex-1 w-px bg-border"
             />
           </div>
+          <!-- Draft card -->
+          <DraftConsultationCard
+            v-if="consultation.status === 'draft'"
+            :consultation="consultation"
+            :patient-id="patient!.id"
+            class="min-w-0 flex-1"
+            :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
+            @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
+          />
+
+          <!-- Finalized card -->
           <div
+            v-else
             class="min-w-0 flex-1 cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-primary/5 hover:border-primary/30"
             :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
             @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: consultation.id } })"
@@ -461,12 +495,6 @@ onUnmounted(() => {
               <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
                 &middot; Dr. {{ consultation.doctor_name }}
               </span>
-              <span
-                v-if="consultation.status === 'draft'"
-                class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
-              >
-                Draft
-              </span>
             </div>
             <p v-if="consultation.triage.chief_complaint" class="mt-1 text-sm font-medium">
               {{ consultation.triage.chief_complaint }}
@@ -477,8 +505,8 @@ onUnmounted(() => {
                 :key="dIdx"
                 class="mt-1 mr-1 inline-block rounded-md bg-muted px-2 py-0.5 text-xs"
               >
-                <span v-if="diagnosis.code" class="mr-0.5 font-mono text-muted-foreground">{{ diagnosis.code }}</span>
                 {{ diagnosis.description }}
+                <span v-if="diagnosis.code" class="ml-0.5 font-mono text-muted-foreground">{{ diagnosis.code }}</span>
               </span>
             </template>
             <p v-if="authStore.hasPermission('consultations.edit-treatment-plan') && consultation.treatment_plan?.advice" class="mt-1.5 text-sm text-muted-foreground">
@@ -523,6 +551,19 @@ onUnmounted(() => {
                 </button>
               </div>
             </TooltipProvider>
+            <div v-if="consultation.documents?.length" class="mt-2 flex flex-wrap gap-1.5">
+              <a
+                v-for="doc in consultation.documents"
+                :key="doc.id"
+                :href="doc.download_url!"
+                target="_blank"
+                class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
+                @click.stop
+              >
+                <FileDown class="size-3" />
+                {{ doc.type === 'prescription' ? 'Prescription PDF' : doc.type === 'medical-certificate' ? 'Med. Certificate PDF' : doc.type + ' PDF' }}
+              </a>
+            </div>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue'
+import { computed, ref } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,6 +13,7 @@ import ProfileForm from '../components/ProfileForm.vue'
 import PasswordForm from '../components/PasswordForm.vue'
 import CredentialsForm from '../components/CredentialsForm.vue'
 import ConsultationFeeForm from '../components/ConsultationFeeForm.vue'
+import ImageCropDialog from '@/components/ImageCropDialog.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -34,28 +35,11 @@ const initials = computed(() => {
 })
 
 // Avatar upload
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const avatarPreviewUrl = ref<string | null>(null)
+const cropDialogOpen = ref(false)
 const isUploadingAvatar = ref(false)
 
-const displayAvatarUrl = computed(() => avatarPreviewUrl.value ?? user.value?.avatar_url ?? null)
-
-function triggerFileInput(): void {
-  fileInputRef.value?.click()
-}
-
-async function handleFileChange(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error('File must be under 2 MB.')
-    return
-  }
-
-  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
-  avatarPreviewUrl.value = URL.createObjectURL(file)
+async function handleAvatarCrop(blob: Blob) {
+  const file = new File([blob], 'avatar.png', { type: 'image/png' })
 
   isUploadingAvatar.value = true
   try {
@@ -63,8 +47,6 @@ async function handleFileChange(event: Event): Promise<void> {
     await authStore.fetchUser()
     toast.success('Avatar updated.')
   } catch (err) {
-    if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
-    avatarPreviewUrl.value = null
     if (err instanceof HttpError && err.status === 422) {
       toast.error('Invalid image. Use JPG, PNG, or WebP under 2 MB.')
     } else {
@@ -72,13 +54,8 @@ async function handleFileChange(event: Event): Promise<void> {
     }
   } finally {
     isUploadingAvatar.value = false
-    input.value = ''
   }
 }
-
-onUnmounted(() => {
-  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
-})
 </script>
 
 <template>
@@ -95,7 +72,7 @@ onUnmounted(() => {
           <!-- Avatar upload zone -->
           <div class="group relative shrink-0">
             <Avatar class="size-20 ring-2 ring-border ring-offset-2 ring-offset-background">
-              <AvatarImage v-if="displayAvatarUrl" :src="displayAvatarUrl" alt="Profile photo" />
+              <AvatarImage v-if="user?.avatar_url" :src="user.avatar_url" alt="Profile photo" />
               <AvatarFallback class="bg-primary/10 text-xl font-semibold text-primary">
                 {{ initials }}
               </AvatarFallback>
@@ -106,20 +83,11 @@ onUnmounted(() => {
               class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               :disabled="isUploadingAvatar"
               aria-label="Upload profile photo"
-              @click="triggerFileInput"
+              @click="cropDialogOpen = true"
             >
               <LoaderCircle v-if="isUploadingAvatar" class="size-5 animate-spin text-white" />
               <Camera v-else class="size-5 text-white" />
             </button>
-
-            <input
-              ref="fileInputRef"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              class="sr-only"
-              aria-hidden="true"
-              @change="handleFileChange"
-            />
           </div>
 
           <!-- Identity text -->
@@ -177,5 +145,13 @@ onUnmounted(() => {
         <ConsultationFeeForm />
       </TabsContent>
     </Tabs>
+
+    <ImageCropDialog
+      v-model:open="cropDialogOpen"
+      title="Upload Avatar"
+      description="Drag to reposition and use the slider to zoom."
+      :output-size="512"
+      @crop="handleAvatarCrop"
+    />
   </div>
 </template>

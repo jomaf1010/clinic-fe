@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
 import {
   AlertTriangle,
@@ -11,6 +11,9 @@ import {
   LoaderCircle,
   CheckCircle2,
   EllipsisVertical,
+  FileDown,
+  FileText,
+  Printer,
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,6 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { prescriptionApi } from '../api/prescriptionApi'
+import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { PrescriptionResponse, PrescriptionItem } from '../types/prescription.types'
 import MedicineAutocomplete from '@/domains/medicine/components/MedicineAutocomplete.vue'
 import { medicineApi } from '@/domains/medicine/api/medicineApi'
@@ -49,6 +53,7 @@ const props = defineProps<{
   consultationId: string
   disabled: boolean
   realtimeUpdate?: PrescriptionResponse | null
+  documentUpdate?: GeneratedDocumentResponse | null
 }>()
 
 // --- Constants ---
@@ -65,6 +70,86 @@ watch(() => props.realtimeUpdate, (update) => {
     prescription.value = update
   }
 })
+
+// --- PDF generation ---
+const pdfDoc = ref<GeneratedDocumentResponse | null>(null)
+const isGeneratingPdf = ref(false)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadDocuments() {
+  try {
+    const res = await documentApi.list(props.consultationId)
+    pdfDoc.value = res.data.find((d) => d.type === 'prescription') ?? null
+  } catch {
+    // ignore
+  }
+}
+
+async function generatePdf() {
+  isGeneratingPdf.value = true
+  try {
+    const res = await documentApi.generate(props.consultationId, 'prescription')
+    pdfDoc.value = res.data
+    startPolling()
+  } catch {
+    toast.error('Failed to generate prescription PDF')
+    isGeneratingPdf.value = false
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(async () => {
+    await loadDocuments()
+    if (pdfDoc.value?.status === 'completed' || pdfDoc.value?.status === 'failed') {
+      stopPolling()
+      isGeneratingPdf.value = false
+      if (pdfDoc.value.status === 'completed') {
+        toast.success('Prescription PDF is ready')
+      } else {
+        toast.error('PDF generation failed')
+      }
+    }
+  }, 3000)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function downloadPdf() {
+  if (pdfDoc.value?.download_url) {
+    window.open(pdfDoc.value.download_url, '_blank')
+  }
+}
+
+function printPdf() {
+  if (!pdfDoc.value?.download_url) return
+  const printWindow = window.open(pdfDoc.value.download_url, '_blank')
+  if (printWindow) {
+    printWindow.addEventListener('load', () => {
+      printWindow.print()
+    })
+  }
+}
+
+watch(() => props.documentUpdate, (update) => {
+  if (update && update.type === 'prescription') {
+    pdfDoc.value = update
+    if (update.status === 'completed' || update.status === 'failed') {
+      stopPolling()
+      isGeneratingPdf.value = false
+      if (update.status === 'completed') {
+        toast.success('Prescription PDF is ready')
+      }
+    }
+  }
+})
+
+onUnmounted(stopPolling)
 
 // --- Modal state ---
 const showModal = ref(false)
@@ -256,7 +341,10 @@ async function loadPrescription() {
   }
 }
 
-onMounted(loadPrescription)
+onMounted(() => {
+  loadPrescription()
+  loadDocuments()
+})
 
 // --- Modal open helpers ---
 function openCreateModal() {
@@ -500,6 +588,41 @@ const canSave = () => {
         >
           {{ prescription.items.length }} {{ prescription.items.length === 1 ? 'medicine' : 'medicines' }}
         </Badge>
+      </div>
+
+      <!-- PDF actions -->
+      <div v-if="prescription && prescription.items.length > 0" class="flex items-center gap-1.5">
+        <Button
+          v-if="pdfDoc?.status === 'completed'"
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1.5 text-xs"
+          @click="printPdf"
+        >
+          <Printer class="size-3" />
+          Print
+        </Button>
+        <Button
+          v-if="pdfDoc?.status === 'completed'"
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1.5 text-xs"
+          @click="downloadPdf"
+        >
+          <FileDown class="size-3" />
+          Download
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1.5 text-xs"
+          :disabled="isGeneratingPdf"
+          @click="generatePdf"
+        >
+          <LoaderCircle v-if="isGeneratingPdf" class="size-3 animate-spin" />
+          <FileText v-else class="size-3" />
+          {{ isGeneratingPdf ? 'Generating...' : pdfDoc ? 'Regenerate' : 'Generate PDF' }}
+        </Button>
       </div>
     </div>
 

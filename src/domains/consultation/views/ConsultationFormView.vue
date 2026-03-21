@@ -16,6 +16,7 @@ import {
   Eye,
   ArrowLeft,
   PercentCircle,
+  FileCheck,
 } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,7 @@ import TreatmentPlanTab from '../components/tabs/TreatmentPlanTab.vue'
 import PaymentTab from '../components/tabs/PaymentTab.vue'
 import VitalsSummary from '../components/VitalsSummary.vue'
 import FinalizeModal from '../components/FinalizeModal.vue'
+import MedCertDialog from '../components/MedCertDialog.vue'
 import type { UpdateConsultationPayload } from '../types/consultation.types'
 import { useConsultationSync } from '../composables/useConsultationSync'
 
@@ -51,7 +53,7 @@ const { isOnline, pendingCount } = useOfflineSync()
 
 const consultationId = computed(() => store.current?.id)
 const clinicId = computed(() => store.current?.clinic_id)
-const { prescriptionUpdate, labOrderUpdate } = useConsultationSync(consultationId, clinicId)
+const { prescriptionUpdate, labOrderUpdate, documentUpdate } = useConsultationSync(consultationId, clinicId)
 
 const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
 const canEditAssessment = computed(() => authStore.hasPermission('consultations.edit-assessment'))
@@ -61,6 +63,7 @@ const canFinalize = computed(() => authStore.hasPermission('consultations.finali
 const activeTab = ref('triage')
 const showPreviewModal = ref(false)
 const showFinalizeModal = ref(false)
+const showMedCertDialog = ref(false)
 const showFeeDiscountModal = ref(false)
 const loadError = ref<string | null>(null)
 
@@ -359,6 +362,7 @@ async function handleFinalizeAndPay(): Promise<void> {
             :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create')"
             :prescription-update="prescriptionUpdate"
             :lab-order-update="labOrderUpdate"
+            :document-update="documentUpdate"
             @save="handleSave"
             @update:consumables="(c) => { if (store.current) store.current.consumables = c }"
             @lab-updated="store.loadConsultation(store.current!.id)"
@@ -385,6 +389,14 @@ async function handleFinalizeAndPay(): Promise<void> {
               >
                 {{ store.current.payment.fee_discount_type === 'percentage' ? `${store.current.payment.fee_discount_value}% off` : `₱${store.current.payment.fee_discount_value} off` }}
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="showMedCertDialog = true"
+              >
+                <FileCheck class="size-3.5" />
+                Medical Certificate
+              </Button>
               <Button
                 v-if="store.isDraft && canFinalize"
                 @click="handleFinalizeAndPay"
@@ -437,6 +449,16 @@ async function handleFinalizeAndPay(): Promise<void> {
       :is-saving="store.isSaving"
       @update:open="showFinalizeModal = $event"
       @confirm="handleFinalizeConfirm"
+    />
+
+    <!-- Medical Certificate Dialog -->
+    <MedCertDialog
+      v-if="store.current"
+      :open="showMedCertDialog"
+      :consultation-id="store.current.id"
+      :diagnoses="store.current.assessment?.diagnoses ?? []"
+      :document-update="documentUpdate"
+      @update:open="showMedCertDialog = $event"
     />
 
     <!-- Fee Discount Modal -->
