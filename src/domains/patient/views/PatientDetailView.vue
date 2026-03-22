@@ -21,9 +21,7 @@ import {
   FlaskConical,
   CheckCircle2,
   Clock,
-  Info,
   ArrowLeft,
-  FileDown,
   ChevronDown,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
@@ -43,6 +41,8 @@ import type { PatientResponse } from '../types/patient.types'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
 import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
+import FinalizedConsultationCard from '@/domains/patient/components/FinalizedConsultationCard.vue'
+import VitalsComparisonCard from '@/domains/patient/components/VitalsComparisonCard.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
 
@@ -71,6 +71,23 @@ const visibleConsultations = computed(() =>
 const draftConsultation = computed(() =>
   visibleConsultations.value.find(c => c.status === 'draft') ?? null,
 )
+
+const latestFinalizedIndex = computed(() =>
+  visibleConsultations.value.findIndex(c => c.status === 'finalized'),
+)
+
+const showVitalsComparison = computed(() => {
+  if (!draftConsultation.value?.triage) return false
+  const idx = latestFinalizedIndex.value
+  if (idx < 0) return false
+  return !!visibleConsultations.value[idx]?.triage
+})
+
+const previousTriage = computed(() => {
+  const idx = latestFinalizedIndex.value
+  if (idx < 0) return null
+  return visibleConsultations.value[idx]?.triage ?? null
+})
 
 const age = computed(() => {
   if (!patient.value) return null
@@ -429,7 +446,7 @@ onUnmounted(() => {
         >
           <div class="flex flex-col items-center">
             <Skeleton class="mt-3.5 size-2 shrink-0 rounded-full" />
-            <div v-if="n < 5" class="mt-1 flex-1 w-px bg-border" />
+            <div v-if="n < 5" class="mt-1 flex-1 w-[2px] bg-foreground/15" />
           </div>
           <div
             class="min-w-0 flex-1 rounded-lg border bg-card p-3"
@@ -461,110 +478,48 @@ onUnmounted(() => {
           :key="consultation.id"
           class="flex gap-3"
         >
-          <div class="flex flex-col items-center">
+          <div class="flex w-3 flex-col items-center">
             <div
               class="mt-3.5 shrink-0 rounded-full"
-              :class="consultation.status === 'draft' ? 'size-3 bg-amber-400 animate-pulse' : 'size-2 bg-primary'"
+              :class="
+                consultation.status === 'draft'
+                  ? 'size-3 bg-amber-400 pulse-ring-amber'
+                  : index === latestFinalizedIndex
+                    ? 'size-3 bg-primary pulse-ring-primary'
+                    : 'size-2 bg-primary'
+              "
             />
             <div
               v-if="index < visibleConsultations.length - 1 || consultationStore.hasMore"
-              class="mt-1 flex-1 w-px bg-border"
+              class="mt-1 flex-1 w-[2px]"
+              :class="consultation.status === 'draft' ? 'bg-amber-300' : 'bg-foreground/15'"
             />
           </div>
-          <!-- Draft card -->
-          <DraftConsultationCard
-            v-if="consultation.status === 'draft'"
+          <!-- Draft card + vitals comparison -->
+          <div v-if="consultation.status === 'draft'" class="min-w-0 flex-1 flex flex-col gap-2" :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''">
+            <DraftConsultationCard
+              :consultation="consultation"
+              :patient-id="patient!.id"
+              @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
+            />
+            <VitalsComparisonCard
+              v-if="showVitalsComparison"
+              :current="consultation.triage"
+              :previous="previousTriage!"
+              :consultation-id="consultation.id"
+            />
+          </div>
+
+          <!-- Finalized card -->
+          <FinalizedConsultationCard
+            v-else
             :consultation="consultation"
             :patient-id="patient!.id"
+            :latest="index === latestFinalizedIndex"
             class="min-w-0 flex-1"
             :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
             @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
           />
-
-          <!-- Finalized card -->
-          <div
-            v-else
-            class="min-w-0 flex-1 cursor-pointer rounded-lg border bg-card p-3 transition-colors hover:bg-primary/5 hover:border-primary/30"
-            :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
-            @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: consultation.id } })"
-          >
-            <div class="flex items-center gap-2">
-              <p class="text-xs text-muted-foreground">
-                {{ formatDate(consultation.created_at) }}
-              </p>
-              <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
-                &middot; Dr. {{ consultation.doctor_name }}
-              </span>
-            </div>
-            <p v-if="consultation.triage.chief_complaint" class="mt-1 text-sm font-medium">
-              {{ consultation.triage.chief_complaint }}
-            </p>
-            <template v-if="authStore.hasPermission('consultations.edit-assessment')">
-              <span
-                v-for="(diagnosis, dIdx) in (consultation.assessment?.diagnoses ?? [])"
-                :key="dIdx"
-                class="mt-1 mr-1 inline-block rounded-md bg-muted px-2 py-0.5 text-xs"
-              >
-                {{ diagnosis.description }}
-                <span v-if="diagnosis.code" class="ml-0.5 font-mono text-muted-foreground">{{ diagnosis.code }}</span>
-              </span>
-            </template>
-            <p v-if="authStore.hasPermission('consultations.edit-treatment-plan') && consultation.treatment_plan?.advice" class="mt-1.5 text-sm text-muted-foreground">
-              {{ consultation.treatment_plan.advice }}
-            </p>
-            <TooltipProvider v-if="consultation.lab_order_summary" :delay-duration="200">
-              <div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <FlaskConical class="size-3 shrink-0" />
-                <span>Lab Orders:</span>
-                <Tooltip v-if="consultation.lab_order_summary.completed">
-                  <TooltipTrigger as-child>
-                    <span class="flex cursor-help items-center gap-0.5 text-green-600">
-                      <CheckCircle2 class="size-3" />
-                      {{ consultation.lab_order_summary.completed }} completed
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" class="max-w-64 text-xs">
-                    <ul class="list-disc pl-3.5">
-                      <li v-for="name in consultation.lab_order_summary.completed_items" :key="name">{{ name }}</li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip v-if="consultation.lab_order_summary.pending">
-                  <TooltipTrigger as-child>
-                    <span class="flex cursor-help items-center gap-0.5 text-amber-600">
-                      <Clock class="size-3" />
-                      {{ consultation.lab_order_summary.pending }} pending
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" class="max-w-64 text-xs">
-                    <ul class="list-disc pl-3.5">
-                      <li v-for="name in consultation.lab_order_summary.pending_items" :key="name">{{ name }}</li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-                <button
-                  type="button"
-                  class="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  @click="showLabOrderDialog(consultation.lab_order_summary!, $event)"
-                >
-                  <Info class="size-3.5" />
-                </button>
-              </div>
-            </TooltipProvider>
-            <div v-if="consultation.documents?.length" class="mt-2 flex flex-wrap gap-1.5">
-              <a
-                v-for="doc in consultation.documents"
-                :key="doc.id"
-                :href="doc.download_url!"
-                target="_blank"
-                class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
-                @click.stop
-              >
-                <FileDown class="size-3" />
-                {{ doc.type === 'prescription' ? 'Prescription PDF' : doc.type === 'medical-certificate' ? 'Med. Certificate PDF' : doc.type + ' PDF' }}
-              </a>
-            </div>
-          </div>
         </div>
 
         <!-- Infinite scroll sentinel -->
@@ -633,3 +588,21 @@ onUnmounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.pulse-ring-amber {
+  animation: pulse-amber 2s ease-out infinite;
+}
+.pulse-ring-primary {
+  animation: pulse-primary 2s ease-out infinite;
+}
+
+@keyframes pulse-amber {
+  0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+}
+@keyframes pulse-primary {
+  0% { box-shadow: 0 0 0 0 oklch(0.283 0.090 253.827 / 0.5); }
+  100% { box-shadow: 0 0 0 10px oklch(0.283 0.090 253.827 / 0); }
+}
+</style>

@@ -35,6 +35,25 @@ export const FREQUENCY_DOSES_PER_DAY: Record<string, number | null> = {
   STAT: null,
 }
 
+/** Maps frequency codes to casual human-readable text. */
+export const FREQUENCY_HUMAN: Record<string, string> = {
+  OD: 'once a day',
+  BID: 'twice a day',
+  TID: 'three times a day',
+  QID: 'four times a day',
+  Q4H: 'every 4 hours',
+  Q6H: 'every 6 hours',
+  Q8H: 'every 8 hours',
+  Q12H: 'every 12 hours',
+  PRN: 'as needed',
+  STAT: 'right away',
+  QHS: 'at bedtime',
+  QAM: 'every morning',
+  QPM: 'every evening',
+  QOD: 'every other day',
+  Weekly: 'once a week',
+}
+
 export const ROUTES = [
   'Oral',
   'Sublingual',
