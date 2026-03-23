@@ -57,18 +57,22 @@ export function timeAgo(dateString: string): string {
 }
 
 export function printPdf(url: string): void {
-  // Normalize URL to current origin to avoid cross-origin issues
-  // Backend asset() may return localhost but app runs on clinic.test
+  // In dev, backend asset() returns localhost but app runs on clinic.test
+  // Only normalize when hosts share the same port (dev mismatch), not cross-subdomain (staging/prod)
   try {
     const parsed = new URL(url)
-    if (parsed.origin !== window.location.origin) {
+    const isSameHost = parsed.hostname === window.location.hostname
+    const isDevMismatch = !isSameHost
+      && parsed.port === window.location.port
+      && (parsed.hostname === 'localhost' || window.location.hostname === 'localhost')
+    if (isDevMismatch) {
       url = `${window.location.origin}${parsed.pathname}${parsed.search}`
     }
   } catch {
     // relative URL, keep as-is
   }
 
-  fetch(url)
+  fetch(url, { credentials: 'include' })
     .then((res) => res.blob())
     .then((blob) => {
       const blobUrl = URL.createObjectURL(blob)
