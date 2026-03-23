@@ -12,6 +12,9 @@ import {
   LoaderCircle,
   Check,
   X,
+  FileCheck,
+  Clock,
+  Download,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
@@ -38,6 +41,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
   'record-payment': []
   'void-invoice': []
+  'request-medcert': []
   'updated': []
 }>()
 
@@ -47,11 +51,18 @@ const billingStore = useBillingStore()
 const isEditing = ref(false)
 const editedQuantities = ref<Record<string, number>>({})
 
+const canManageBilling = computed(() => authStore.hasPermission('billing.manage'))
+
 const canRecordPayment = computed(() =>
-  props.invoice?.status !== 'paid' && props.invoice?.status !== 'void',
+  canManageBilling.value
+  && props.invoice?.status !== 'paid'
+  && props.invoice?.status !== 'void',
 )
 
-const canVoid = computed(() => props.invoice?.status !== 'void')
+const canVoid = computed(() =>
+  canManageBilling.value
+  && props.invoice?.status !== 'void',
+)
 
 const canEdit = computed(() =>
   props.invoice
@@ -191,6 +202,15 @@ function editedSubtotal(item: typeof props.invoice extends null ? never : NonNul
     return calcMedicinePricing(qty, item)
   }
   return qty * item.unit_price
+}
+
+async function downloadMedCert(documentId: string) {
+  try {
+    const url = await documentApi.getSignedUrl(documentId)
+    window.open(url, '_blank')
+  } catch {
+    toast.error('Failed to get download link')
+  }
 }
 
 const lineItemTypeLabel: Record<string, string> = {
@@ -373,6 +393,37 @@ const lineItemTypeLabel: Record<string, string> = {
       </div>
 
       <DialogFooter v-if="invoice" class="shrink-0 flex-row gap-2 border-t pt-4 sm:gap-2">
+        <!-- Med cert button -->
+        <template v-if="invoice.consultation_id && invoice.status !== 'void'">
+          <Button
+            v-if="!invoice.medcert_status"
+            variant="outline"
+            class="flex-1"
+            @click="emit('request-medcert')"
+          >
+            <FileCheck class="size-4" />
+            <span class="hidden sm:inline">Request</span> Med Cert
+          </Button>
+          <Button
+            v-else-if="invoice.medcert_status === 'requested'"
+            variant="outline"
+            class="flex-1"
+            disabled
+          >
+            <Clock class="size-4" />
+            Requested
+          </Button>
+          <Button
+            v-else-if="invoice.medcert_status === 'completed' && invoice.medcert_document_id"
+            variant="outline"
+            class="flex-1"
+            @click="downloadMedCert(invoice.medcert_document_id!)"
+          >
+            <Download class="size-4" />
+            Med Cert
+          </Button>
+        </template>
+
         <Button
           variant="outline"
           class="flex-1 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"

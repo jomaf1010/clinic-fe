@@ -121,6 +121,19 @@ export const useBillingStore = defineStore('billing', () => {
     }
   }
 
+  async function requestMedCert(invoiceId: string): Promise<void> {
+    isSaving.value = true
+    try {
+      const response = await billingApi.requestMedCert(invoiceId)
+      currentInvoice.value = response.data
+      const index = invoices.value.findIndex((i) => i.id === invoiceId)
+      if (index !== -1) invoices.value[index] = response.data
+      toast.success('Medical certificate requested')
+    } finally {
+      isSaving.value = false
+    }
+  }
+
   function clearCurrent(): void {
     currentInvoice.value = null
   }
@@ -143,6 +156,7 @@ export const useBillingStore = defineStore('billing', () => {
     updateInvoice,
     recordPayment,
     voidInvoice,
+    requestMedCert,
     clearCurrent,
   }
 })

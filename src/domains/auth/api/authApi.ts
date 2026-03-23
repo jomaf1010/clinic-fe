@@ -80,4 +80,12 @@ export const authApi = {
       // Best-effort — server might be unreachable
     }
   },
+
+  async heartbeat(): Promise<void> {
+    await http.post('/auth/heartbeat', {})
+  },
+
+  async onlineUsers(): Promise<{ data: string[] }> {
+    return http.get<{ data: string[] }>('/auth/online-users')
+  },
 }

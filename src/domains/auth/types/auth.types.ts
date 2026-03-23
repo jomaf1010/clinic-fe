@@ -8,6 +8,7 @@ export interface SignupCredentials {
   email: string
   password: string
   name?: string
+  recaptcha_token: string
 }
 
 export interface TokenResponse {
@@ -25,14 +26,22 @@ export interface Membership {
   id: string
   clinic_id: string
   clinic_name: string
+  logo_url: string | null
   role: string
   status: string
+  plan: 'free' | 'pro'
+  is_trial: boolean
 }
 
 export interface ClinicSettings {
   auto_generate_prescription_pdf?: boolean
   prescription_quantity_mode?: 'absolute' | 'adjusted'
   auto_regenerate_pdf_on_qty_change?: boolean
+}
+
+export interface PlanLimit {
+  max: number | null
+  used: number
 }
 
 export interface ClinicContext {
@@ -46,6 +55,14 @@ export interface ClinicContext {
   role: string
   membership_id: string
   permissions: string[]
+  plan: 'free' | 'pro'
+  is_trial: boolean
+  trial_ends_at: string | null
+  features: string[]
+  limits: {
+    team_members: PlanLimit
+    pdf_generation_daily: PlanLimit
+  }
 }
 
 export interface User {

@@ -55,3 +55,46 @@ export function timeAgo(dateString: string): string {
     return `${months} month${months > 1 ? 's' : ''} and ${remainingDays} day${remainingDays > 1 ? 's' : ''} ago`
   return `${months} month${months > 1 ? 's' : ''} ago`
 }
+
+export function printPdf(url: string): void {
+  // Normalize URL to current origin to avoid cross-origin issues
+  // Backend asset() may return localhost but app runs on clinic.test
+  try {
+    const parsed = new URL(url)
+    if (parsed.origin !== window.location.origin) {
+      url = `${window.location.origin}${parsed.pathname}${parsed.search}`
+    }
+  } catch {
+    // relative URL, keep as-is
+  }
+
+  fetch(url)
+    .then((res) => res.blob())
+    .then((blob) => {
+      const blobUrl = URL.createObjectURL(blob)
+      const iframe = document.createElement('iframe')
+      iframe.style.position = 'fixed'
+      iframe.style.right = '0'
+      iframe.style.bottom = '0'
+      iframe.style.width = '0'
+      iframe.style.height = '0'
+      iframe.style.border = 'none'
+      iframe.src = blobUrl
+      document.body.appendChild(iframe)
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus()
+          iframe.contentWindow?.print()
+        } catch {
+          window.open(url, '_blank')
+        }
+        setTimeout(() => {
+          document.body.removeChild(iframe)
+          URL.revokeObjectURL(blobUrl)
+        }, 60000)
+      }
+    })
+    .catch(() => {
+      window.open(url, '_blank')
+    })
+}

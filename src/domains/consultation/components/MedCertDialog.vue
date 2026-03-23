@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { today, getLocalTimeZone } from '@internationalized/date'
 import type { DateRange, DateValue } from 'reka-ui'
 import { toast } from 'vue-sonner'
+import { HttpError } from '@/lib/http'
 import { FileCheck, LoaderCircle, FileDown, Printer, CalendarDays } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -18,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { printPdf } from '@/lib/utils'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { AssessmentDiagnosis } from '../types/consultation.types'
 
@@ -108,8 +110,11 @@ async function generate() {
     })
     medCertDoc.value = res.data
     startPolling()
-  } catch {
-    toast.error('Failed to generate medical certificate')
+  } catch (err: unknown) {
+    const msg = err instanceof HttpError && (err.data as { message?: string })?.message
+      ? (err.data as { message: string }).message
+      : 'Failed to generate medical certificate'
+    toast.error(msg)
     isGenerating.value = false
   }
 }
@@ -137,17 +142,23 @@ function stopPolling() {
   }
 }
 
-function download() {
-  if (medCertDoc.value?.download_url) {
-    window.open(medCertDoc.value.download_url, '_blank')
+async function download() {
+  if (!medCertDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(medCertDoc.value.id)
+    window.open(url, '_blank')
+  } catch {
+    toast.error('Failed to get download link')
   }
 }
 
-function printDoc() {
-  if (!medCertDoc.value?.download_url) return
-  const w = window.open(medCertDoc.value.download_url, '_blank')
-  if (w) {
-    w.addEventListener('load', () => w.print())
+async function printDoc() {
+  if (!medCertDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(medCertDoc.value.id)
+    printPdf(url)
+  } catch {
+    toast.error('Failed to get download link')
   }
 }
 

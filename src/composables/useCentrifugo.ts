@@ -45,7 +45,14 @@ export function useCentrifugo() {
     onPublication: (ctx: PublicationContext) => void,
   ): void {
     if (!client) return
-    if (subscriptions.has(channel)) return
+
+    // Reuse existing subscription if already active
+    const existing = subscriptions.get(channel) ?? client.getSubscription(channel)
+    if (existing) {
+      existing.on('publication', onPublication)
+      if (!subscriptions.has(channel)) subscriptions.set(channel, existing)
+      return
+    }
 
     const sub = client.newSubscription(channel, {
       getToken: async () => {
@@ -84,11 +91,16 @@ export function useCentrifugo() {
     isConnected.value = false
   }
 
+  function getSubscription(channel: string): Subscription | undefined {
+    return subscriptions.get(channel)
+  }
+
   return {
     isConnected,
     connect,
     subscribe,
     unsubscribe,
+    getSubscription,
     disconnect,
   }
 }

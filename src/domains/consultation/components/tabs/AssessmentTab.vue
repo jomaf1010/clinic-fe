@@ -161,6 +161,23 @@ function emitSave() {
 
 <template>
   <div class="flex flex-col gap-6">
+    <!-- Assessment Notes -->
+    <div class="flex flex-col gap-2">
+      <Label for="assessment-notes" class="flex items-center gap-1.5">
+        <Stethoscope class="size-3.5 text-muted-foreground" />
+        Assessment Notes
+      </Label>
+      <Textarea
+        id="assessment-notes"
+        :model-value="local.notes ?? undefined"
+        placeholder="Additional assessment notes..."
+        :disabled="disabled"
+        :rows="4"
+        @update:model-value="onNotesUpdate"
+        @blur="onNotesBlur"
+      />
+    </div>
+
     <!-- Diagnoses -->
     <div class="flex flex-col gap-2">
       <Label class="flex items-center gap-1.5">
@@ -177,10 +194,10 @@ function emitSave() {
           class="flex items-center gap-1.5 py-1 pl-2.5 pr-1.5"
         >
           <span class="text-sm">
-            <span v-if="diagnosis.code" class="mr-1 font-mono text-xs text-muted-foreground">
+            {{ diagnosis.description }}
+            <span v-if="diagnosis.code" class="ml-1 font-mono text-xs text-muted-foreground">
               {{ diagnosis.code }}
             </span>
-            {{ diagnosis.description }}
           </span>
           <Button
             v-if="!disabled"
@@ -225,33 +242,16 @@ function emitSave() {
             <Badge variant="outline" class="shrink-0 text-[10px]">
               {{ result.source === 'icd' ? 'ICD' : 'Custom' }}
             </Badge>
+            <span class="truncate">{{ result.description }}</span>
             <span v-if="result.code" class="shrink-0 font-mono text-xs text-muted-foreground">
               {{ result.code }}
             </span>
-            <span class="truncate">{{ result.description }}</span>
           </button>
         </div>
       </div>
       <p v-if="!disabled" class="text-xs text-muted-foreground">
         Type to search or press Enter to add a custom diagnosis
       </p>
-    </div>
-
-    <!-- Assessment Notes -->
-    <div class="flex flex-col gap-2">
-      <Label for="assessment-notes" class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Assessment Notes
-      </Label>
-      <Textarea
-        id="assessment-notes"
-        :model-value="local.notes ?? undefined"
-        placeholder="Additional assessment notes..."
-        :disabled="disabled"
-        :rows="4"
-        @update:model-value="onNotesUpdate"
-        @blur="onNotesBlur"
-      />
     </div>
   </div>
 </template>

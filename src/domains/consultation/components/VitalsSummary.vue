@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { AlertTriangle, CheckCircle2, ShieldAlert, HeartPulse, History, LoaderCircle, TrendingUp, FlaskConical } from 'lucide-vue-next'
+import { AlertTriangle, CheckCircle2, ShieldAlert, HeartPulse, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -10,6 +10,7 @@ import { VisXYContainer, VisLine, VisAxis, VisArea, VisScatter, VisTooltip } fro
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { http } from '@/lib/http'
 import type { ConsultationTriage, ConsultationResponse, LabOrderSummary } from '../types/consultation.types'
+import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar } from '@/lib/vitals'
 import { labOrderApi } from '../api/labOrderApi'
 import FinalizeModal from './FinalizeModal.vue'
 
@@ -119,10 +120,10 @@ const bpSystolic = (d: BPDataPoint) => d.systolic
 const bpDiastolic = (d: BPDataPoint) => d.diastolic
 
 function bpStatusColor(systolic: number, diastolic: number): { label: string; color: string } {
-  if (systolic < 90 || diastolic < 60) return { label: 'Low', color: '#2563eb' }
-  if (systolic <= 120 && diastolic <= 80) return { label: 'Normal', color: '#16a34a' }
-  if (systolic <= 139 || diastolic <= 89) return { label: 'Elevated', color: '#d97706' }
-  return { label: 'High', color: '#dc2626' }
+  const s = classifyBpAsStatus(`${systolic}/${diastolic}`)
+  if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
+  if (s.severity === 'elevated' || s.severity === 'low') return { label: s.label, color: '#d97706' }
+  return { label: s.label, color: '#dc2626' }
 }
 
 function bpTooltipTemplate(d: BPDataPoint): string {
@@ -153,10 +154,11 @@ const bsX = (_: BSDataPoint, i: number) => i
 const bsY = (d: BSDataPoint) => d.blood_sugar
 
 function bsStatusColor(val: number): { label: string; color: string } {
-  if (val < 70) return { label: 'Low (Hypoglycemia)', color: '#2563eb' }
-  if (val <= 100) return { label: 'Normal', color: '#16a34a' }
-  if (val <= 125) return { label: 'Pre-diabetic', color: '#d97706' }
-  return { label: 'High (Diabetic)', color: '#dc2626' }
+  const s = classifyBloodSugar(val)
+  if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
+  if (s.severity === 'low') return { label: s.label, color: '#2563eb' }
+  if (s.severity === 'elevated') return { label: s.label, color: '#d97706' }
+  return { label: s.label, color: '#dc2626' }
 }
 
 function bsTooltipTemplate(d: BSDataPoint): string {
@@ -286,13 +288,6 @@ function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function parseBP(bp: string | null): { systolic: number; diastolic: number } | null {
-  if (!bp) return null
-  const match = bp.match(/^(\d+)\s*\/\s*(\d+)$/)
-  if (!match) return null
-  return { systolic: parseInt(match[1]), diastolic: parseInt(match[2]) }
-}
-
 const bmi = computed(() => {
   if (!props.triage.weight || !props.triage.height) return null
   const heightM = props.triage.height / 100
@@ -308,50 +303,39 @@ const bmiCategory = computed(() => {
 })
 
 const tempStatus = computed(() => {
-  if (props.triage.vitals?.temp === null || props.triage.vitals?.temp === undefined) return null
-  if (props.triage.vitals.temp < 36) return { label: 'Hypothermia', color: 'text-blue-600', icon: AlertTriangle }
-  if (props.triage.vitals.temp <= 37.5) return { label: 'Normal', color: 'text-green-600', icon: CheckCircle2 }
-  if (props.triage.vitals.temp <= 38.5) return { label: 'Low-grade fever', color: 'text-amber-600', icon: AlertTriangle }
-  return { label: 'High fever', color: 'text-red-600', icon: AlertTriangle }
+  const s = classifyTemp(props.triage.vitals?.temp)
+  if (!s) return null
+  return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bpStatus = computed(() => {
-  const parsed = parseBP(props.triage.vitals?.bp ?? null)
-  if (!parsed) return null
-  const { systolic, diastolic } = parsed
-  if (systolic < 90 || diastolic < 60) return { label: 'Low', color: 'text-blue-600', icon: AlertTriangle }
-  if (systolic <= 120 && diastolic <= 80) return { label: 'Normal', color: 'text-green-600', icon: CheckCircle2 }
-  if (systolic <= 139 || diastolic <= 89) return { label: 'Elevated', color: 'text-amber-600', icon: AlertTriangle }
-  return { label: 'High', color: 'text-red-600', icon: AlertTriangle }
+  const s = classifyBpAsStatus(props.triage.vitals?.bp)
+  if (!s) return null
+  return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const hrStatus = computed(() => {
-  if (props.triage.vitals?.hr === null || props.triage.vitals?.hr === undefined) return null
-  if (props.triage.vitals.hr < 60) return { label: 'Bradycardia', color: 'text-blue-600', icon: AlertTriangle }
-  if (props.triage.vitals.hr <= 100) return { label: 'Normal', color: 'text-green-600', icon: CheckCircle2 }
-  return { label: 'Tachycardia', color: 'text-red-600', icon: AlertTriangle }
+  const s = classifyHr(props.triage.vitals?.hr)
+  if (!s) return null
+  return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const spo2Status = computed(() => {
-  if (props.triage.vitals?.spo2 === null || props.triage.vitals?.spo2 === undefined) return null
-  if (props.triage.vitals.spo2 >= 95) return { label: 'Normal', color: 'text-green-600', icon: CheckCircle2 }
-  if (props.triage.vitals.spo2 >= 90) return { label: 'Low', color: 'text-amber-600', icon: AlertTriangle }
-  return { label: 'Critical', color: 'text-red-600', icon: AlertTriangle }
+  const s = classifySpo2(props.triage.vitals?.spo2)
+  if (!s) return null
+  return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const rrStatus = computed(() => {
-  if (props.triage.vitals?.rr === null || props.triage.vitals?.rr === undefined) return null
-  if (props.triage.vitals.rr < 12) return { label: 'Low', color: 'text-blue-600', icon: AlertTriangle }
-  if (props.triage.vitals.rr <= 20) return { label: 'Normal', color: 'text-green-600', icon: CheckCircle2 }
-  return { label: 'Elevated', color: 'text-red-600', icon: AlertTriangle }
+  const s = classifyRr(props.triage.vitals?.rr)
+  if (!s) return null
+  return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bsStatus = computed(() => {
-  if (props.triage.vitals?.blood_sugar === null || props.triage.vitals?.blood_sugar === undefined) return null
-  if (props.triage.vitals.blood_sugar < 70) return { label: 'Low', color: 'text-blue-600', icon: AlertTriangle }
-  if (props.triage.vitals.blood_sugar <= 100) return { label: 'Normal', color: 'text-green-600', icon: CheckCircle2 }
-  if (props.triage.vitals.blood_sugar <= 125) return { label: 'Pre-diabetic', color: 'text-amber-600', icon: AlertTriangle }
-  return { label: 'High', color: 'text-red-600', icon: AlertTriangle }
+  const s = classifyBloodSugar(props.triage.vitals?.blood_sugar)
+  if (!s) return null
+  return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const hasAllergies = computed(() => (props.allergies?.length ?? 0) > 0)
@@ -365,177 +349,176 @@ const hasAnyVital = computed(() =>
 
 const hasPastDiagnoses = computed(() => pastDiagnoses.value.length > 0)
 const hasLabResults = computed(() => (props.labOrderSummary?.total ?? 0) > 0)
+const BADGE_RED = 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600'
+const BADGE_AMBER = 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600'
+const BADGE_BLUE = 'text-white bg-blue-500 border-blue-500 dark:bg-blue-600 dark:border-blue-600'
+const BADGE_GREEN = 'border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400'
+
+interface VitalBadge { label: string; value: string; status: string; badgeClass: string }
+
+function severityToBadge(severity: string): string {
+  if (severity === 'critical' || severity === 'high') return BADGE_RED
+  if (severity === 'elevated') return BADGE_AMBER
+  if (severity === 'low') return BADGE_BLUE
+  return BADGE_GREEN
+}
+
+const vitalBadges = computed(() => {
+  const vitals = props.triage.vitals
+  if (!vitals) return []
+
+  const badges: VitalBadge[] = []
+
+  if (bmi.value !== null && bmiCategory.value) {
+    const isNormal = bmi.value >= 18.5 && bmi.value < 25
+    badges.push({
+      label: 'BMI',
+      value: `${bmi.value}`,
+      status: bmiCategory.value.label,
+      badgeClass: isNormal ? BADGE_GREEN : bmi.value < 18.5 ? BADGE_BLUE : bmi.value < 30 ? BADGE_AMBER : BADGE_RED,
+    })
+  }
+
+  if (bpStatus.value) {
+    badges.push({
+      label: 'BP',
+      value: vitals.bp ?? '',
+      status: bpStatus.value.label,
+      badgeClass: severityToBadge(bpStatus.value.severity),
+    })
+  }
+
+  if (tempStatus.value) {
+    badges.push({
+      label: 'Temp',
+      value: `${vitals.temp}°C`,
+      status: tempStatus.value.label,
+      badgeClass: severityToBadge(tempStatus.value.severity),
+    })
+  }
+
+  if (hrStatus.value) {
+    badges.push({
+      label: 'HR',
+      value: `${vitals.hr} bpm`,
+      status: hrStatus.value.label,
+      badgeClass: severityToBadge(hrStatus.value.severity),
+    })
+  }
+
+  if (spo2Status.value) {
+    badges.push({
+      label: 'SpO2',
+      value: `${vitals.spo2}%`,
+      status: spo2Status.value.label,
+      badgeClass: severityToBadge(spo2Status.value.severity),
+    })
+  }
+
+  if (rrStatus.value) {
+    badges.push({
+      label: 'RR',
+      value: `${vitals.rr}/min`,
+      status: rrStatus.value.label,
+      badgeClass: severityToBadge(rrStatus.value.severity),
+    })
+  }
+
+  if (bsStatus.value) {
+    badges.push({
+      label: 'Sugar',
+      value: `${vitals.blood_sugar} mg/dL`,
+      status: bsStatus.value.label,
+      badgeClass: severityToBadge(bsStatus.value.severity),
+    })
+  }
+
+  return badges
+})
+
+const showDisclaimer = ref(false)
+
 const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || hasConditions.value || hasPastDiagnoses.value || hasLabResults.value)
 </script>
 
 <template>
   <TooltipProvider v-if="hasAnything" :delay-duration="200">
     <div class="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2">
-    <div v-if="hasAnyVital" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs [&>span.sep]:h-3 [&>span.sep]:w-px [&>span.sep]:bg-border">
-      <span class="font-medium text-muted-foreground">Vitals</span>
-      <span class="sep" />
+    <div v-if="hasAnyVital" class="flex flex-wrap items-center gap-1.5">
+      <span
+        v-for="badge in vitalBadges"
+        :key="badge.label"
+        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium"
+        :class="badge.badgeClass"
+      >
+        <AlertTriangle v-if="badge.status !== 'Normal'" class="size-3" />
+        <CheckCircle2 v-else class="size-3" />
+        {{ badge.label }}: {{ badge.value }}
+        <span class="opacity-75">{{ badge.status }}</span>
+      </span>
+      <button
+        type="button"
+        class="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        @click="showDisclaimer = !showDisclaimer"
+      >
+        <Info class="size-3.5" />
+      </button>
+    </div>
 
-      <Tooltip v-if="bmi !== null">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            BMI {{ bmi }} <span :class="bmiCategory?.color" class="font-medium">{{ bmiCategory?.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">BMI Reference</p>
-          <p>&lt;18.5 Underweight</p>
-          <p>18.5–24.9 Normal</p>
-          <p>25–29.9 Overweight</p>
-          <p>≥30 Obese</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <span v-if="bpStatus" class="sep" />
-      <Tooltip v-if="bpStatus">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            <component :is="bpStatus.icon" :class="bpStatus.color" class="size-3" />
-            BP <span :class="bpStatus.color" class="font-medium">{{ bpStatus.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">Blood Pressure (mmHg)</p>
-          <p>&lt;90/60 Low</p>
-          <p>90/60–120/80 Normal</p>
-          <p>121/81–139/89 Elevated</p>
-          <p>≥140/90 High</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <span v-if="tempStatus" class="sep" />
-      <Tooltip v-if="tempStatus">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            <component :is="tempStatus.icon" :class="tempStatus.color" class="size-3" />
-            Temp <span :class="tempStatus.color" class="font-medium">{{ tempStatus.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">Temperature (°C)</p>
-          <p>&lt;36 Hypothermia</p>
-          <p>36–37.5 Normal</p>
-          <p>37.6–38.5 Low-grade fever</p>
-          <p>&gt;38.5 High fever</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <span v-if="hrStatus" class="sep" />
-      <Tooltip v-if="hrStatus">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            <component :is="hrStatus.icon" :class="hrStatus.color" class="size-3" />
-            HR <span :class="hrStatus.color" class="font-medium">{{ hrStatus.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">Heart Rate (bpm)</p>
-          <p>&lt;60 Bradycardia</p>
-          <p>60–100 Normal</p>
-          <p>&gt;100 Tachycardia</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <span v-if="spo2Status" class="sep" />
-      <Tooltip v-if="spo2Status">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            <component :is="spo2Status.icon" :class="spo2Status.color" class="size-3" />
-            SpO2 <span :class="spo2Status.color" class="font-medium">{{ spo2Status.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">Oxygen Saturation (%)</p>
-          <p>95–100 Normal</p>
-          <p>90–94 Low</p>
-          <p>&lt;90 Critical</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <span v-if="rrStatus" class="sep" />
-      <Tooltip v-if="rrStatus">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            <component :is="rrStatus.icon" :class="rrStatus.color" class="size-3" />
-            RR <span :class="rrStatus.color" class="font-medium">{{ rrStatus.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">Respiratory Rate (breaths/min)</p>
-          <p>&lt;12 Low</p>
-          <p>12–20 Normal</p>
-          <p>&gt;20 Elevated</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <span v-if="bsStatus" class="sep" />
-      <Tooltip v-if="bsStatus">
-        <TooltipTrigger as-child>
-          <span class="flex cursor-help items-center gap-1">
-            <component :is="bsStatus.icon" :class="bsStatus.color" class="size-3" />
-            BS <span :class="bsStatus.color" class="font-medium">{{ bsStatus.label }}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" class="max-w-56 text-xs">
-          <p class="font-medium">Blood Sugar (mg/dL, fasting)</p>
-          <p>&lt;70 Low (Hypoglycemia)</p>
-          <p>70–100 Normal</p>
-          <p>101–125 Pre-diabetic</p>
-          <p>&gt;125 High (Diabetic)</p>
-        </TooltipContent>
-      </Tooltip>
+    <!-- Clinical disclaimer -->
+    <div
+      v-if="showDisclaimer"
+      class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+    >
+      <Info class="mt-0.5 size-3.5 shrink-0" />
+      <p>
+        Vital sign classifications are based on general clinical reference ranges and are intended as decision-support only.
+        They do not account for patient-specific factors such as age, medical history, medications, or clinical context.
+        Always exercise independent clinical judgment.
+      </p>
     </div>
 
     <!-- Allergies & Conditions -->
-    <div v-if="hasAllergies || hasConditions" class="flex flex-wrap items-center gap-1.5 text-xs">
-      <template v-if="hasAllergies">
-        <span class="flex items-center gap-1 font-medium text-red-600 dark:text-red-400">
-          <ShieldAlert class="size-3" />
-          Allergies
-        </span>
-        <span
-          v-for="allergy in allergies"
-          :key="allergy"
-          class="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
-        >
-          {{ allergy }}
-        </span>
-      </template>
-      <span v-if="hasAllergies && hasConditions" class="mx-1 h-3 w-px bg-border" />
-      <template v-if="hasConditions">
-        <span class="flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
-          <HeartPulse class="size-3" />
-          Conditions
-        </span>
-        <span
-          v-for="condition in conditions"
-          :key="condition"
-          class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-        >
-          {{ condition }}
-        </span>
-      </template>
+    <div v-if="hasAllergies || hasConditions" class="flex flex-wrap gap-1.5">
+      <span
+        v-for="allergy in allergies"
+        :key="'a-' + allergy"
+        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600"
+      >
+        <ShieldAlert class="size-3" />
+        {{ allergy }}
+      </span>
+      <span
+        v-for="condition in conditions"
+        :key="'c-' + condition"
+        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600"
+      >
+        <HeartPulse class="size-3" />
+        {{ condition }}
+      </span>
     </div>
     <!-- Past Diagnoses -->
-    <div v-if="hasPastDiagnoses" class="flex flex-wrap items-center gap-1.5 text-xs">
+    <div v-if="hasPastDiagnoses" class="flex flex-col gap-1 text-xs">
       <span class="flex items-center gap-1 font-medium text-muted-foreground">
         <History class="size-3" />
         Recent Dx
       </span>
-      <button
-        v-for="(dx, i) in pastDiagnoses"
-        :key="i"
-        type="button"
-        class="rounded-full border bg-muted/50 px-2 py-0.5 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-foreground"
-        @click="openConsultationPreview(dx.consultationId)"
-      >
-        {{ dx.description }}<span v-if="dx.code" class="ml-0.5 opacity-60">({{ dx.code }})</span>
-        <span class="ml-0.5 opacity-50">{{ formatShortDate(dx.date) }}</span>
-      </button>
+      <ul class="flex flex-col gap-0.5 pl-4">
+        <li
+          v-for="(dx, i) in pastDiagnoses"
+          :key="i"
+          class="list-disc text-muted-foreground"
+        >
+          <button
+            type="button"
+            class="text-left transition-colors hover:text-foreground"
+            @click="openConsultationPreview(dx.consultationId)"
+          >
+            {{ dx.description }}<span v-if="dx.code" class="ml-0.5 opacity-60">({{ dx.code }})</span>
+            <span class="ml-1 opacity-50">{{ formatShortDate(dx.date) }}</span>
+          </button>
+        </li>
+      </ul>
     </div>
     </div>
 
@@ -565,9 +548,9 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
       </template>
       <Button
         v-if="showTrendsButton"
-        variant="ghost"
+        variant="outline"
         size="sm"
-        class="ml-auto h-6 gap-1 px-2 text-xs text-muted-foreground"
+        class="h-6 gap-1 px-2 text-xs"
         @click="openTrends"
       >
         <TrendingUp class="size-3" />

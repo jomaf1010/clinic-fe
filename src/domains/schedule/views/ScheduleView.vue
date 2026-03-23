@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { toast } from 'vue-sonner'
 import { CalendarDate, type DateValue, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateRange } from 'reka-ui'
@@ -257,6 +258,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <FeatureGate feature="schedule" label="Schedule">
   <div class="-mx-4 -mb-4 flex min-h-0 flex-1 flex-col gap-0 md:flex-row">
     <!-- Left panel -->
     <div class="hidden shrink-0 flex-col gap-4 border-r p-4 md:flex md:w-72 md:p-5">
@@ -453,4 +455,5 @@ onMounted(() => {
       </DialogFooter>
     </DialogContent>
   </Dialog>
+  </FeatureGate>
 </template>

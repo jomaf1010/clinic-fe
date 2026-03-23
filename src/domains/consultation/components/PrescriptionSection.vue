@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
+import { HttpError } from '@/lib/http'
 import {
   AlertTriangle,
   Calculator,
@@ -41,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { printPdf } from '@/lib/utils'
 import { prescriptionApi } from '../api/prescriptionApi'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { PrescriptionResponse, PrescriptionItem } from '../types/prescription.types'
@@ -91,8 +93,11 @@ async function generatePdf() {
     const res = await documentApi.generate(props.consultationId, 'prescription')
     pdfDoc.value = res.data
     startPolling()
-  } catch {
-    toast.error('Failed to generate prescription PDF')
+  } catch (err: unknown) {
+    const msg = err instanceof HttpError && (err.data as { message?: string })?.message
+      ? (err.data as { message: string }).message
+      : 'Failed to generate prescription PDF'
+    toast.error(msg)
     isGeneratingPdf.value = false
   }
 }
@@ -120,19 +125,23 @@ function stopPolling() {
   }
 }
 
-function downloadPdf() {
-  if (pdfDoc.value?.download_url) {
-    window.open(pdfDoc.value.download_url, '_blank')
+async function downloadPdf() {
+  if (!pdfDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(pdfDoc.value.id)
+    window.open(url, '_blank')
+  } catch {
+    toast.error('Failed to get download link')
   }
 }
 
-function printPdf() {
-  if (!pdfDoc.value?.download_url) return
-  const printWindow = window.open(pdfDoc.value.download_url, '_blank')
-  if (printWindow) {
-    printWindow.addEventListener('load', () => {
-      printWindow.print()
-    })
+async function printPrescription() {
+  if (!pdfDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(pdfDoc.value.id)
+    printPdf(url)
+  } catch {
+    toast.error('Failed to get download link')
   }
 }
 
@@ -597,7 +606,7 @@ const canSave = () => {
           variant="outline"
           size="sm"
           class="h-7 gap-1.5 text-xs"
-          @click="printPdf"
+          @click="printPrescription"
         >
           <Printer class="size-3" />
           Print

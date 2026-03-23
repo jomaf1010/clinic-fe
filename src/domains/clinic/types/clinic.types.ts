@@ -1,7 +1,7 @@
 export interface CreateClinicPayload {
   clinic_name: string
   address?: string
-  default_fee?: string
+  email?: string
 }
 
 export interface ClinicResponse {

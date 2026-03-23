@@ -17,6 +17,7 @@ const emit = defineEmits<{
 
 const editorRef = ref<HTMLDivElement | null>(null)
 const emojiOpen = ref(false)
+const isEditorEmpty = ref(true)
 
 // --- @patient mention ---
 const mentionQuery = ref<string | null>(null)
@@ -124,6 +125,7 @@ function selectPatient(patient: PatientSearchResult) {
   sel.addRange(newRange)
 
   closeMention()
+  isEditorEmpty.value = isEmpty()
 }
 
 function closeMention() {
@@ -199,10 +201,12 @@ function insertEmoji(emoji: string) {
     el.appendChild(document.createTextNode(emoji))
   }
   emojiOpen.value = false
+  isEditorEmpty.value = isEmpty()
 }
 
 function onInput() {
   detectMention()
+  isEditorEmpty.value = isEmpty()
   emit('typing')
 }
 
@@ -216,6 +220,7 @@ function handleSend() {
   if (editorRef.value) {
     editorRef.value.innerHTML = ''
   }
+  isEditorEmpty.value = true
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -340,7 +345,7 @@ function onPaste(e: ClipboardEvent) {
       <Button
         size="icon"
         class="shrink-0"
-        :disabled="isEmpty()"
+        :disabled="isEditorEmpty"
         @click="handleSend"
       >
         <SendHorizontal class="size-4" />

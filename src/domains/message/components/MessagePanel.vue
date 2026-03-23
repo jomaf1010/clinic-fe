@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ArrowLeft, LoaderCircle, MessageSquare, Plus } from 'lucide-vue-next'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import OnlineDot from '@/components/OnlineDot.vue'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useMessageStore } from '../stores/messageStore'
@@ -21,12 +23,18 @@ const newDialogOpen = ref(false)
 
 const { onInput: onTypingInput } = useTypingIndicator(() => messageStore.activeConversationId)
 
-const otherParticipantName = computed(() => {
+const otherParticipant = computed(() => {
   const conv = messageStore.activeConversation
-  if (!conv) return ''
+  if (!conv) return null
   const userId = authStore.user?.id
-  const other = conv.participants.find((p) => p.id !== userId)
-  return other?.name ?? 'Unknown'
+  return conv.participants.find((p) => p.id !== userId) ?? null
+})
+
+const otherParticipantName = computed(() => otherParticipant.value?.name ?? 'Unknown')
+
+const otherParticipantInitials = computed(() => {
+  const name = otherParticipantName.value
+  return name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 })
 
 const showThread = computed(() => messageStore.activeConversationId !== null)
@@ -106,6 +114,13 @@ onMounted(() => {
           >
             <ArrowLeft class="size-4" />
           </Button>
+          <div class="relative">
+            <Avatar class="size-7">
+              <AvatarImage v-if="otherParticipant?.avatar_url" :src="otherParticipant.avatar_url" :alt="otherParticipantName" />
+              <AvatarFallback class="text-[10px]">{{ otherParticipantInitials }}</AvatarFallback>
+            </Avatar>
+            <OnlineDot :user-id="otherParticipant?.id ?? null" />
+          </div>
           <span class="text-sm font-semibold">{{ otherParticipantName }}</span>
         </div>
 

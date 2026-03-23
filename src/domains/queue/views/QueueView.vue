@@ -67,7 +67,7 @@ const completeTargetId = ref<string | null>(null)
 const isCompleting = ref(false)
 const error = ref<string | null>(null)
 const statusFilter = ref<string>('all')
-const viewMode = ref<'list' | 'kanban'>('kanban')
+const viewMode = ref<'list' | 'kanban'>(window.innerWidth < 1024 ? 'list' : 'kanban')
 
 const displayToken = ref<QueueDisplayTokenStatus>({ token: null, created_at: null })
 const isLoadingDisplayToken = ref(false)

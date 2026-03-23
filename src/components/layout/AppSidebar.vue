@@ -2,17 +2,15 @@
 import {
   Calendar,
   CalendarCheck,
-  Component,
+  Crown,
   LayoutDashboard,
   ListOrdered,
   MessageSquare,
   Receipt,
-  ScrollText,
-  ShieldCheck,
   Stethoscope,
   Users,
-  UsersRound,
 } from 'lucide-vue-next'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RouteNames } from '@/router/routeNames'
@@ -23,6 +21,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
+  useSidebar,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
@@ -31,11 +30,26 @@ import NavMain from '@/components/layout/NavMain.vue'
 import NavSecondary from '@/components/layout/NavSecondary.vue'
 import NavUser from '@/components/layout/NavUser.vue'
 import SwitchClinicDialog from '@/components/layout/SwitchClinicDialog.vue'
+import UpgradePrompt from '@/components/shared/UpgradePrompt.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
+const { isMobile, setOpenMobile } = useSidebar()
 const switchDialogOpen = ref(false)
+const upgradeDialogOpen = ref(false)
+const upgradeFeatureLabel = ref('')
+
+function openSwitchDialog() {
+  if (isMobile.value) setOpenMobile(false)
+  switchDialogOpen.value = true
+}
+
+function handleLockedClick(title: string) {
+  if (isMobile.value) setOpenMobile(false)
+  upgradeFeatureLabel.value = title
+  upgradeDialogOpen.value = true
+}
 
 const allNavItems = [
   {
@@ -56,18 +70,15 @@ const allNavItems = [
     url: '/appointments',
     icon: CalendarCheck,
     permission: 'appointments.view',
-  },
-  {
-    title: 'Clinic',
-    url: '/clinic',
-    icon: Stethoscope,
-    permission: ['medicines.view', 'consumables.view', 'lab-services.view'],
+    feature: 'appointments',
+    separator: true,
   },
   {
     title: 'Schedule',
     url: '/schedule',
     icon: Calendar,
     permission: 'schedule.view',
+    feature: 'schedule',
   },
   {
     title: 'Queue',
@@ -76,51 +87,42 @@ const allNavItems = [
     permission: 'queue.view',
   },
   {
+    title: 'Clinic',
+    url: '/clinic',
+    icon: Stethoscope,
+    permission: ['medicines.view', 'consumables.view', 'lab-services.view', 'team.view', 'roles.manage', 'audit-logs.view'],
+    separator: true,
+  },
+  {
     title: 'Billing',
     url: '/billing',
     icon: Receipt,
-    permission: 'billing.view',
+    permission: ['billing.view', 'billing.view-own'],
   },
   {
     title: 'Messages',
     url: '/messages',
     icon: MessageSquare,
     permission: 'messages.view',
+    feature: 'messages',
     badge: () => messageStore.totalUnread,
-  },
-  {
-    title: 'Team',
-    url: '/team',
-    icon: UsersRound,
-    permission: 'team.view',
-  },
-  {
-    title: 'Roles',
-    url: '/roles',
-    icon: ShieldCheck,
-    permission: 'roles.manage',
-  },
-  {
-    title: 'Logs',
-    url: '/logs',
-    icon: ScrollText,
-    permission: 'audit-logs.view',
-  },
-  {
-    title: 'Components',
-    url: '/components',
-    icon: Component,
+    separator: true,
   },
 ]
 
 const navMain = computed(() =>
-  allNavItems.filter((item) => {
-    if (!item.permission) return true
-    if (Array.isArray(item.permission)) {
-      return item.permission.some((p) => authStore.hasPermission(p))
-    }
-    return authStore.hasPermission(item.permission)
-  }),
+  allNavItems
+    .filter((item) => {
+      if (!item.permission) return true
+      if (Array.isArray(item.permission)) {
+        return item.permission.some((p) => authStore.hasPermission(p))
+      }
+      return authStore.hasPermission(item.permission)
+    })
+    .map((item) => ({
+      ...item,
+      locked: item.feature ? !authStore.hasFeature(item.feature) : false,
+    })),
 )
 
 const navSecondary: { title: string; url: string; icon: typeof LifeBuoy }[] = []
@@ -128,6 +130,7 @@ const navSecondary: { title: string; url: string; icon: typeof LifeBuoy }[] = []
 const userData = computed(() => ({
   name: authStore.user?.name ?? authStore.user?.email ?? 'User',
   email: authStore.user?.email ?? '',
+  avatarUrl: authStore.user?.avatar_url ?? null,
 }))
 
 const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Clinic App')
@@ -144,9 +147,12 @@ async function handleLogout() {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" as="a" href="/">
-            <div class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-              <Stethoscope class="size-4" />
-            </div>
+            <Avatar class="size-8 rounded-lg">
+              <AvatarImage v-if="authStore.currentClinic?.logo_url" :src="authStore.currentClinic.logo_url" alt="Clinic logo" class="rounded-lg object-cover" />
+              <AvatarFallback class="bg-sidebar-primary text-sidebar-primary-foreground rounded-lg text-xs">
+                <Stethoscope class="size-4" />
+              </AvatarFallback>
+            </Avatar>
             <div class="grid flex-1 text-left text-sm leading-tight">
               <span class="truncate font-medium">{{ clinicName }}</span>
               <span class="truncate text-xs capitalize">{{ authStore.currentClinic?.role ?? 'Management' }}</span>
@@ -156,7 +162,7 @@ async function handleLogout() {
       </SidebarMenu>
     </SidebarHeader>
     <SidebarContent>
-      <NavMain :items="navMain" />
+      <NavMain :items="navMain" @locked-click="handleLockedClick" />
       <NavSecondary :items="navSecondary" />
     </SidebarContent>
     <SidebarFooter>
@@ -164,9 +170,10 @@ async function handleLogout() {
         :user="userData"
         :show-switch-clinic="authStore.memberships.length > 1"
         @logout="handleLogout"
-        @switch-clinic="switchDialogOpen = true"
+        @switch-clinic="openSwitchDialog"
       />
     </SidebarFooter>
   </Sidebar>
   <SwitchClinicDialog v-model:open="switchDialogOpen" />
+  <UpgradePrompt v-model:open="upgradeDialogOpen" :feature="upgradeFeatureLabel" />
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { HttpError } from '@/lib/http'
 import {
   Stethoscope,
   Activity,
@@ -121,10 +122,27 @@ onMounted(async () => {
     } else {
       const id = route.params.id as string
       await store.loadConsultation(id)
-
     }
-  } catch {
-    loadError.value = 'Failed to load consultation. Please try again.'
+
+    // Auto-open med cert dialog from notification
+    if (route.query.openMedCert === '1') {
+      showMedCertDialog.value = true
+      router.replace({ ...route, query: { ...route.query, openMedCert: undefined } })
+    }
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 403) {
+      loadError.value = 'You don\'t have permission to access this consultation.'
+    } else {
+      loadError.value = 'Failed to load consultation. Please try again.'
+    }
+  }
+})
+
+// Handle openMedCert query when navigating to same consultation (component reuse)
+watch(() => route.query.openMedCert, (val) => {
+  if (val === '1') {
+    showMedCertDialog.value = true
+    router.replace({ ...route, query: { ...route.query, openMedCert: undefined } })
   }
 })
 
@@ -359,7 +377,7 @@ async function handleFinalizeAndPay(): Promise<void> {
             :doctor-id="store.current.created_by"
             :consumables="store.current.consumables ?? []"
             :disabled="store.isFinalized || !canEditTreatmentPlan"
-            :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create')"
+            :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
             :prescription-update="prescriptionUpdate"
             :lab-order-update="labOrderUpdate"
             :document-update="documentUpdate"

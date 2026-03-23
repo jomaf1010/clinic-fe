@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
+import { HttpError } from '@/lib/http'
 import {
   Plus,
   Search,
@@ -29,6 +30,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useCentrifugo } from '@/composables/useCentrifugo'
 import { useBillingStore } from '../stores/billingStore'
 import BillingStatCards from '../components/BillingStatCards.vue'
 import InvoiceTable from '../components/InvoiceTable.vue'
@@ -39,6 +41,7 @@ import type { InvoiceResponse } from '../types/billing.types'
 
 const authStore = useAuthStore()
 const billingStore = useBillingStore()
+const { connect, subscribe, getSubscription } = useCentrifugo()
 
 // UI state
 const showCreateDialog = ref(false)
@@ -166,6 +169,20 @@ function onPaymentRecorded() {
   fetchInvoices(billingStore.currentPage)
 }
 
+async function handleRequestMedCert() {
+  if (!selectedInvoice.value) return
+  try {
+    await billingStore.requestMedCert(selectedInvoice.value.id)
+    const updated = billingStore.invoices.find((i) => i.id === selectedInvoice.value?.id)
+    if (updated) selectedInvoice.value = updated
+  } catch (err: unknown) {
+    const msg = err instanceof HttpError && (err.data as { message?: string })?.message
+      ? (err.data as { message: string }).message
+      : 'Failed to request medical certificate.'
+    toast.error(msg)
+  }
+}
+
 function onInvoiceCreated() {
   fetchInvoices(1)
   billingStore.fetchSummary()
@@ -173,9 +190,31 @@ function onInvoiceCreated() {
 
 watch(statusFilter, onStatusChange)
 
+function onBillingEvent(ctx: { data?: { type?: string } }) {
+  const type = ctx.data?.type
+  if (type?.startsWith('invoice.')) {
+    fetchInvoices(billingStore.currentPage)
+    billingStore.fetchSummary()
+  }
+}
+
 onMounted(() => {
   billingStore.fetchSummary()
   fetchInvoices(1)
+
+  const clinicId = authStore.currentClinic?.id
+  if (clinicId) {
+    connect()
+    subscribe(`clinic:${clinicId}:dashboard`, onBillingEvent)
+  }
+})
+
+onUnmounted(() => {
+  const clinicId = authStore.currentClinic?.id
+  if (clinicId) {
+    const sub = getSubscription(`clinic:${clinicId}:dashboard`)
+    sub?.removeListener('publication', onBillingEvent)
+  }
 })
 </script>
 
@@ -278,6 +317,7 @@ onMounted(() => {
       @update:open="showDetailSheet = $event"
       @record-payment="handleRecordPayment"
       @void-invoice="handleVoidInvoice"
+      @request-medcert="handleRequestMedCert"
       @updated="onInvoiceUpdated"
     />
 

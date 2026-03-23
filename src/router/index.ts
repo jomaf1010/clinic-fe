@@ -83,6 +83,21 @@ const router = createRouter({
               name: RouteNames.CLINIC_TEMPLATES,
               component: () => import('@/domains/template/views/TemplateListView.vue'),
             },
+            {
+              path: 'team',
+              name: RouteNames.TEAM,
+              component: () => import('@/domains/team/views/TeamManagementView.vue'),
+            },
+            {
+              path: 'roles',
+              name: RouteNames.ROLES,
+              component: () => import('@/domains/roles/views/RoleManagementView.vue'),
+            },
+            {
+              path: 'logs',
+              name: RouteNames.AUDIT_LOG_LIST,
+              component: () => import('@/domains/audit-log/views/AuditLogListView.vue'),
+            },
           ],
         },
         {
@@ -101,16 +116,6 @@ const router = createRouter({
           component: () => import('@/domains/queue/views/QueueView.vue'),
         },
         {
-          path: 'team',
-          name: RouteNames.TEAM,
-          component: () => import('@/domains/team/views/TeamManagementView.vue'),
-        },
-        {
-          path: 'roles',
-          name: RouteNames.ROLES,
-          component: () => import('@/domains/roles/views/RoleManagementView.vue'),
-        },
-        {
           path: 'messages',
           name: RouteNames.MESSAGES,
           component: () => import('@/domains/message/views/MessagesView.vue'),
@@ -119,11 +124,6 @@ const router = createRouter({
           path: 'billing',
           name: RouteNames.BILLING,
           component: () => import('@/domains/billing/views/BillingView.vue'),
-        },
-        {
-          path: 'logs',
-          name: RouteNames.AUDIT_LOG_LIST,
-          component: () => import('@/domains/audit-log/views/AuditLogListView.vue'),
         },
         {
           path: 'account',

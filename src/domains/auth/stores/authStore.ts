@@ -30,11 +30,33 @@ export const useAuthStore = defineStore('auth', () => {
     () => memberships.value.length > 0 && !hasClinicContext.value,
   )
 
+  const isPro = computed(() => currentClinic.value?.plan === 'pro')
+
+  const isOnTrial = computed(() => currentClinic.value?.is_trial ?? false)
+
+  const trialDaysLeft = computed(() => {
+    const endsAt = currentClinic.value?.trial_ends_at
+    if (!endsAt) return 0
+    const diff = new Date(endsAt).getTime() - Date.now()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  })
+
   function hasPermission(permission: string): boolean {
     const clinic = currentClinic.value
     if (!clinic) return false
     if (clinic.role === 'owner') return true
     return clinic.permissions?.includes(permission) ?? false
+  }
+
+  function hasFeature(feature: string): boolean {
+    return currentClinic.value?.features?.includes(feature) ?? false
+  }
+
+  function getLimit(key: 'team_members' | 'pdf_generation_daily') {
+    const limit = currentClinic.value?.limits?.[key]
+    const max = limit?.max ?? null
+    const used = limit?.used ?? 0
+    return { max, used, remaining: max === null ? null : Math.max(0, max - used) }
   }
 
   function setToken(newToken: string): void {
@@ -111,9 +133,14 @@ export const useAuthStore = defineStore('auth', () => {
     hasClinicContext,
     currentClinic,
     currentRole,
+    isPro,
+    isOnTrial,
+    trialDaysLeft,
     needsOnboarding,
     needsClinicSelection,
     hasPermission,
+    hasFeature,
+    getLimit,
     setToken,
     fetchUser,
     login,

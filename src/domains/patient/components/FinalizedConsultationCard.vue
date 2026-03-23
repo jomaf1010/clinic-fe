@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { FlaskConical, CheckCircle2, Clock, Info, FileDown } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { FlaskConical, CheckCircle2, Clock, Info, FileDown, FileCheck, LoaderCircle, Ellipsis, ExternalLink } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { HttpError } from '@/lib/http'
 import { timeAgo } from '@/lib/utils'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import { consultationApi } from '@/domains/consultation/api/consultationApi'
+import { documentApi } from '@/domains/consultation/api/documentApi'
 import { buildNarrative } from '@/lib/narrative'
 
 const props = defineProps<{
@@ -39,6 +50,57 @@ function formatDate(iso: string): string {
 const canSeeAssessment = computed(() => authStore.hasPermission('consultations.edit-assessment'))
 const canSeeTreatment = computed(() => authStore.hasPermission('consultations.edit-treatment-plan'))
 
+const prescriptionDoc = computed(() =>
+  props.consultation.documents?.find((d) => d.type === 'prescription' && d.status === 'completed'),
+)
+
+const medCertDoc = computed(() =>
+  props.consultation.documents?.find((d) => d.type === 'medical-certificate' && d.status === 'completed'),
+)
+
+const hasMedCert = computed(() => !!medCertDoc.value)
+
+const alreadyRequested = computed(() =>
+  !hasMedCert.value
+  && (props.consultation.medcert_requested_by || medCertRequested.value),
+)
+
+const canRequestMedCert = computed(() =>
+  props.consultation.finalized_at
+  && !hasMedCert.value
+  && !props.consultation.medcert_requested_by
+  && !medCertRequested.value,
+)
+
+const isRequestingMedCert = ref(false)
+const medCertRequested = ref(false)
+
+async function downloadDocument(documentId: string) {
+  try {
+    const url = await documentApi.getSignedUrl(documentId)
+    window.open(url, '_blank')
+  } catch {
+    toast.error('Failed to get download link')
+  }
+}
+
+async function requestMedCert() {
+  if (isRequestingMedCert.value) return
+  isRequestingMedCert.value = true
+  try {
+    await consultationApi.requestMedCert(props.consultation.id)
+    medCertRequested.value = true
+    toast.success('Medical certificate requested')
+  } catch (err: unknown) {
+    const msg = err instanceof HttpError && (err.data as { message?: string })?.message
+      ? (err.data as { message: string }).message
+      : 'Failed to request medical certificate.'
+    toast.error(msg)
+  } finally {
+    isRequestingMedCert.value = false
+  }
+}
+
 const summary = computed(() => {
   const c = props.consultation
   return buildNarrative({
@@ -55,12 +117,62 @@ const summary = computed(() => {
 
 <template>
   <div
-    class="min-w-0 flex-1 cursor-pointer rounded-lg border p-3 transition-colors"
+    class="group relative min-w-0 flex-1 cursor-pointer rounded-lg border p-3 transition-colors"
     :class="latest
       ? 'bg-card border-primary/30 shadow-sm hover:bg-primary/5 hover:border-primary/40'
       : 'bg-card/60 border-border/60 opacity-75 hover:opacity-100 hover:bg-card'"
     @click="openConsultation"
   >
+    <!-- 3-dot menu -->
+    <div class="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100" @click.stop>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <button
+            type="button"
+            class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <Ellipsis class="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-52">
+          <DropdownMenuItem class="gap-2" @click="openConsultation">
+            <ExternalLink class="size-3.5" />
+            View Consultation
+          </DropdownMenuItem>
+
+          <template v-if="prescriptionDoc || medCertDoc">
+            <DropdownMenuSeparator />
+            <DropdownMenuItem v-if="prescriptionDoc" class="gap-2" @click="downloadDocument(prescriptionDoc.id)">
+              <FileDown class="size-3.5" />
+              Download Prescription
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="medCertDoc" class="gap-2" @click="downloadDocument(medCertDoc.id)">
+              <FileDown class="size-3.5" />
+              Download Med Cert
+            </DropdownMenuItem>
+          </template>
+
+          <template v-if="consultation.finalized_at && !hasMedCert">
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              v-if="canRequestMedCert"
+              class="gap-2"
+              :disabled="isRequestingMedCert"
+              @click="requestMedCert"
+            >
+              <LoaderCircle v-if="isRequestingMedCert" class="size-3.5 animate-spin" />
+              <FileCheck v-else class="size-3.5" />
+              Request Med Cert
+            </DropdownMenuItem>
+            <DropdownMenuItem v-else-if="alreadyRequested" disabled class="gap-2">
+              <Clock class="size-3.5" />
+              Med Cert Requested
+            </DropdownMenuItem>
+          </template>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+
     <div class="flex items-center gap-2">
       <TooltipProvider :delay-duration="200">
         <Tooltip>
@@ -119,18 +231,5 @@ const summary = computed(() => {
         </button>
       </div>
     </TooltipProvider>
-    <div v-if="consultation.documents?.length" class="mt-2 flex flex-wrap gap-1.5">
-      <a
-        v-for="doc in consultation.documents"
-        :key="doc.id"
-        :href="doc.download_url!"
-        target="_blank"
-        class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
-        @click.stop
-      >
-        <FileDown class="size-3" />
-        {{ doc.type === 'prescription' ? 'Prescription PDF' : doc.type === 'medical-certificate' ? 'Med. Certificate PDF' : doc.type + ' PDF' }}
-      </a>
-    </div>
   </div>
 </template>

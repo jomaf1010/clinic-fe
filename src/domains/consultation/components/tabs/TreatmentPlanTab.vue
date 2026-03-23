@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { CalendarDate, today, getLocalTimeZone, getDayOfWeek } from '@internationalized/date'
 import {
   MessageSquareText,
@@ -44,6 +45,11 @@ const emit = defineEmits<{
   'update:consumables': [consumables: ConsultationConsumable[]]
   'lab-updated': []
 }>()
+
+const authStore = useAuthStore()
+const hasConsumables = computed(() => authStore.hasFeature('consumables'))
+const hasLabOrders = computed(() => authStore.hasFeature('lab_orders'))
+const hasAppointments = computed(() => authStore.hasFeature('appointments'))
 
 const local = reactive({
   advice: props.treatmentPlan.advice ?? '',
@@ -227,11 +233,14 @@ function applyPreset(days: number): void {
       />
     </div>
 
-    <hr class="border-border" />
+    <template v-if="hasLabOrders">
+      <hr class="border-border" />
 
-    <!-- Lab Orders -->
-    <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" @lab-updated="emit('lab-updated')" />
+      <!-- Lab Orders -->
+      <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" @lab-updated="emit('lab-updated')" />
+    </template>
 
+    <template v-if="hasAppointments">
     <hr class="border-border" />
 
     <!-- Follow-up -->
@@ -357,15 +366,18 @@ function applyPreset(days: number): void {
       </p>
       <p v-else class="text-sm text-muted-foreground">No follow-up scheduled</p>
     </div>
+    </template>
 
-    <hr class="border-border" />
+    <template v-if="hasConsumables">
+      <hr class="border-border" />
 
-    <!-- Consumables -->
-    <ConsumableSection
-      :consultation-id="consultationId"
-      :consumables="consumables"
-      :disabled="disabled"
-      @update="emit('update:consumables', $event)"
-    />
+      <!-- Consumables -->
+      <ConsumableSection
+        :consultation-id="consultationId"
+        :consumables="consumables"
+        :disabled="disabled"
+        @update="emit('update:consumables', $event)"
+      />
+    </template>
   </div>
 </template>

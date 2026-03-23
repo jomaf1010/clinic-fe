@@ -16,6 +16,7 @@ import type { ValidationError } from '@/domains/auth/types/auth.types'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
 
 const authStore = useAuthStore()
+const canManage = computed(() => authStore.hasPermission('clinic.manage'))
 const isLoading = ref(false)
 const isFetching = ref(true)
 const generalError = ref<string | null>(null)
@@ -134,6 +135,7 @@ const onSubmit = handleSubmit(async (values) => {
             </Avatar>
 
             <button
+              v-if="canManage"
               type="button"
               class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               :disabled="isUploadingLogo"
@@ -153,7 +155,7 @@ const onSubmit = handleSubmit(async (values) => {
             <span v-if="authStore.currentClinic?.address" class="text-sm text-muted-foreground">
               {{ authStore.currentClinic.address }}
             </span>
-            <p class="mt-0.5 text-xs text-muted-foreground">
+            <p v-if="canManage" class="mt-0.5 text-xs text-muted-foreground">
               Click the logo to upload a new image. JPG, PNG, or WebP up to 2 MB.
             </p>
           </div>
@@ -187,7 +189,7 @@ const onSubmit = handleSubmit(async (values) => {
                 <Building2 class="size-3.5 text-muted-foreground" />
                 Clinic name
               </Label>
-              <Input id="clinic-name" v-model="clinicName" type="text" placeholder="My Clinic" :disabled="isLoading" :aria-invalid="!!clinicNameError" />
+              <Input id="clinic-name" v-model="clinicName" type="text" placeholder="My Clinic" :disabled="isLoading || !canManage" :aria-invalid="!!clinicNameError" />
               <p v-if="clinicNameError" class="text-xs text-destructive">{{ clinicNameError }}</p>
             </div>
 
@@ -197,7 +199,7 @@ const onSubmit = handleSubmit(async (values) => {
                 Email
                 <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
               </Label>
-              <Input id="clinic-email" v-model="email" type="email" placeholder="clinic@example.com" :disabled="isLoading" :aria-invalid="!!emailError" />
+              <Input id="clinic-email" v-model="email" type="email" placeholder="clinic@example.com" :disabled="isLoading || !canManage" :aria-invalid="!!emailError" />
               <p v-if="emailError" class="text-xs text-destructive">{{ emailError }}</p>
             </div>
           </div>
@@ -208,7 +210,7 @@ const onSubmit = handleSubmit(async (values) => {
               Address
               <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
             </Label>
-            <Input id="clinic-address" v-model="address" type="text" placeholder="123 Main Street, City" :disabled="isLoading" :aria-invalid="!!addressError" />
+            <Input id="clinic-address" v-model="address" type="text" placeholder="123 Main Street, City" :disabled="isLoading || !canManage" :aria-invalid="!!addressError" />
             <p v-if="addressError" class="text-xs text-destructive">{{ addressError }}</p>
           </div>
 
@@ -219,7 +221,7 @@ const onSubmit = handleSubmit(async (values) => {
                 Contact number
                 <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
               </Label>
-              <Input id="clinic-contact" v-model="contactNumber" type="tel" placeholder="(02) 123-4567" :disabled="isLoading" :aria-invalid="!!contactNumberError" />
+              <Input id="clinic-contact" v-model="contactNumber" type="tel" placeholder="(02) 123-4567" :disabled="isLoading || !canManage" :aria-invalid="!!contactNumberError" />
               <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
             </div>
 
@@ -229,22 +231,24 @@ const onSubmit = handleSubmit(async (values) => {
                 Default consultation fee
                 <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
               </Label>
-              <Input id="clinic-fee" v-model="defaultFee" type="number" placeholder="500" min="0" :disabled="isLoading" :aria-invalid="!!defaultFeeError" />
+              <Input id="clinic-fee" v-model="defaultFee" type="number" placeholder="500" min="0" :disabled="isLoading || !canManage" :aria-invalid="!!defaultFeeError" />
               <p v-if="defaultFeeError" class="text-xs text-destructive">{{ defaultFeeError }}</p>
             </div>
           </div>
         </form>
       </CardContent>
 
-      <Separator />
+      <template v-if="canManage">
+        <Separator />
 
-      <CardFooter class="flex flex-col items-stretch gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-center text-xs text-muted-foreground sm:text-left">Changes are saved to your clinic immediately.</p>
-        <Button type="submit" form="clinic-profile-form" size="sm" class="w-full sm:w-auto" :disabled="isLoading || isFetching">
-          <LoaderCircle v-if="isLoading" class="mr-2 size-3.5 animate-spin" />
-          {{ isLoading ? 'Saving...' : 'Save changes' }}
-        </Button>
-      </CardFooter>
+        <CardFooter class="flex flex-col items-stretch gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-center text-xs text-muted-foreground sm:text-left">Changes are saved to your clinic immediately.</p>
+          <Button type="submit" form="clinic-profile-form" size="sm" class="w-full sm:w-auto" :disabled="isLoading || isFetching">
+            <LoaderCircle v-if="isLoading" class="mr-2 size-3.5 animate-spin" />
+            {{ isLoading ? 'Saving...' : 'Save changes' }}
+          </Button>
+        </CardFooter>
+      </template>
     </Card>
 
     <ImageCropDialog

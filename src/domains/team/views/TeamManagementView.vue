@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import OnlineDot from '@/components/OnlineDot.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   UsersRound,
@@ -376,12 +377,15 @@ onMounted(async () => {
           <TableRow v-for="member in members" :key="member.id">
             <TableCell>
               <div class="flex items-center gap-3">
-                <Avatar class="size-8 shrink-0">
-                  <AvatarImage v-if="member.user?.avatar_url" :src="member.user.avatar_url" :alt="getMemberName(member)" />
-                  <AvatarFallback class="bg-primary/10 text-xs font-semibold text-primary">
-                    {{ getInitials(getMemberName(member)) }}
-                  </AvatarFallback>
-                </Avatar>
+                <div class="relative shrink-0">
+                  <Avatar class="size-8">
+                    <AvatarImage v-if="member.user?.avatar_url" :src="member.user.avatar_url" :alt="getMemberName(member)" />
+                    <AvatarFallback class="bg-primary/10 text-xs font-semibold text-primary">
+                      {{ getInitials(getMemberName(member)) }}
+                    </AvatarFallback>
+                  </Avatar>
+                  <OnlineDot v-if="member.status === 'active'" :user-id="member.user_id" />
+                </div>
                 <div class="min-w-0">
                   <p class="truncate font-medium">{{ getMemberName(member) }}</p>
                   <p v-if="getMemberEmail(member)" class="truncate text-xs text-muted-foreground">

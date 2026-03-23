@@ -52,6 +52,10 @@ export interface InvoiceResponse {
   voided_by: string | null
   voided_by_name: string | null
   voided_at: string | null
+  medcert_status: 'requested' | 'completed' | null
+  medcert_requested_by: string | null
+  medcert_requested_at: string | null
+  medcert_document_id: string | null
   created_at: string
   updated_at: string
 }

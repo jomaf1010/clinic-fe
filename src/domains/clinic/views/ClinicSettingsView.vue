@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { FileText, LoaderCircle } from 'lucide-vue-next'
+import { FileText, Receipt, LoaderCircle, Banknote } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
 import { clinicApi } from '@/domains/clinic/api/clinicApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 
@@ -15,6 +17,10 @@ const isSaving = ref(false)
 const autoGeneratePdf = ref(true)
 const prescriptionQtyMode = ref<'absolute' | 'adjusted'>('absolute')
 const autoRegenOnQtyChange = ref(true)
+const suppliesAsClinicRevenue = ref(true)
+const defaultConsultationFee = ref('')
+const defaultFollowUpFee = ref('')
+const defaultEmergencyFee = ref('')
 
 onMounted(async () => {
   try {
@@ -23,6 +29,10 @@ onMounted(async () => {
     autoGeneratePdf.value = settings.auto_generate_prescription_pdf !== false
     prescriptionQtyMode.value = (settings.prescription_quantity_mode as 'absolute' | 'adjusted') ?? 'absolute'
     autoRegenOnQtyChange.value = settings.auto_regenerate_pdf_on_qty_change !== false
+    suppliesAsClinicRevenue.value = settings.billing_supplies_as_clinic_revenue !== false
+    defaultConsultationFee.value = settings.default_consultation_fee != null ? String(settings.default_consultation_fee) : ''
+    defaultFollowUpFee.value = settings.default_follow_up_fee != null ? String(settings.default_follow_up_fee) : ''
+    defaultEmergencyFee.value = settings.default_emergency_fee != null ? String(settings.default_emergency_fee) : ''
   } catch {
     toast.error('Failed to load settings')
   } finally {
@@ -59,6 +69,16 @@ function toggleAutoRegen(val: boolean) {
   autoRegenOnQtyChange.value = val
   saveSetting('auto_regenerate_pdf_on_qty_change', val)
 }
+
+function toggleSuppliesRevenue(val: boolean) {
+  suppliesAsClinicRevenue.value = val
+  saveSetting('billing_supplies_as_clinic_revenue', val)
+}
+
+function saveFeeSetting(key: string, value: string) {
+  const num = parseFloat(value)
+  saveSetting(key, num > 0 ? num : null)
+}
 </script>
 
 <template>
@@ -68,6 +88,92 @@ function toggleAutoRegen(val: boolean) {
     </div>
 
     <template v-else>
+      <!-- Billing Settings -->
+      <Card>
+        <CardHeader>
+          <div class="flex items-center gap-2">
+            <Receipt class="size-4 text-muted-foreground" />
+            <CardTitle class="text-base">Billing & Revenue</CardTitle>
+          </div>
+          <CardDescription>Configure how revenue is attributed between the clinic and doctors</CardDescription>
+        </CardHeader>
+
+        <CardContent class="flex flex-col gap-6">
+          <div class="flex items-start gap-4">
+            <Switch
+              :model-value="suppliesAsClinicRevenue"
+              :disabled="isSaving"
+              class="mt-0.5 shrink-0"
+              @update:model-value="toggleSuppliesRevenue"
+            />
+            <div>
+              <Label class="text-sm font-medium">Clinic revenue for medicines, consumables & lab services</Label>
+              <p class="mt-0.5 text-xs text-muted-foreground">
+                When enabled, revenue from medicines, consumables, and lab services is attributed to the clinic. Only the consultation fee counts as doctor revenue. When disabled, all line items (including medicines, consumables, and lab services) are attributed to the doctor who created the consultation.
+              </p>
+              <div class="mt-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                <p class="font-medium">How this affects the doctor's billing view:</p>
+                <ul class="mt-1 list-disc pl-4 space-y-0.5">
+                  <li><strong>ON:</strong> Doctor's revenue stats show only consultation fees. Invoices are still fully visible with all line items.</li>
+                  <li><strong>OFF:</strong> Doctor's revenue stats include all line items (consultation fees + medicines + consumables + lab services).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <Separator />
+
+          <!-- Default fees -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex items-center gap-2">
+              <Banknote class="size-3.5 text-muted-foreground" />
+              <Label class="text-sm font-medium">Default consultation fees</Label>
+            </div>
+            <p class="text-xs text-muted-foreground">
+              Clinic-wide default fees used when a doctor has not set their own fee. Doctors can override these in their account settings.
+            </p>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-3">
+            <div class="flex flex-col gap-2">
+              <Label for="default-consultation-fee" class="text-xs text-muted-foreground">Consultation Fee</Label>
+              <Input
+                id="default-consultation-fee"
+                v-model="defaultConsultationFee"
+                type="number"
+                placeholder="0.00"
+                min="0"
+                :disabled="isSaving"
+                @blur="saveFeeSetting('default_consultation_fee', defaultConsultationFee)"
+              />
+            </div>
+            <div class="flex flex-col gap-2">
+              <Label for="default-followup-fee" class="text-xs text-muted-foreground">Follow-up Fee</Label>
+              <Input
+                id="default-followup-fee"
+                v-model="defaultFollowUpFee"
+                type="number"
+                placeholder="0.00"
+                min="0"
+                :disabled="isSaving"
+                @blur="saveFeeSetting('default_follow_up_fee', defaultFollowUpFee)"
+              />
+            </div>
+            <div class="flex flex-col gap-2">
+              <Label for="default-emergency-fee" class="text-xs text-muted-foreground">Emergency Fee</Label>
+              <Input
+                id="default-emergency-fee"
+                v-model="defaultEmergencyFee"
+                type="number"
+                placeholder="0.00"
+                min="0"
+                :disabled="isSaving"
+                @blur="saveFeeSetting('default_emergency_fee', defaultEmergencyFee)"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <!-- Consultation Settings -->
       <Card>
         <CardHeader>

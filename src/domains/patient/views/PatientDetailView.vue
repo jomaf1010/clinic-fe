@@ -45,11 +45,13 @@ import FinalizedConsultationCard from '@/domains/patient/components/FinalizedCon
 import VitalsComparisonCard from '@/domains/patient/components/VitalsComparisonCard.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
+import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const consultationStore = useConsultationStore()
+const notificationStore = useNotificationStore()
 const patient = ref<PatientResponse | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
@@ -69,7 +71,9 @@ const visibleConsultations = computed(() =>
 )
 
 const draftConsultation = computed(() =>
-  visibleConsultations.value.find(c => c.status === 'draft') ?? null,
+  visibleConsultations.value.find(c =>
+    c.status === 'draft' && (c.created_by === currentUserId.value || isOwner.value),
+  ) ?? null,
 )
 
 const latestFinalizedIndex = computed(() =>
@@ -127,6 +131,13 @@ async function fetchPatient() {
 }
 
 watch(() => route.params.id, () => fetchPatient(), { immediate: true })
+
+// Refresh timeline when a med cert is generated
+watch(() => notificationStore.notifications[0], (newest) => {
+  if (newest?.type === 'medcert.completed' || newest?.type === 'document.generated') {
+    consultationStore.loadForPatient(patient.value?.id ?? '')
+  }
+})
 
 const editDialogOpen = ref(false)
 const mobileCardExpanded = ref(false)
@@ -268,7 +279,7 @@ onUnmounted(() => {
           Continue Draft
         </Button>
         <Button
-          v-else
+          v-else-if="authStore.hasPermission('consultations.create')"
           size="sm"
           class="flex-1"
           @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"

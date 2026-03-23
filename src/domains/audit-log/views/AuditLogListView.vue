@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
+import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import {
@@ -76,6 +77,7 @@ onMounted(() => {
 </script>
 
 <template>
+  <FeatureGate feature="audit_logs" label="Audit Logs">
   <div class="-mx-4 -mb-4 flex min-h-0 flex-1 flex-col gap-0 md:flex-row">
     <!-- Left panel -->
     <div class="flex shrink-0 flex-col gap-4 border-b p-4 md:w-64 md:gap-6 md:border-b-0 md:border-r md:p-6">
@@ -171,4 +173,5 @@ onMounted(() => {
       </template>
     </div>
   </div>
+  </FeatureGate>
 </template>

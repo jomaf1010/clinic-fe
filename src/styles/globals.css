@@ -157,6 +157,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  ::placeholder {
+    color: oklch(0.75 0 0);
+  }
+  .dark ::placeholder {
+    color: oklch(0.35 0 0);
+  }
   button,
   a,
   [role='button'],

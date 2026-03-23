@@ -66,7 +66,6 @@ export interface ConsultationDocument {
   id: string
   type: string
   status: string
-  download_url: string | null
 }
 
 export interface ConsultationResponse {
@@ -90,6 +89,8 @@ export interface ConsultationResponse {
   prescription_summary: PrescriptionSummary | null
   documents: ConsultationDocument[]
   invoice_id: string | null
+  medcert_requested_by: string | null
+  medcert_requested_at: string | null
   finalized_at: string | null
   created_at: string
   updated_at: string

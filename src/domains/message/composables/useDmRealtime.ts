@@ -22,10 +22,25 @@ export function useDmRealtime() {
     messageStore.handleRealtimeEvent(event)
   }
 
+  let stopWatcher: (() => void) | null = null
+
   function start(): void {
+    // Subscribe immediately if channel is ready
     if (channel.value) {
       connect()
       subscribe(channel.value, onEvent)
+    }
+
+    // Watch for channel changes (user loaded later, clinic switch)
+    if (!stopWatcher) {
+      const { stop: unwatch } = watch(channel, (newCh, oldCh) => {
+        if (oldCh) unsubscribe(oldCh)
+        if (newCh) {
+          connect()
+          subscribe(newCh, onEvent)
+        }
+      })
+      stopWatcher = unwatch
     }
   }
 
@@ -33,15 +48,9 @@ export function useDmRealtime() {
     if (channel.value) {
       unsubscribe(channel.value)
     }
+    stopWatcher?.()
+    stopWatcher = null
   }
-
-  watch(channel, (newCh, oldCh) => {
-    if (oldCh) unsubscribe(oldCh)
-    if (newCh) {
-      connect()
-      subscribe(newCh, onEvent)
-    }
-  })
 
   onUnmounted(() => {
     stop()

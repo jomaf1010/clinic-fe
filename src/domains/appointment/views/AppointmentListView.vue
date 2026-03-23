@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { toast } from 'vue-sonner'
 import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date'
 import { AlertTriangle, CalendarCheck, CalendarIcon, ClipboardPlus, LoaderCircle, Plus, X } from 'lucide-vue-next'
@@ -273,6 +274,7 @@ onMounted(() => fetchData())
 </script>
 
 <template>
+  <FeatureGate feature="appointments" label="Appointments">
   <div class="flex flex-1 flex-col gap-4 pt-4">
     <!-- Header -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -526,4 +528,5 @@ onMounted(() => fetchData())
       </DialogContent>
     </Dialog>
   </div>
+  </FeatureGate>
 </template>

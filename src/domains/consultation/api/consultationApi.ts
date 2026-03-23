@@ -47,6 +47,10 @@ export const consultationApi = {
     return http.put<ConsultationDetailResponse>(`/consultations/${id}/fee-discount`, payload)
   },
 
+  requestMedCert(id: string): Promise<ConsultationDetailResponse> {
+    return http.post<ConsultationDetailResponse>(`/consultations/${id}/request-medcert`)
+  },
+
   searchDiagnoses(query: string): Promise<DiagnosisSearchResponse> {
     return http.get<DiagnosisSearchResponse>(`/diagnoses/search?q=${encodeURIComponent(query)}`)
   },

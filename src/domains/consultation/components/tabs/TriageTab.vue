@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from 'vue'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { toast } from 'vue-sonner'
 import {
   Thermometer, Weight, Activity, Ruler, MessageSquare, HeartPulse,
@@ -29,6 +30,9 @@ const emit = defineEmits<{
   'patient-updated': []
   'lab-updated': []
 }>()
+
+const authStore = useAuthStore()
+const hasLabOrders = computed(() => authStore.hasFeature('lab_orders'))
 
 const local = reactive<ConsultationTriage>({
   chief_complaint: props.triage.chief_complaint,
@@ -554,7 +558,7 @@ function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2' | 'blood_sugar', va
     </div>
 
     <!-- Lab Orders -->
-    <LabOrderSection :consultation-id="consultationId" :disabled="disabled" @lab-updated="emit('lab-updated')" />
+    <LabOrderSection v-if="hasLabOrders" :consultation-id="consultationId" :disabled="disabled" @lab-updated="emit('lab-updated')" />
 
     <!-- Notes -->
     <div class="flex flex-col gap-2">
@@ -584,21 +588,21 @@ function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2' | 'blood_sugar', va
             Allergies
           </Label>
           <div class="flex flex-wrap gap-1.5">
-            <Badge
+            <span
               v-for="(allergy, i) in patientAllergies"
               :key="i"
-              variant="outline"
-              class="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
+              class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600"
             >
+              <ShieldAlert class="size-3" />
               {{ allergy }}
               <button
                 v-if="!disabled"
-                class="ml-1 rounded-full p-0.5 hover:bg-red-200 dark:hover:bg-red-800"
+                class="ml-0.5 rounded-full p-0.5 hover:bg-red-600 dark:hover:bg-red-700"
                 @click="removeAllergy(i)"
               >
                 <X class="size-3" />
               </button>
-            </Badge>
+            </span>
             <span v-if="!patientAllergies.length" class="text-xs text-muted-foreground">No known allergies</span>
           </div>
           <div v-if="!disabled" class="relative">
@@ -633,21 +637,21 @@ function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2' | 'blood_sugar', va
             Chronic Conditions
           </Label>
           <div class="flex flex-wrap gap-1.5">
-            <Badge
+            <span
               v-for="(condition, i) in patientConditions"
               :key="i"
-              variant="outline"
-              class="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
+              class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600"
             >
+              <HeartPulse class="size-3" />
               {{ condition }}
               <button
                 v-if="!disabled"
-                class="ml-1 rounded-full p-0.5 hover:bg-amber-200 dark:hover:bg-amber-800"
+                class="ml-0.5 rounded-full p-0.5 hover:bg-amber-600 dark:hover:bg-amber-700"
                 @click="removeCondition(i)"
               >
                 <X class="size-3" />
               </button>
-            </Badge>
+            </span>
             <span v-if="!patientConditions.length" class="text-xs text-muted-foreground">No known conditions</span>
           </div>
           <div v-if="!disabled" class="relative">

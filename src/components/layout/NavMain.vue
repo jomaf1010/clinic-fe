@@ -4,7 +4,7 @@ import { markRaw } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 const RawRouterLink = markRaw(RouterLink)
-import { ChevronRight } from 'lucide-vue-next'
+import { ChevronRight, Crown } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 
 import { useSidebar } from '@/components/ui/sidebar'
@@ -30,22 +30,24 @@ import {
 } from '@/components/ui/collapsible'
 import {
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarSeparator,
 } from '@/components/ui/sidebar'
 
-defineProps<{
+const props = defineProps<{
   items: {
     title: string
     url: string
     icon: Component
     isActive?: boolean
     comingSoon?: boolean
+    locked?: boolean
+    separator?: boolean
     badge?: (() => number) | number
     items?: {
       title: string
@@ -53,13 +55,17 @@ defineProps<{
     }[]
   }[]
 }>()
+
+const emit = defineEmits<{
+  'locked-click': [title: string]
+}>()
 </script>
 
 <template>
   <SidebarGroup>
-    <SidebarGroupLabel>Platform</SidebarGroupLabel>
-    <SidebarMenu class="gap-2">
+    <SidebarMenu class="gap-1">
       <template v-for="item in items" :key="item.title">
+        <SidebarSeparator v-if="item.separator" class="my-1" />
         <!-- Items with sub-items: collapsible -->
         <Collapsible
           v-if="item.items?.length"
@@ -93,6 +99,15 @@ defineProps<{
             <component :is="item.icon" />
             <span>{{ item.title }}</span>
             <Badge variant="outline" class="ml-auto text-[10px] px-1.5 py-0">Soon</Badge>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+
+        <!-- Locked (Pro) items -->
+        <SidebarMenuItem v-else-if="item.locked">
+          <SidebarMenuButton :tooltip="`${item.title} — Pro`" class="h-10 opacity-60 hover:opacity-80" @click="emit('locked-click', item.title)">
+            <component :is="item.icon" />
+            <span>{{ item.title }}</span>
+            <Crown class="ml-auto size-3.5 text-amber-500" />
           </SidebarMenuButton>
         </SidebarMenuItem>
 

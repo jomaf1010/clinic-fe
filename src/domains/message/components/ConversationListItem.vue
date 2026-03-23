@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import OnlineDot from '@/components/OnlineDot.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ConversationResponse } from '../types/message.types'
 import { formatMessagePreview } from '../utils/formatMessagePreview'
@@ -59,9 +60,13 @@ function formatRelativeTime(dateStr: string | null): string {
     :class="isActive ? 'bg-accent' : ''"
     @click="emit('select', conversation.id)"
   >
-    <Avatar class="size-10 shrink-0">
-      <AvatarFallback class="text-xs">{{ initials }}</AvatarFallback>
-    </Avatar>
+    <div class="relative shrink-0">
+      <Avatar class="size-10">
+        <AvatarImage v-if="otherParticipant?.avatar_url" :src="otherParticipant.avatar_url" :alt="otherParticipant.name" />
+        <AvatarFallback class="text-xs">{{ initials }}</AvatarFallback>
+      </Avatar>
+      <OnlineDot :user-id="otherParticipant?.id ?? null" />
+    </div>
     <div class="min-w-0 flex-1">
       <div class="flex items-center justify-between gap-2">
         <span class="truncate text-sm font-medium" :class="conversation.unread_count > 0 ? 'font-semibold' : ''">

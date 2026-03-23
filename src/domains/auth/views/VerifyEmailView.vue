@@ -20,7 +20,8 @@ const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
   const token = typeof route.query.token === 'string' ? route.query.token : null
-  const email = typeof route.query.email === 'string' ? route.query.email : null
+  const encodedEmail = typeof route.query.email === 'string' ? route.query.email : null
+  const email = encodedEmail ? atob(encodedEmail) : null
 
   if (!token || !email) {
     status.value = 'error'

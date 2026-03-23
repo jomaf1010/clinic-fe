@@ -40,6 +40,10 @@ export const billingApi = {
     return http.patch<InvoiceDetailResponse>(`/invoices/${id}/void`, payload)
   },
 
+  requestMedCert(id: string): Promise<InvoiceDetailResponse> {
+    return http.post<InvoiceDetailResponse>(`/invoices/${id}/request-medcert`)
+  },
+
   forConsultation(consultationId: string): Promise<InvoiceDetailResponse> {
     return http.get<InvoiceDetailResponse>(`/consultations/${consultationId}/invoice`)
   },

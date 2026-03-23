@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import {
   ArrowLeftRight,
   BadgeCheck,
-  Bell,
   ChevronsUpDown,
   LogOut,
   Moon,
@@ -15,6 +14,7 @@ import { useTheme } from '@/composables/useTheme'
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
 } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -36,6 +36,7 @@ const props = defineProps<{
   user: {
     name: string
     email: string
+    avatarUrl?: string | null
   }
   showSwitchClinic?: boolean
 }>()
@@ -71,8 +72,9 @@ const initials = computed(() => {
             size="lg"
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
-            <Avatar class="h-8 w-8 rounded-lg">
-              <AvatarFallback class="rounded-lg">
+            <Avatar class="h-8 w-8 rounded-full">
+              <AvatarImage v-if="user.avatarUrl" :src="user.avatarUrl" :alt="user.name" class="rounded-full object-cover" />
+              <AvatarFallback class="rounded-full">
                 {{ initials }}
               </AvatarFallback>
             </Avatar>
@@ -91,8 +93,9 @@ const initials = computed(() => {
         >
           <DropdownMenuLabel class="p-0 font-normal">
             <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-              <Avatar class="h-8 w-8 rounded-lg">
-                <AvatarFallback class="rounded-lg">
+              <Avatar class="h-8 w-8 rounded-full">
+                <AvatarImage v-if="user.avatarUrl" :src="user.avatarUrl" :alt="user.name" class="rounded-full object-cover" />
+                <AvatarFallback class="rounded-full">
                   {{ initials }}
                 </AvatarFallback>
               </Avatar>
@@ -107,10 +110,6 @@ const initials = computed(() => {
             <DropdownMenuItem @click="router.push({ name: RouteNames.ACCOUNT })">
               <BadgeCheck class="mr-2 size-4" />
               Account
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Bell class="mr-2 size-4" />
-              Notifications
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

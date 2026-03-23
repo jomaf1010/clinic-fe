@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { HttpError } from '@/lib/http'
 import { consultationApi } from '../api/consultationApi'
 import type { ConsultationResponse, UpdateConsultationPayload } from '../types/consultation.types'
 import type { ConsultationRealtimeEvent } from '../types/realtime.types'
@@ -50,8 +51,12 @@ export const useConsultationStore = defineStore('consultation', () => {
       const response = await consultationApi.get(id)
       current.value = response.data
       await cacheConsultation(response.data as unknown as Record<string, unknown>)
-    } catch {
-      // Try loading from cache if offline
+    } catch (err) {
+      // Don't fall back to cache for permission errors
+      if (err instanceof HttpError && (err.status === 403 || err.status === 404)) {
+        throw err
+      }
+
       const cached = await getCachedConsultation(id)
       if (cached) {
         current.value = cached as unknown as ConsultationResponse

@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { timeAgo } from '@/lib/utils'
-import { classifyBpString } from '@/lib/vitals'
+import { classifyBpString, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyPain } from '@/lib/vitals'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { buildNarrative } from '@/lib/narrative'
 
@@ -36,62 +36,53 @@ const doctorInitials = computed(() => {
 
 interface VitalAlert { label: string; value: string; status: string; color: string }
 
+const BADGE_RED = 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600'
+const BADGE_AMBER = 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600'
+
+function badgeColor(severity: string): string {
+  if (severity === 'critical' || severity === 'high') return BADGE_RED
+  return BADGE_AMBER
+}
+
 const abnormalVitals = computed(() => {
   const vitals = props.consultation.triage?.vitals
   if (!vitals) return []
 
   const alerts: VitalAlert[] = []
 
-  // BP — AHA/ACC classification
-  const bpResult = classifyBpString(vitals.bp)
-  if (bpResult && bpResult.severity >= 1) {
-    const isHigh = bpResult.severity >= 2 // stage1+
-    alerts.push({
-      label: 'BP',
-      value: `${vitals.bp} · ${bpResult.label}`,
-      status: bpResult.severity >= 3 ? 'High' : bpResult.severity >= 2 ? 'Elevated' : 'Elevated',
-      color: isHigh
-        ? 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600'
-        : 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600',
-    })
+  const bp = classifyBpString(vitals.bp)
+  if (bp && bp.severity >= 1) {
+    alerts.push({ label: 'BP', value: `${vitals.bp} · ${bp.label}`, status: bp.label, color: bp.severity >= 2 ? BADGE_RED : BADGE_AMBER })
   }
 
-  // HR
-  if (vitals.hr != null) {
-    if (vitals.hr < 60) alerts.push({ label: 'HR', value: `${vitals.hr} bpm`, status: 'Low', color: 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600' })
-    else if (vitals.hr > 100) alerts.push({ label: 'HR', value: `${vitals.hr} bpm`, status: 'High', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
+  const hr = classifyHr(vitals.hr)
+  if (hr && hr.severity !== 'normal') {
+    alerts.push({ label: 'HR', value: `${vitals.hr} bpm`, status: hr.label, color: badgeColor(hr.severity) })
   }
 
-  // Temp
-  if (vitals.temp != null) {
-    if (vitals.temp < 36) alerts.push({ label: 'Temp', value: `${vitals.temp}°C`, status: 'Low', color: 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600' })
-    else if (vitals.temp > 38.5) alerts.push({ label: 'Temp', value: `${vitals.temp}°C`, status: 'High', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
-    else if (vitals.temp > 37.5) alerts.push({ label: 'Temp', value: `${vitals.temp}°C`, status: 'Elevated', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
+  const temp = classifyTemp(vitals.temp)
+  if (temp && temp.severity !== 'normal') {
+    alerts.push({ label: 'Temp', value: `${vitals.temp}°C`, status: temp.label, color: badgeColor(temp.severity) })
   }
 
-  // SpO2
-  if (vitals.spo2 != null) {
-    if (vitals.spo2 < 90) alerts.push({ label: 'SpO2', value: `${vitals.spo2}%`, status: 'Critical', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
-    else if (vitals.spo2 < 95) alerts.push({ label: 'SpO2', value: `${vitals.spo2}%`, status: 'Low', color: 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600' })
+  const spo2 = classifySpo2(vitals.spo2)
+  if (spo2 && spo2.severity !== 'normal') {
+    alerts.push({ label: 'SpO2', value: `${vitals.spo2}%`, status: spo2.label, color: badgeColor(spo2.severity) })
   }
 
-  // RR
-  if (vitals.rr != null) {
-    if (vitals.rr < 12) alerts.push({ label: 'RR', value: `${vitals.rr}/min`, status: 'Low', color: 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600' })
-    else if (vitals.rr > 20) alerts.push({ label: 'RR', value: `${vitals.rr}/min`, status: 'High', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
+  const rr = classifyRr(vitals.rr)
+  if (rr && rr.severity !== 'normal') {
+    alerts.push({ label: 'RR', value: `${vitals.rr}/min`, status: rr.label, color: badgeColor(rr.severity) })
   }
 
-  // Blood sugar
-  if (vitals.blood_sugar != null) {
-    if (vitals.blood_sugar < 70) alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: 'Low', color: 'text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600' })
-    else if (vitals.blood_sugar > 125) alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: 'High', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
-    else if (vitals.blood_sugar > 100) alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: 'Elevated', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
+  const bs = classifyBloodSugar(vitals.blood_sugar)
+  if (bs && bs.severity !== 'normal') {
+    alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: bs.label, color: badgeColor(bs.severity) })
   }
 
-  // Pain score
-  const pain = props.consultation.triage?.pain_score
-  if (pain != null && pain >= 7) {
-    alerts.push({ label: 'Pain', value: `${pain}/10`, status: 'High', color: 'text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600' })
+  const pain = classifyPain(props.consultation.triage?.pain_score)
+  if (pain) {
+    alerts.push({ label: 'Pain', value: `${props.consultation.triage?.pain_score}/10`, status: pain.label, color: BADGE_RED })
   }
 
   return alerts
@@ -118,6 +109,11 @@ const narrativeSummary = computed(() => {
     prescriptionItems: c.prescription_summary?.items,
   })
 })
+
+const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
+const isMine = computed(() => props.consultation.created_by === authStore.user?.id)
+const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
+const canContinue = computed(() => isMine.value || isOwner.value || canEditTriage.value)
 
 function openDraft() {
   router.push({
@@ -188,9 +184,9 @@ function formatDate(iso: string): string {
         </div>
 
         <!-- Continue -->
-        <Button variant="secondary" size="sm" class="mt-3 gap-1.5" @click.stop="openDraft">
+        <Button v-if="canContinue" variant="secondary" size="sm" class="mt-3 gap-1.5" @click.stop="openDraft">
           <PlayCircle class="size-3.5" />
-          Continue
+          {{ isMine || isOwner ? 'Continue' : 'Edit Triage' }}
         </Button>
       </div>
 

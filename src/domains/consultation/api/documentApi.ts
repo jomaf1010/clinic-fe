@@ -19,8 +19,8 @@ export const documentApi = {
     return http.get<{ data: GeneratedDocumentResponse[] }>(`/consultations/${consultationId}/documents`)
   },
 
-  downloadUrl(documentId: string): string {
-    const baseUrl = import.meta.env.VITE_API_URL || '/api'
-    return `${baseUrl}/documents/${documentId}/download`
+  async getSignedUrl(documentId: string): Promise<string> {
+    const res = await http.get<{ data: { url: string } }>(`/documents/${documentId}/signed-url`)
+    return res.data.url
   },
 }

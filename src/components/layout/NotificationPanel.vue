@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bell, Check, CheckCheck, FileText, AlertCircle } from 'lucide-vue-next'
+import { Bell, Check, CheckCheck, FileText, FileCheck, AlertCircle, UserRound, CalendarDays, Download, Printer } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { RouteNames } from '@/router/routeNames'
+import { printPdf } from '@/lib/utils'
+import { documentApi } from '@/domains/consultation/api/documentApi'
 
 const emit = defineEmits<{
   close: []
@@ -20,6 +22,10 @@ onMounted(() => {
 function getIcon(type: string) {
   switch (type) {
     case 'document.generated': return FileText
+    case 'queue.patient_assigned': return UserRound
+    case 'appointment.created': return CalendarDays
+    case 'medcert.requested': return FileCheck
+    case 'medcert.completed': return FileText
     default: return Bell
   }
 }
@@ -41,17 +47,61 @@ function handleClick(notification: typeof store.notifications[number]) {
   // Navigate based on type
   const data = notification.data
   if (notification.type === 'document.generated' && data.consultation_id) {
-    // Find patient_id from the notification data if available
     if (data.patient_id) {
       router.push({
         name: RouteNames.CONSULTATION_DETAIL,
         params: { patientId: data.patient_id as string, id: data.consultation_id as string },
       })
     }
+  } else if (notification.type === 'queue.patient_assigned' && data.patient_id) {
+    router.push({
+      name: RouteNames.PATIENT_DETAIL,
+      params: { id: data.patient_id as string },
+    })
+  } else if (notification.type === 'appointment.created' && data.patient_id) {
+    router.push({
+      name: RouteNames.PATIENT_DETAIL,
+      params: { id: data.patient_id as string },
+    })
+  } else if (notification.type === 'medcert.requested' && data.consultation_id && data.patient_id) {
+    router.push({
+      name: RouteNames.CONSULTATION_DETAIL,
+      params: { patientId: data.patient_id as string, id: data.consultation_id as string },
+      query: { openMedCert: '1' },
+    })
+  } else if (notification.type === 'medcert.completed' && data.patient_id) {
+    router.push({
+      name: RouteNames.PATIENT_DETAIL,
+      params: { id: data.patient_id as string },
+    })
   }
 
   emit('close')
 }
+
+function hasDocumentId(notification: typeof store.notifications[number]): boolean {
+  return (notification.type === 'medcert.completed' || notification.type === 'document.generated')
+    && !!notification.data?.document_id
+}
+
+async function handleDownload(documentId: string) {
+  try {
+    const url = await documentApi.getSignedUrl(documentId)
+    window.open(url, '_blank')
+  } catch {
+    // silent
+  }
+}
+
+async function handlePrint(documentId: string) {
+  try {
+    const url = await documentApi.getSignedUrl(documentId)
+    printPdf(url)
+  } catch {
+    // silent
+  }
+}
+
 </script>
 
 <template>
@@ -110,7 +160,26 @@ function handleClick(notification: typeof store.notifications[number]) {
               <div v-if="!notification.read_at" class="size-1.5 shrink-0 rounded-full bg-primary" />
             </div>
             <p class="mt-0.5 text-xs text-muted-foreground line-clamp-2">{{ notification.body }}</p>
-            <p class="mt-1 text-[10px] text-muted-foreground">{{ timeAgo(notification.created_at) }}</p>
+            <div v-if="hasDocumentId(notification)" class="mt-1.5 flex items-center gap-1.5" @click.stop>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent"
+                @click="handleDownload(notification.data.document_id as string)"
+              >
+                <Download class="size-3" />
+                Download
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent"
+                @click="handlePrint(notification.data.document_id as string)"
+              >
+                <Printer class="size-3" />
+                Print
+              </button>
+              <span class="ml-auto text-[10px] text-muted-foreground">{{ timeAgo(notification.created_at) }}</span>
+            </div>
+            <p v-else class="mt-1 text-[10px] text-muted-foreground">{{ timeAgo(notification.created_at) }}</p>
           </div>
         </button>
       </div>

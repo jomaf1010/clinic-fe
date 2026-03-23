@@ -129,3 +129,94 @@ export function isBpAbnormal(reading: BpReading): boolean {
 export function isBpConcerning(reading: BpReading): boolean {
   return classifyBp(reading).severity >= 2
 }
+
+// ──────────────────────────────────────────────
+// Generic vital status
+// ──────────────────────────────────────────────
+
+export interface VitalStatus {
+  label: string
+  color: string
+  severity: 'normal' | 'low' | 'elevated' | 'high' | 'critical'
+}
+
+const NORMAL: VitalStatus  = { label: 'Normal', color: 'text-green-600', severity: 'normal' }
+
+/**
+ * Heart rate classification (bpm).
+ * < 60 Bradycardia, 60-100 Normal, > 100 Tachycardia
+ */
+export function classifyHr(hr: number | null | undefined): VitalStatus | null {
+  if (hr == null) return null
+  if (hr < 60)  return { label: 'Bradycardia', color: 'text-blue-600', severity: 'low' }
+  if (hr <= 100) return NORMAL
+  return { label: 'Tachycardia', color: 'text-red-600', severity: 'high' }
+}
+
+/**
+ * Temperature classification (°C).
+ * < 36 Hypothermia, 36-37.5 Normal, 37.6-38.5 Low-grade fever, > 38.5 High fever
+ */
+export function classifyTemp(temp: number | null | undefined): VitalStatus | null {
+  if (temp == null) return null
+  if (temp < 36)    return { label: 'Hypothermia', color: 'text-blue-600', severity: 'low' }
+  if (temp <= 37.5) return NORMAL
+  if (temp <= 38.5) return { label: 'Low-grade fever', color: 'text-amber-600', severity: 'elevated' }
+  return { label: 'High fever', color: 'text-red-600', severity: 'high' }
+}
+
+/**
+ * SpO2 classification (%).
+ * >= 95 Normal, 90-94 Low, < 90 Critical
+ */
+export function classifySpo2(spo2: number | null | undefined): VitalStatus | null {
+  if (spo2 == null) return null
+  if (spo2 >= 95) return NORMAL
+  if (spo2 >= 90) return { label: 'Low', color: 'text-amber-600', severity: 'low' }
+  return { label: 'Critical', color: 'text-red-600', severity: 'critical' }
+}
+
+/**
+ * Respiratory rate classification (breaths/min).
+ * < 12 Low, 12-20 Normal, > 20 Elevated
+ */
+export function classifyRr(rr: number | null | undefined): VitalStatus | null {
+  if (rr == null) return null
+  if (rr < 12)  return { label: 'Low', color: 'text-blue-600', severity: 'low' }
+  if (rr <= 20) return NORMAL
+  return { label: 'Elevated', color: 'text-red-600', severity: 'high' }
+}
+
+/**
+ * Blood sugar classification (mg/dL, fasting).
+ * < 70 Hypoglycemia, 70-100 Normal, 101-125 Pre-diabetic, > 125 Diabetic
+ */
+export function classifyBloodSugar(bs: number | null | undefined): VitalStatus | null {
+  if (bs == null) return null
+  if (bs < 70)   return { label: 'Low (Hypoglycemia)', color: 'text-blue-600', severity: 'low' }
+  if (bs <= 100) return NORMAL
+  if (bs <= 125) return { label: 'Pre-diabetic', color: 'text-amber-600', severity: 'elevated' }
+  return { label: 'High (Diabetic)', color: 'text-red-600', severity: 'high' }
+}
+
+/**
+ * Pain score classification (0-10).
+ * >= 7 High
+ */
+export function classifyPain(pain: number | null | undefined): VitalStatus | null {
+  if (pain == null) return null
+  if (pain >= 7) return { label: 'High', color: 'text-red-600', severity: 'high' }
+  return null // only flag when concerning
+}
+
+/**
+ * BP classification as VitalStatus (for consistent API with other vitals).
+ */
+export function classifyBpAsStatus(bp: string | null | undefined): VitalStatus | null {
+  const result = classifyBpString(bp)
+  if (!result) return null
+  if (result.severity === 0) return NORMAL
+  if (result.severity === 1) return { label: result.label, color: 'text-amber-600', severity: 'elevated' }
+  if (result.severity >= 4)  return { label: result.label, color: 'text-red-600', severity: 'critical' }
+  return { label: result.label, color: 'text-red-600', severity: 'high' }
+}

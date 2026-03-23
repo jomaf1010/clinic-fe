@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
@@ -20,10 +20,12 @@ import AppLogo from '@/components/AppLogo.vue'
 import { HttpError } from '@/lib/http'
 import { loginSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
+import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
 import type { ValidationError } from '../types/auth.types'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { canvasRef } = useNeuralNetwork()
 
 const { handleSubmit, setFieldError } = useForm({
   validationSchema: loginSchema,
@@ -35,6 +37,13 @@ const { value: password, errorMessage: passwordError } = useField<string>('passw
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
 const rememberMe = ref(true)
+
+const ready = ref(false)
+onMounted(() => {
+  requestAnimationFrame(() => {
+    ready.value = true
+  })
+})
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
@@ -71,89 +80,119 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-background px-4">
-    <div class="w-full max-w-sm">
-      <div class="mb-4 flex justify-center">
+  <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+    <canvas ref="canvasRef" class="pointer-events-none absolute inset-0" />
+
+    <div
+      class="relative z-10 w-full max-w-sm transition-all duration-700 ease-out"
+      :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'"
+    >
+      <div
+        class="mb-4 flex justify-center transition-all delay-100 duration-700 ease-out"
+        :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
+      >
         <AppLogo class="h-24 w-auto" />
       </div>
 
-      <Card>
-        <CardHeader class="text-center">
-          <CardTitle class="text-xl">Sign in</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
-        </CardHeader>
+      <div
+        class="transition-all delay-200 duration-700 ease-out"
+        :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
+      >
+        <Card class="backdrop-blur-sm bg-card/90">
+          <CardHeader class="text-center">
+            <CardTitle class="text-xl">Welcome back!</CardTitle>
+            <CardDescription>Sign in to your account</CardDescription>
+          </CardHeader>
 
-        <CardContent>
-          <form class="flex flex-col gap-5" novalidate @submit.prevent="onSubmit">
-            <div
-              v-if="generalError"
-              role="alert"
-              class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-            >
-              {{ generalError }}
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <Label for="email" class="flex items-center gap-1.5">
-                <Mail class="size-3.5 text-muted-foreground" />
-                Email
-              </Label>
-              <Input
-                id="email"
-                v-model="email"
-                type="email"
-                placeholder="you@example.com"
-                autocomplete="email"
-                :disabled="isLoading"
-                :aria-invalid="!!emailError"
-                required
-              />
-              <p v-if="emailError" class="text-xs text-destructive">
-                {{ emailError }}
-              </p>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <Label for="password" class="flex items-center gap-1.5">
-                <Lock class="size-3.5 text-muted-foreground" />
-                Password
-              </Label>
-              <PasswordInput
-                id="password"
-                v-model="password"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                :disabled="isLoading"
-                :aria-invalid="!!passwordError"
-                required
-              />
-              <p v-if="passwordError" class="text-xs text-destructive">
-                {{ passwordError }}
-              </p>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <Checkbox id="remember-me" :checked="rememberMe" @update:checked="rememberMe = $event" :disabled="isLoading" />
-              <Label for="remember-me" class="text-sm font-normal cursor-pointer">Remember me</Label>
-            </div>
-
-            <Button type="submit" class="w-full" :disabled="isLoading">
-              <LoaderCircle v-if="isLoading" class="size-4 animate-spin" />
-              {{ isLoading ? 'Signing in...' : 'Sign in' }}
-            </Button>
-
-            <p class="text-center text-sm text-muted-foreground">
-              Don't have an account?
-              <RouterLink
-                :to="{ name: RouteNames.SIGNUP }"
-                class="font-medium text-primary underline-offset-4 hover:underline"
+          <CardContent>
+            <form class="flex flex-col gap-5" novalidate @submit.prevent="onSubmit">
+              <div
+                v-if="generalError"
+                role="alert"
+                class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
               >
-                Sign up
-              </RouterLink>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+                {{ generalError }}
+              </div>
+
+              <div
+                class="flex flex-col gap-2 transition-all delay-300 duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <Label for="email" class="flex items-center gap-1.5">
+                  <Mail class="size-3.5 text-muted-foreground" />
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  v-model="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autocomplete="email"
+                  :disabled="isLoading"
+                  :aria-invalid="!!emailError"
+                  required
+                />
+                <p v-if="emailError" class="text-xs text-destructive">
+                  {{ emailError }}
+                </p>
+              </div>
+
+              <div
+                class="flex flex-col gap-2 transition-all delay-[350ms] duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <Label for="password" class="flex items-center gap-1.5">
+                  <Lock class="size-3.5 text-muted-foreground" />
+                  Password
+                </Label>
+                <PasswordInput
+                  id="password"
+                  v-model="password"
+                  placeholder="••••••••"
+                  autocomplete="current-password"
+                  :disabled="isLoading"
+                  :aria-invalid="!!passwordError"
+                  required
+                />
+                <p v-if="passwordError" class="text-xs text-destructive">
+                  {{ passwordError }}
+                </p>
+              </div>
+
+              <div
+                class="flex items-center gap-2 transition-all delay-[400ms] duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <Checkbox id="remember-me" :checked="rememberMe" @update:checked="rememberMe = $event" :disabled="isLoading" />
+                <Label for="remember-me" class="text-sm font-normal cursor-pointer">Remember me</Label>
+              </div>
+
+              <div
+                class="transition-all delay-[450ms] duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <Button type="submit" class="w-full" :disabled="isLoading">
+                  <LoaderCircle v-if="isLoading" class="size-4 animate-spin" />
+                  {{ isLoading ? 'Signing in...' : 'Sign in' }}
+                </Button>
+              </div>
+
+              <p
+                class="text-center text-sm text-muted-foreground transition-all delay-500 duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                Don't have an account?
+                <RouterLink
+                  :to="{ name: RouteNames.SIGNUP }"
+                  class="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Sign up
+                </RouterLink>
+              </p>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   </div>
 </template>

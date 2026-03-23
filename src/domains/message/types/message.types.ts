@@ -1,6 +1,7 @@
 export interface Participant {
   id: string
   name: string
+  avatar_url: string | null
 }
 
 export interface ConversationResponse {

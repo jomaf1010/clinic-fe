@@ -80,6 +80,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   })
 
   if (response.status === 401) {
@@ -94,6 +95,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        credentials: 'include',
       })
 
       let retryData: unknown
@@ -149,6 +151,7 @@ async function uploadRequest<T>(endpoint: string, formData: FormData, method: Ht
     method,
     headers,
     body: formData,
+    credentials: 'include',
   })
 
   if (response.status === 401) {
@@ -163,6 +166,7 @@ async function uploadRequest<T>(endpoint: string, formData: FormData, method: Ht
         method,
         headers,
         body: formData,
+        credentials: 'include',
       })
 
       let retryData: unknown
