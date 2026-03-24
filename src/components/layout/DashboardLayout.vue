@@ -4,6 +4,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
 import TrialBanner from '@/components/layout/TrialBanner.vue'
+import GracePeriodBanner from '@/components/layout/GracePeriodBanner.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useDmRealtime } from '@/domains/message/composables/useDmRealtime'
 import { useMessageStore } from '@/domains/message/stores/messageStore'
@@ -50,6 +51,7 @@ onUnmounted(() => {
     <SidebarInset>
       <SiteHeader />
       <TrialBanner />
+      <GracePeriodBanner />
       <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4">
         <RouterView />
       </div>

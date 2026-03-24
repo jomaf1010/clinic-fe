@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Crown, Check, Lock } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,6 +11,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { RouteNames } from '@/router/routeNames'
 
 const props = withDefaults(defineProps<{
   open?: boolean
@@ -24,7 +26,13 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
+const router = useRouter()
 const authStore = useAuthStore()
+
+function goToSubscription() {
+  emit('update:open', false)
+  router.push({ name: RouteNames.SUBSCRIPTION })
+}
 
 const trialText = computed(() => {
   if (!authStore.isOnTrial) return null
@@ -66,7 +74,7 @@ const proFeatures = [
         <span>{{ feat }}</span>
       </div>
     </div>
-    <Button class="gap-2">
+    <Button class="gap-2" @click="goToSubscription">
       <Crown class="size-4" />
       Upgrade to Pro
     </Button>
@@ -102,7 +110,7 @@ const proFeatures = [
         <Button variant="outline" @click="emit('update:open', false)">
           Maybe Later
         </Button>
-        <Button class="gap-2">
+        <Button class="gap-2" @click="goToSubscription">
           <Crown class="size-4" />
           Upgrade
         </Button>

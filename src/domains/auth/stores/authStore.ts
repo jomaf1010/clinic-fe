@@ -41,6 +41,12 @@ export const useAuthStore = defineStore('auth', () => {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
   })
 
+  const billingPeriodEnd = computed(() => currentClinic.value?.billing_period_ends_at ?? null)
+
+  const isInGracePeriod = computed(() => currentClinic.value?.is_in_grace_period ?? false)
+
+  const willCancel = computed(() => currentClinic.value?.cancel_at_period_end ?? false)
+
   function hasPermission(permission: string): boolean {
     const clinic = currentClinic.value
     if (!clinic) return false
@@ -136,6 +142,9 @@ export const useAuthStore = defineStore('auth', () => {
     isPro,
     isOnTrial,
     trialDaysLeft,
+    billingPeriodEnd,
+    isInGracePeriod,
+    willCancel,
     needsOnboarding,
     needsClinicSelection,
     hasPermission,

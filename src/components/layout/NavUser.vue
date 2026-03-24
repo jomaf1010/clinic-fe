@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   BadgeCheck,
   ChevronsUpDown,
+  Crown,
   LogOut,
   Moon,
   Sun,
@@ -39,6 +40,7 @@ const props = defineProps<{
     avatarUrl?: string | null
   }
   showSwitchClinic?: boolean
+  isOwner?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -110,6 +112,10 @@ const initials = computed(() => {
             <DropdownMenuItem @click="router.push({ name: RouteNames.ACCOUNT })">
               <BadgeCheck class="mr-2 size-4" />
               Account
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="isOwner" @click="router.push({ name: RouteNames.SUBSCRIPTION })">
+              <Crown class="mr-2 size-4" />
+              Subscription
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

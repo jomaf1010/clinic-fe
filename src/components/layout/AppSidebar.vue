@@ -169,6 +169,7 @@ async function handleLogout() {
       <NavUser
         :user="userData"
         :show-switch-clinic="authStore.memberships.length > 1"
+        :is-owner="authStore.currentRole === 'owner'"
         @logout="handleLogout"
         @switch-clinic="openSwitchDialog"
       />

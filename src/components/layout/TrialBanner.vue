@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Crown, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { RouteNames } from '@/router/routeNames'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const dismissed = ref(false)
 
@@ -34,7 +37,7 @@ const message = computed(() => {
       </span>
     </div>
     <div class="flex items-center gap-2">
-      <Button size="sm" class="h-7 gap-1.5 text-xs">
+      <Button size="sm" class="h-7 gap-1.5 text-xs" @click="router.push({ name: RouteNames.SUBSCRIPTION })">
         <Crown class="size-3" />
         Upgrade
       </Button>

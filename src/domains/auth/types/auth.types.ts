@@ -58,6 +58,9 @@ export interface ClinicContext {
   plan: 'free' | 'pro'
   is_trial: boolean
   trial_ends_at: string | null
+  billing_period_ends_at: string | null
+  cancel_at_period_end: boolean
+  is_in_grace_period: boolean
   features: string[]
   limits: {
     team_members: PlanLimit

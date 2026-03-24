@@ -30,6 +30,9 @@ export const RouteNames = {
   COMPONENTS: 'components',
   QUEUE_DISPLAY: 'queue-display',
   BILLING: 'billing',
+  SUBSCRIPTION: 'subscription',
+  PAYMENT_SUCCESS: 'payment-success',
+  PAYMENT_CANCELLED: 'payment-cancelled',
   TEMPLATE_EDITOR: 'template-editor',
 } as const
 

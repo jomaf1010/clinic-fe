@@ -126,6 +126,11 @@ const router = createRouter({
           component: () => import('@/domains/billing/views/BillingView.vue'),
         },
         {
+          path: 'subscription',
+          name: RouteNames.SUBSCRIPTION,
+          component: () => import('@/domains/subscription/views/SubscriptionView.vue'),
+        },
+        {
           path: 'account',
           name: RouteNames.ACCOUNT,
           component: () => import('@/domains/auth/views/AccountView.vue'),
@@ -176,6 +181,18 @@ const router = createRouter({
       path: '/select-clinic',
       name: RouteNames.SELECT_CLINIC,
       component: () => import('@/domains/auth/views/SelectClinicView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/subscription/success',
+      name: RouteNames.PAYMENT_SUCCESS,
+      component: () => import('@/domains/subscription/views/PaymentSuccessView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/subscription/cancelled',
+      name: RouteNames.PAYMENT_CANCELLED,
+      component: () => import('@/domains/subscription/views/PaymentCancelledView.vue'),
       meta: { requiresAuth: true },
     },
     {

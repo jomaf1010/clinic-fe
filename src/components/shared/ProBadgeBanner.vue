@@ -1,22 +1,36 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Sparkles, Clock } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Sparkles, Crown, CalendarCheck, Settings } from 'lucide-vue-next'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { RouteNames } from '@/router/routeNames'
 
+const router = useRouter()
 const authStore = useAuthStore()
 
 const isPro = computed(() => authStore.isPro)
 const isOnTrial = computed(() => authStore.isOnTrial)
 const trialDaysLeft = computed(() => authStore.trialDaysLeft)
 const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Your Clinic')
+const isOwner = computed(() => authStore.currentRole === 'owner')
+
+const billingEndFormatted = computed(() => {
+  const endsAt = authStore.billingPeriodEnd
+  if (!endsAt) return null
+  return new Date(endsAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+})
 </script>
 
 <template>
   <!-- Pro (paid) -->
   <div v-if="isPro && !isOnTrial" class="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 dark:border-amber-800/40 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-amber-950/40">
-    <div class="flex items-center gap-4 px-5 py-2.5">
-      <img src="/images/pro-badge.svg" alt="Pro" class="size-8 shrink-0 drop-shadow-sm" />
-      <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex items-center gap-4 px-5 py-3">
+      <img src="/images/pro-badge.svg" alt="Pro" class="size-9 shrink-0 drop-shadow-sm" />
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <div class="flex items-center gap-2">
           <span class="text-sm font-semibold text-amber-900 dark:text-amber-100">{{ clinicName }}</span>
           <span class="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
@@ -24,19 +38,32 @@ const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Your 
             Pro
           </span>
         </div>
-        <p class="text-xs text-amber-600/80 dark:text-amber-400/70">
-          All premium features unlocked
-        </p>
+        <div class="flex items-center gap-3 text-xs text-amber-600/80 dark:text-amber-400/70">
+          <span>All premium features unlocked</span>
+          <span v-if="billingEndFormatted" class="hidden items-center gap-1 sm:inline-flex">
+            <CalendarCheck class="size-3" />
+            Renews {{ billingEndFormatted }}
+          </span>
+        </div>
       </div>
+      <button
+        v-if="isOwner"
+        type="button"
+        class="shrink-0 rounded-lg border border-amber-300/60 bg-white/60 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-white/80 dark:border-amber-700/40 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+        @click="router.push({ name: RouteNames.SUBSCRIPTION })"
+      >
+        <Settings class="inline size-3 mr-1" />
+        Manage
+      </button>
     </div>
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent dark:via-white/5" />
   </div>
 
   <!-- Trial -->
   <div v-else-if="isPro && isOnTrial" class="rounded-xl border border-sky-200/60 bg-gradient-to-r from-sky-50/80 to-indigo-50/50 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-indigo-950/20">
-    <div class="flex items-center gap-4 px-5 py-2.5">
-      <img src="/images/pro-badge.svg" alt="Pro" class="size-8 shrink-0 opacity-70" />
-      <div class="flex min-w-0 flex-1 flex-col">
+    <div class="flex items-center gap-4 px-5 py-3">
+      <img src="/images/pro-badge.svg" alt="Pro" class="size-9 shrink-0 opacity-70" />
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-sky-900 dark:text-sky-100">{{ clinicName }}</span>
           <span class="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-sky-300 bg-sky-100 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-sky-700 dark:border-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
@@ -47,7 +74,8 @@ const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Your 
           Pro features active &middot; {{ trialDaysLeft }} day{{ trialDaysLeft === 1 ? '' : 's' }} remaining
         </p>
       </div>
-      <button type="button" class="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600">
+      <button type="button" class="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600" @click="router.push({ name: RouteNames.SUBSCRIPTION })">
+        <Crown class="inline size-3 mr-1" />
         Upgrade
       </button>
     </div>
