@@ -21,6 +21,7 @@ import {
   Receipt,
   Pill,
   ClipboardList,
+  Loader2,
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -83,8 +84,38 @@ onMounted(() => {
       <div class="grid gap-6 lg:grid-cols-5">
         <!-- Left column (3/5) -->
         <div class="flex flex-col gap-6 lg:col-span-2">
+          <!-- Free Plan Card -->
+          <div v-if="status && status.plan === 'free' && !status.is_trial" class="rounded-xl border bg-card p-6">
+            <div class="flex items-start gap-4">
+              <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+                <Crown class="size-6 text-muted-foreground" />
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2.5">
+                  <h2 class="text-lg font-bold">{{ authStore.currentClinic?.clinic_name }}</h2>
+                  <Badge variant="secondary">Free</Badge>
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  Upgrade to Pro to unlock all premium features
+                </p>
+                <div v-if="isOwner" class="mt-4">
+                  <Button
+                    size="sm"
+                    class="gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-sm hover:from-amber-600 hover:to-yellow-600"
+                    :disabled="subscriptionStore.checkoutLoading"
+                    @click="subscriptionStore.initiateCheckout()"
+                  >
+                    <Loader2 v-if="subscriptionStore.checkoutLoading" class="size-3.5 animate-spin" />
+                    <Crown v-else class="size-3.5" />
+                    Upgrade to Pro — PHP 1,299/mo
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Pro Status Card (premium feel, same theme as dashboard banner) -->
-          <div v-if="status" class="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-50/80 dark:border-amber-800/40 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-amber-950/40">
+          <div v-if="status && (status.plan === 'pro' || status.is_trial)" class="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-50/80 dark:border-amber-800/40 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-amber-950/40">
             <div class="relative z-10 p-6">
               <div class="flex items-start gap-4">
                 <img src="/images/pro-badge.svg" alt="Pro" class="size-12 shrink-0 drop-shadow-md" />
