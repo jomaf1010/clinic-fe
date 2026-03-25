@@ -41,6 +41,7 @@ import { patientApi } from '../api/patientApi'
 import { HttpError } from '@/lib/http'
 import { createPatientSchema } from '@/lib/validationRules'
 import { useFormDraft } from '@/composables/useFormDraft'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
 import type { PatientAddress, PatientName } from '../types/patient.types'
 
@@ -62,6 +63,12 @@ const { value: sex, errorMessage: sexError } = useField<string>('sex')
 const { value: contactNumber, errorMessage: contactNumberError } = useField<string>('contact_number')
 const { value: email, errorMessage: emailError } = useField<string>('email')
 const { value: note, errorMessage: noteError } = useField<string>('note')
+
+const authStore = useAuthStore()
+const clinicAddress = authStore.currentClinic?.address
+const addressPrefill = clinicAddress?.region_code && clinicAddress?.province_code && clinicAddress?.city_code
+  ? { region_code: clinicAddress.region_code, province_code: clinicAddress.province_code, city_code: clinicAddress.city_code }
+  : null
 
 const name = ref<PatientName | null>(null)
 const address = ref<PatientAddress | null>(null)
@@ -252,7 +259,7 @@ const onSubmit = handleSubmit(async (values) => {
             <MapPin class="size-3.5 text-muted-foreground" />
             Address
           </Label>
-          <AddressForm v-model="address" :disabled="isLoading" />
+          <AddressForm v-model="address" :disabled="isLoading" :prefill="addressPrefill" />
         </div>
 
         <Separator />

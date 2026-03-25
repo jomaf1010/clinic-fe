@@ -16,8 +16,10 @@ import type { PatientAddress } from '@/domains/patient/types/patient.types'
 const props = withDefaults(defineProps<{
   modelValue: PatientAddress | null
   disabled?: boolean
+  prefill?: { region_code: string; province_code: string; city_code: string } | null
 }>(), {
   disabled: false,
+  prefill: null,
 })
 
 const emit = defineEmits<{
@@ -89,6 +91,44 @@ onMounted(async () => {
         const res = await addressApi.lookup('barangay', props.modelValue.city_code)
         barangays.value = res.data
         selectedBarangay.value = props.modelValue.barangay_code
+      } finally {
+        loadingBarangays.value = false
+      }
+    }
+
+    initializing = false
+  } else if (props.prefill) {
+    // Prefill region/province/city from clinic address, leave barangay empty
+    initializing = true
+    selectedRegion.value = props.prefill.region_code
+
+    if (props.prefill.region_code) {
+      loadingProvinces.value = true
+      try {
+        const res = await addressApi.lookup('province', props.prefill.region_code)
+        provinces.value = res.data
+        selectedProvince.value = props.prefill.province_code
+      } finally {
+        loadingProvinces.value = false
+      }
+    }
+
+    if (props.prefill.province_code) {
+      loadingCities.value = true
+      try {
+        const res = await addressApi.lookup('city', props.prefill.province_code)
+        cities.value = res.data
+        selectedCity.value = props.prefill.city_code
+      } finally {
+        loadingCities.value = false
+      }
+    }
+
+    if (props.prefill.city_code) {
+      loadingBarangays.value = true
+      try {
+        const res = await addressApi.lookup('barangay', props.prefill.city_code)
+        barangays.value = res.data
       } finally {
         loadingBarangays.value = false
       }

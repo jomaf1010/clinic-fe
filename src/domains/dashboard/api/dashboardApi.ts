@@ -200,6 +200,10 @@ export const dashboardApi = {
     return http.get<{ data: RevenueChartPoint[] }>('/dashboard/doctor/revenue-chart')
   },
 
+  patientDistribution(): Promise<{ data: { city: string | null; total: number; other: number; data: { name: string; value: number }[] } }> {
+    return http.get<{ data: { city: string | null; total: number; other: number; data: { name: string; value: number }[] } }>('/dashboard/patient-distribution')
+  },
+
   ownerRevenueChart(): Promise<{ data: RevenueChartPoint[] }> {
     return http.get<{ data: RevenueChartPoint[] }>('/dashboard/owner/revenue-chart')
   },

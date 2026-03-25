@@ -14,6 +14,7 @@ import {
   FileCheck,
   TrendingUp,
   AlertTriangle,
+  MapPin,
 } from 'lucide-vue-next'
 import { dashboardApi } from '@/domains/dashboard/api/dashboardApi'
 import type { OwnerDashboardStats } from '@/domains/dashboard/api/dashboardApi'
@@ -21,7 +22,15 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import StatCard from '@/domains/dashboard/components/StatCard.vue'
 import OwnerRevenueChart from '@/domains/dashboard/components/OwnerRevenueChart.vue'
+import { use } from 'echarts/core'
+import { PieChart } from 'echarts/charts'
+import { TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import VChart from 'vue-echarts'
+
+use([PieChart, TooltipComponent, CanvasRenderer])
 import ProBadgeBanner from '@/components/shared/ProBadgeBanner.vue'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import PatientAvatar from '@/components/PatientAvatar.vue'
@@ -33,6 +42,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const hasAppointments = computed(() => authStore.hasFeature('appointments'))
+const isPro = computed(() => authStore.isPro)
 const todayCount = computed(() => stats.value?.my_upcoming_appointments.filter(a => a.date === todayDate).length ?? 0)
 
 const stats = ref<OwnerDashboardStats | null>(null)
@@ -88,6 +98,79 @@ function formatStatus(status: string): string {
   return status.replace(/_/g, ' ')
 }
 
+// Patient distribution mini chart
+const distData = ref<{ name: string; value: number }[]>([])
+const distCity = ref<string | null>(null)
+const distOther = ref(0)
+const distLoaded = ref(false)
+
+const distColors = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#06b6d4', '#f97316', '#ec4899', '#14b8a6', '#6366f1',
+  '#84cc16', '#e11d48', '#0ea5e9', '#d946ef', '#22c55e',
+]
+
+const distOption = computed(() => ({
+  color: distColors,
+  tooltip: {
+    trigger: 'item' as const,
+    formatter: (params: { name: string; value: number; percent: number }) =>
+      `<b>${params.name}</b><br/>${params.value} patient${params.value > 1 ? 's' : ''} (${params.percent}%)`,
+  },
+  series: [{
+    type: 'pie',
+    radius: ['55%', '85%'],
+    center: ['50%', '50%'],
+    data: distData.value,
+    label: { show: false },
+    emphasis: {
+      itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,0.1)' },
+      scale: true,
+      scaleSize: 4,
+    },
+    itemStyle: { borderRadius: 3, borderColor: '#fff', borderWidth: 1.5 },
+  }],
+}))
+
+const showDistDialog = ref(false)
+
+const distFullOption = computed(() => ({
+  color: distColors,
+  tooltip: {
+    trigger: 'item' as const,
+    formatter: (params: { name: string; value: number; percent: number }) =>
+      `<b>${params.name}</b><br/>${params.value} patient${params.value > 1 ? 's' : ''} (${params.percent}%)`,
+  },
+  series: [{
+    type: 'pie',
+    radius: ['40%', '75%'],
+    center: ['50%', '50%'],
+    data: distData.value,
+    label: {
+      show: true,
+      fontSize: 12,
+      color: '#475569',
+      formatter: (params: { name: string; percent: number }) =>
+        params.percent >= 2 ? `${params.name}` : '',
+    },
+    labelLine: { show: true, length: 12, length2: 18 },
+    emphasis: {
+      itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.15)' },
+    },
+    itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+  }],
+}))
+
+async function fetchDistribution() {
+  try {
+    const res = await dashboardApi.patientDistribution()
+    distData.value = res.data.data
+    distCity.value = res.data.city
+    distOther.value = res.data.other
+  } catch { /* ignore */ }
+  distLoaded.value = true
+}
+
 async function fetchStats(): Promise<void> {
   loading.value = true
   error.value = null
@@ -113,6 +196,7 @@ function silentRefresh() {
 
 onMounted(() => {
   fetchStats()
+  if (isPro.value) fetchDistribution()
 
   const clinicId = authStore.currentClinic?.id
   if (clinicId) {
@@ -153,13 +237,25 @@ onUnmounted(() => {
       <!-- Stat cards -->
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button class="text-left h-full" @click="router.push({ name: RouteNames.PATIENT_LIST })">
-          <StatCard
-            label="Total Patients"
-            :value="stats?.total_patients ?? 0"
-            :icon="Users"
-            color-class="stat-blue"
-            :loading="loading"
-          />
+          <div class="h-full rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+            <div class="flex items-start justify-between">
+              <div class="flex flex-col gap-1">
+                <span class="text-sm font-medium text-muted-foreground">Total Patients</span>
+                <Skeleton v-if="loading" class="h-9 w-20" />
+                <span v-else class="text-3xl font-bold tabular-nums">{{ stats?.total_patients ?? 0 }}</span>
+                <p v-if="isPro && distLoaded && distCity" class="text-xs text-muted-foreground leading-snug mt-1">
+                  <span class="font-semibold">{{ (stats?.total_patients ?? 0) - distOther }}</span> in {{ distCity }}
+                  <span v-if="distOther > 0"><br/><span class="font-semibold">{{ distOther }}</span> from other areas</span>
+                </p>
+              </div>
+              <div v-if="isPro && distLoaded && distData.length" class="shrink-0 cursor-pointer" @click.stop="showDistDialog = true">
+                <VChart :option="distOption" autoresize style="width: 120px; height: 120px; pointer-events: none;" />
+              </div>
+              <div v-else class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-stat-blue/10">
+                <Users class="size-5 text-stat-blue" />
+              </div>
+            </div>
+          </div>
         </button>
         <button class="text-left h-full" @click="router.push({ name: RouteNames.PATIENT_LIST })">
           <StatCard
@@ -513,6 +609,26 @@ onUnmounted(() => {
           </template>
         </div>
       </div>
+
     </template>
+
+    <!-- Patient Distribution Dialog -->
+    <Dialog v-model:open="showDistDialog">
+      <DialogContent class="sm:max-w-2xl" @close-auto-focus.prevent>
+        <DialogHeader>
+          <DialogTitle>Patient Distribution</DialogTitle>
+          <DialogDescription>
+            {{ distCity }} · <span class="font-semibold">{{ (stats?.total_patients ?? 0) - distOther }}</span> patients
+            <span v-if="distOther > 0"> · <span class="font-semibold">{{ distOther }}</span> from other areas</span>
+          </DialogDescription>
+        </DialogHeader>
+        <VChart
+          v-if="distData.length"
+          :option="distFullOption"
+          autoresize
+          style="height: 500px; width: 100%;"
+        />
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

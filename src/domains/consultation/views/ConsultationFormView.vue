@@ -445,7 +445,7 @@ function proceedAfterFeeWarning() {
     </div>
 
     <!-- Tabs row -->
-    <TabsList class="w-full justify-start px-4">
+    <TabsList class="w-full justify-start overflow-x-auto overflow-y-hidden px-4">
       <TabsTrigger value="triage">
         <Activity class="size-4" />
         Triage
