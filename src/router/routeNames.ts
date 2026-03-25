@@ -34,6 +34,8 @@ export const RouteNames = {
   PAYMENT_SUCCESS: 'payment-success',
   PAYMENT_CANCELLED: 'payment-cancelled',
   TEMPLATE_EDITOR: 'template-editor',
+  FORGOT_PASSWORD: 'forgot-password',
+  RESET_PASSWORD: 'reset-password',
 } as const
 
 export type RouteName = (typeof RouteNames)[keyof typeof RouteNames]

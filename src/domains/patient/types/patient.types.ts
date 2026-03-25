@@ -1,6 +1,25 @@
 export type PatientStatus = 'active' | 'inactive' | 'new' | 'returning'
 
-export type PatientSortField = 'created_at' | 'updated_at' | 'full_name'
+export interface PatientName {
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  suffix: string | null
+}
+
+export interface PatientAddress {
+  region_code: string
+  region_name: string
+  province_code: string
+  province_name: string
+  city_code: string
+  city_name: string
+  barangay_code: string
+  barangay_name: string
+  street: string | null
+}
+
+export type PatientSortField = 'created_at' | 'updated_at' | 'full_name' | 'last_name'
 export type SortDirection = 'asc' | 'desc'
 
 export interface PatientListFilters {
@@ -12,8 +31,11 @@ export interface PatientListFilters {
 }
 
 export interface CreatePatientPayload {
-  full_name: string
-  address: string
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+  suffix?: string | null
+  address: PatientAddress
   date_of_birth: string
   sex: string
   contact_number?: string
@@ -25,8 +47,14 @@ export interface CreatePatientPayload {
 
 export interface PatientResponse {
   id: string
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  suffix: string | null
+  formal_name: string
   full_name: string
-  address: string
+  address: PatientAddress | null
+  formatted_address: string
   date_of_birth: string
   sex: string
   contact_number: string | null
@@ -34,6 +62,7 @@ export interface PatientResponse {
   allergies: string[]
   chronic_conditions: string[]
   note: string | null
+  avatar_url: string | null
   status: PatientStatus
   created_at: string
   updated_at: string
@@ -60,8 +89,11 @@ export interface PatientDetailResponse {
 }
 
 export interface UpdatePatientPayload {
-  full_name?: string
-  address?: string
+  first_name?: string
+  middle_name?: string | null
+  last_name?: string
+  suffix?: string | null
+  address?: PatientAddress
   date_of_birth?: string
   sex?: string
   contact_number?: string | null

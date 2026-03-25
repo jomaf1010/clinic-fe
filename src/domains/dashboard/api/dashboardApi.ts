@@ -11,6 +11,8 @@ export interface OwnerAppointment {
   id: string
   patient_name: string
   patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
   doctor_name: string
   scheduled_at: string
   status: string
@@ -20,6 +22,8 @@ export interface OwnerQueueItem {
   id: string
   patient_name: string
   patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
   doctor_name: string
   status: string
   queued_at: string
@@ -29,6 +33,8 @@ export interface RecentConsultation {
   id: string
   patient_name: string
   patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
   doctor_name: string
   finalized_at: string
 }
@@ -77,6 +83,8 @@ export interface OwnerDashboardStats {
 export interface RecentPatient {
   id: string
   name: string
+  sex: string | null
+  avatar_url: string | null
   last_visit: string
 }
 
@@ -84,6 +92,8 @@ export interface DoctorAppointment {
   id: string
   patient_name: string
   patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
   scheduled_at: string
   date: string
   status: string
@@ -93,6 +103,8 @@ export interface DraftConsultation {
   id: string
   patient_name: string
   patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
   updated_at: string
   chief_complaint: string | null
 }
@@ -101,6 +113,8 @@ export interface QueueItem {
   id: string
   patient_name: string
   patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
   consultation_id: string | null
   status: string
   queued_at: string

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ArrowLeft, LoaderCircle, MessageSquare, Plus } from 'lucide-vue-next'
+import { ArrowLeft, LoaderCircle, MessageSquare, SquarePen } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import OnlineDot from '@/components/OnlineDot.vue'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useMessageStore } from '../stores/messageStore'
 import { useTypingIndicator } from '../composables/useTypingIndicator'
@@ -74,11 +75,16 @@ onMounted(() => {
         showThread && mode === 'full' ? 'hidden md:flex' : 'flex',
       ]"
     >
-      <div class="flex items-center justify-between border-b px-4 py-3">
+      <div class="flex items-center justify-between border-b px-4 py-3" :class="mode === 'panel' ? 'pr-12' : ''">
         <h2 class="text-sm font-semibold">Messages</h2>
-        <Button variant="ghost" size="icon" class="size-8" @click="newDialogOpen = true">
-          <Plus class="size-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon" class="size-8" @click="newDialogOpen = true">
+              <SquarePen class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">New message</TooltipContent>
+        </Tooltip>
       </div>
 
       <div v-if="messageStore.isLoading && messageStore.conversations.length === 0" class="flex flex-1 items-center justify-center">

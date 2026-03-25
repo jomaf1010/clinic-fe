@@ -20,7 +20,6 @@ const templateSections = [
     description: 'Layout used when printing or exporting patient prescriptions',
     variations: [
       { key: 'default', name: 'Default', active: true },
-      { key: 'compact', name: 'Compact', active: false },
     ],
   },
   {
@@ -50,10 +49,9 @@ const templateSections = [
   {
     key: 'invoice',
     title: 'Invoice',
-    description: 'Billing invoice layout for patient charges and payments',
+    description: 'Billing invoice with line items, totals, and payment history',
     variations: [
       { key: 'default', name: 'Default', active: true },
-      { key: 'detailed', name: 'Detailed', active: false },
     ],
   },
 ]

@@ -6,7 +6,6 @@ import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -20,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RouteNames } from '@/router/routeNames'
-import { defaultPrescriptionTemplate } from '@/domains/template/types/template.types'
+import { defaultLabRequestTemplate } from '@/domains/template/types/template.types'
 import { templateApi } from '@/domains/template/api/templateApi'
 
 const route = useRoute()
@@ -30,7 +29,7 @@ const authStore = useAuthStore()
 const category = computed(() => route.params.category as string)
 const variation = computed(() => route.params.variation as string)
 
-const template = reactive({ ...defaultPrescriptionTemplate })
+const template = reactive({ ...defaultLabRequestTemplate })
 const templateName = ref('Default')
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -91,8 +90,8 @@ async function save() {
         <ArrowLeft class="size-4" />
       </Button>
       <div>
-        <h1 class="text-lg font-semibold">Edit Prescription Template</h1>
-        <p class="text-sm text-muted-foreground">Customize the layout for printed prescriptions</p>
+        <h1 class="text-lg font-semibold">Edit Lab Request Template</h1>
+        <p class="text-sm text-muted-foreground">Customize the layout for laboratory request forms</p>
       </div>
       <div class="ml-auto flex gap-2">
         <Button variant="outline" @click="goBack" :disabled="isSaving">Cancel</Button>
@@ -118,9 +117,7 @@ async function save() {
             <div class="flex flex-col gap-2">
               <Label>Paper Size</Label>
               <Select v-model="template.paperSize">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select size" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="a4">A4</SelectItem>
                   <SelectItem value="a5">A5</SelectItem>
@@ -128,26 +125,20 @@ async function save() {
                 </SelectContent>
               </Select>
             </div>
-
             <div class="flex flex-col gap-2">
               <Label>Orientation</Label>
               <Select v-model="template.orientation">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select orientation" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select orientation" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="portrait">Portrait</SelectItem>
                   <SelectItem value="landscape">Landscape</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
             <div class="flex flex-col gap-2">
               <Label>Font Family</Label>
               <Select v-model="template.fontFamily">
-                <SelectTrigger>
-                  <SelectValue placeholder="Select font" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select font" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sans-serif">Sans Serif</SelectItem>
                   <SelectItem value="serif">Serif</SelectItem>
@@ -155,7 +146,6 @@ async function save() {
                 </SelectContent>
               </Select>
             </div>
-
             <div class="col-span-full flex flex-col gap-2">
               <div class="flex items-center justify-between">
                 <Label>Font Size (px)</Label>
@@ -208,8 +198,8 @@ async function save() {
           <CardContent class="flex flex-col gap-4">
             <div class="flex flex-col gap-3">
               <div class="flex items-center gap-2">
-                <Checkbox id="show-logo" :model-value="template.header.showLogo" @update:model-value="template.header.showLogo = !!$event" />
-                <Label for="show-logo" class="font-normal">Show clinic logo</Label>
+                <Checkbox id="lr-show-logo" :model-value="template.header.showLogo" @update:model-value="template.header.showLogo = !!$event" />
+                <Label for="lr-show-logo" class="font-normal">Show clinic logo</Label>
               </div>
               <div v-if="template.header.showLogo" class="flex items-center gap-3 pl-6">
                 <Label class="shrink-0 text-xs text-muted-foreground">Logo size</Label>
@@ -224,19 +214,18 @@ async function save() {
                 <span class="w-6 text-center text-xs tabular-nums text-muted-foreground">{{ template.header.logoSize ?? 40 }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-clinic-name" :model-value="template.header.showClinicName" @update:model-value="template.header.showClinicName = !!$event" />
-                <Label for="show-clinic-name" class="font-normal">Show clinic name</Label>
+                <Checkbox id="lr-show-clinic-name" :model-value="template.header.showClinicName" @update:model-value="template.header.showClinicName = !!$event" />
+                <Label for="lr-show-clinic-name" class="font-normal">Show clinic name</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-clinic-address" :model-value="template.header.showClinicAddress" @update:model-value="template.header.showClinicAddress = !!$event" />
-                <Label for="show-clinic-address" class="font-normal">Show clinic address</Label>
+                <Checkbox id="lr-show-clinic-address" :model-value="template.header.showClinicAddress" @update:model-value="template.header.showClinicAddress = !!$event" />
+                <Label for="lr-show-clinic-address" class="font-normal">Show clinic address</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-clinic-contact" :model-value="template.header.showClinicContact" @update:model-value="template.header.showClinicContact = !!$event" />
-                <Label for="show-clinic-contact" class="font-normal">Show clinic contact</Label>
+                <Checkbox id="lr-show-clinic-contact" :model-value="template.header.showClinicContact" @update:model-value="template.header.showClinicContact = !!$event" />
+                <Label for="lr-show-clinic-contact" class="font-normal">Show clinic contact</Label>
               </div>
             </div>
-
             <div class="flex flex-col gap-2">
               <Label>Custom Header Text</Label>
               <Textarea v-model="template.header.customText" placeholder="Optional text to display in the header" rows="2" />
@@ -251,24 +240,32 @@ async function save() {
           </CardHeader>
           <CardContent class="flex flex-col gap-3">
             <div class="flex items-center gap-2">
-              <Checkbox id="show-patient-name" :model-value="template.body.showPatientName" @update:model-value="template.body.showPatientName = !!$event" />
-              <Label for="show-patient-name" class="font-normal">Show patient name</Label>
+              <Checkbox id="lr-show-patient-name" :model-value="template.body.showPatientName" @update:model-value="template.body.showPatientName = !!$event" />
+              <Label for="lr-show-patient-name" class="font-normal">Show patient name</Label>
             </div>
             <div class="flex items-center gap-2">
-              <Checkbox id="show-patient-age" :model-value="template.body.showPatientAge" @update:model-value="template.body.showPatientAge = !!$event" />
-              <Label for="show-patient-age" class="font-normal">Show patient age</Label>
+              <Checkbox id="lr-show-patient-age" :model-value="template.body.showPatientAge" @update:model-value="template.body.showPatientAge = !!$event" />
+              <Label for="lr-show-patient-age" class="font-normal">Show patient age</Label>
             </div>
             <div class="flex items-center gap-2">
-              <Checkbox id="show-patient-gender" :model-value="template.body.showPatientGender" @update:model-value="template.body.showPatientGender = !!$event" />
-              <Label for="show-patient-gender" class="font-normal">Show patient gender</Label>
+              <Checkbox id="lr-show-patient-gender" :model-value="template.body.showPatientGender" @update:model-value="template.body.showPatientGender = !!$event" />
+              <Label for="lr-show-patient-gender" class="font-normal">Show patient sex</Label>
             </div>
             <div class="flex items-center gap-2">
-              <Checkbox id="show-date" :model-value="template.body.showDate" @update:model-value="template.body.showDate = !!$event" />
-              <Label for="show-date" class="font-normal">Show date</Label>
+              <Checkbox id="lr-show-date" :model-value="template.body.showDate" @update:model-value="template.body.showDate = !!$event" />
+              <Label for="lr-show-date" class="font-normal">Show date</Label>
             </div>
             <div class="flex items-center gap-2">
-              <Checkbox id="show-doctor-name" :model-value="template.body.showDoctorName" @update:model-value="template.body.showDoctorName = !!$event" />
-              <Label for="show-doctor-name" class="font-normal">Show doctor name</Label>
+              <Checkbox id="lr-show-doctor-name" :model-value="template.body.showDoctorName" @update:model-value="template.body.showDoctorName = !!$event" />
+              <Label for="lr-show-doctor-name" class="font-normal">Show requesting physician</Label>
+            </div>
+            <div class="flex items-center gap-2">
+              <Checkbox id="lr-show-lab-name" :model-value="template.body.showLaboratoryName" @update:model-value="template.body.showLaboratoryName = !!$event" />
+              <Label for="lr-show-lab-name" class="font-normal">Show laboratory name (if provided)</Label>
+            </div>
+            <div class="flex items-center gap-2">
+              <Checkbox id="lr-show-instructions" :model-value="template.body.showInstructions" @update:model-value="template.body.showInstructions = !!$event" />
+              <Label for="lr-show-instructions" class="font-normal">Show special instructions per test</Label>
             </div>
           </CardContent>
         </Card>
@@ -281,39 +278,38 @@ async function save() {
           <CardContent class="flex flex-col gap-4">
             <div class="flex flex-col gap-3">
               <div class="flex items-center gap-2">
-                <Checkbox id="show-signature" :model-value="template.footer.showDoctorSignature" @update:model-value="template.footer.showDoctorSignature = !!$event" />
-                <Label for="show-signature" class="font-normal">Show doctor signature line</Label>
+                <Checkbox id="lr-show-signature" :model-value="template.footer.showDoctorSignature" @update:model-value="template.footer.showDoctorSignature = !!$event" />
+                <Label for="lr-show-signature" class="font-normal">Show doctor signature line</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-specialty" :model-value="template.footer.showSpecialty" @update:model-value="template.footer.showSpecialty = !!$event" />
-                <Label for="show-specialty" class="font-normal">Show specialty</Label>
+                <Checkbox id="lr-show-specialty" :model-value="template.footer.showSpecialty" @update:model-value="template.footer.showSpecialty = !!$event" />
+                <Label for="lr-show-specialty" class="font-normal">Show specialty</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-sub-specialty" :model-value="template.footer.showSubSpecialty" @update:model-value="template.footer.showSubSpecialty = !!$event" />
-                <Label for="show-sub-specialty" class="font-normal">Show sub-specialty</Label>
+                <Checkbox id="lr-show-sub-specialty" :model-value="template.footer.showSubSpecialty" @update:model-value="template.footer.showSubSpecialty = !!$event" />
+                <Label for="lr-show-sub-specialty" class="font-normal">Show sub-specialty</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-prc" :model-value="template.footer.showPrcLicense" @update:model-value="template.footer.showPrcLicense = !!$event" />
-                <Label for="show-prc" class="font-normal">Show PRC License No.</Label>
+                <Checkbox id="lr-show-prc" :model-value="template.footer.showPrcLicense" @update:model-value="template.footer.showPrcLicense = !!$event" />
+                <Label for="lr-show-prc" class="font-normal">Show PRC License No.</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-ptr" :model-value="template.footer.showPtrNumber" @update:model-value="template.footer.showPtrNumber = !!$event" />
-                <Label for="show-ptr" class="font-normal">Show PTR No.</Label>
+                <Checkbox id="lr-show-ptr" :model-value="template.footer.showPtrNumber" @update:model-value="template.footer.showPtrNumber = !!$event" />
+                <Label for="lr-show-ptr" class="font-normal">Show PTR No.</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-s2" :model-value="template.footer.showS2License" @update:model-value="template.footer.showS2License = !!$event" />
-                <Label for="show-s2" class="font-normal">Show S2 License No.</Label>
+                <Checkbox id="lr-show-s2" :model-value="template.footer.showS2License" @update:model-value="template.footer.showS2License = !!$event" />
+                <Label for="lr-show-s2" class="font-normal">Show S2 License No.</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-page-number" :model-value="template.footer.showPageNumber" @update:model-value="template.footer.showPageNumber = !!$event" />
-                <Label for="show-page-number" class="font-normal">Show page number</Label>
+                <Checkbox id="lr-show-page-number" :model-value="template.footer.showPageNumber" @update:model-value="template.footer.showPageNumber = !!$event" />
+                <Label for="lr-show-page-number" class="font-normal">Show page number</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="show-watermark" :model-value="template.footer.showWatermark" @update:model-value="template.footer.showWatermark = !!$event" />
-                <Label for="show-watermark" class="font-normal text-muted-foreground">Show watermark <span class="text-xs">(Pro accounts can hide this)</span></Label>
+                <Checkbox id="lr-show-watermark" :model-value="template.footer.showWatermark" @update:model-value="template.footer.showWatermark = !!$event" />
+                <Label for="lr-show-watermark" class="font-normal text-muted-foreground">Show watermark <span class="text-xs">(Pro accounts can hide this)</span></Label>
               </div>
             </div>
-
             <div class="flex flex-col gap-2">
               <Label>Custom Footer Text</Label>
               <Textarea v-model="template.footer.customText" placeholder="Optional text to display in the footer" rows="2" />
@@ -358,35 +354,44 @@ async function save() {
                 </div>
               </div>
 
+              <!-- Title -->
+              <div class="mb-3 text-center font-bold uppercase" :style="{ fontSize: `${template.fontSize * 0.8}px`, letterSpacing: '2px' }">
+                Laboratory Request
+              </div>
+
               <!-- Preview Body -->
-              <div class="flex-1">
-                <div class="mb-3 flex flex-wrap gap-x-4 gap-y-1">
+              <div class="flex-1 flex flex-col gap-1.5">
+                <!-- Patient Info -->
+                <div class="flex flex-wrap gap-x-4 gap-y-0.5">
                   <span v-if="template.body.showPatientName"><strong>Patient:</strong> Juan Dela Cruz</span>
                   <span v-if="template.body.showPatientAge"><strong>Age:</strong> 32</span>
                   <span v-if="template.body.showPatientGender"><strong>Sex:</strong> Male</span>
-                  <span v-if="template.body.showDate"><strong>Date:</strong> Mar 21, 2026</span>
+                  <span v-if="template.body.showDate"><strong>Date:</strong> Mar 25, 2026</span>
                 </div>
 
-                <div v-if="template.body.showDoctorName" class="mb-3">
-                  <strong>{{ doctorName }}</strong>
+                <div v-if="template.body.showDoctorName" class="mt-1">
+                  <strong>Requesting Physician:</strong> {{ doctorName }}
                 </div>
 
-                <div class="mb-2 font-bold">Rx</div>
-                <div class="flex flex-col gap-2 pl-4">
-                  <div>
-                    <div class="flex justify-between">
-                      <span>1. Amoxicillin 500mg</span>
-                      <span>#21</span>
+                <div v-if="template.body.showLaboratoryName" class="mt-1">
+                  <strong>To:</strong> <span class="text-muted-foreground italic">Sample Laboratory Name</span>
+                </div>
+
+                <!-- Lab Items -->
+                <div class="mt-2">
+                  <div class="font-bold" :style="{ fontSize: `${template.fontSize * 0.65}px` }">Requested Tests:</div>
+                  <div class="mt-1 pl-3 flex flex-col gap-1">
+                    <div>
+                      <span class="font-medium">1. Complete Blood Count (CBC)</span>
+                      <div v-if="template.body.showInstructions" class="pl-3 italic text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.5}px` }">Fasting required</div>
                     </div>
-                    <div class="pl-3 italic text-muted-foreground">Take 1 capsule 3 times a day for 7 days</div>
-                    <div class="pl-3 text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.5}px` }">Note: Take after meals</div>
-                  </div>
-                  <div>
-                    <div class="flex justify-between">
-                      <span>2. Paracetamol 500mg</span>
-                      <span>#10</span>
+                    <div>
+                      <span class="font-medium">2. Urinalysis</span>
                     </div>
-                    <div class="pl-3 italic text-muted-foreground">Take 1 tablet every 4 hours as needed for fever</div>
+                    <div>
+                      <span class="font-medium">3. Lipid Profile</span>
+                      <div v-if="template.body.showInstructions" class="pl-3 italic text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.5}px` }">12-hour fasting</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -404,13 +409,13 @@ async function save() {
                   </div>
                 </div>
                 <div v-if="template.footer.showPrcLicense" class="text-right text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.45}px` }">
-                  PRC Lic. No. {{ prcLicense || '—' }}
+                  PRC Lic. No. {{ prcLicense || '---' }}
                 </div>
                 <div v-if="template.footer.showPtrNumber" class="text-right text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.45}px` }">
-                  PTR No. {{ ptrNumber || '—' }}
+                  PTR No. {{ ptrNumber || '---' }}
                 </div>
                 <div v-if="template.footer.showS2License" class="text-right text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.45}px` }">
-                  S2 Lic. No. {{ s2License || '—' }}
+                  S2 Lic. No. {{ s2License || '---' }}
                 </div>
                 <div v-if="template.footer.customText" class="mt-1 text-center text-muted-foreground" :style="{ fontSize: `${template.fontSize * 0.45}px` }">
                   {{ template.footer.customText }}
@@ -419,12 +424,12 @@ async function save() {
                   Page 1 of 1
                 </div>
               </div>
-            </div>
 
-            <!-- Watermark -->
-            <div v-if="template.footer.showWatermark" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 opacity-[0.12]">
-              <img src="/favicon.svg" alt="" class="size-36 select-none" />
-              <span class="select-none text-lg font-bold uppercase tracking-widest text-foreground">MediFlow</span>
+              <!-- Watermark -->
+              <div v-if="template.footer.showWatermark" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 opacity-[0.12]">
+                <img src="/favicon.svg" alt="" class="size-36 select-none" />
+                <span class="select-none text-lg font-bold uppercase tracking-widest text-foreground">MediFlow</span>
+              </div>
             </div>
           </div>
         </div>

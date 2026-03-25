@@ -36,7 +36,7 @@ const isLoading = ref(false)
 const isSaving = ref(false)
 
 const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Clinic Name')
-const clinicAddress = computed(() => authStore.currentClinic?.address ?? '')
+const clinicAddress = computed(() => authStore.currentClinic?.formatted_address ?? '')
 const clinicContact = computed(() => authStore.currentClinic?.contact_number ?? '')
 const clinicEmail = computed(() => authStore.currentClinic?.email ?? '')
 const clinicLogoUrl = computed(() => authStore.currentClinic?.logo_url ?? null)

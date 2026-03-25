@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { RouteNames } from '@/router/routeNames'
 import QueueStatusBadge from './QueueStatusBadge.vue'
+import PatientAvatar from '@/components/PatientAvatar.vue'
 import type { QueueVisitResponse } from '../types/queue.types'
 
 const props = defineProps<{
@@ -82,6 +83,12 @@ function openConsultation() {
       >
         #{{ visit.position }}
       </div>
+      <PatientAvatar
+        :avatar-url="visit.patient_avatar_url"
+        :sex="visit.patient_sex"
+        :name="visit.patient_name"
+        class="size-8 shrink-0"
+      />
       <div class="min-w-0">
         <div class="flex items-center gap-2">
           <p class="truncate text-sm font-medium">{{ visit.patient_name ?? 'Unknown' }}</p>

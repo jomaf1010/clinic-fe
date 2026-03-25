@@ -71,6 +71,7 @@ export const useNotificationStore = defineStore('notification', () => {
         description: event.data.body,
         duration: 5000,
         position: 'top-right',
+        closeButton: true,
       })
     }
   }

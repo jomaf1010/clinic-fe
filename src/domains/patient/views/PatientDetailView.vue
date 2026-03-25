@@ -3,7 +3,6 @@ import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   User,
-  UserRound,
   MapPin,
   CalendarDays,
   Phone,
@@ -23,8 +22,11 @@ import {
   Clock,
   ArrowLeft,
   ChevronDown,
+  Camera,
 } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
+import PatientAvatar from '@/components/PatientAvatar.vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -36,6 +38,7 @@ import {
 } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import EditPatientDialog from '../components/EditPatientDialog.vue'
+import ImageCropDialog from '@/components/ImageCropDialog.vue'
 import { patientApi } from '../api/patientApi'
 import type { PatientResponse } from '../types/patient.types'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
@@ -56,9 +59,26 @@ const patient = ref<PatientResponse | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
-const isFemale = computed(() => patient.value?.sex === 'female')
-const avatarBg = computed(() => isFemale.value ? 'bg-pink-100 dark:bg-pink-950' : 'bg-blue-100 dark:bg-blue-950')
-const avatarColor = computed(() => isFemale.value ? 'text-pink-500' : 'text-blue-500')
+const avatarCropOpen = ref(false)
+const isUploadingAvatar = ref(false)
+const avatarUrl = ref<string | null>(null)
+
+const displayAvatarUrl = computed(() => avatarUrl.value ?? patient.value?.avatar_url ?? null)
+
+async function handleAvatarCrop(blob: Blob) {
+  if (!patient.value) return
+  const file = new File([blob], 'avatar.png', { type: 'image/png' })
+  isUploadingAvatar.value = true
+  try {
+    const res = await patientApi.uploadAvatar(patient.value.id, file)
+    avatarUrl.value = res.data.avatar_url
+    toast.success('Patient photo updated')
+  } catch {
+    toast.error('Failed to upload photo')
+  } finally {
+    isUploadingAvatar.value = false
+  }
+}
 
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
 const currentUserId = computed(() => authStore.user?.id)
@@ -117,6 +137,7 @@ function formatDate(dateStr: string): string {
 async function fetchPatient() {
   isLoading.value = true
   error.value = null
+  avatarUrl.value = null
 
   try {
     const response = await patientApi.get(route.params.id as string)
@@ -254,14 +275,32 @@ onUnmounted(() => {
 
       <!-- Header — always visible -->
       <div class="flex items-center gap-3 md:flex-col md:items-center md:text-center">
-        <div class="flex size-12 shrink-0 items-center justify-center rounded-full md:size-16" :class="avatarBg">
-          <UserRound class="size-6 md:size-8" :class="avatarColor" />
+        <!-- Patient avatar -->
+        <div class="group relative shrink-0">
+          <PatientAvatar
+            :avatar-url="displayAvatarUrl"
+            :sex="patient.sex"
+            :name="patient.full_name"
+            class="size-12 md:size-16"
+          />
+
+          <button
+            v-if="authStore.hasPermission('patients.edit')"
+            type="button"
+            class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            :disabled="isUploadingAvatar"
+            aria-label="Upload patient photo"
+            @click="avatarCropOpen = true"
+          >
+            <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
+            <Camera v-else class="size-4 text-white" />
+          </button>
         </div>
-        <div class="min-w-0 flex-1 md:mt-2 md:flex-none">
+        <div class="min-w-0 flex-1 md:mt-2 md:w-full md:flex-none">
           <h2 class="text-base font-semibold md:text-lg">{{ patient.full_name }}</h2>
-          <p v-if="patient.address" class="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground md:justify-center">
+          <p v-if="patient.formatted_address" class="mt-0.5 flex max-w-full items-center gap-1 text-sm text-muted-foreground md:justify-center" :title="patient.formatted_address">
             <MapPin class="size-3.5 shrink-0" />
-            <span class="truncate">{{ patient.address }}</span>
+            <span class="truncate">{{ patient.formatted_address }}</span>
           </p>
         </div>
       </div>
@@ -369,7 +408,7 @@ onUnmounted(() => {
             <div class="flex items-start gap-2 text-sm">
               <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               <div>
-                <span class="text-muted-foreground">Gender: </span>
+                <span class="text-muted-foreground">Sex: </span>
                 {{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}
               </div>
             </div>
@@ -596,6 +635,15 @@ onUnmounted(() => {
       :patient="patient"
       @update:open="editDialogOpen = $event"
       @updated="fetchPatient()"
+    />
+
+    <!-- Avatar Crop Dialog -->
+    <ImageCropDialog
+      v-model:open="avatarCropOpen"
+      title="Upload Patient Photo"
+      description="Position the photo within the circle."
+      :output-size="256"
+      @crop="handleAvatarCrop"
     />
   </div>
 </template>

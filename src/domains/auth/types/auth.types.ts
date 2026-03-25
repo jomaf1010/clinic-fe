@@ -1,3 +1,5 @@
+import type { PatientAddress } from '@/domains/patient/types/patient.types'
+
 export interface LoginCredentials {
   email: string
   password: string
@@ -7,7 +9,8 @@ export interface LoginCredentials {
 export interface SignupCredentials {
   email: string
   password: string
-  name?: string
+  first_name?: string
+  last_name?: string
   recaptcha_token: string
 }
 
@@ -47,7 +50,8 @@ export interface PlanLimit {
 export interface ClinicContext {
   id: string
   clinic_name: string
-  address: string | null
+  address: PatientAddress | null
+  formatted_address: string | null
   contact_number: string | null
   email: string | null
   logo_url: string | null
@@ -70,7 +74,11 @@ export interface ClinicContext {
 
 export interface User {
   id: string
-  name: string | null
+  first_name: string | null
+  middle_name: string | null
+  last_name: string | null
+  suffix: string | null
+  name: string | null  // computed full name, kept for display
   title_prefix: string | null
   email: string
   contact_number: string | null

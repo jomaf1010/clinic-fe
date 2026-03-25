@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { RouteNames } from '@/router/routeNames'
+import PatientAvatar from '@/components/PatientAvatar.vue'
 import type { QueueVisitResponse, QueueVisitStatus } from '../types/queue.types'
 
 const props = defineProps<{
@@ -152,6 +153,12 @@ function openConsultation(visit: QueueVisitResponse) {
               <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold">
                 #{{ visit.position }}
               </span>
+              <PatientAvatar
+                :avatar-url="visit.patient_avatar_url"
+                :sex="visit.patient_sex"
+                :name="visit.patient_name"
+                class="size-7 shrink-0"
+              />
               <div class="min-w-0">
                 <p class="truncate text-sm font-medium leading-tight">{{ visit.patient_name ?? 'Unknown' }}</p>
               </div>

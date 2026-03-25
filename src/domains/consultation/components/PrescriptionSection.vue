@@ -42,7 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { printPdf } from '@/lib/utils'
+import { openNewTab, printPdf } from '@/lib/utils'
 import { prescriptionApi } from '../api/prescriptionApi'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { PrescriptionResponse, PrescriptionItem } from '../types/prescription.types'
@@ -127,10 +127,12 @@ function stopPolling() {
 
 async function downloadPdf() {
   if (!pdfDoc.value?.id) return
+  const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(pdfDoc.value.id)
-    window.open(url, '_blank')
+    tab.navigate(url)
   } catch {
+    tab.close()
     toast.error('Failed to get download link')
   }
 }

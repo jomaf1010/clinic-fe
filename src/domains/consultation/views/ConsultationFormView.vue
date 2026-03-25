@@ -18,6 +18,9 @@ import {
   ArrowLeft,
   PercentCircle,
   FileCheck,
+  FileText,
+  FileDown,
+  Printer,
 } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -43,6 +46,8 @@ import PaymentTab from '../components/tabs/PaymentTab.vue'
 import VitalsSummary from '../components/VitalsSummary.vue'
 import FinalizeModal from '../components/FinalizeModal.vue'
 import MedCertDialog from '../components/MedCertDialog.vue'
+import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
+import { openNewTab, printPdf } from '@/lib/utils'
 import type { UpdateConsultationPayload } from '../types/consultation.types'
 import { useConsultationSync } from '../composables/useConsultationSync'
 
@@ -67,6 +72,83 @@ const showFinalizeModal = ref(false)
 const showMedCertDialog = ref(false)
 const showFeeDiscountModal = ref(false)
 const loadError = ref<string | null>(null)
+
+// --- Consultation Summary PDF ---
+const summaryDoc = ref<GeneratedDocumentResponse | null>(null)
+const isGeneratingSummary = ref(false)
+const summaryReady = computed(() => summaryDoc.value?.status === 'completed')
+let summaryPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadSummaryDoc() {
+  if (!consultationId.value) return
+  try {
+    const res = await documentApi.list(consultationId.value)
+    summaryDoc.value = res.data.find((d) => d.type === 'consultation-summary') ?? null
+  } catch {
+    // ignore
+  }
+}
+
+watch(documentUpdate, async (update) => {
+  if (update && (update as Record<string, unknown>).type === 'consultation-summary') {
+    const status = (update as Record<string, unknown>).status as string
+    if (status === 'completed' || status === 'failed') {
+      stopSummaryPolling()
+      isGeneratingSummary.value = false
+      // Reload full doc to get the id for print/download
+      await loadSummaryDoc()
+    }
+  }
+})
+
+async function generateSummary() {
+  if (!consultationId.value) return
+  isGeneratingSummary.value = true
+  try {
+    const res = await documentApi.generate(consultationId.value, 'consultation-summary')
+    summaryDoc.value = res.data
+    startSummaryPolling()
+  } catch {
+    isGeneratingSummary.value = false
+  }
+}
+
+function startSummaryPolling() {
+  stopSummaryPolling()
+  summaryPollTimer = setInterval(async () => {
+    await loadSummaryDoc()
+    if (summaryDoc.value?.status === 'completed' || summaryDoc.value?.status === 'failed') {
+      stopSummaryPolling()
+      isGeneratingSummary.value = false
+    }
+  }, 3000)
+}
+
+function stopSummaryPolling() {
+  if (summaryPollTimer) {
+    clearInterval(summaryPollTimer)
+    summaryPollTimer = null
+  }
+}
+
+async function printSummary() {
+  if (!summaryDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(summaryDoc.value.id)
+    printPdf(url)
+  } catch { /* ignore */ }
+}
+
+async function downloadSummary() {
+  if (!summaryDoc.value?.id) return
+  const tab = openNewTab()
+  try {
+    const url = await documentApi.getSignedUrl(summaryDoc.value.id)
+    tab.navigate(url)
+  } catch {
+    tab.close()
+  }
+}
 
 // Fee discount state
 const feeDiscountType = ref<'percentage' | 'fixed'>('percentage')
@@ -124,6 +206,11 @@ onMounted(async () => {
       await store.loadConsultation(id)
     }
 
+    // Load summary doc status if finalized
+    if (store.isFinalized) {
+      loadSummaryDoc()
+    }
+
     // Auto-open med cert dialog from notification
     if (route.query.openMedCert === '1') {
       showMedCertDialog.value = true
@@ -147,6 +234,7 @@ watch(() => route.query.openMedCert, (val) => {
 })
 
 onUnmounted(() => {
+  stopSummaryPolling()
   store.clearCurrent()
 })
 
@@ -238,6 +326,38 @@ async function handleFinalizeAndPay(): Promise<void> {
             <CheckCircle2 class="size-3" />
             Finalized
           </Badge>
+        </div>
+
+        <!-- Right: actions (finalized) -->
+        <div v-if="store.isFinalized" class="flex items-center gap-2">
+          <Button
+            v-if="summaryReady"
+            variant="outline"
+            size="sm"
+            @click="printSummary"
+          >
+            <Printer class="size-3.5" />
+            Print
+          </Button>
+          <Button
+            v-if="summaryReady"
+            variant="outline"
+            size="sm"
+            @click="downloadSummary"
+          >
+            <FileDown class="size-3.5" />
+            Download
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="isGeneratingSummary"
+            @click="generateSummary"
+          >
+            <LoaderCircle v-if="isGeneratingSummary" class="size-3.5 animate-spin" />
+            <FileText v-else class="size-3.5" />
+            {{ isGeneratingSummary ? 'Generating...' : summaryReady ? 'Regenerate' : 'Consultation Summary' }}
+          </Button>
         </div>
 
         <!-- Right: actions (drafts only) -->

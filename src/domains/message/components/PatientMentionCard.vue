@@ -92,9 +92,9 @@ onMounted(async () => {
               <Phone class="size-3" />
               {{ patient.contact_number }}
             </span>
-            <span class="flex items-center gap-1">
+            <span v-if="patient.formatted_address" class="flex items-center gap-1">
               <MapPin class="size-3" />
-              {{ patient.address }}
+              {{ patient.formatted_address }}
             </span>
           </div>
 

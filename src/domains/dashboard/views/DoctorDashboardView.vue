@@ -22,8 +22,8 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import StatCard from '@/domains/dashboard/components/StatCard.vue'
 import RevenueChart from '@/domains/dashboard/components/RevenueChart.vue'
 import ProBadgeBanner from '@/components/shared/ProBadgeBanner.vue'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import PatientAvatar from '@/components/PatientAvatar.vue'
 import { Button } from '@/components/ui/button'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
 import { RouteNames } from '@/router/routeNames'
@@ -53,15 +53,6 @@ const greeting = computed(() => {
 })
 
 const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? '')
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('')
-}
 
 function formatDate(dateString: string): string {
   return new Intl.DateTimeFormat('en-PH', {
@@ -283,11 +274,12 @@ onUnmounted(() => {
                   <span class="w-16 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
                     {{ appt.scheduled_at }}
                   </span>
-                  <Avatar class="size-8">
-                    <AvatarFallback class="text-xs font-medium">
-                      {{ getInitials(appt.patient_name) }}
-                    </AvatarFallback>
-                  </Avatar>
+                  <PatientAvatar
+                    :avatar-url="appt.patient_avatar_url"
+                    :sex="appt.patient_sex"
+                    :name="appt.patient_name"
+                    class="size-8 shrink-0"
+                  />
                   <div class="flex min-w-0 flex-1 flex-col">
                     <span class="truncate text-sm font-medium">{{ appt.patient_name }}</span>
                   </div>
@@ -334,11 +326,12 @@ onUnmounted(() => {
                 class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 transition-colors hover:opacity-80"
                 @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: item.patient_id } })"
               >
-                <Avatar class="size-8">
-                  <AvatarFallback class="text-xs font-medium">
-                    {{ getInitials(item.patient_name) }}
-                  </AvatarFallback>
-                </Avatar>
+                <PatientAvatar
+                  :avatar-url="item.patient_avatar_url"
+                  :sex="item.patient_sex"
+                  :name="item.patient_name"
+                  class="size-8 shrink-0"
+                />
                 <div class="flex min-w-0 flex-1 flex-col text-left">
                   <span class="truncate text-sm font-medium">{{ item.patient_name }}</span>
                   <span class="text-xs text-muted-foreground">Queued at {{ item.queued_at }}</span>
@@ -399,11 +392,12 @@ onUnmounted(() => {
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
               @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: draft.patient_id, id: draft.id } })"
             >
-              <Avatar class="size-8">
-                <AvatarFallback class="text-xs font-medium">
-                  {{ getInitials(draft.patient_name) }}
-                </AvatarFallback>
-              </Avatar>
+              <PatientAvatar
+                :avatar-url="draft.patient_avatar_url"
+                :sex="draft.patient_sex"
+                :name="draft.patient_name"
+                class="size-8 shrink-0"
+              />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="truncate text-sm font-medium">{{ draft.patient_name }}</span>
                 <span class="truncate text-xs text-muted-foreground">
@@ -442,11 +436,12 @@ onUnmounted(() => {
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: patient.id } })"
             >
-              <Avatar class="size-8">
-                <AvatarFallback class="text-xs font-medium">
-                  {{ getInitials(patient.name) }}
-                </AvatarFallback>
-              </Avatar>
+              <PatientAvatar
+                :avatar-url="patient.avatar_url"
+                :sex="patient.sex"
+                :name="patient.name"
+                class="size-8 shrink-0"
+              />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="truncate text-sm font-medium">{{ patient.name }}</span>
                 <span class="text-xs text-muted-foreground">

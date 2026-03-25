@@ -6,6 +6,8 @@ export interface QueueVisitResponse {
   clinic_id: string
   patient_id: string
   patient_name: string | null
+  patient_sex: string | null
+  patient_avatar_url: string | null
   doctor_id: string | null
   doctor_name: string | null
   appointment_id: string | null

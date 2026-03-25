@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { LoaderCircle } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { LoaderCircle, ArrowUp, ArrowDown } from 'lucide-vue-next'
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,16 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  classifyBpAsStatus,
+  classifyHr,
+  classifyTemp,
+  classifySpo2,
+  classifyRr,
+  classifyBloodSugar,
+  classifyPain,
+  type VitalStatus,
+} from '@/lib/vitals'
 import type { ConsultationResponse } from '../types/consultation.types'
 
 const props = withDefaults(defineProps<{
@@ -30,6 +41,38 @@ function formatValue(val: string | number | null | undefined): string {
   if (val === null || val === undefined || val === '') return '—'
   return String(val)
 }
+
+// Vital classifications
+const vitals = computed(() => props.consultation.triage.vitals)
+
+function vitalIndicator(status: VitalStatus | null): { icon: typeof ArrowUp | typeof ArrowDown | null; class: string } | null {
+  if (!status || status.severity === 'normal') return null
+  if (status.severity === 'low') return { icon: ArrowDown, class: 'text-blue-600 dark:text-blue-400' }
+  return { icon: ArrowUp, class: 'text-red-600 dark:text-red-400' }
+}
+
+const bpInd = computed(() => vitalIndicator(classifyBpAsStatus(vitals.value?.bp)))
+const hrInd = computed(() => vitalIndicator(classifyHr(vitals.value?.hr)))
+const rrInd = computed(() => vitalIndicator(classifyRr(vitals.value?.rr)))
+const tempInd = computed(() => vitalIndicator(classifyTemp(vitals.value?.temp)))
+const spo2Ind = computed(() => vitalIndicator(classifySpo2(vitals.value?.spo2)))
+const bsInd = computed(() => vitalIndicator(classifyBloodSugar(vitals.value?.blood_sugar)))
+const painInd = computed(() => vitalIndicator(classifyPain(props.consultation.triage.pain_score)))
+
+const bmi = computed(() => {
+  const w = props.consultation.triage.weight
+  const h = props.consultation.triage.height
+  if (!w || !h) return null
+  return +(w / ((h / 100) ** 2)).toFixed(1)
+})
+
+const bmiCategory = computed(() => {
+  if (bmi.value === null) return null
+  if (bmi.value < 18.5) return { label: 'Underweight', color: 'text-blue-600' }
+  if (bmi.value < 25) return { label: 'Normal', color: 'text-green-600' }
+  if (bmi.value < 30) return { label: 'Overweight', color: 'text-amber-600' }
+  return { label: 'Obese', color: 'text-red-600' }
+})
 </script>
 
 <template>
@@ -63,54 +106,69 @@ function formatValue(val: string | number | null | undefined): string {
           <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-md border bg-muted/30 p-3 text-sm">
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">BP</span>
-              <span class="font-medium">{{ formatValue(consultation.triage.vitals?.bp) }}</span>
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="bpInd.icon" v-if="bpInd" class="size-3" :class="bpInd.class" />
+                {{ formatValue(consultation.triage.vitals?.bp) }}
+              </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">HR</span>
-              <span class="font-medium">
-                {{ consultation.triage.vitals?.hr !== null ? `${consultation.triage.vitals?.hr} bpm` : '—' }}
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="hrInd.icon" v-if="hrInd" class="size-3" :class="hrInd.class" />
+                {{ consultation.triage.vitals?.hr != null ? `${consultation.triage.vitals.hr} bpm` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">RR</span>
-              <span class="font-medium">
-                {{ consultation.triage.vitals?.rr !== null ? `${consultation.triage.vitals?.rr} /min` : '—' }}
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="rrInd.icon" v-if="rrInd" class="size-3" :class="rrInd.class" />
+                {{ consultation.triage.vitals?.rr != null ? `${consultation.triage.vitals.rr} /min` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Temp</span>
-              <span class="font-medium">
-                {{ consultation.triage.vitals?.temp !== null ? `${consultation.triage.vitals?.temp} °C` : '—' }}
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="tempInd.icon" v-if="tempInd" class="size-3" :class="tempInd.class" />
+                {{ consultation.triage.vitals?.temp != null ? `${consultation.triage.vitals.temp} °C` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">SpO2</span>
-              <span class="font-medium">
-                {{ consultation.triage.vitals?.spo2 !== null ? `${consultation.triage.vitals?.spo2}%` : '—' }}
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="spo2Ind.icon" v-if="spo2Ind" class="size-3" :class="spo2Ind.class" />
+                {{ consultation.triage.vitals?.spo2 != null ? `${consultation.triage.vitals.spo2}%` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">BS</span>
-              <span class="font-medium">
-                {{ consultation.triage.vitals?.blood_sugar !== null && consultation.triage.vitals?.blood_sugar !== undefined ? `${consultation.triage.vitals.blood_sugar} mg/dL` : '—' }}
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="bsInd.icon" v-if="bsInd" class="size-3" :class="bsInd.class" />
+                {{ consultation.triage.vitals?.blood_sugar != null ? `${consultation.triage.vitals.blood_sugar} mg/dL` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Weight</span>
               <span class="font-medium">
-                {{ consultation.triage.weight !== null ? `${consultation.triage.weight} kg` : '—' }}
+                {{ consultation.triage.weight != null ? `${consultation.triage.weight} kg` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Height</span>
               <span class="font-medium">
-                {{ consultation.triage.height !== null ? `${consultation.triage.height} cm` : '—' }}
+                {{ consultation.triage.height != null ? `${consultation.triage.height} cm` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Pain</span>
-              <span class="font-medium">
-                {{ consultation.triage.pain_score !== null ? `${consultation.triage.pain_score}/10` : '—' }}
+              <span class="flex items-center gap-1 font-medium">
+                <component :is="painInd.icon" v-if="painInd" class="size-3" :class="painInd.class" />
+                {{ consultation.triage.pain_score != null ? `${consultation.triage.pain_score}/10` : '—' }}
+              </span>
+            </div>
+            <div v-if="bmi" class="flex justify-between gap-2">
+              <span class="text-muted-foreground">BMI</span>
+              <span class="font-medium" :class="bmiCategory?.color">
+                {{ bmi }} <span class="text-xs font-normal">{{ bmiCategory?.label }}</span>
               </span>
             </div>
           </div>
@@ -134,37 +192,78 @@ function formatValue(val: string | number | null | undefined): string {
             <p class="mb-1 text-xs text-muted-foreground">Notes</p>
             <p class="text-sm whitespace-pre-wrap">{{ consultation.triage.notes }}</p>
           </div>
+
+          <!-- Lab Orders Summary -->
+          <div v-if="consultation.lab_order_summary && consultation.lab_order_summary.total > 0">
+            <h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Lab Orders
+            </h3>
+            <div class="rounded-md border bg-muted/30 p-3">
+              <div class="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{{ consultation.lab_order_summary.total }} test{{ consultation.lab_order_summary.total > 1 ? 's' : '' }}</span>
+                <span>&middot;</span>
+                <span v-if="consultation.lab_order_summary.pending > 0" class="text-amber-600 dark:text-amber-400">{{ consultation.lab_order_summary.pending }} pending</span>
+                <span v-if="consultation.lab_order_summary.pending > 0 && consultation.lab_order_summary.completed > 0">&middot;</span>
+                <span v-if="consultation.lab_order_summary.completed > 0" class="text-green-600 dark:text-green-400">{{ consultation.lab_order_summary.completed }} completed</span>
+              </div>
+              <div class="flex flex-col gap-1">
+                <div
+                  v-for="(item, idx) in [...consultation.lab_order_summary.pending_items, ...consultation.lab_order_summary.completed_items]"
+                  :key="idx"
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <Badge
+                    variant="outline"
+                    class="text-[10px] px-1.5 py-0"
+                    :class="idx < consultation.lab_order_summary.pending_items.length
+                      ? 'border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                      : 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400'"
+                  >
+                    {{ idx < consultation.lab_order_summary.pending_items.length ? 'pending' : 'done' }}
+                  </Badge>
+                  <span>{{ item }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Right Column: Assessment, Prescription, Payment -->
         <div class="flex flex-col gap-5">
-          <!-- Assessment Summary -->
+          <!-- Diagnosis -->
+          <div v-if="consultation.assessment?.diagnoses?.length">
+            <h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {{ consultation.assessment.diagnoses.length > 1 ? 'Diagnoses' : 'Diagnosis' }}
+            </h3>
+            <div class="rounded-md border bg-muted/30 p-3">
+              <!-- Single diagnosis -->
+              <div v-if="consultation.assessment.diagnoses.length === 1" class="flex items-baseline gap-2 text-sm">
+                <span class="font-medium">{{ consultation.assessment.diagnoses[0].description }}</span>
+                <span v-if="consultation.assessment.diagnoses[0].code" class="text-xs font-mono text-muted-foreground">{{ consultation.assessment.diagnoses[0].code }}</span>
+              </div>
+              <!-- Multiple diagnoses -->
+              <ul v-else class="flex flex-col gap-1.5 pl-4 list-disc">
+                <li
+                  v-for="(diagnosis, index) in consultation.assessment.diagnoses"
+                  :key="index"
+                  class="text-sm"
+                >
+                  <span class="font-medium">{{ diagnosis.description }}</span>
+                  <span v-if="diagnosis.code" class="ml-1 text-xs font-mono text-muted-foreground">{{ diagnosis.code }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Assessment Notes -->
           <div>
             <h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Assessment
             </h3>
             <div class="rounded-md border bg-muted/30 p-3">
-              <div v-if="consultation.assessment?.diagnoses?.length" class="flex flex-col gap-2">
-                <div class="flex flex-wrap gap-1.5">
-                  <Badge
-                    v-for="(diagnosis, index) in consultation.assessment.diagnoses"
-                    :key="index"
-                    variant="secondary"
-                    class="text-xs"
-                  >
-                    <span v-if="diagnosis.code" class="mr-1 font-mono text-muted-foreground">
-                      {{ diagnosis.code }}
-                    </span>
-                    {{ diagnosis.description }}
-                  </Badge>
-                </div>
-                <p
-                  v-if="consultation.assessment.notes"
-                  class="mt-1 text-sm whitespace-pre-wrap text-muted-foreground"
-                >
-                  {{ consultation.assessment.notes }}
-                </p>
-              </div>
+              <p v-if="consultation.assessment?.notes" class="text-sm whitespace-pre-wrap">
+                {{ consultation.assessment.notes }}
+              </p>
               <p v-else class="text-sm text-muted-foreground">—</p>
             </div>
           </div>
@@ -213,15 +312,6 @@ function formatValue(val: string | number | null | undefined): string {
             </div>
           </div>
 
-          <!-- Payment Summary -->
-          <div>
-            <h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Payment
-            </h3>
-            <div class="rounded-md border bg-muted/30 p-3">
-              <p class="text-sm text-muted-foreground">Not yet configured</p>
-            </div>
-          </div>
         </div>
       </div>
 

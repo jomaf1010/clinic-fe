@@ -172,6 +172,18 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/forgot-password',
+      name: RouteNames.FORGOT_PASSWORD,
+      component: () => import('@/domains/auth/views/ForgotPasswordView.vue'),
+      meta: { requiresGuest: true },
+    },
+    {
+      path: '/reset-password',
+      name: RouteNames.RESET_PASSWORD,
+      component: () => import('@/domains/auth/views/ResetPasswordView.vue'),
+      meta: { requiresGuest: true },
+    },
+    {
       path: '/onboarding/create-clinic',
       name: RouteNames.ONBOARDING_CREATE_CLINIC,
       component: () => import('@/domains/clinic/views/CreateClinicView.vue'),

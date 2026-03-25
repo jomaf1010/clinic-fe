@@ -1,4 +1,5 @@
 import { http } from '@/lib/http'
+import type { GeneratedDocumentResponse } from '@/domains/consultation/api/documentApi'
 import type {
   BillingSummaryResponse,
   CreateInvoicePayload,
@@ -50,5 +51,13 @@ export const billingApi = {
 
   summary(): Promise<BillingSummaryResponse> {
     return http.get<BillingSummaryResponse>('/billing/summary')
+  },
+
+  generatePdf(invoiceId: string): Promise<{ data: GeneratedDocumentResponse }> {
+    return http.post<{ data: GeneratedDocumentResponse }>(`/invoices/${invoiceId}/pdf`)
+  },
+
+  getPdf(invoiceId: string): Promise<{ data: GeneratedDocumentResponse | null }> {
+    return http.get<{ data: GeneratedDocumentResponse | null }>(`/invoices/${invoiceId}/pdf`)
   },
 }

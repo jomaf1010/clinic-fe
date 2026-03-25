@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -14,29 +12,34 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { useAuthStore } from '../stores/authStore'
-import { Mail, Lock, LoaderCircle } from 'lucide-vue-next'
+import { Lock, LoaderCircle, CircleCheck, CircleX, ArrowRight } from 'lucide-vue-next'
 import AppLogo from '@/components/AppLogo.vue'
 import { HttpError } from '@/lib/http'
-import { loginSchema } from '@/lib/validationRules'
+import { resetPasswordSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
+import { authApi } from '../api/authApi'
 import type { ValidationError } from '../types/auth.types'
 
-const router = useRouter()
-const authStore = useAuthStore()
+const route = useRoute()
 const { canvasRef } = useNeuralNetwork()
 
+const token = typeof route.query.token === 'string' ? route.query.token : null
+const encodedEmail = typeof route.query.email === 'string' ? route.query.email : null
+const decodedEmail = encodedEmail ? atob(encodedEmail) : null
+
+const hasValidParams = !!(token && decodedEmail)
+
 const { handleSubmit, setFieldError } = useForm({
-  validationSchema: loginSchema,
+  validationSchema: resetPasswordSchema,
 })
 
-const { value: email, errorMessage: emailError } = useField<string>('email')
 const { value: password, errorMessage: passwordError } = useField<string>('password')
+const { value: passwordConfirmation, errorMessage: passwordConfirmationError } = useField<string>('password_confirmation')
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
-const rememberMe = ref(true)
+const succeeded = ref(false)
 
 const ready = ref(false)
 onMounted(() => {
@@ -46,12 +49,22 @@ onMounted(() => {
 })
 
 const onSubmit = handleSubmit(async (values) => {
+  if (values.password !== values.password_confirmation) {
+    setFieldError('password_confirmation', 'Passwords do not match.')
+    return
+  }
+
   generalError.value = null
   isLoading.value = true
 
   try {
-    await authStore.login({ email: values.email, password: values.password, remember_me: rememberMe.value })
-    router.push({ name: RouteNames.HOME })
+    await authApi.resetPassword({
+      email: decodedEmail!,
+      token: token!,
+      password: values.password,
+      password_confirmation: values.password_confirmation,
+    })
+    succeeded.value = true
   } catch (err) {
     if (err instanceof HttpError) {
       if (err.status === 422) {
@@ -63,10 +76,8 @@ const onSubmit = handleSubmit(async (values) => {
         }
 
         generalError.value = body.message ?? 'Validation failed.'
-      } else if (err.status === 401) {
-        generalError.value = 'Invalid email or password.'
-      } else if (err.status === 403) {
-        generalError.value = 'Please verify your email address before signing in.'
+      } else if (err.status === 400) {
+        generalError.value = 'This password reset link is invalid or has expired. Please request a new one.'
       } else {
         generalError.value = 'An unexpected error occurred. Please try again.'
       }
@@ -98,10 +109,52 @@ const onSubmit = handleSubmit(async (values) => {
         class="transition-all delay-200 duration-700 ease-out"
         :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
       >
-        <Card class="backdrop-blur-sm bg-card/90">
+        <!-- Invalid params state -->
+        <Card v-if="!hasValidParams" class="backdrop-blur-sm bg-card/90">
           <CardHeader class="text-center">
-            <CardTitle class="text-xl">Welcome back!</CardTitle>
-            <CardDescription>Sign in to your account</CardDescription>
+            <div class="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-destructive/10">
+              <CircleX class="size-6 text-destructive" />
+            </div>
+            <CardTitle class="text-xl">Invalid reset link</CardTitle>
+            <CardDescription>
+              This password reset link is missing required parameters. Please request a new one.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RouterLink :to="{ name: RouteNames.FORGOT_PASSWORD }">
+              <Button class="w-full">
+                Request a new link
+              </Button>
+            </RouterLink>
+          </CardContent>
+        </Card>
+
+        <!-- Success state -->
+        <Card v-else-if="succeeded" class="backdrop-blur-sm bg-card/90">
+          <CardHeader class="text-center">
+            <div class="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-green-500/10">
+              <CircleCheck class="size-6 text-green-600 dark:text-green-400" />
+            </div>
+            <CardTitle class="text-xl">Password reset!</CardTitle>
+            <CardDescription>
+              Your password has been updated successfully. You can now sign in with your new password.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RouterLink :to="{ name: RouteNames.LOGIN }">
+              <Button class="w-full">
+                Continue to sign in
+                <ArrowRight class="size-4" />
+              </Button>
+            </RouterLink>
+          </CardContent>
+        </Card>
+
+        <!-- Form state -->
+        <Card v-else class="backdrop-blur-sm bg-card/90">
+          <CardHeader class="text-center">
+            <CardTitle class="text-xl">Set new password</CardTitle>
+            <CardDescription>Enter your new password below</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -118,38 +171,15 @@ const onSubmit = handleSubmit(async (values) => {
                 class="flex flex-col gap-2 transition-all delay-300 duration-500 ease-out"
                 :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
               >
-                <Label for="email" class="flex items-center gap-1.5">
-                  <Mail class="size-3.5 text-muted-foreground" />
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  v-model="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  autocomplete="email"
-                  :disabled="isLoading"
-                  :aria-invalid="!!emailError"
-                  required
-                />
-                <p v-if="emailError" class="text-xs text-destructive">
-                  {{ emailError }}
-                </p>
-              </div>
-
-              <div
-                class="flex flex-col gap-2 transition-all delay-[350ms] duration-500 ease-out"
-                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
-              >
                 <Label for="password" class="flex items-center gap-1.5">
                   <Lock class="size-3.5 text-muted-foreground" />
-                  Password
+                  New password
                 </Label>
                 <PasswordInput
                   id="password"
                   v-model="password"
                   placeholder="••••••••"
-                  autocomplete="current-password"
+                  autocomplete="new-password"
                   :disabled="isLoading"
                   :aria-invalid="!!passwordError"
                   required
@@ -160,49 +190,36 @@ const onSubmit = handleSubmit(async (values) => {
               </div>
 
               <div
+                class="flex flex-col gap-2 transition-all delay-[350ms] duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <Label for="password-confirmation" class="flex items-center gap-1.5">
+                  <Lock class="size-3.5 text-muted-foreground" />
+                  Confirm password
+                </Label>
+                <PasswordInput
+                  id="password-confirmation"
+                  v-model="passwordConfirmation"
+                  placeholder="••••••••"
+                  autocomplete="new-password"
+                  :disabled="isLoading"
+                  :aria-invalid="!!passwordConfirmationError"
+                  required
+                />
+                <p v-if="passwordConfirmationError" class="text-xs text-destructive">
+                  {{ passwordConfirmationError }}
+                </p>
+              </div>
+
+              <div
                 class="transition-all delay-[400ms] duration-500 ease-out"
-                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
-              >
-                <div class="flex justify-end">
-                  <RouterLink
-                    :to="{ name: RouteNames.FORGOT_PASSWORD }"
-                    class="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
-                  >
-                    Forgot password?
-                  </RouterLink>
-                </div>
-              </div>
-
-              <div
-                class="flex items-center gap-2 transition-all delay-[450ms] duration-500 ease-out"
-                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
-              >
-                <Checkbox id="remember-me" :checked="rememberMe" @update:checked="rememberMe = $event" :disabled="isLoading" />
-                <Label for="remember-me" class="text-sm font-normal cursor-pointer">Remember me</Label>
-              </div>
-
-              <div
-                class="transition-all delay-[500ms] duration-500 ease-out"
                 :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
               >
                 <Button type="submit" class="w-full" :disabled="isLoading">
                   <LoaderCircle v-if="isLoading" class="size-4 animate-spin" />
-                  {{ isLoading ? 'Signing in...' : 'Sign in' }}
+                  {{ isLoading ? 'Resetting...' : 'Reset password' }}
                 </Button>
               </div>
-
-              <p
-                class="text-center text-sm text-muted-foreground transition-all delay-[550ms] duration-500 ease-out"
-                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
-              >
-                Don't have an account?
-                <RouterLink
-                  :to="{ name: RouteNames.SIGNUP }"
-                  class="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Sign up
-                </RouterLink>
-              </p>
             </form>
           </CardContent>
         </Card>

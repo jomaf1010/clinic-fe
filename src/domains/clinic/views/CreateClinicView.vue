@@ -15,21 +15,21 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { Building2, MapPin, Mail, LoaderCircle, Camera, Check, ArrowRight, ArrowLeft, Sparkles } from 'lucide-vue-next'
 import AppLogo from '@/components/AppLogo.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
+import AddressForm from '@/components/AddressForm.vue'
 import { clinicApi } from '../api/clinicApi'
 import { HttpError } from '@/lib/http'
 import { createClinicSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
+import type { PatientAddress } from '@/domains/patient/types/patient.types'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const { canvasRef } = useNeuralNetwork()
 
 const userName = computed(() => {
-  const name = authStore.user?.name
-  if (!name) return null
-  return name.split(' ')[0]
+  return authStore.user?.first_name ?? null
 })
 
 const createdClinicName = ref('')
@@ -39,8 +39,8 @@ const { handleSubmit, setFieldError, validateField } = useForm({
 })
 
 const { value: clinicName, errorMessage: clinicNameError } = useField<string>('clinic_name')
-const { value: address, errorMessage: addressError } = useField<string>('address')
 const { value: email, errorMessage: emailError } = useField<string>('email')
+const address = ref<PatientAddress | null>(null)
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
 
@@ -171,7 +171,7 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     const response = await clinicApi.create({
       clinic_name: values.clinic_name,
-      ...(values.address ? { address: values.address } : {}),
+      ...(address.value ? { address: address.value } : {}),
       ...(values.email ? { email: values.email } : {}),
     })
 
@@ -353,22 +353,12 @@ const onSubmit = handleSubmit(async (values) => {
                       <p class="mt-1 text-sm text-muted-foreground">Add your address and email so patients can find you - or skip for now</p>
                     </div>
 
-                    <div class="flex flex-col gap-2">
-                      <Label for="address" class="flex items-center gap-1.5">
+                    <div>
+                      <Label class="mb-2 flex items-center gap-1.5">
                         <MapPin class="size-3.5 text-muted-foreground" />
                         Address
                       </Label>
-                      <Input
-                        id="address"
-                        v-model="address"
-                        type="text"
-                        placeholder="123 Main St, City"
-                        :disabled="isLoading"
-                        :aria-invalid="!!addressError"
-                      />
-                      <p v-if="addressError" class="text-xs text-destructive">
-                        {{ addressError }}
-                      </p>
+                      <AddressForm v-model="address" :disabled="isLoading" />
                     </div>
 
                     <div class="flex flex-col gap-2">

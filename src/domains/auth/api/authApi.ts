@@ -81,6 +81,14 @@ export const authApi = {
     }
   },
 
+  async forgotPassword(email: string): Promise<MessageResponse> {
+    return http.post<MessageResponse>('/auth/forgot-password', { email })
+  },
+
+  async resetPassword(data: { email: string; token: string; password: string; password_confirmation: string }): Promise<MessageResponse> {
+    return http.post<MessageResponse>('/auth/reset-password', data)
+  },
+
   async heartbeat(): Promise<void> {
     await http.post('/auth/heartbeat', {})
   },

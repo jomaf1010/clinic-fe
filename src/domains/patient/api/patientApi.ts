@@ -45,4 +45,10 @@ export const patientApi = {
   search(q: string): Promise<PatientSearchResponse> {
     return http.get<PatientSearchResponse>(`/patients/search?q=${encodeURIComponent(q)}`)
   },
+
+  uploadAvatar(uuid: string, file: File): Promise<{ data: { avatar_url: string } }> {
+    const formData = new FormData()
+    formData.append('avatar', file)
+    return http.upload(`/patients/${uuid}/avatar`, formData)
+  },
 }

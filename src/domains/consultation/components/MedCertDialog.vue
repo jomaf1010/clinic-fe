@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { printPdf } from '@/lib/utils'
+import { openNewTab, printPdf } from '@/lib/utils'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { AssessmentDiagnosis } from '../types/consultation.types'
 
@@ -144,10 +144,12 @@ function stopPolling() {
 
 async function download() {
   if (!medCertDoc.value?.id) return
+  const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(medCertDoc.value.id)
-    window.open(url, '_blank')
+    tab.navigate(url)
   } catch {
+    tab.close()
     toast.error('Failed to get download link')
   }
 }

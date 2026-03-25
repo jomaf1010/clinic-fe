@@ -40,6 +40,7 @@ import {
   Search,
   X,
 } from 'lucide-vue-next'
+import PatientAvatar from '@/components/PatientAvatar.vue'
 import { patientApi } from '../api/patientApi'
 import { RouteNames } from '@/router/routeNames'
 import PatientStatusBadge from '../components/PatientStatusBadge.vue'
@@ -78,10 +79,6 @@ const searchQuery = ref((route.query.search as string) || '')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const hasActiveFilters = computed(() => !!filters.value.status || !!filters.value.sex || !!filters.value.sort_by || !!filters.value.sort_dir)
-
-function getInitials(name: string): string {
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
-}
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -258,7 +255,7 @@ onMounted(() => {
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs text-muted-foreground">Gender</label>
+                <label class="text-xs text-muted-foreground">Sex</label>
                 <Select :model-value="filters.sex ?? 'all'" @update:model-value="setSexFilter">
                   <SelectTrigger>
                     <SelectValue placeholder="All" />
@@ -281,6 +278,7 @@ onMounted(() => {
                     <SelectItem value="updated_at">Last Updated</SelectItem>
                     <SelectItem value="created_at">Date Registered</SelectItem>
                     <SelectItem value="full_name">Name</SelectItem>
+                    <SelectItem value="last_name">Last Name</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -402,12 +400,15 @@ onMounted(() => {
             >
               <TableCell>
                 <div class="flex items-center gap-3">
-                  <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    {{ getInitials(patient.full_name) }}
-                  </div>
+                  <PatientAvatar
+                    :avatar-url="patient.avatar_url"
+                    :sex="patient.sex"
+                    :name="patient.full_name"
+                    class="size-8 shrink-0"
+                  />
                   <div class="min-w-0">
                     <p class="truncate font-medium">{{ patient.full_name }}</p>
-                    <p class="truncate text-xs text-muted-foreground">{{ patient.address }}</p>
+                    <p class="truncate text-xs text-muted-foreground">{{ patient.formatted_address }}</p>
                   </div>
                 </div>
               </TableCell>

@@ -124,7 +124,8 @@ export const loginSchema = {
 export const signupSchema = {
   email: [required('Email'), email('Email')],
   password: [required('Password'), minLength('Password', 8)],
-  name: [maxLength('Name', 255)],
+  first_name: [maxLength('First name', 255)],
+  last_name: [maxLength('Last name', 255)],
 }
 
 /**
@@ -133,8 +134,6 @@ export const signupSchema = {
  */
 export const createClinicSchema = {
   clinic_name: [required('Clinic name'), maxLength('Clinic name', 255)],
-  address: [maxLength('Address', 500)],
-  default_fee: [numeric('Default fee')],
   rx_header: [maxLength('Prescription header', 1000)],
   rx_footer: [maxLength('Prescription footer', 1000)],
 }
@@ -144,10 +143,8 @@ export const createClinicSchema = {
  * Pass directly to `useForm({ validationSchema: createPatientSchema })`.
  */
 export const createPatientSchema = {
-  full_name: [required('Full name'), maxLength('Full name', 255)],
-  address: [required('Address'), maxLength('Address', 500)],
   date_of_birth: [required('Date of birth')],
-  sex: [required('Gender'), oneOf('Gender', ['male', 'female'])],
+  sex: [required('Sex'), oneOf('Sex', ['male', 'female'])],
   contact_number: [phoneNumberPH('Contact number')],
   email: [email('Email'), maxLength('Email', 255)],
   note: [maxLength('Note', 2000)],
@@ -163,7 +160,6 @@ export const editPatientSchema = createPatientSchema
  * Validation schema for the account personal information form.
  */
 export const updateProfileSchema = {
-  name: [required('Name'), maxLength('Name', 255)],
   contact_number: [phoneNumberPH('Contact number')],
   date_of_birth: [],
 }
@@ -187,4 +183,21 @@ export const changePasswordSchema = {
   current_password: [required('Current password')],
   new_password: [required('New password'), minLength('New password', 8)],
   new_password_confirmation: [required('Password confirmation')],
+}
+
+/**
+ * Validation schema for the forgot password form.
+ * Pass directly to `useForm({ validationSchema: forgotPasswordSchema })`.
+ */
+export const forgotPasswordSchema = {
+  email: [required('Email'), email('Email')],
+}
+
+/**
+ * Validation schema for the reset password form.
+ * Pass directly to `useForm({ validationSchema: resetPasswordSchema })`.
+ */
+export const resetPasswordSchema = {
+  password: [required('New password'), minLength('New password', 8)],
+  password_confirmation: [required('Confirm password')],
 }

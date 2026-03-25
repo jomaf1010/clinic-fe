@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { toast } from 'vue-sonner'
 import {
   User,
@@ -15,6 +15,9 @@ import {
   FileCheck,
   Clock,
   Download,
+  Printer,
+  FileDown,
+  RefreshCw,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
@@ -28,7 +31,9 @@ import {
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBillingStore } from '../stores/billingStore'
-import { documentApi } from '@/domains/consultation/api/documentApi'
+import { documentApi, type GeneratedDocumentResponse } from '@/domains/consultation/api/documentApi'
+import { billingApi } from '../api/billingApi'
+import { openNewTab, printPdf } from '@/lib/utils'
 import InvoiceStatusBadge from './InvoiceStatusBadge.vue'
 import type { InvoiceResponse } from '../types/billing.types'
 
@@ -205,10 +210,12 @@ function editedSubtotal(item: typeof props.invoice extends null ? never : NonNul
 }
 
 async function downloadMedCert(documentId: string) {
+  const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(documentId)
-    window.open(url, '_blank')
+    tab.navigate(url)
   } catch {
+    tab.close()
     toast.error('Failed to get download link')
   }
 }
@@ -220,6 +227,93 @@ const lineItemTypeLabel: Record<string, string> = {
   lab_service: 'Lab Service',
   custom: 'Custom',
 }
+
+// --- Invoice PDF generation ---
+const invoiceDoc = ref<GeneratedDocumentResponse | null>(null)
+const isGeneratingInvoicePdf = ref(false)
+const invoicePollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+
+const invoicePdfReady = computed(() => invoiceDoc.value?.status === 'completed')
+
+function stopInvoicePolling() {
+  if (invoicePollTimer.value) {
+    clearInterval(invoicePollTimer.value)
+    invoicePollTimer.value = null
+  }
+}
+
+async function loadInvoiceDoc() {
+  if (!props.invoice) return
+  try {
+    const res = await billingApi.getPdf(props.invoice.id)
+    invoiceDoc.value = res.data
+  } catch {
+    // ignore
+  }
+}
+
+function startInvoicePolling() {
+  stopInvoicePolling()
+  invoicePollTimer.value = setInterval(async () => {
+    await loadInvoiceDoc()
+    if (invoiceDoc.value?.status === 'completed' || invoiceDoc.value?.status === 'failed') {
+      stopInvoicePolling()
+      isGeneratingInvoicePdf.value = false
+      if (invoiceDoc.value.status === 'failed') {
+        toast.error('Invoice PDF generation failed')
+      }
+    }
+  }, 3000)
+}
+
+async function generateInvoicePdf() {
+  if (!props.invoice) return
+  isGeneratingInvoicePdf.value = true
+  try {
+    const res = await billingApi.generatePdf(props.invoice.id)
+    invoiceDoc.value = res.data
+    startInvoicePolling()
+  } catch {
+    isGeneratingInvoicePdf.value = false
+    toast.error('Failed to generate invoice PDF')
+  }
+}
+
+async function downloadInvoicePdf() {
+  if (!invoiceDoc.value?.id) return
+  const tab = openNewTab()
+  try {
+    const url = await documentApi.getSignedUrl(invoiceDoc.value.id)
+    tab.navigate(url)
+  } catch {
+    tab.close()
+    toast.error('Failed to get download link')
+  }
+}
+
+async function printInvoicePdf() {
+  if (!invoiceDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(invoiceDoc.value.id)
+    printPdf(url)
+  } catch {
+    toast.error('Failed to print invoice')
+  }
+}
+
+watch(() => [props.open, props.invoice?.id], ([open]) => {
+  if (open && props.invoice) {
+    loadInvoiceDoc()
+  } else if (!open) {
+    stopInvoicePolling()
+    isGeneratingInvoicePdf.value = false
+    invoiceDoc.value = null
+  }
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  stopInvoicePolling()
+})
 </script>
 
 <template>
@@ -256,6 +350,30 @@ const lineItemTypeLabel: Record<string, string> = {
               <p class="font-medium">{{ formatDate(invoice.created_at) }}</p>
             </div>
           </div>
+        </div>
+
+        <!-- Invoice PDF -->
+        <div v-if="invoice.status !== 'void'" class="flex flex-wrap items-center gap-2">
+          <template v-if="invoicePdfReady">
+            <Button variant="outline" size="sm" class="h-7 gap-1.5 text-xs" @click="printInvoicePdf">
+              <Printer class="size-3" />
+              Print
+            </Button>
+            <Button variant="outline" size="sm" class="h-7 gap-1.5 text-xs" @click="downloadInvoicePdf">
+              <FileDown class="size-3" />
+              Download
+            </Button>
+            <Button variant="outline" size="sm" class="h-7 gap-1.5 text-xs" @click="generateInvoicePdf" :disabled="isGeneratingInvoicePdf">
+              <LoaderCircle v-if="isGeneratingInvoicePdf" class="size-3 animate-spin" />
+              <RefreshCw v-else class="size-3" />
+              Regenerate
+            </Button>
+          </template>
+          <Button v-else variant="secondary" size="sm" class="h-7 gap-1.5 text-xs" @click="generateInvoicePdf" :disabled="isGeneratingInvoicePdf">
+            <LoaderCircle v-if="isGeneratingInvoicePdf" class="size-3 animate-spin" />
+            <FileText v-else class="size-3" />
+            {{ isGeneratingInvoicePdf ? 'Generating...' : 'Generate Invoice PDF' }}
+          </Button>
         </div>
 
         <Separator />

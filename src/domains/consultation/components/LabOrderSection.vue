@@ -8,6 +8,8 @@ import {
   X,
   Upload,
   FileDown,
+  FileText,
+  Printer,
   CheckCircle2,
   Clock,
   LoaderCircle,
@@ -33,11 +35,15 @@ import { labOrderApi } from '../api/labOrderApi'
 import { labServiceApi } from '@/domains/labService/api/labServiceApi'
 import { cacheLabOrder, getCachedLabOrder } from '@/lib/offlineDb'
 import type { LabOrderResponse, LabOrderItem, SystemLabItem } from '../types/labOrder.types'
+import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
+import { openNewTab, printPdf } from '@/lib/utils'
+import LabRequestDialog from './LabRequestDialog.vue'
 
 const props = defineProps<{
   consultationId: string
   disabled: boolean
   realtimeUpdate?: LabOrderResponse | null
+  documentUpdate?: GeneratedDocumentResponse | null
 }>()
 
 const emit = defineEmits<{
@@ -114,7 +120,10 @@ async function loadLabOrder() {
   }
 }
 
-onMounted(loadLabOrder)
+onMounted(() => {
+  loadLabOrder()
+  loadLabRequestDoc()
+})
 
 // --- Search ---
 function onSearchInput(val: string | number, row: { description: string; instruction: string } | null) {
@@ -469,6 +478,48 @@ function itemStatusClass(status: 'pending' | 'completed') {
     : 'border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400'
 }
 
+// --- Lab Request PDF ---
+const showLabRequestDialog = ref(false)
+const labRequestDoc = ref<GeneratedDocumentResponse | null>(null)
+const labRequestReady = computed(() => labRequestDoc.value?.status === 'completed')
+
+async function loadLabRequestDoc() {
+  try {
+    const res = await documentApi.list(props.consultationId)
+    labRequestDoc.value = res.data.find((d) => d.type === 'lab-request') ?? null
+  } catch {
+    // ignore
+  }
+}
+
+watch(() => props.documentUpdate, (update) => {
+  if (update && update.type === 'lab-request') {
+    labRequestDoc.value = update as GeneratedDocumentResponse
+  }
+})
+
+async function downloadLabRequest() {
+  if (!labRequestDoc.value?.id) return
+  const tab = openNewTab()
+  try {
+    const url = await documentApi.getSignedUrl(labRequestDoc.value.id)
+    tab.navigate(url)
+  } catch {
+    tab.close()
+    toast.error('Failed to get download link')
+  }
+}
+
+async function printLabRequest() {
+  if (!labRequestDoc.value?.id) return
+  try {
+    const url = await documentApi.getSignedUrl(labRequestDoc.value.id)
+    printPdf(url)
+  } catch {
+    toast.error('Failed to get download link')
+  }
+}
+
 // --- Show add form toggle ---
 const showAddForm = ref(false)
 
@@ -508,16 +559,49 @@ function cancelAddForm() {
         </Badge>
       </div>
 
-      <Button
-        v-if="labOrder && !disabled && !showAddForm"
-        variant="outline"
-        size="sm"
-        class="h-7 gap-1.5 text-xs"
-        @click="openAddForm"
-      >
-        <Plus class="size-3.5" />
-        Add Item
-      </Button>
+      <div class="flex items-center gap-1.5">
+        <template v-if="labOrder && labOrder.items.some(i => i.status === 'pending')">
+          <Button
+            v-if="labRequestReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 text-xs"
+            @click="printLabRequest"
+          >
+            <Printer class="size-3" />
+            Print
+          </Button>
+          <Button
+            v-if="labRequestReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 text-xs"
+            @click="downloadLabRequest"
+          >
+            <FileDown class="size-3" />
+            Download
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 text-xs"
+            @click="showLabRequestDialog = true"
+          >
+            <FileText class="size-3" />
+            {{ labRequestReady ? 'Regenerate' : 'Lab Request PDF' }}
+          </Button>
+        </template>
+        <Button
+          v-if="labOrder && !disabled && !showAddForm"
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1.5 text-xs"
+          @click="openAddForm"
+        >
+          <Plus class="size-3.5" />
+          Add Item
+        </Button>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -967,5 +1051,15 @@ function cancelAddForm() {
         </div>
       </DialogScrollContent>
     </Dialog>
+
+    <!-- Lab Request PDF Dialog -->
+    <LabRequestDialog
+      v-if="labOrder && labOrder.items.some(i => i.status === 'pending')"
+      :open="showLabRequestDialog"
+      :consultation-id="consultationId"
+      :document-update="documentUpdate"
+      @update:open="showLabRequestDialog = $event"
+      @generated="labRequestDoc = $event"
+    />
   </div>
 </template>

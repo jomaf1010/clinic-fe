@@ -31,7 +31,8 @@ const { handleSubmit, setFieldError } = useForm({
   validationSchema: signupSchema,
 })
 
-const { value: name, errorMessage: nameError } = useField<string>('name')
+const { value: firstName, errorMessage: firstNameError } = useField<string>('first_name')
+const { value: lastName, errorMessage: lastNameError } = useField<string>('last_name')
 const { value: email, errorMessage: emailError } = useField<string>('email')
 const { value: password, errorMessage: passwordError } = useField<string>('password')
 
@@ -60,7 +61,8 @@ const onSubmit = handleSubmit(async (values) => {
     await authStore.signup({
       email: values.email,
       password: values.password,
-      ...(values.name ? { name: values.name } : {}),
+      ...(values.first_name ? { first_name: values.first_name } : {}),
+      ...(values.last_name ? { last_name: values.last_name } : {}),
       recaptcha_token: recaptchaToken,
     })
     router.push({ name: RouteNames.VERIFY_EMAIL_NOTICE, query: { email: values.email } })
@@ -123,25 +125,45 @@ const onSubmit = handleSubmit(async (values) => {
               </div>
 
               <div
-                class="flex flex-col gap-2 transition-all delay-300 duration-500 ease-out"
+                class="grid grid-cols-2 gap-3 transition-all delay-300 duration-500 ease-out"
                 :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
               >
-                <Label for="name" class="flex items-center gap-1.5">
-                  <User class="size-3.5 text-muted-foreground" />
-                  Name <span class="text-muted-foreground">(optional)</span>
-                </Label>
-                <Input
-                  id="name"
-                  v-model="name"
-                  type="text"
-                  placeholder="John Doe"
-                  autocomplete="name"
-                  :disabled="isLoading"
-                  :aria-invalid="!!nameError"
-                />
-                <p v-if="nameError" class="text-xs text-destructive">
-                  {{ nameError }}
-                </p>
+                <div class="flex flex-col gap-2">
+                  <Label for="first_name" class="flex items-center gap-1.5">
+                    <User class="size-3.5 text-muted-foreground" />
+                    First name
+                  </Label>
+                  <Input
+                    id="first_name"
+                    v-model="firstName"
+                    type="text"
+                    placeholder="Juan"
+                    autocomplete="given-name"
+                    :disabled="isLoading"
+                    :aria-invalid="!!firstNameError"
+                  />
+                  <p v-if="firstNameError" class="text-xs text-destructive">
+                    {{ firstNameError }}
+                  </p>
+                </div>
+                <div class="flex flex-col gap-2">
+                  <Label for="last_name" class="flex items-center gap-1.5">
+                    <User class="size-3.5 text-muted-foreground" />
+                    Last name
+                  </Label>
+                  <Input
+                    id="last_name"
+                    v-model="lastName"
+                    type="text"
+                    placeholder="Dela Cruz"
+                    autocomplete="family-name"
+                    :disabled="isLoading"
+                    :aria-invalid="!!lastNameError"
+                  />
+                  <p v-if="lastNameError" class="text-xs text-destructive">
+                    {{ lastNameError }}
+                  </p>
+                </div>
               </div>
 
               <div

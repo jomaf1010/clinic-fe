@@ -14,7 +14,7 @@ import {
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { HttpError } from '@/lib/http'
-import { timeAgo } from '@/lib/utils'
+import { openNewTab, timeAgo } from '@/lib/utils'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { consultationApi } from '@/domains/consultation/api/consultationApi'
 import { documentApi } from '@/domains/consultation/api/documentApi'
@@ -76,10 +76,12 @@ const isRequestingMedCert = ref(false)
 const medCertRequested = ref(false)
 
 async function downloadDocument(documentId: string) {
+  const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(documentId)
-    window.open(url, '_blank')
+    tab.navigate(url)
   } catch {
+    tab.close()
     toast.error('Failed to get download link')
   }
 }

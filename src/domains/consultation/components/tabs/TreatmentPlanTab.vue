@@ -237,7 +237,7 @@ function applyPreset(days: number): void {
       <hr class="border-border" />
 
       <!-- Lab Orders -->
-      <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" @lab-updated="emit('lab-updated')" />
+      <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" :document-update="documentUpdate" @lab-updated="emit('lab-updated')" />
     </template>
 
     <template v-if="hasAppointments">

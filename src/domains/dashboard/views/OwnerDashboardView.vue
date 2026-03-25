@@ -24,6 +24,7 @@ import OwnerRevenueChart from '@/domains/dashboard/components/OwnerRevenueChart.
 import ProBadgeBanner from '@/components/shared/ProBadgeBanner.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import PatientAvatar from '@/components/PatientAvatar.vue'
 import { Button } from '@/components/ui/button'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
 import { RouteNames } from '@/router/routeNames'
@@ -46,15 +47,6 @@ const revenueFormatted = computed(() => {
     maximumFractionDigits: 0,
   }).format(stats.value.total_revenue_today)
 })
-
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('')
-}
 
 function formatDate(dateString: string): string {
   return new Intl.DateTimeFormat('en-PH', {
@@ -244,11 +236,12 @@ onUnmounted(() => {
               <span class="w-16 shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
                 {{ appt.scheduled_at }}
               </span>
-              <Avatar class="size-8">
-                <AvatarFallback class="text-xs font-medium">
-                  {{ getInitials(appt.patient_name) }}
-                </AvatarFallback>
-              </Avatar>
+              <PatientAvatar
+                :avatar-url="appt.patient_avatar_url"
+                :sex="appt.patient_sex"
+                :name="appt.patient_name"
+                class="size-8 shrink-0"
+              />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="truncate text-sm font-medium">{{ appt.patient_name }}</span>
                 <span class="truncate text-xs text-muted-foreground">Dr. {{ appt.doctor_name }}</span>
@@ -291,11 +284,12 @@ onUnmounted(() => {
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: item.patient_id } })"
             >
-              <Avatar class="size-8">
-                <AvatarFallback class="text-xs font-medium">
-                  {{ getInitials(item.patient_name) }}
-                </AvatarFallback>
-              </Avatar>
+              <PatientAvatar
+                :avatar-url="item.patient_avatar_url"
+                :sex="item.patient_sex"
+                :name="item.patient_name"
+                class="size-8 shrink-0"
+              />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="truncate text-sm font-medium">{{ item.patient_name }}</span>
                 <span class="truncate text-xs text-muted-foreground">
@@ -334,11 +328,12 @@ onUnmounted(() => {
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: consultation.patient_id, id: consultation.id } })"
             >
-              <Avatar class="size-8">
-                <AvatarFallback class="text-xs font-medium">
-                  {{ getInitials(consultation.patient_name) }}
-                </AvatarFallback>
-              </Avatar>
+              <PatientAvatar
+                :avatar-url="consultation.patient_avatar_url"
+                :sex="consultation.patient_sex"
+                :name="consultation.patient_name"
+                class="size-8 shrink-0"
+              />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="truncate text-sm font-medium">{{ consultation.patient_name }}</span>
                 <span class="truncate text-xs text-muted-foreground">Dr. {{ consultation.doctor_name }}</span>

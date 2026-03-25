@@ -35,11 +35,14 @@ import {
 } from 'lucide-vue-next'
 import DateOfBirthPicker from '@/components/DateOfBirthPicker.vue'
 import TagInput from '@/components/TagInput.vue'
+import AddressForm from '@/components/AddressForm.vue'
+import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
 import { HttpError } from '@/lib/http'
 import { createPatientSchema } from '@/lib/validationRules'
 import { useFormDraft } from '@/composables/useFormDraft'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
+import type { PatientAddress, PatientName } from '../types/patient.types'
 
 const props = defineProps<{
   open: boolean
@@ -54,14 +57,14 @@ const { handleSubmit, setFieldError, resetForm } = useForm({
   validationSchema: createPatientSchema,
 })
 
-const { value: fullName, errorMessage: fullNameError } = useField<string>('full_name')
-const { value: address, errorMessage: addressError } = useField<string>('address')
 const { value: dateOfBirth, errorMessage: dateOfBirthError } = useField<string>('date_of_birth')
 const { value: sex, errorMessage: sexError } = useField<string>('sex')
 const { value: contactNumber, errorMessage: contactNumberError } = useField<string>('contact_number')
 const { value: email, errorMessage: emailError } = useField<string>('email')
 const { value: note, errorMessage: noteError } = useField<string>('note')
 
+const name = ref<PatientName | null>(null)
+const address = ref<PatientAddress | null>(null)
 const allergies = ref<string[]>([])
 const chronicConditions = ref<string[]>([])
 
@@ -71,8 +74,6 @@ const generalError = ref<string | null>(null)
 const { clearDraft } = useFormDraft(
   'create-patient',
   {
-    full_name: fullName,
-    address,
     date_of_birth: dateOfBirth,
     sex,
     contact_number: contactNumber,
@@ -96,12 +97,26 @@ watch(
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
+
+  if (!name.value?.first_name || !name.value?.last_name) {
+    generalError.value = 'Please enter first and last name.'
+    return
+  }
+
+  if (!address.value) {
+    generalError.value = 'Please complete the address fields.'
+    return
+  }
+
   isLoading.value = true
 
   try {
     await patientApi.create({
-      full_name: values.full_name,
-      address: values.address,
+      first_name: name.value.first_name,
+      middle_name: name.value.middle_name,
+      last_name: name.value.last_name,
+      suffix: name.value.suffix,
+      address: address.value,
       date_of_birth: values.date_of_birth,
       sex: values.sex,
       ...(values.contact_number ? { contact_number: values.contact_number } : {}),
@@ -113,6 +128,8 @@ const onSubmit = handleSubmit(async (values) => {
 
     clearDraft()
     resetForm()
+    name.value = null
+    address.value = null
     allergies.value = []
     chronicConditions.value = []
     emit('created')
@@ -157,43 +174,16 @@ const onSubmit = handleSubmit(async (values) => {
           {{ generalError }}
         </div>
 
-        <!-- Basic Information -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div class="flex flex-col gap-2">
-            <Label for="dlg_full_name" class="flex items-center gap-1.5">
-              <User class="size-3.5 text-muted-foreground" />
-              Full name
-            </Label>
-            <Input
-              id="dlg_full_name"
-              v-model="fullName"
-              type="text"
-              placeholder="Juan Dela Cruz"
-              :disabled="isLoading"
-              :aria-invalid="!!fullNameError"
-              required
-            />
-            <p v-if="fullNameError" class="text-xs text-destructive">{{ fullNameError }}</p>
-          </div>
-
-          <div class="flex flex-col gap-2">
-            <Label for="dlg_address" class="flex items-center gap-1.5">
-              <MapPin class="size-3.5 text-muted-foreground" />
-              Address
-            </Label>
-            <Input
-              id="dlg_address"
-              v-model="address"
-              type="text"
-              placeholder="123 Main St, Quezon City"
-              :disabled="isLoading"
-              :aria-invalid="!!addressError"
-              required
-            />
-            <p v-if="addressError" class="text-xs text-destructive">{{ addressError }}</p>
-          </div>
+        <!-- Patient Name (full width) -->
+        <div>
+          <Label class="mb-2 flex items-center gap-1.5">
+            <User class="size-3.5 text-muted-foreground" />
+            Patient Name
+          </Label>
+          <NameForm v-model="name" :disabled="isLoading" />
         </div>
 
+        <!-- DOB / Sex -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="flex flex-col gap-2">
             <Label class="flex items-center gap-1.5">
@@ -207,11 +197,11 @@ const onSubmit = handleSubmit(async (values) => {
           <div class="flex flex-col gap-2">
             <Label for="dlg_sex" class="flex items-center gap-1.5">
               <User class="size-3.5 text-muted-foreground" />
-              Gender
+              Sex
             </Label>
             <Select v-model="sex">
               <SelectTrigger :aria-invalid="!!sexError">
-                <SelectValue placeholder="Select gender" />
+                <SelectValue placeholder="Select sex" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="male">Male</SelectItem>
@@ -254,6 +244,15 @@ const onSubmit = handleSubmit(async (values) => {
             />
             <p v-if="emailError" class="text-xs text-destructive">{{ emailError }}</p>
           </div>
+        </div>
+
+        <!-- Address -->
+        <div>
+          <Label class="mb-2 flex items-center gap-1.5">
+            <MapPin class="size-3.5 text-muted-foreground" />
+            Address
+          </Label>
+          <AddressForm v-model="address" :disabled="isLoading" />
         </div>
 
         <Separator />

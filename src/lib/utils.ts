@@ -56,6 +56,28 @@ export function timeAgo(dateString: string): string {
   return `${months} month${months > 1 ? 's' : ''} ago`
 }
 
+/**
+ * Open a URL in a new tab, safe for mobile browsers.
+ * Must be called synchronously from a user gesture — open the blank tab first,
+ * then set the location after any async work (e.g. fetching a signed URL).
+ */
+export function openNewTab(): { navigate: (url: string) => void; close: () => void } {
+  const win = window.open('', '_blank')
+  return {
+    navigate: (url: string) => {
+      if (win && !win.closed) {
+        win.location.href = url
+      } else {
+        // Fallback: popup was blocked, try direct navigation
+        window.location.href = url
+      }
+    },
+    close: () => {
+      if (win && !win.closed) win.close()
+    },
+  }
+}
+
 export function printPdf(url: string): void {
   // In dev, backend asset() returns localhost but app runs on clinic.test
   // Only normalize when hosts share the same port (dev mismatch), not cross-subdomain (staging/prod)

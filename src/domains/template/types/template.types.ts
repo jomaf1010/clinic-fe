@@ -120,3 +120,119 @@ export const defaultMedCertTemplate: MedCertTemplate = {
   },
   footer: { ...defaultFooter, showS2License: false, showPtrNumber: false },
 }
+
+// Lab Request
+export interface LabRequestTemplate extends PageSetup {
+  header: TemplateHeader
+  body: {
+    showPatientName: boolean
+    showPatientAge: boolean
+    showPatientGender: boolean
+    showDate: boolean
+    showDoctorName: boolean
+    showLaboratoryName: boolean
+    showInstructions: boolean
+  }
+  footer: TemplateFooter
+}
+
+export const defaultLabRequestTemplate: LabRequestTemplate = {
+  ...defaultPageSetup,
+  header: { ...defaultHeader },
+  body: {
+    showPatientName: true,
+    showPatientAge: true,
+    showPatientGender: true,
+    showDate: true,
+    showDoctorName: true,
+    showLaboratoryName: true,
+    showInstructions: true,
+  },
+  footer: { ...defaultFooter, showPtrNumber: false, showS2License: false },
+}
+
+// Consultation Summary
+export interface ConsultationSummaryTemplate extends PageSetup {
+  header: TemplateHeader
+  body: {
+    showPatientName: boolean
+    showPatientAge: boolean
+    showPatientGender: boolean
+    showDate: boolean
+    showDoctorName: boolean
+    showChiefComplaint: boolean
+    showVitals: boolean
+    showBMI: boolean
+    showAllergies: boolean
+    showChronicConditions: boolean
+    showDiagnoses: boolean
+    showAssessmentNotes: boolean
+    showPrescription: boolean
+    showLabOrders: boolean
+    showAdvice: boolean
+    showFollowUp: boolean
+  }
+  footer: TemplateFooter
+}
+
+export const defaultConsultationSummaryTemplate: ConsultationSummaryTemplate = {
+  ...defaultPageSetup,
+  header: { ...defaultHeader },
+  body: {
+    showPatientName: true,
+    showPatientAge: true,
+    showPatientGender: true,
+    showDate: true,
+    showDoctorName: true,
+    showChiefComplaint: true,
+    showVitals: true,
+    showBMI: true,
+    showAllergies: true,
+    showChronicConditions: true,
+    showDiagnoses: true,
+    showAssessmentNotes: true,
+    showPrescription: true,
+    showLabOrders: true,
+    showAdvice: true,
+    showFollowUp: true,
+  },
+  footer: { ...defaultFooter },
+}
+
+// Invoice
+export interface InvoiceTemplate extends PageSetup {
+  header: TemplateHeader
+  body: {
+    showInvoiceNumber: boolean
+    showPatientName: boolean
+    showPatientAge: boolean
+    showPatientGender: boolean
+    showDate: boolean
+    showPriceBreakdown: boolean
+    showDiscount: boolean
+    showPaymentHistory: boolean
+    showBalance: boolean
+    showStatus: boolean
+    showNotes: boolean
+  }
+  footer: TemplateFooter
+}
+
+export const defaultInvoiceTemplate: InvoiceTemplate = {
+  ...defaultPageSetup,
+  header: { ...defaultHeader },
+  body: {
+    showInvoiceNumber: true,
+    showPatientName: true,
+    showPatientAge: true,
+    showPatientGender: true,
+    showDate: true,
+    showPriceBreakdown: true,
+    showDiscount: true,
+    showPaymentHistory: true,
+    showBalance: true,
+    showStatus: true,
+    showNotes: true,
+  },
+  footer: { ...defaultFooter, showDoctorSignature: false, showSpecialty: false, showPrcLicense: false, showPtrNumber: false },
+}

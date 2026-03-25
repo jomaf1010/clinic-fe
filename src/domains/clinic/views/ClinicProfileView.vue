@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useForm, useField } from 'vee-validate'
-import { Building2, MapPin, Phone, Mail, Banknote, LoaderCircle, Camera } from 'lucide-vue-next'
+import { Building2, MapPin, Phone, Mail, LoaderCircle, Camera } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,9 @@ import { HttpError } from '@/lib/http'
 import { clinicApi } from '@/domains/clinic/api/clinicApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
+import type { PatientAddress } from '@/domains/patient/types/patient.types'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
+import AddressForm from '@/components/AddressForm.vue'
 
 const authStore = useAuthStore()
 const canManage = computed(() => authStore.hasPermission('clinic.manage'))
@@ -23,6 +25,8 @@ const generalError = ref<string | null>(null)
 const logoUrl = ref<string | null>(null)
 const cropDialogOpen = ref(false)
 const isUploadingLogo = ref(false)
+
+const address = ref<PatientAddress | null>(null)
 
 const displayLogoUrl = computed(() => logoUrl.value ?? authStore.currentClinic?.logo_url ?? null)
 
@@ -39,29 +43,24 @@ const clinicInitials = computed(() => {
 const { handleSubmit, setFieldError, setValues } = useForm({
   initialValues: {
     clinic_name: '',
-    address: '',
     contact_number: '',
     email: '',
-    default_fee: '',
   },
 })
 
 const { value: clinicName, errorMessage: clinicNameError } = useField<string>('clinic_name')
-const { value: address, errorMessage: addressError } = useField<string>('address')
 const { value: contactNumber, errorMessage: contactNumberError } = useField<string>('contact_number')
 const { value: email, errorMessage: emailError } = useField<string>('email')
-const { value: defaultFee, errorMessage: defaultFeeError } = useField<string>('default_fee')
 
 onMounted(async () => {
   try {
     const res = await clinicApi.show()
     logoUrl.value = res.data.logo_url
+    address.value = res.data.address
     setValues({
       clinic_name: res.data.clinic_name ?? '',
-      address: res.data.address ?? '',
       contact_number: res.data.contact_number ?? '',
       email: res.data.email ?? '',
-      default_fee: res.data.default_fee ?? '',
     })
   } catch {
     toast.error('Failed to load clinic details')
@@ -96,10 +95,9 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     await clinicApi.update({
       clinic_name: values.clinic_name,
-      address: values.address || null,
+      address: address.value || null,
       contact_number: values.contact_number || null,
       email: values.email || null,
-      default_fee: values.default_fee ? Number(values.default_fee) : null,
     })
     await authStore.fetchUser()
     toast.success('Clinic profile updated')
@@ -152,8 +150,8 @@ const onSubmit = handleSubmit(async (values) => {
             <span class="text-lg font-semibold leading-tight">
               {{ authStore.currentClinic?.clinic_name ?? 'Clinic' }}
             </span>
-            <span v-if="authStore.currentClinic?.address" class="text-sm text-muted-foreground">
-              {{ authStore.currentClinic.address }}
+            <span v-if="authStore.currentClinic?.formatted_address" class="text-sm text-muted-foreground">
+              {{ authStore.currentClinic.formatted_address }}
             </span>
             <p v-if="canManage" class="mt-0.5 text-xs text-muted-foreground">
               Click the logo to upload a new image. JPG, PNG, or WebP up to 2 MB.
@@ -204,36 +202,23 @@ const onSubmit = handleSubmit(async (values) => {
             </div>
           </div>
 
-          <div class="flex flex-col gap-2">
-            <Label for="clinic-address" class="flex items-center gap-1.5">
+          <div>
+            <Label class="mb-2 flex items-center gap-1.5">
               <MapPin class="size-3.5 text-muted-foreground" />
               Address
               <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
             </Label>
-            <Input id="clinic-address" v-model="address" type="text" placeholder="123 Main Street, City" :disabled="isLoading || !canManage" :aria-invalid="!!addressError" />
-            <p v-if="addressError" class="text-xs text-destructive">{{ addressError }}</p>
+            <AddressForm v-model="address" :disabled="isLoading || !canManage" />
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="flex flex-col gap-2">
-              <Label for="clinic-contact" class="flex items-center gap-1.5">
-                <Phone class="size-3.5 text-muted-foreground" />
-                Contact number
-                <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
-              </Label>
-              <Input id="clinic-contact" v-model="contactNumber" type="tel" placeholder="(02) 123-4567" :disabled="isLoading || !canManage" :aria-invalid="!!contactNumberError" />
-              <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <Label for="clinic-fee" class="flex items-center gap-1.5">
-                <Banknote class="size-3.5 text-muted-foreground" />
-                Default consultation fee
-                <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
-              </Label>
-              <Input id="clinic-fee" v-model="defaultFee" type="number" placeholder="500" min="0" :disabled="isLoading || !canManage" :aria-invalid="!!defaultFeeError" />
-              <p v-if="defaultFeeError" class="text-xs text-destructive">{{ defaultFeeError }}</p>
-            </div>
+          <div class="flex flex-col gap-2">
+            <Label for="clinic-contact" class="flex items-center gap-1.5">
+              <Phone class="size-3.5 text-muted-foreground" />
+              Contact number
+              <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
+            </Label>
+            <Input id="clinic-contact" v-model="contactNumber" type="tel" placeholder="(02) 123-4567" :disabled="isLoading || !canManage" :aria-invalid="!!contactNumberError" />
+            <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
           </div>
         </form>
       </CardContent>

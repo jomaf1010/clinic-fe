@@ -1,4 +1,8 @@
+import { ref } from 'vue'
+
 const BASE_URL = import.meta.env.VITE_API_URL as string
+
+export const isMaintenanceMode = ref(false)
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -83,6 +87,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     credentials: 'include',
   })
 
+  if (response.status === 503) {
+    isMaintenanceMode.value = true
+    throw new HttpError(503, 'Service temporarily unavailable')
+  }
+
   if (response.status === 401) {
     const refreshed = await handleUnauthorized()
     if (refreshed) {
@@ -153,6 +162,11 @@ async function uploadRequest<T>(endpoint: string, formData: FormData, method: Ht
     body: formData,
     credentials: 'include',
   })
+
+  if (response.status === 503) {
+    isMaintenanceMode.value = true
+    throw new HttpError(503, 'Service temporarily unavailable')
+  }
 
   if (response.status === 401) {
     const refreshed = await handleUnauthorized()

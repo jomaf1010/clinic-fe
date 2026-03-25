@@ -5,7 +5,7 @@ import { Bell, Check, CheckCheck, FileText, FileCheck, AlertCircle, UserRound, C
 import { Button } from '@/components/ui/button'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { RouteNames } from '@/router/routeNames'
-import { printPdf } from '@/lib/utils'
+import { openNewTab, printPdf } from '@/lib/utils'
 import { documentApi } from '@/domains/consultation/api/documentApi'
 
 const emit = defineEmits<{
@@ -85,11 +85,12 @@ function hasDocumentId(notification: typeof store.notifications[number]): boolea
 }
 
 async function handleDownload(documentId: string) {
+  const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(documentId)
-    window.open(url, '_blank')
+    tab.navigate(url)
   } catch {
-    // silent
+    tab.close()
   }
 }
 
@@ -107,7 +108,7 @@ async function handlePrint(documentId: string) {
 <template>
   <div class="flex h-full flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between border-b px-4 py-3">
+    <div class="flex items-center justify-between border-b pl-4 pr-12 py-3">
       <h3 class="text-sm font-semibold">Notifications</h3>
       <Button
         v-if="store.unreadCount > 0"
