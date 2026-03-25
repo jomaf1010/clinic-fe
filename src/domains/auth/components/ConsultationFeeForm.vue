@@ -20,10 +20,6 @@ const consultationFee = ref(
 const followUpFee = ref(
   authStore.user?.follow_up_fee != null ? String(authStore.user.follow_up_fee) : '',
 )
-const emergencyFee = ref(
-  authStore.user?.emergency_fee != null ? String(authStore.user.emergency_fee) : '',
-)
-
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const fieldErrors = ref<Record<string, string>>({})
@@ -37,7 +33,6 @@ async function onSubmit() {
     await authApi.updateProfile({
       consultation_fee: consultationFee.value ? parseFloat(consultationFee.value) : null,
       follow_up_fee: followUpFee.value ? parseFloat(followUpFee.value) : null,
-      emergency_fee: emergencyFee.value ? parseFloat(emergencyFee.value) : null,
     })
     await authStore.fetchUser()
     toast.success('Billing settings updated successfully.')
@@ -73,7 +68,7 @@ async function onSubmit() {
           {{ error }}
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2">
           <div class="flex flex-col gap-2">
             <Label for="consultation-fee" class="flex items-center gap-1.5">
               <Banknote class="size-3.5 text-muted-foreground" />
@@ -110,23 +105,6 @@ async function onSubmit() {
             <p v-if="fieldErrors.follow_up_fee" class="text-xs text-destructive">{{ fieldErrors.follow_up_fee }}</p>
           </div>
 
-          <div class="flex flex-col gap-2">
-            <Label for="emergency-fee" class="flex items-center gap-1.5">
-              <Banknote class="size-3.5 text-muted-foreground" />
-              Emergency Fee (₱)
-            </Label>
-            <Input
-              id="emergency-fee"
-              v-model="emergencyFee"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              :disabled="isLoading"
-              :aria-invalid="!!fieldErrors.emergency_fee"
-            />
-            <p v-if="fieldErrors.emergency_fee" class="text-xs text-destructive">{{ fieldErrors.emergency_fee }}</p>
-          </div>
         </div>
       </form>
     </CardContent>

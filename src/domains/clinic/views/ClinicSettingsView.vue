@@ -20,7 +20,6 @@ const autoRegenOnQtyChange = ref(true)
 const suppliesAsClinicRevenue = ref(true)
 const defaultConsultationFee = ref('')
 const defaultFollowUpFee = ref('')
-const defaultEmergencyFee = ref('')
 
 onMounted(async () => {
   try {
@@ -32,7 +31,6 @@ onMounted(async () => {
     suppliesAsClinicRevenue.value = settings.billing_supplies_as_clinic_revenue !== false
     defaultConsultationFee.value = settings.default_consultation_fee != null ? String(settings.default_consultation_fee) : ''
     defaultFollowUpFee.value = settings.default_follow_up_fee != null ? String(settings.default_follow_up_fee) : ''
-    defaultEmergencyFee.value = settings.default_emergency_fee != null ? String(settings.default_emergency_fee) : ''
   } catch {
     toast.error('Failed to load settings')
   } finally {
@@ -156,18 +154,6 @@ function saveFeeSetting(key: string, value: string) {
                 min="0"
                 :disabled="isSaving"
                 @blur="saveFeeSetting('default_follow_up_fee', defaultFollowUpFee)"
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <Label for="default-emergency-fee" class="text-xs text-muted-foreground">Emergency Fee</Label>
-              <Input
-                id="default-emergency-fee"
-                v-model="defaultEmergencyFee"
-                type="number"
-                placeholder="0.00"
-                min="0"
-                :disabled="isSaving"
-                @blur="saveFeeSetting('default_emergency_fee', defaultEmergencyFee)"
               />
             </div>
           </div>

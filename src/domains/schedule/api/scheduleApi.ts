@@ -23,6 +23,11 @@ export const scheduleApi = {
     return http.get<CalendarBlockListResponse>(`/calendar-blocks?${params}`)
   },
 
+  listAllBlocks(start: string, end: string): Promise<CalendarBlockListResponse> {
+    const params = new URLSearchParams({ start, end })
+    return http.get<CalendarBlockListResponse>(`/calendar-blocks?${params}`)
+  },
+
   createBlock(payload: StoreCalendarBlockPayload): Promise<CalendarBlockResponse> {
     return http.post<CalendarBlockResponse>('/calendar-blocks', payload)
   },

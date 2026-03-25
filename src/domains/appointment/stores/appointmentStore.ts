@@ -30,6 +30,13 @@ export const useAppointmentStore = defineStore('appointment', () => {
     }
   }
 
+  async function fetchAllForRange(startDate: string, endDate: string, status?: AppointmentListFilters['status']): Promise<AppointmentResponse[]> {
+    const filters: AppointmentListFilters = { start_date: startDate, end_date: endDate }
+    if (status) filters.status = status
+    const response = await appointmentApi.list(1, 500, filters)
+    return response.data
+  }
+
   async function fetchAppointment(uuid: string): Promise<void> {
     isLoading.value = true
     try {
@@ -78,6 +85,7 @@ export const useAppointmentStore = defineStore('appointment', () => {
     isLoading,
     isCreating,
     fetchAppointments,
+    fetchAllForRange,
     fetchAppointment,
     createAppointment,
     cancelAppointment,

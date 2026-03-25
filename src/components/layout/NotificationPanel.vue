@@ -24,6 +24,7 @@ function getIcon(type: string) {
     case 'document.generated': return FileText
     case 'queue.patient_assigned': return UserRound
     case 'appointment.created': return CalendarDays
+    case 'appointment.rescheduled': return CalendarDays
     case 'medcert.requested': return FileCheck
     case 'medcert.completed': return FileText
     default: return Bell
@@ -58,7 +59,7 @@ function handleClick(notification: typeof store.notifications[number]) {
       name: RouteNames.PATIENT_DETAIL,
       params: { id: data.patient_id as string },
     })
-  } else if (notification.type === 'appointment.created' && data.patient_id) {
+  } else if ((notification.type === 'appointment.created' || notification.type === 'appointment.rescheduled') && data.patient_id) {
     router.push({
       name: RouteNames.PATIENT_DETAIL,
       params: { id: data.patient_id as string },

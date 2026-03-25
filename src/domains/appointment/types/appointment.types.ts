@@ -7,6 +7,7 @@ export interface AppointmentResponse {
   patient_name: string | null
   doctor_id: string
   doctor_name: string | null
+  doctor_avatar_url: string | null
   created_by: string
   status: AppointmentStatus
   scheduled_at: string
@@ -25,6 +26,7 @@ export interface CreateAppointmentPayload {
   patient_id: string
   doctor_id: string
   scheduled_at: string
+  duration?: number | null // total minutes (multi-slot)
   reason?: string | null
   notes?: string | null
   consultation_type?: 'default' | 'follow_up'
@@ -64,6 +66,7 @@ export interface ClinicDoctor {
   name: string
   email: string
   role: string
+  avatar_url: string | null
 }
 
 export interface ClinicDoctorsResponse {

@@ -41,6 +41,14 @@ export const appointmentApi = {
     return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/no-show`)
   },
 
+  reschedule(uuid: string, scheduledAt: string): Promise<SingleAppointmentResponse> {
+    return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/reschedule`, { scheduled_at: scheduledAt })
+  },
+
+  resize(uuid: string, duration: number): Promise<SingleAppointmentResponse> {
+    return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/resize`, { duration })
+  },
+
   getDoctors(): Promise<ClinicDoctorsResponse> {
     return http.get<ClinicDoctorsResponse>('/clinic/doctors')
   },

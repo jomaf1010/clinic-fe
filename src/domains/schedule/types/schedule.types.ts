@@ -29,6 +29,8 @@ export interface CalendarBlock {
   id: string
   clinic_id: string
   user_id: string
+  user_name: string | null
+  user_avatar_url: string | null
   title: string
   type: BlockType
   all_day: boolean

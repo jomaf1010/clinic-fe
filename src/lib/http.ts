@@ -91,6 +91,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     credentials: 'include',
+    cache: 'no-store',
   })
 
   if (response.status === 503) {

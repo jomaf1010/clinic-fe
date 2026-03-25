@@ -32,7 +32,7 @@ export interface TemplateFooter {
 const defaultPageSetup: PageSetup = {
   paperSize: 'a4',
   orientation: 'portrait',
-  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  margins: { top: 5, right: 5, bottom: 5, left: 5 },
   fontFamily: 'sans-serif',
   fontSize: 12,
 }

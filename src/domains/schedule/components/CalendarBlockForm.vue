@@ -46,6 +46,7 @@ const props = defineProps<{
   isSaving?: boolean
   userId: string
   timezone?: string
+  prefillDateTime?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -97,20 +98,34 @@ function resetForm() {
     const endLocal = utcToLocal(props.block.end)
     singleDate.value = startLocal.date
     dateRange.value = { start: startLocal.date, end: endLocal.date }
-    startTime.value = startLocal.time
-    endTime.value = endLocal.time
+    if (!props.block.all_day) {
+      startTime.value = startLocal.time
+      endTime.value = endLocal.time
+    }
     notes.value = props.block.notes ?? ''
   } else {
     title.value = ''
     type.value = 'leave'
-    allDay.value = true
     recurring.value = false
-    const now = today(getLocalTimeZone())
-    singleDate.value = now
-    dateRange.value = { start: now, end: now }
-    startTime.value = '08:00'
-    endTime.value = '17:00'
     notes.value = ''
+
+    if (props.prefillDateTime) {
+      const prefill = utcToLocal(props.prefillDateTime)
+      allDay.value = false
+      singleDate.value = prefill.date
+      dateRange.value = { start: prefill.date, end: prefill.date }
+      startTime.value = prefill.time
+      // Default end time: 1 hour after start
+      const [h, m] = prefill.time.split(':').map(Number)
+      endTime.value = `${String(Math.min(23, h! + 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    } else {
+      allDay.value = true
+      const now = today(getLocalTimeZone())
+      singleDate.value = now
+      dateRange.value = { start: now, end: now }
+      startTime.value = '08:00'
+      endTime.value = '17:00'
+    }
   }
 }
 
@@ -129,7 +144,7 @@ const rangeDateLabel = computed(() => {
 
 const canSave = computed(() => {
   if (!title.value) return false
-  if (allDay.value) return !!singleDate.value
+  if (allDay.value || !recurring.value) return !!singleDate.value
   return !!dateRange.value.start && !!dateRange.value.end
 })
 
@@ -141,9 +156,13 @@ function handleSave() {
     const dateStr = calendarDateToIso(singleDate.value)
     start = dateStr
     end = dateStr
-  } else {
+  } else if (recurring.value) {
     start = `${calendarDateToIso(dateRange.value.start!)}T${startTime.value}:00`
     end = `${calendarDateToIso(dateRange.value.end!)}T${endTime.value}:00`
+  } else {
+    const dateStr = calendarDateToIso(singleDate.value)
+    start = `${dateStr}T${startTime.value}:00`
+    end = `${dateStr}T${endTime.value}:00`
   }
 
   if (isEdit.value) {
@@ -175,7 +194,7 @@ function handleSave() {
 
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-lg">
+    <DialogContent class="sm:max-w-lg" @close-auto-focus.prevent>
       <DialogHeader>
         <DialogTitle>{{ isEdit ? 'Edit Calendar Block' : 'Add Calendar Block' }}</DialogTitle>
       </DialogHeader>
@@ -233,8 +252,8 @@ function handleSave() {
           The time range will repeat every day within the selected dates.
         </p>
 
-        <!-- Single date picker (all-day) -->
-        <div v-if="allDay">
+        <!-- Single date picker (all-day or single-day timed block) -->
+        <div v-if="allDay || !recurring">
           <Label class="mb-1.5 block">Date</Label>
           <Popover>
             <PopoverTrigger as-child>
@@ -249,7 +268,7 @@ function handleSave() {
           </Popover>
         </div>
 
-        <!-- Date range picker (not all-day) -->
+        <!-- Date range picker (recurring timed block) -->
         <div v-else>
           <Label class="mb-1.5 block">Date range</Label>
           <Popover>

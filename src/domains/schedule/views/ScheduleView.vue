@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { toast } from 'vue-sonner'
 import { CalendarDate, type DateValue, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateRange } from 'reka-ui'
-import { Calendar as CalendarLucide, CalendarIcon, LoaderCircle, Plus, RefreshCw } from 'lucide-vue-next'
+import { Calendar as CalendarLucide, CalendarCheck, CalendarIcon, CalendarX, LoaderCircle, Plus, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Calendar as ShadcnCalendar } from '@/components/ui/calendar'
 import { RangeCalendar } from '@/components/ui/range-calendar'
@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useCentrifugo } from '@/composables/useCentrifugo'
 import { useScheduleStore } from '../stores/scheduleStore'
 import ScheduleCalendar from '../components/ScheduleCalendar.vue'
 import WeeklyScheduleEditor from '../components/WeeklyScheduleEditor.vue'
@@ -32,10 +33,13 @@ import CalendarBlockForm from '../components/CalendarBlockForm.vue'
 import AvailabilityGrid from '../components/AvailabilityGrid.vue'
 import type { CalendarBlock, StoreCalendarBlockPayload, UpsertWorkingSchedulePayload, UpdateCalendarBlockPayload } from '../types/schedule.types'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
+import AppointmentBookingWizard from '@/domains/appointment/components/AppointmentBookingWizard.vue'
+import AppointmentDetailSheet from '@/domains/appointment/components/AppointmentDetailSheet.vue'
 import type { AppointmentResponse } from '@/domains/appointment/types/appointment.types'
 
 const authStore = useAuthStore()
 const store = useScheduleStore()
+const { connect, subscribe, getSubscription } = useCentrifugo()
 
 const scheduleTimezone = computed(() => store.schedule?.timezone ?? 'Asia/Manila')
 
@@ -101,6 +105,88 @@ const blockFilterLabel = computed(() => {
 const availabilityError = ref<string | null>(null)
 const availabilityDateValue = ref<DateValue>(today(getLocalTimeZone()))
 const availabilityDateLabel = computed(() => formatDisplayDate(availabilityDateValue.value))
+
+// --- Appointment interactions from calendar ---
+const showBookingWizard = ref(false)
+const prefillDateTime = ref<string | null>(null)
+const showDetailSheet = ref(false)
+const selectedAppointment = ref<AppointmentResponse | null>(null)
+const scrollContainerRef = ref<HTMLElement | null>(null)
+let savedContainerScroll = 0
+let savedWindowScroll = 0
+
+function saveScroll() {
+  savedContainerScroll = scrollContainerRef.value?.scrollTop ?? 0
+  savedWindowScroll = window.scrollY
+}
+
+function restoreScroll() {
+  // Delay to ensure dialog fully unmounts and body scroll lock is released
+  setTimeout(() => {
+    if (scrollContainerRef.value) {
+      scrollContainerRef.value.scrollTop = savedContainerScroll
+    }
+    window.scrollTo(0, savedWindowScroll)
+  }, 50)
+}
+
+// Slot action picker
+const showSlotActionPicker = ref(false)
+const slotActionDateTime = ref<string | null>(null)
+
+function handleSlotSelect(dateTime: string) {
+  saveScroll()
+  slotActionDateTime.value = dateTime
+  showSlotActionPicker.value = true
+}
+
+function slotActionBookAppointment() {
+  showSlotActionPicker.value = false
+  prefillDateTime.value = slotActionDateTime.value
+  showBookingWizard.value = true
+}
+
+function slotActionAddBlock() {
+  showSlotActionPicker.value = false
+  prefillDateTime.value = slotActionDateTime.value
+  editingBlock.value = null
+  showBlockForm.value = true
+}
+
+function formatSlotTime(iso: string | null): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  })
+}
+
+// Restore scroll position after dialog closes
+watch(showBookingWizard, (open) => { if (!open) restoreScroll() })
+watch(showDetailSheet, (open) => { if (!open) restoreScroll() })
+watch(showSlotActionPicker, (open) => { if (!open) restoreScroll() })
+watch(showBlockForm, (open) => { if (!open) restoreScroll() })
+
+async function handleAppointmentClick(id: string) {
+  saveScroll()
+  try {
+    const res = await appointmentApi.get(id)
+    selectedAppointment.value = res.data
+    showDetailSheet.value = true
+  } catch {
+    toast.error('Failed to load appointment')
+  }
+}
+
+function handleAppointmentUpdated() {
+  if (calendarRange.start) {
+    loadAppointmentsForRange(calendarRange.start, calendarRange.end)
+  }
+}
+
+function handleAppointmentCreated() {
+  handleAppointmentUpdated()
+}
 
 // --- Working Hours ---
 async function loadSchedule() {
@@ -252,8 +338,30 @@ function onTabChange(tab: string) {
   if (tab === 'availability') loadAvailability()
 }
 
+// Real-time appointment updates
+const appointmentChannel = computed(() => {
+  const clinicId = authStore.currentClinic?.id
+  return clinicId ? `clinic:${clinicId}:appointments` : null
+})
+
+function onAppointmentEvent() {
+  if (calendarRange.start) {
+    loadAppointmentsForRange(calendarRange.start, calendarRange.end)
+  }
+}
+
 onMounted(() => {
   loadSchedule()
+  if (appointmentChannel.value) {
+    connect()
+    subscribe(appointmentChannel.value, onAppointmentEvent)
+  }
+})
+
+onUnmounted(() => {
+  if (appointmentChannel.value) {
+    getSubscription(appointmentChannel.value)?.removeListener('publication', onAppointmentEvent)
+  }
 })
 </script>
 
@@ -286,7 +394,7 @@ onMounted(() => {
     </div>
 
     <!-- Right panel -->
-    <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-8">
+    <div ref="scrollContainerRef" class="flex flex-1 flex-col overflow-y-auto p-4 md:p-8">
       <Tabs default-value="calendar" @update:model-value="onTabChange(String($event))">
         <div class="mb-6 flex flex-wrap items-center gap-3">
           <TabsList class="w-full justify-start sm:w-auto">
@@ -311,6 +419,9 @@ onMounted(() => {
             :is-loading="store.isLoadingSchedule"
             @date-range-change="handleCalendarDateRange"
             @block-click="handleCalendarBlockClick"
+            @slot-select="handleSlotSelect"
+            @appointment-click="handleAppointmentClick"
+            @appointment-updated="handleAppointmentUpdated"
           />
         </TabsContent>
 
@@ -432,7 +543,8 @@ onMounted(() => {
     :is-saving="isSavingBlock"
     :user-id="userId"
     :timezone="scheduleTimezone"
-    @update:open="showBlockForm = $event"
+    :prefill-date-time="prefillDateTime"
+    @update:open="(val) => { showBlockForm = val; if (!val) prefillDateTime = null }"
     @save="handleBlockSave"
   />
 
@@ -455,5 +567,60 @@ onMounted(() => {
       </DialogFooter>
     </DialogContent>
   </Dialog>
+  <!-- Booking wizard (doctor pre-selected) -->
+  <AppointmentBookingWizard
+    :open="showBookingWizard"
+    :prefill-date-time="prefillDateTime"
+    :prefill-doctor-id="userId"
+    :prefill-doctor-name="authStore.user?.name ?? ''"
+    @update:open="(val) => { showBookingWizard = val; if (!val) prefillDateTime = null }"
+    @created="handleAppointmentCreated"
+  />
+
+  <!-- Slot action picker -->
+  <Dialog v-model:open="showSlotActionPicker">
+    <DialogContent class="sm:max-w-xs" @close-auto-focus.prevent>
+      <DialogHeader>
+        <DialogTitle class="text-sm">What would you like to create?</DialogTitle>
+        <p v-if="slotActionDateTime" class="text-xs text-muted-foreground">
+          {{ formatSlotTime(slotActionDateTime) }}
+        </p>
+      </DialogHeader>
+      <div class="flex flex-col gap-2">
+        <button
+          class="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+          @click="slotActionBookAppointment"
+        >
+          <div class="flex size-8 items-center justify-center rounded-full bg-primary/10">
+            <CalendarCheck class="size-4 text-primary" />
+          </div>
+          <div>
+            <p class="text-sm font-medium">Book Appointment</p>
+            <p class="text-xs text-muted-foreground">Schedule a patient visit</p>
+          </div>
+        </button>
+        <button
+          class="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+          @click="slotActionAddBlock"
+        >
+          <div class="flex size-8 items-center justify-center rounded-full bg-amber-500/10">
+            <CalendarX class="size-4 text-amber-600" />
+          </div>
+          <div>
+            <p class="text-sm font-medium">Add Time Block</p>
+            <p class="text-xs text-muted-foreground">Leave, meeting, or unavailable</p>
+          </div>
+        </button>
+      </div>
+    </DialogContent>
+  </Dialog>
+
+  <!-- Appointment detail sheet -->
+  <AppointmentDetailSheet
+    :open="showDetailSheet"
+    :appointment="selectedAppointment"
+    :can-manage="true"
+    @update:open="showDetailSheet = $event"
+  />
   </FeatureGate>
 </template>

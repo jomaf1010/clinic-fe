@@ -73,11 +73,32 @@ function formatDateTime(iso: string | null): string {
     hour12: true,
   })
 }
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+const endTimeIso = computed(() => {
+  if (!props.appointment) return null
+  const start = new Date(props.appointment.scheduled_at).getTime()
+  return new Date(start + props.appointment.duration * 60000).toISOString()
+})
+
+const durationLabel = computed(() => {
+  if (!props.appointment) return ''
+  const min = props.appointment.duration
+  if (min >= 60) {
+    const h = Math.floor(min / 60)
+    const m = min % 60
+    return m ? `${h}h ${m}m` : `${h}h`
+  }
+  return `${min}m`
+})
 </script>
 
 <template>
   <Dialog :open="open" @update:open="(val) => emit('update:open', val)">
-    <DialogContent class="sm:max-w-md">
+    <DialogContent class="sm:max-w-md" @close-auto-focus.prevent>
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <CalendarCheck class="size-5 text-primary" />
@@ -88,7 +109,6 @@ function formatDateTime(iso: string | null): string {
       <div v-if="appointment" class="flex flex-col gap-4">
         <div class="flex items-center justify-between">
           <AppointmentStatusBadge :status="appointment.status" />
-          <span class="text-xs text-muted-foreground">{{ appointment.duration }}min</span>
         </div>
 
         <Separator />
@@ -113,9 +133,11 @@ function formatDateTime(iso: string | null): string {
             <div>
               <p class="text-xs text-muted-foreground">Scheduled</p>
               <p class="font-medium">
-                {{ formatDateTime(appointment.scheduled_at) }}
+                {{ formatTime(appointment.scheduled_at) }} — {{ endTimeIso ? formatTime(endTimeIso) : '—' }}
+                <span class="text-xs text-muted-foreground">({{ durationLabel }})</span>
                 <span v-if="relativeTime" class="text-xs font-medium text-primary">&middot; {{ relativeTime }}</span>
               </p>
+              <p class="text-xs text-muted-foreground">{{ formatDateTime(appointment.scheduled_at) }}</p>
             </div>
           </div>
           <div v-if="appointment.reason" class="flex items-start gap-2">

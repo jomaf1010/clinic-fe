@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { toast } from 'vue-sonner'
 import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date'
-import { AlertTriangle, CalendarCheck, CalendarIcon, ClipboardPlus, LoaderCircle, Plus, X } from 'lucide-vue-next'
+import { AlertTriangle, CalendarCheck, CalendarIcon, ClipboardPlus, List, LoaderCircle, Plus, X } from 'lucide-vue-next'
 import { RouteNames } from '@/router/routeNames'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,22 +34,54 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useCentrifugo } from '@/composables/useCentrifugo'
+import { appointmentApi } from '../api/appointmentApi'
 import { useAppointmentStore } from '../stores/appointmentStore'
 import AppointmentBookingWizard from '../components/AppointmentBookingWizard.vue'
+import AppointmentCalendar from '../components/AppointmentCalendar.vue'
 import AppointmentCard from '../components/AppointmentCard.vue'
 import AppointmentDetailSheet from '../components/AppointmentDetailSheet.vue'
-import type { AppointmentListFilters, AppointmentResponse } from '../types/appointment.types'
+import type { AppointmentResponse } from '../types/appointment.types'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const store = useAppointmentStore()
+const { connect, subscribe, getSubscription } = useCentrifugo()
 
+const viewMode = ref<'list' | 'calendar'>('calendar')
 const showBookingWizard = ref(false)
+const prefillDateTime = ref<string | null>(null)
 const showDetailSheet = ref(false)
 const selectedAppointment = ref<AppointmentResponse | null>(null)
 const currentPage = ref(Number(route.query.page) || 1)
 const error = ref<string | null>(null)
+
+const calendarRef = ref<InstanceType<typeof AppointmentCalendar> | null>(null)
+
+let savedScrollY = 0
+
+function onCalendarSlotSelect(dateTime: string) {
+  savedScrollY = window.scrollY
+  prefillDateTime.value = dateTime
+  showBookingWizard.value = true
+}
+
+async function onCalendarAppointmentClick(id: string) {
+  savedScrollY = window.scrollY
+  try {
+    const res = await appointmentApi.get(id)
+    selectedAppointment.value = res.data
+    showDetailSheet.value = true
+  } catch {
+    // Fallback to cached data
+    const appt = calendarRef.value?.getAppointment(id)
+    if (appt) {
+      selectedAppointment.value = appt
+      showDetailSheet.value = true
+    }
+  }
+}
 
 // Filters
 const statusFilter = ref<string>((route.query.status as string) || 'all')
@@ -270,7 +302,39 @@ function onCreated() {
 
 watch(currentPage, () => fetchData())
 
-onMounted(() => fetchData())
+// Restore scroll position after dialogs close
+watch(showBookingWizard, (open) => {
+  if (!open) nextTick(() => window.scrollTo(0, savedScrollY))
+})
+watch(showDetailSheet, (open) => {
+  if (!open) nextTick(() => window.scrollTo(0, savedScrollY))
+})
+
+const appointmentChannel = computed(() => {
+  const clinicId = authStore.currentClinic?.id
+  return clinicId ? `clinic:${clinicId}:appointments` : null
+})
+
+function onAppointmentEvent() {
+  // Refresh both list and calendar
+  fetchData()
+  calendarRef.value?.refetch()
+}
+
+onMounted(() => {
+  fetchData()
+  if (appointmentChannel.value) {
+    connect()
+    subscribe(appointmentChannel.value, onAppointmentEvent)
+  }
+})
+
+onUnmounted(() => {
+  if (appointmentChannel.value) {
+    const sub = getSubscription(appointmentChannel.value)
+    sub?.removeListener('publication', onAppointmentEvent)
+  }
+})
 </script>
 
 <template>
@@ -284,8 +348,8 @@ onMounted(() => fetchData())
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <!-- Range quick filters -->
-        <div class="flex h-8 items-center rounded-md border text-xs">
+        <!-- Range quick filters (list view only) -->
+        <div v-if="viewMode === 'list'" class="flex h-8 items-center rounded-md border text-xs">
           <button
             v-for="opt in [
               { value: 'today', label: 'Today' },
@@ -308,8 +372,8 @@ onMounted(() => fetchData())
           </button>
         </div>
 
-        <!-- Date picker -->
-        <div class="flex items-center gap-1">
+        <!-- Date picker (list view only) -->
+        <div v-if="viewMode === 'list'" class="flex items-center gap-1">
           <Popover>
             <PopoverTrigger as-child>
               <Button
@@ -355,88 +419,119 @@ onMounted(() => fetchData())
           </SelectContent>
         </Select>
 
-        <Button size="sm" class="h-8" @click="showBookingWizard = true">
+        <!-- View toggle -->
+        <div class="flex h-8 items-center rounded-md border">
+          <button
+            :class="['flex h-full items-center gap-1 rounded-l-md px-2.5 text-xs font-medium transition-colors', viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
+            @click="viewMode = 'list'"
+          >
+            <List class="size-3.5" />
+            List
+          </button>
+          <button
+            :class="['flex h-full items-center gap-1 rounded-r-md px-2.5 text-xs font-medium transition-colors', viewMode === 'calendar' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
+            @click="viewMode = 'calendar'"
+          >
+            <CalendarCheck class="size-3.5" />
+            Calendar
+          </button>
+        </div>
+
+        <Button size="sm" class="h-8" @click="prefillDateTime = null; showBookingWizard = true">
           <Plus class="size-3.5" />
           <span class="hidden sm:inline">Book</span>
         </Button>
       </div>
     </div>
 
-    <!-- Loading -->
-    <div v-if="store.isLoading" class="flex items-center justify-center py-12">
-      <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
-    </div>
-
-    <!-- Error -->
-    <div
-      v-else-if="error"
-      role="alert"
-      class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-    >
-      {{ error }}
-      <Button variant="outline" size="sm" class="mt-2" @click="fetchData">
-        Try again
-      </Button>
-    </div>
-
-    <!-- Empty state -->
-    <div
-      v-else-if="store.appointments.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-center"
-    >
-      <div class="mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
-        <CalendarCheck class="size-6 text-primary" />
-      </div>
-      <p class="text-sm font-medium">No appointments found</p>
-      <p class="mt-1 text-xs text-muted-foreground">
-        {{ activeRange === 'upcoming' ? 'No upcoming appointments' : 'No appointments match your filters' }}
-      </p>
-      <Button size="sm" class="mt-4" @click="showBookingWizard = true">
-        <Plus class="size-3.5" />
-        Book Appointment
-      </Button>
-    </div>
-
-    <!-- List -->
-    <div v-else class="flex flex-col gap-2">
-      <AppointmentCard
-        v-for="appt in store.appointments"
-        :key="appt.id"
-        :appointment="appt"
-        :can-manage="authStore.hasPermission('appointments.manage')"
-        @click="openDetail"
-        @check-in="handleCheckIn"
-        @cancel="handleCancel"
-        @no-show="handleNoShow"
+    <!-- Calendar View -->
+    <template v-if="viewMode === 'calendar'">
+      <AppointmentCalendar
+        ref="calendarRef"
+        :status-filter="statusFilter"
+        @appointment-click="onCalendarAppointmentClick"
+        @slot-select="onCalendarSlotSelect"
       />
-    </div>
+    </template>
 
-    <!-- Pagination -->
-    <div v-if="store.pagination.last_page > 1" class="flex justify-center">
-      <Pagination
-        :total="store.pagination.total"
-        :items-per-page="store.pagination.per_page"
-        :page="currentPage"
-        :sibling-count="1"
-        :show-edges="true"
-        @update:page="goToPage"
+    <!-- List View -->
+    <template v-else>
+      <!-- Loading -->
+      <div v-if="store.isLoading" class="flex items-center justify-center py-12">
+        <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
+      </div>
+
+      <!-- Error -->
+      <div
+        v-else-if="error"
+        role="alert"
+        class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
       >
-        <PaginationContent v-slot="{ items }">
-          <PaginationPrevious />
-          <template v-for="(item, index) in items" :key="item.type === 'page' ? item.value : `ellipsis-${index}`">
-            <PaginationItem
-              v-if="item.type === 'page'"
-              :value="item.value"
-              :is-active="item.value === currentPage"
-            >
-              {{ item.value }}
-            </PaginationItem>
-            <PaginationEllipsis v-else :index="index" />
-          </template>
-          <PaginationNext />
-        </PaginationContent>
-      </Pagination>
-    </div>
+        {{ error }}
+        <Button variant="outline" size="sm" class="mt-2" @click="fetchData">
+          Try again
+        </Button>
+      </div>
+
+      <!-- Empty state -->
+      <div
+        v-else-if="store.appointments.length === 0"
+        class="flex flex-col items-center justify-center py-16 text-center"
+      >
+        <div class="mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
+          <CalendarCheck class="size-6 text-primary" />
+        </div>
+        <p class="text-sm font-medium">No appointments found</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          {{ activeRange === 'upcoming' ? 'No upcoming appointments' : 'No appointments match your filters' }}
+        </p>
+        <Button size="sm" class="mt-4" @click="prefillDateTime = null; showBookingWizard = true">
+          <Plus class="size-3.5" />
+          Book Appointment
+        </Button>
+      </div>
+
+      <!-- List -->
+      <div v-else class="flex flex-col gap-2">
+        <AppointmentCard
+          v-for="appt in store.appointments"
+          :key="appt.id"
+          :appointment="appt"
+          :can-manage="authStore.hasPermission('appointments.manage')"
+          @click="openDetail"
+          @check-in="handleCheckIn"
+          @cancel="handleCancel"
+          @no-show="handleNoShow"
+        />
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="store.pagination.last_page > 1" class="flex justify-center">
+        <Pagination
+          :total="store.pagination.total"
+          :items-per-page="store.pagination.per_page"
+          :page="currentPage"
+          :sibling-count="1"
+          :show-edges="true"
+          @update:page="goToPage"
+        >
+          <PaginationContent v-slot="{ items }">
+            <PaginationPrevious />
+            <template v-for="(item, index) in items" :key="item.type === 'page' ? item.value : `ellipsis-${index}`">
+              <PaginationItem
+                v-if="item.type === 'page'"
+                :value="item.value"
+                :is-active="item.value === currentPage"
+              >
+                {{ item.value }}
+              </PaginationItem>
+              <PaginationEllipsis v-else :index="index" />
+            </template>
+            <PaginationNext />
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </template>
 
     <!-- Detail modal -->
     <AppointmentDetailSheet
@@ -452,7 +547,8 @@ onMounted(() => fetchData())
     <!-- Booking wizard -->
     <AppointmentBookingWizard
       :open="showBookingWizard"
-      @update:open="showBookingWizard = $event"
+      :prefill-date-time="prefillDateTime"
+      @update:open="(val) => { showBookingWizard = val; if (!val) prefillDateTime = null }"
       @created="onCreated"
     />
 

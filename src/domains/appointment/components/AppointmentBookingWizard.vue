@@ -30,6 +30,9 @@ import type { ClinicDoctor } from '../types/appointment.types'
 
 const props = defineProps<{
   open: boolean
+  prefillDateTime?: string | null // ISO datetime from calendar click
+  prefillDoctorId?: string | null // pre-select doctor (skip step 1)
+  prefillDoctorName?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -40,7 +43,7 @@ const emit = defineEmits<{
 const appointmentStore = useAppointmentStore()
 
 const step = ref(1)
-const totalSteps = 4
+const totalSteps = computed(() => hasPrefillDoctor.value ? 3 : 4)
 
 // Step 1: Doctor
 const doctorId = ref<string | null>(null)
@@ -50,6 +53,7 @@ const isLoadingDoctors = ref(false)
 
 // Step 2: Date/Slot
 const selectedSlot = ref<string | null>(null)
+const selectedDuration = ref<number | null>(null)
 
 // Step 3: Patient
 const patientId = ref<string | null>(null)
@@ -60,6 +64,16 @@ const reason = ref('')
 const notes = ref('')
 
 const generalError = ref<string | null>(null)
+
+// Prefill helpers — extract date and ISO from prefillDateTime
+const prefillDate = computed(() => {
+  if (!props.prefillDateTime) return undefined
+  const d = new Date(props.prefillDateTime)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+})
 
 async function loadDoctors() {
   isLoadingDoctors.value = true
@@ -98,11 +112,12 @@ const canNext = computed(() => {
 })
 
 function next() {
-  if (step.value < totalSteps && canNext.value) step.value++
+  if (step.value < totalSteps.value && canNext.value) step.value++
 }
 
 function prev() {
-  if (step.value > 1) step.value--
+  const minStep = hasPrefillDoctor.value ? 2 : 1
+  if (step.value > minStep) step.value--
 }
 
 async function submit() {
@@ -114,6 +129,7 @@ async function submit() {
       patient_id: patientId.value,
       doctor_id: doctorId.value,
       scheduled_at: selectedSlot.value,
+      duration: selectedDuration.value ?? undefined,
       reason: reason.value || undefined,
       notes: notes.value || undefined,
     })
@@ -131,11 +147,22 @@ async function submit() {
   }
 }
 
+const hasPrefillDoctor = computed(() => !!props.prefillDoctorId)
+const displayStep = computed(() => hasPrefillDoctor.value ? step.value - 1 : step.value)
+
 function reset() {
-  step.value = 1
-  doctorId.value = null
-  doctorName.value = ''
+  if (props.prefillDoctorId) {
+    // Skip doctor step — start at date/slot
+    step.value = 2
+    doctorId.value = props.prefillDoctorId
+    doctorName.value = props.prefillDoctorName ?? ''
+  } else {
+    step.value = 1
+    doctorId.value = null
+    doctorName.value = ''
+  }
   selectedSlot.value = null
+  selectedDuration.value = null
   patientId.value = null
   patientName.value = ''
   reason.value = ''
@@ -148,7 +175,7 @@ watch(
   (open) => {
     if (open) {
       reset()
-      loadDoctors()
+      if (!props.prefillDoctorId) loadDoctors()
     }
   },
 )
@@ -184,7 +211,7 @@ function formatSlotTime(iso: string | null): string {
 
 <template>
   <Dialog :open="open" @update:open="(val) => emit('update:open', val)">
-    <DialogContent class="max-h-[85vh] sm:max-w-lg" :class="step === 3 ? 'overflow-visible' : 'overflow-y-auto'">
+    <DialogContent class="max-h-[85vh] sm:max-w-lg" :class="step === 3 ? 'overflow-visible' : 'overflow-y-auto'" @close-auto-focus.prevent>
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <CalendarCheck class="size-5 text-primary" />
@@ -194,12 +221,16 @@ function formatSlotTime(iso: string | null): string {
           <div
             v-for="s in totalSteps"
             :key="s"
-            :class="['h-1 flex-1 rounded-full', s <= step ? 'bg-primary' : 'bg-muted']"
+            :class="['h-1 flex-1 rounded-full', s <= displayStep ? 'bg-primary' : 'bg-muted']"
           />
         </div>
         <p class="text-sm text-muted-foreground">
-          Step {{ step }} of {{ totalSteps }}: {{ stepTitle }}
+          Step {{ displayStep }} of {{ totalSteps }}: {{ stepTitle }}
         </p>
+        <div v-if="prefillDateTime" class="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-primary">
+          <CalendarCheck class="size-3.5" />
+          {{ formatSlotTime(prefillDateTime) }}
+        </div>
       </DialogHeader>
 
       <div
@@ -240,7 +271,13 @@ function formatSlotTime(iso: string | null): string {
 
       <!-- Step 2: Date/Slot -->
       <div v-if="step === 2">
-        <DateSlotPicker v-model="selectedSlot" :doctor-id="doctorId" />
+        <DateSlotPicker
+          v-model="selectedSlot"
+          v-model:duration="selectedDuration"
+          :doctor-id="doctorId"
+          :initial-date="prefillDate"
+          :auto-select-time="prefillDateTime ?? undefined"
+        />
       </div>
 
       <!-- Step 3: Patient -->
@@ -264,6 +301,12 @@ function formatSlotTime(iso: string | null): string {
               <span class="text-muted-foreground">Date & Time</span>
               <span class="font-medium">{{ formatSlotTime(selectedSlot) }}</span>
             </div>
+            <div v-if="selectedDuration" class="flex justify-between">
+              <span class="text-muted-foreground">Duration</span>
+              <span class="font-medium">
+                {{ selectedDuration >= 60 ? `${Math.floor(selectedDuration / 60)}h${selectedDuration % 60 ? ` ${selectedDuration % 60}m` : ''}` : `${selectedDuration}m` }}
+              </span>
+            </div>
             <div class="flex justify-between">
               <span class="text-muted-foreground">Patient</span>
               <span class="font-medium">{{ patientName }}</span>
@@ -281,7 +324,7 @@ function formatSlotTime(iso: string | null): string {
       </div>
 
       <DialogFooter class="flex-row gap-2">
-        <Button v-if="step > 1" variant="outline" @click="prev">
+        <Button v-if="step > (hasPrefillDoctor ? 2 : 1)" variant="outline" @click="prev">
           <ChevronLeft class="size-4" />
           Back
         </Button>

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { toast } from 'vue-sonner'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import type { CalendarOptions, EventInput, DatesSetArg } from '@fullcalendar/core'
+import type { CalendarOptions, EventInput, DatesSetArg, EventDropArg, EventResizeDoneArg } from '@fullcalendar/core'
+import { HttpError } from '@/lib/http'
+import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import type { CalendarBlock, WorkingSchedule } from '../types/schedule.types'
 import type { AppointmentResponse } from '@/domains/appointment/types/appointment.types'
 
@@ -37,6 +40,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   'date-range-change': [start: string, end: string]
   'block-click': [block: CalendarBlock]
+  'appointment-click': [id: string]
+  'slot-select': [dateTime: string]
+  'appointment-updated': []
 }>()
 
 const calendarRef = ref<InstanceType<typeof FullCalendar> | null>(null)
@@ -50,7 +56,6 @@ const calendarEvents = computed<EventInput[]>(() => {
     for (const day of props.schedule.days) {
       if (!day.enabled) continue
 
-      // FullCalendar daysOfWeek: 0=Sunday..6=Saturday (matches our data)
       events.push({
         id: `working-${day.day}`,
         title: 'Working Hours',
@@ -62,7 +67,6 @@ const calendarEvents = computed<EventInput[]>(() => {
         borderColor: WORKING_HOURS_COLOR.border,
       })
 
-      // Breaks as foreground events
       for (const brk of day.breaks) {
         events.push({
           id: `break-${day.day}-${brk.start_time}`,
@@ -73,25 +77,22 @@ const calendarEvents = computed<EventInput[]>(() => {
           backgroundColor: BREAK_COLOR.bg,
           borderColor: BREAK_COLOR.border,
           textColor: BREAK_COLOR.text,
-          extendedProps: { type: 'break' },
+          extendedProps: { type: 'break', label: brk.label || 'Break' },
         })
       }
     }
   }
 
-  // Calendar blocks as concrete events
+  // Calendar blocks
   for (const block of props.blocks) {
     const colors = BLOCK_TYPE_COLORS[block.type] ?? BLOCK_TYPE_COLORS.unavailable
     const tz = props.schedule?.timezone ?? 'Asia/Manila'
 
     if (block.recurring && !block.all_day) {
-      // Recurring: create one event per day with the time portion
       const startLocal = new Date(block.start)
       const endLocal = new Date(block.end)
       const startTimeStr = startLocal.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false })
       const endTimeStr = endLocal.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false })
-
-      // Iterate each day in the range
       const startDate = new Date(startLocal.toLocaleDateString('en-CA', { timeZone: tz }))
       const endDate = new Date(endLocal.toLocaleDateString('en-CA', { timeZone: tz }))
       const current = new Date(startDate)
@@ -104,34 +105,36 @@ const calendarEvents = computed<EventInput[]>(() => {
           start: `${dateStr}T${startTimeStr}`,
           end: `${dateStr}T${endTimeStr}`,
           allDay: false,
+          editable: false,
           backgroundColor: colors.bg,
           borderColor: colors.border,
           textColor: colors.text,
-          extendedProps: { type: 'block', blockId: block.id },
+          extendedProps: { type: 'block', blockId: block.id, blockType: block.type, blockTitle: block.title },
         })
         current.setDate(current.getDate() + 1)
       }
     } else {
-      // Span or all-day: single continuous event
       events.push({
         id: `block-${block.id}`,
         title: block.title,
         start: block.start,
         end: block.end,
         allDay: block.all_day,
+        editable: false,
         backgroundColor: colors.bg,
         borderColor: colors.border,
         textColor: colors.text,
-        extendedProps: { type: 'block', blockId: block.id },
+        extendedProps: { type: 'block', blockId: block.id, blockType: block.type, blockTitle: block.title },
       })
     }
   }
 
-  // Appointments as foreground events
+  // Appointments
   for (const appt of props.appointments) {
     const colors = APPOINTMENT_COLORS[appt.status] ?? APPOINTMENT_COLORS.scheduled
     const startDate = new Date(appt.scheduled_at)
     const endDate = new Date(startDate.getTime() + appt.duration * 60000)
+    const canDrag = appt.status === 'scheduled' && startDate.getTime() > Date.now()
 
     const statusLabel = appt.status === 'checked_in' ? 'Checked In'
       : appt.status === 'no_show' ? 'No Show'
@@ -143,17 +146,43 @@ const calendarEvents = computed<EventInput[]>(() => {
       start: startDate.toISOString(),
       end: endDate.toISOString(),
       allDay: false,
+      editable: canDrag,
+      durationEditable: canDrag,
       backgroundColor: colors.bg,
       borderColor: colors.border,
       textColor: colors.text,
-      extendedProps: { type: 'appointment', appointmentId: appt.id },
+      extendedProps: {
+        type: 'appointment',
+        appointmentId: appt.id,
+        patientName: appt.patient_name ?? 'Patient',
+        statusLabel,
+        duration: appt.duration,
+      },
     })
   }
 
   return events
 })
 
-// Build businessHours from schedule
+// Derive visible time range from working hours
+const slotMinTime = computed(() => {
+  if (!props.schedule) return '06:00:00'
+  const times = props.schedule.days.filter(d => d.enabled).map(d => d.start_time)
+  if (!times.length) return '06:00:00'
+  times.sort()
+  const [h] = times[0].split(':').map(Number)
+  return `${String(Math.max(0, h - 1)).padStart(2, '0')}:00:00`
+})
+
+const slotMaxTime = computed(() => {
+  if (!props.schedule) return '22:00:00'
+  const times = props.schedule.days.filter(d => d.enabled).map(d => d.end_time)
+  if (!times.length) return '22:00:00'
+  times.sort()
+  const [h] = times[times.length - 1].split(':').map(Number)
+  return `${String(Math.min(24, h + 1)).padStart(2, '0')}:00:00`
+})
+
 const businessHours = computed(() => {
   if (!props.schedule) return false
   return props.schedule.days
@@ -172,25 +201,130 @@ function handleDatesSet(info: DatesSetArg) {
 }
 
 function goToDate(dateStr: string) {
-  const api = calendarRef.value?.getApi()
-  if (api) {
-    api.gotoDate(dateStr)
-  }
+  calendarRef.value?.getApi()?.gotoDate(dateStr)
 }
 
 defineExpose({ goToDate })
 
+function handleDateClick(info: { date: Date; allDay: boolean }) {
+  if (info.allDay) return
+  if (info.date.getTime() < Date.now()) return
+  emit('slot-select', info.date.toISOString())
+}
+
 function handleEventClick(info: { event: { extendedProps: Record<string, unknown> } }) {
-  if (info.event.extendedProps.type === 'block') {
-    const blockId = info.event.extendedProps.blockId as string
+  const ep = info.event.extendedProps
+  if (ep.type === 'block') {
+    const blockId = ep.blockId as string
     const block = props.blocks.find((b) => b.id === blockId)
     if (block) emit('block-click', block)
+  } else if (ep.type === 'appointment') {
+    emit('appointment-click', ep.appointmentId as string)
+  }
+}
+
+async function handleEventDrop(info: EventDropArg) {
+  const apptId = info.event.extendedProps.appointmentId as string
+  const newStart = info.event.start
+  if (!apptId || !newStart) { info.revert(); return }
+
+  if (newStart.getTime() < Date.now()) {
+    info.revert()
+    toast.error('Cannot reschedule to a past time')
+    return
+  }
+
+  try {
+    await appointmentApi.reschedule(apptId, newStart.toISOString())
+    toast.success('Appointment rescheduled')
+    emit('appointment-updated')
+  } catch (err) {
+    info.revert()
+    const msg = err instanceof HttpError && (err.data as { errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0]
+      ? (err.data as { errors: Record<string, string[]> }).errors.scheduled_at[0]
+      : 'Failed to reschedule — slot may not be available'
+    toast.error(msg)
+  }
+}
+
+async function handleEventResize(info: EventResizeDoneArg) {
+  const apptId = info.event.extendedProps.appointmentId as string
+  const start = info.event.start
+  const end = info.event.end
+  if (!apptId || !start || !end) { info.revert(); return }
+
+  const durationMin = Math.round((end.getTime() - start.getTime()) / 60000)
+  if (durationMin < 1) { info.revert(); return }
+
+  try {
+    await appointmentApi.resize(apptId, durationMin)
+    toast.success('Appointment duration updated')
+    emit('appointment-updated')
+  } catch (err) {
+    info.revert()
+    const msg = err instanceof HttpError && (err.data as { errors?: Record<string, string[]> })?.errors?.duration?.[0]
+      ? (err.data as { errors: Record<string, string[]> }).errors.duration[0]
+      : 'Failed to resize — slots may not be available'
+    toast.error(msg)
+  }
+}
+
+const BLOCK_TYPE_LABELS: Record<string, string> = {
+  leave: 'Leave',
+  meeting: 'Meeting',
+  holiday: 'Holiday',
+  personal: 'Personal',
+  unavailable: 'Unavailable',
+}
+
+function renderEventContent(arg: { event: { extendedProps: Record<string, unknown> }; timeText: string }) {
+  const ep = arg.event.extendedProps
+
+  if (ep.type === 'break') {
+    const label = ep.label as string
+    return {
+      html: `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.3;padding:1px 0;opacity:0.85;">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">${label}</div>
+      </div>`,
+    }
+  }
+
+  if (ep.type === 'block') {
+    const title = ep.blockTitle as string
+    const typeLabel = BLOCK_TYPE_LABELS[ep.blockType as string] ?? (ep.blockType as string)
+    return {
+      html: `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.3;padding:1px 0;opacity:0.85;">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">${title}</div>
+        <div style="opacity:0.75;font-size:0.65rem;overflow:hidden;text-overflow:ellipsis;">${typeLabel}</div>
+      </div>`,
+    }
+  }
+
+  if (ep.type !== 'appointment') return undefined
+
+  const patient = ep.patientName as string
+  const status = ep.statusLabel as string
+  const duration = ep.duration as number
+
+  if (duration <= 20) {
+    return {
+      html: `<div style="display:flex;align-items:center;gap:3px;overflow:hidden;padding:0;">
+        <span style="font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:0.65rem;line-height:1;">${patient}</span>
+      </div>`,
+    }
+  }
+
+  return {
+    html: `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.3;padding:1px 0;">
+      <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;">${patient}</div>
+      <div style="opacity:0.75;font-size:0.65rem;overflow:hidden;text-overflow:ellipsis;">${status}</div>
+    </div>`,
   }
 }
 
 const calendarOptions = computed<CalendarOptions>(() => ({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
-  initialView: 'timeGridDay',
+  initialView: 'dayGridMonth',
   headerToolbar: {
     left: 'prev,next today',
     center: 'title',
@@ -199,18 +333,22 @@ const calendarOptions = computed<CalendarOptions>(() => ({
   events: calendarEvents.value,
   businessHours: businessHours.value,
   nowIndicator: true,
-  editable: false,
-  selectable: false,
-  slotMinTime: '06:00:00',
-  slotMaxTime: '22:00:00',
-  slotDuration: props.schedule ? `00:${String(props.schedule.slot_duration).padStart(2, '0')}:00` : '00:30:00',
+  editable: true,
+  slotMinTime: slotMinTime.value,
+  slotMaxTime: slotMaxTime.value,
+  slotDuration: '00:15:00',
   allDaySlot: true,
   weekends: true,
   dayMaxEvents: true,
   height: 'auto',
   datesSet: handleDatesSet,
+  dateClick: handleDateClick,
   eventClick: handleEventClick,
+  eventDrop: handleEventDrop,
+  eventResize: handleEventResize,
+  eventContent: renderEventContent,
   eventDisplay: 'block',
+  dragRevertDuration: 300,
 }))
 </script>
 
@@ -250,9 +388,10 @@ const calendarOptions = computed<CalendarOptions>(() => ({
           <div class="size-3 rounded border" :style="{ backgroundColor: BLOCK_TYPE_COLORS.unavailable.bg, borderColor: BLOCK_TYPE_COLORS.unavailable.border }" />
           Unavailable
         </div>
-        <div class="flex items-center gap-1.5">
-          <div class="size-3 rounded border" :style="{ backgroundColor: APPOINTMENT_COLORS.scheduled.bg, borderColor: APPOINTMENT_COLORS.scheduled.border }" />
-          Appointment
+        <span class="text-border">|</span>
+        <div v-for="(colors, status) in APPOINTMENT_COLORS" :key="status" class="flex items-center gap-1.5">
+          <div class="size-3 rounded border" :style="{ backgroundColor: colors.bg, borderColor: colors.border }" />
+          {{ status === 'checked_in' ? 'Checked In' : status === 'no_show' ? 'No Show' : status.charAt(0).toUpperCase() + status.slice(1) }}
         </div>
       </div>
 
@@ -262,7 +401,6 @@ const calendarOptions = computed<CalendarOptions>(() => ({
 </template>
 
 <style>
-/* FullCalendar theme overrides to match app design system */
 .schedule-calendar .fc {
   --fc-border-color: var(--border);
   --fc-today-bg-color: oklch(0.97 0.005 253.827 / 0.3);
@@ -313,7 +451,7 @@ const calendarOptions = computed<CalendarOptions>(() => ({
 }
 
 .schedule-calendar .fc .fc-timegrid-slot {
-  height: 2.5rem;
+  height: 1.25rem;
 }
 
 .schedule-calendar .fc .fc-timegrid-slot-label {
@@ -327,10 +465,6 @@ const calendarOptions = computed<CalendarOptions>(() => ({
   padding: 1px 4px;
   border-width: 1px;
   border-left-width: 3px;
-  cursor: default;
-}
-
-.schedule-calendar .fc .fc-event[data-event-type='block'] {
   cursor: pointer;
 }
 
@@ -341,7 +475,26 @@ const calendarOptions = computed<CalendarOptions>(() => ({
 
 .schedule-calendar .fc .fc-day-today .fc-daygrid-day-number {
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: 9999px;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schedule-calendar .fc .fc-day-past {
+  background: oklch(0.96 0 0 / 0.4);
+}
+
+.schedule-calendar .fc .fc-day-past .fc-daygrid-day-number {
+  opacity: 0.4;
+}
+
+.schedule-calendar .fc .fc-day-past .fc-daygrid-event {
+  opacity: 0.5;
 }
 
 .schedule-calendar .fc .fc-scrollgrid {
@@ -349,13 +502,16 @@ const calendarOptions = computed<CalendarOptions>(() => ({
   overflow: hidden;
 }
 
-/* Non-business hours styling */
 .schedule-calendar .fc .fc-non-business {
   background: oklch(0.96 0 0 / 0.5);
 }
 
 .dark .schedule-calendar .fc .fc-non-business {
   background: oklch(0.2 0 0 / 0.3);
+}
+
+.dark .schedule-calendar .fc .fc-day-past {
+  background: oklch(0.15 0 0 / 0.4);
 }
 
 .dark .schedule-calendar .fc {

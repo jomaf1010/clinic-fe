@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { CalendarIcon, Clock, LoaderCircle } from 'lucide-vue-next'
-import { getLocalTimeZone, today } from '@internationalized/date'
+import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -12,22 +12,69 @@ import type { Slot } from '@/domains/schedule/types/schedule.types'
 const props = defineProps<{
   doctorId: string | null
   modelValue: string | null
+  duration?: number | null // total minutes
+  initialDate?: string // ISO date "2026-03-27"
+  autoSelectTime?: string // ISO datetime — auto-select matching slot after load
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | null]
+  'update:duration': [value: number]
 }>()
 
+function parseInitialDate() {
+  if (props.initialDate) {
+    const [y, m, d] = props.initialDate.split('-').map(Number)
+    if (y && m && d) return new CalendarDate(y, m, d)
+  }
+  return today(getLocalTimeZone())
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dateValue = ref<any>(today(getLocalTimeZone()))
+const dateValue = ref<any>(parseInitialDate())
 const slots = ref<Slot[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const slotDuration = ref(30) // minutes, from schedule
+
+// Multi-slot selection: track selected slot indices
+const selectedIndices = ref<Set<number>>(new Set())
 
 const dateLabel = computed(() => {
   const d = dateValue.value
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return `${months[d.month - 1]} ${d.day}, ${d.year}`
+})
+
+const selectionSummary = computed(() => {
+  const count = selectedIndices.value.size
+  if (count === 0) return null
+  const totalMin = count * slotDuration.value
+  const sorted = [...selectedIndices.value].sort((a, b) => a - b)
+  const first = slots.value[sorted[0]]
+  const last = slots.value[sorted[sorted.length - 1]]
+  if (!first || !last) return null
+  return {
+    count,
+    totalMin,
+    startLabel: formatTime(first.start),
+    endLabel: formatTime(last.end),
+    durationLabel: totalMin >= 60
+      ? `${Math.floor(totalMin / 60)}h${totalMin % 60 ? ` ${totalMin % 60}m` : ''}`
+      : `${totalMin}m`,
+  }
+})
+
+// Which indices can be added (adjacent to current selection and available)
+const extendableIndices = computed(() => {
+  const ext = new Set<number>()
+  if (selectedIndices.value.size === 0) return ext
+  const sorted = [...selectedIndices.value].sort((a, b) => a - b)
+  const before = sorted[0] - 1
+  const after = sorted[sorted.length - 1] + 1
+  if (before >= 0 && slots.value[before]?.available) ext.add(before)
+  if (after < slots.value.length && slots.value[after]?.available) ext.add(after)
+  return ext
 })
 
 function dateToIso(d: DateValue): string {
@@ -41,6 +88,17 @@ async function loadAvailability() {
   try {
     const response = await scheduleApi.getAvailability(props.doctorId, dateToIso(dateValue.value))
     slots.value = response.data.slots
+    slotDuration.value = response.data.schedule?.slot_duration ?? 30
+
+    // Auto-select the slot matching the prefill time
+    if (props.autoSelectTime && selectedIndices.value.size === 0) {
+      const targetTs = new Date(props.autoSelectTime).getTime()
+      const idx = slots.value.findIndex(s => s.available && new Date(s.start).getTime() === targetTs)
+      if (idx >= 0) {
+        selectedIndices.value = new Set([idx])
+        emitSelection()
+      }
+    }
   } catch {
     error.value = 'Failed to load availability'
     slots.value = []
@@ -52,13 +110,69 @@ async function loadAvailability() {
 function onDateChange(date: DateValue | undefined) {
   if (!date) return
   dateValue.value = date
-  emit('update:modelValue', null)
+  clearSelection()
   loadAvailability()
 }
 
-function selectSlot(slot: Slot) {
-  if (!slot.available) return
-  emit('update:modelValue', slot.start)
+function selectSlot(index: number) {
+  const slot = slots.value[index]
+  if (!slot?.available) return
+
+  const selected = selectedIndices.value
+
+  if (selected.size === 0) {
+    // First selection
+    selectedIndices.value = new Set([index])
+  } else if (selected.has(index)) {
+    // Already selected — shrink if edge, ignore if middle
+    const sorted = [...selected].sort((a, b) => a - b)
+    const min = sorted[0]
+    const max = sorted[sorted.length - 1]
+    if (index === min || index === max) {
+      const next = new Set(selected)
+      next.delete(index)
+      selectedIndices.value = next
+    }
+  } else {
+    const sorted = [...selected].sort((a, b) => a - b)
+    const min = sorted[0]
+    const max = sorted[sorted.length - 1]
+
+    if (index === min - 1) {
+      // Extend backward
+      selectedIndices.value = new Set([...selected, index])
+    } else if (index === max + 1) {
+      // Extend forward
+      selectedIndices.value = new Set([...selected, index])
+    } else {
+      // Not adjacent — start new selection
+      selectedIndices.value = new Set([index])
+    }
+  }
+
+  emitSelection()
+}
+
+function emitSelection() {
+  const selected = selectedIndices.value
+  if (selected.size === 0) {
+    emit('update:modelValue', null)
+    emit('update:duration', slotDuration.value)
+    return
+  }
+
+  const sorted = [...selected].sort((a, b) => a - b)
+  const firstSlot = slots.value[sorted[0]]
+  const totalMin = selected.size * slotDuration.value
+
+  emit('update:modelValue', firstSlot.start)
+  emit('update:duration', totalMin)
+}
+
+function clearSelection() {
+  selectedIndices.value = new Set()
+  emit('update:modelValue', null)
+  emit('update:duration', slotDuration.value)
 }
 
 function formatTime(iso: string): string {
@@ -66,9 +180,23 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
+function slotClass(index: number): string {
+  const slot = slots.value[index]
+  if (!slot) return ''
+  const isSelected = selectedIndices.value.has(index)
+  const isExtendable = extendableIndices.value.has(index)
+
+  if (isSelected) return 'border-primary bg-primary text-primary-foreground'
+  if (!slot.available) return 'cursor-not-allowed bg-muted text-muted-foreground opacity-50'
+  if (isExtendable) return 'cursor-pointer border-primary/40 bg-primary/10 hover:bg-primary/20'
+  if (selectedIndices.value.size > 0) return 'cursor-pointer opacity-60 hover:bg-accent'
+  return 'cursor-pointer hover:border-primary/50 hover:bg-accent'
+}
+
 watch(
   () => props.doctorId,
   (id) => {
+    clearSelection()
     if (id) loadAvailability()
     else slots.value = []
   },
@@ -91,6 +219,19 @@ watch(
           <Calendar v-model="dateValue" @update:model-value="onDateChange" />
         </PopoverContent>
       </Popover>
+    </div>
+
+    <!-- Selection summary -->
+    <div
+      v-if="selectionSummary"
+      class="flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs"
+    >
+      <span class="font-medium text-primary">
+        {{ selectionSummary.startLabel }} — {{ selectionSummary.endLabel }}
+      </span>
+      <span class="text-muted-foreground">
+        {{ selectionSummary.count }} slot{{ selectionSummary.count > 1 ? 's' : '' }} · {{ selectionSummary.durationLabel }}
+      </span>
     </div>
 
     <!-- Loading -->
@@ -117,24 +258,25 @@ watch(
     </div>
 
     <!-- Slot grid -->
-    <div v-else class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-      <button
-        v-for="slot in slots"
-        :key="slot.start"
-        :disabled="!slot.available"
-        :class="[
-          'flex items-center justify-center gap-1 rounded-md border px-2 py-2 text-xs font-medium transition-colors',
-          slot.available && slot.start !== modelValue
-            ? 'cursor-pointer hover:border-primary/50 hover:bg-accent'
-            : '',
-          !slot.available ? 'cursor-not-allowed bg-muted text-muted-foreground opacity-50' : '',
-          slot.start === modelValue ? 'border-primary bg-primary text-primary-foreground' : '',
-        ]"
-        @click="selectSlot(slot)"
-      >
-        <Clock class="size-3" />
-        {{ formatTime(slot.start) }}
-      </button>
+    <div v-else>
+      <p class="mb-2 text-xs text-muted-foreground">
+        Click a slot to select, click adjacent slots to extend the duration.
+      </p>
+      <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+        <button
+          v-for="(slot, index) in slots"
+          :key="slot.start"
+          :disabled="!slot.available"
+          :class="[
+            'flex items-center justify-center gap-1 rounded-md border px-2 py-2 text-xs font-medium transition-colors',
+            slotClass(index),
+          ]"
+          @click="selectSlot(index)"
+        >
+          <Clock class="size-3" />
+          {{ formatTime(slot.start) }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
