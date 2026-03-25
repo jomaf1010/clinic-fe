@@ -33,6 +33,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const hasAppointments = computed(() => authStore.hasFeature('appointments'))
+const todayCount = computed(() => stats.value?.my_upcoming_appointments.filter(a => a.date === todayDate).length ?? 0)
 
 const stats = ref<OwnerDashboardStats | null>(null)
 const loading = ref(true)
@@ -48,12 +49,29 @@ const revenueFormatted = computed(() => {
   }).format(stats.value.total_revenue_today)
 })
 
+const todayDate = new Date().toISOString().slice(0, 10)
+
 function formatDate(dateString: string): string {
   return new Intl.DateTimeFormat('en-PH', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   }).format(new Date(dateString))
+}
+
+function formatShortDate(dateString: string): string {
+  return new Intl.DateTimeFormat('en-PH', {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(dateString + 'T00:00:00'))
+}
+
+function formatMonth(dateString: string): string {
+  return new Intl.DateTimeFormat('en-PH', { month: 'short' }).format(new Date(dateString + 'T00:00:00'))
+}
+
+function formatDay(dateString: string): string {
+  return new Date(dateString + 'T00:00:00').getDate().toString()
 }
 
 const appointmentStatusColors: Record<string, string> = {
@@ -205,10 +223,72 @@ onUnmounted(() => {
       <div class="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <!-- Clinic Revenue -->
         <OwnerRevenueChart />
-        <!-- Today's Appointments -->
+
+        <!-- Your Upcoming Appointments -->
+        <div v-if="hasAppointments && (loading || stats?.my_upcoming_appointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-sm font-semibold">
+              Your Upcoming Appointments
+              <span v-if="!loading && todayCount > 0" class="ml-1.5 inline-flex items-center rounded-full bg-green-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">today {{ todayCount }}</span>
+            </h2>
+            <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.SCHEDULE })">
+              View schedule
+              <ChevronRight class="size-3.5" />
+            </Button>
+          </div>
+
+          <div v-if="loading" class="flex flex-col gap-3">
+            <div v-for="n in 3" :key="n" class="flex items-center gap-3">
+              <Skeleton class="h-5 w-14 shrink-0" />
+              <Skeleton class="size-8 shrink-0 rounded-full" />
+              <div class="flex flex-col gap-1">
+                <Skeleton class="h-4 w-28" />
+                <Skeleton class="h-3 w-20" />
+              </div>
+            </div>
+          </div>
+
+          <ul v-else class="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overflow-x-hidden">
+            <li
+              v-for="appt in stats.my_upcoming_appointments"
+              :key="appt.id"
+              class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/50 rounded-lg"
+              @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: appt.patient_id } })"
+            >
+              <div v-if="appt.date === todayDate" class="w-14 shrink-0 flex flex-col items-center rounded-lg border border-green-600 bg-green-600 py-1">
+                <span class="text-[10px] font-semibold uppercase text-white leading-none">Today</span>
+                <span class="text-lg font-bold leading-tight tabular-nums text-white">{{ formatDay(appt.date) }}</span>
+                <span class="text-[10px] font-semibold tabular-nums text-white/80 leading-none">{{ appt.scheduled_at }}</span>
+              </div>
+              <div v-else class="w-14 shrink-0 flex flex-col items-center rounded-lg border bg-muted/50 py-1">
+                <span class="text-[10px] font-medium uppercase text-muted-foreground leading-none">{{ formatMonth(appt.date) }}</span>
+                <span class="text-lg font-bold leading-tight tabular-nums">{{ formatDay(appt.date) }}</span>
+                <span class="text-[10px] font-medium tabular-nums text-muted-foreground leading-none">{{ appt.scheduled_at }}</span>
+              </div>
+              <PatientAvatar
+                :avatar-url="appt.patient_avatar_url"
+                :sex="appt.patient_sex"
+                :name="appt.patient_name"
+                class="size-8 shrink-0"
+              />
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="truncate text-sm font-medium">{{ appt.patient_name }}</span>
+              </div>
+              <Badge
+                variant="secondary"
+                class="shrink-0 text-[10px] capitalize"
+                :class="appointmentStatusColors[appt.status] ?? ''"
+              >
+                {{ formatStatus(appt.status) }}
+              </Badge>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Today's Clinic Appointments -->
         <div v-if="hasAppointments && (loading || stats?.todays_appointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-sm font-semibold">Today's Appointments</h2>
+            <h2 class="text-sm font-semibold">Today's Clinic Appointments</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.APPOINTMENT_LIST })">
               View all
               <ChevronRight class="size-3.5" />
@@ -260,7 +340,12 @@ onUnmounted(() => {
         <!-- Queue -->
         <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-sm font-semibold">Queue</h2>
+            <h2 class="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+              Queue
+              <span v-if="!loading && stats?.queue_waiting" class="inline-flex items-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">{{ stats.queue_waiting }} waiting</span>
+              <span v-if="!loading && stats?.queue_in_progress" class="inline-flex items-center rounded-full bg-green-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">{{ stats.queue_in_progress }} in progress</span>
+              <span v-if="!loading && stats?.queue_completed" class="inline-flex items-center rounded-full bg-gray-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">{{ stats.queue_completed }} completed</span>
+            </h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.QUEUE })">
               View all
               <ChevronRight class="size-3.5" />

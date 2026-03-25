@@ -62,6 +62,17 @@ export interface TeamMemberSummary {
   is_online: boolean
 }
 
+export interface OwnerUpcomingAppointment {
+  id: string
+  patient_name: string
+  patient_id: string
+  patient_sex: string | null
+  patient_avatar_url: string | null
+  scheduled_at: string
+  date: string
+  status: string
+}
+
 export interface OwnerDashboardStats {
   total_patients: number
   consultations_today: number
@@ -73,7 +84,11 @@ export interface OwnerDashboardStats {
   pending_invites: number
   total_appointments_today: number
   total_revenue_today: number
+  my_upcoming_appointments: OwnerUpcomingAppointment[]
   todays_appointments: OwnerAppointment[]
+  queue_waiting: number
+  queue_in_progress: number
+  queue_completed: number
   queue_list: OwnerQueueItem[]
   recent_consultations: RecentConsultation[]
   top_medicines: TopMedicine[]
