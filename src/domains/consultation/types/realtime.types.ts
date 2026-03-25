@@ -9,6 +9,7 @@ import type { LabOrderResponse } from './labOrder.types'
 export interface ConsultationUpdatedEvent {
   type: 'consultation.updated'
   actor_id: string
+  session_id?: string
   consultation_id: string
   timestamp: string
   data: {
@@ -23,6 +24,7 @@ export interface ConsultationUpdatedEvent {
 export interface ConsultationFinalizedEvent {
   type: 'consultation.finalized'
   actor_id: string
+  session_id?: string
   consultation_id: string
   timestamp: string
   data: {
@@ -35,6 +37,7 @@ export interface ConsultationFinalizedEvent {
 export interface PrescriptionRealtimeEvent {
   type: 'prescription.created' | 'prescription.item_added' | 'prescription.item_updated' | 'prescription.item_removed'
   actor_id: string
+  session_id?: string
   consultation_id: string
   timestamp: string
   data: PrescriptionResponse
@@ -43,6 +46,7 @@ export interface PrescriptionRealtimeEvent {
 export interface LabOrderRealtimeEvent {
   type: 'lab_order.created' | 'lab_order.item_added' | 'lab_order.item_updated' | 'lab_order.item_removed' | 'lab_order.result_uploaded'
   actor_id: string
+  session_id?: string
   consultation_id: string
   timestamp: string
   data: LabOrderResponse

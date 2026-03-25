@@ -2,6 +2,9 @@ import { ref } from 'vue'
 
 const BASE_URL = import.meta.env.VITE_API_URL as string
 
+// Unique ID per browser tab — used for self-echo prevention in real-time sync
+export const SESSION_ID = crypto.randomUUID()
+
 export const isMaintenanceMode = ref(false)
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -70,6 +73,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    'X-Session-Id': SESSION_ID,
     ...extraHeaders,
   }
 

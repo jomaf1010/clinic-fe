@@ -4,7 +4,7 @@ import type { PublicationContext } from 'centrifuge'
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import { consultationApi } from '../api/consultationApi'
 import { useConsultationStore } from '../stores/consultationStore'
-import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { SESSION_ID } from '@/lib/http'
 import type { ConsultationRealtimeEvent } from '../types/realtime.types'
 import type { PrescriptionResponse } from '../types/prescription.types'
 import type { LabOrderResponse } from '../types/labOrder.types'
@@ -13,24 +13,26 @@ import type { GeneratedDocumentResponse } from '../api/documentApi'
 export function useConsultationSync(consultationId: Ref<string | undefined>, clinicId: Ref<string | undefined>) {
   const { connect, subscribe, unsubscribe } = useCentrifugo()
   const consultationStore = useConsultationStore()
-  const authStore = useAuthStore()
 
   const prescriptionUpdate = ref<PrescriptionResponse | null>(null)
   const labOrderUpdate = ref<LabOrderResponse | null>(null)
   const documentUpdate = ref<GeneratedDocumentResponse | null>(null)
 
+  function isSelf(event: ConsultationRealtimeEvent): boolean {
+    return !!event.session_id && event.session_id === SESSION_ID
+  }
+
   function onEvent(ctx: PublicationContext) {
     const event = ctx.data as ConsultationRealtimeEvent
 
     if (event.type.startsWith('consultation.')) {
-      // Self-echo prevention
-      if (event.actor_id === authStore.user?.id) return
+      if (isSelf(event)) return
       consultationStore.handleRealtimeEvent(event)
     } else if (event.type.startsWith('prescription.')) {
-      if (event.actor_id === authStore.user?.id) return
+      if (isSelf(event)) return
       prescriptionUpdate.value = event.data as PrescriptionResponse
     } else if (event.type.startsWith('lab_order.')) {
-      if (event.actor_id === authStore.user?.id) return
+      if (isSelf(event)) return
       labOrderUpdate.value = event.data as LabOrderResponse
       // Silently refresh consultation to update lab_order_summary in the vitals card
       if (consultationId.value) {
