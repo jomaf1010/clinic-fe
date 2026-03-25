@@ -78,7 +78,11 @@ watch(() => props.open, (open) => {
 // Handle WebSocket update
 watch(() => props.documentUpdate, (update) => {
   if (update && update.type === 'medical-certificate') {
-    medCertDoc.value = update
+    if (medCertDoc.value) {
+      medCertDoc.value = { ...medCertDoc.value, status: update.status }
+    } else {
+      medCertDoc.value = update
+    }
     if (update.status === 'completed' || update.status === 'failed') {
       stopPolling()
       isGenerating.value = false

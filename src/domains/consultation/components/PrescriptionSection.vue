@@ -149,7 +149,11 @@ async function printPrescription() {
 
 watch(() => props.documentUpdate, (update) => {
   if (update && update.type === 'prescription') {
-    pdfDoc.value = update
+    if (pdfDoc.value) {
+      pdfDoc.value = { ...pdfDoc.value, status: update.status }
+    } else {
+      pdfDoc.value = update
+    }
     if (update.status === 'completed' || update.status === 'failed') {
       stopPolling()
       isGeneratingPdf.value = false

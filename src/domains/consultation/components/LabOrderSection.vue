@@ -494,7 +494,11 @@ async function loadLabRequestDoc() {
 
 watch(() => props.documentUpdate, (update) => {
   if (update && update.type === 'lab-request') {
-    labRequestDoc.value = update as GeneratedDocumentResponse
+    if (labRequestDoc.value) {
+      labRequestDoc.value = { ...labRequestDoc.value, status: update.status }
+    } else {
+      labRequestDoc.value = update as GeneratedDocumentResponse
+    }
   }
 })
 

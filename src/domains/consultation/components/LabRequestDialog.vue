@@ -41,7 +41,11 @@ watch(() => props.open, (open) => {
 
 watch(() => props.documentUpdate, (update) => {
   if (update && update.type === 'lab-request') {
-    labRequestDoc.value = update
+    if (labRequestDoc.value) {
+      labRequestDoc.value = { ...labRequestDoc.value, status: update.status }
+    } else {
+      labRequestDoc.value = update
+    }
     if (update.status === 'completed' || update.status === 'failed') {
       stopPolling()
       isGenerating.value = false
