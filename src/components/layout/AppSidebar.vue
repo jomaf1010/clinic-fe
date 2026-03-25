@@ -11,7 +11,7 @@ import {
   Users,
 } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
@@ -26,6 +26,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { useMessageStore } from '@/domains/message/stores/messageStore'
+import { http } from '@/lib/http'
 import NavMain from '@/components/layout/NavMain.vue'
 import NavSecondary from '@/components/layout/NavSecondary.vue'
 import NavUser from '@/components/layout/NavUser.vue'
@@ -139,6 +140,19 @@ async function handleLogout() {
   await authStore.logout()
   router.push({ name: RouteNames.LOGIN })
 }
+
+declare const __COMMIT_HASH__: string
+const feVersion = typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'
+const apiVersion = ref('...')
+
+onMounted(async () => {
+  try {
+    const res = await http.get<{ commit: string }>('/version')
+    apiVersion.value = res.commit
+  } catch {
+    apiVersion.value = '?'
+  }
+})
 </script>
 
 <template>
@@ -173,6 +187,9 @@ async function handleLogout() {
         @logout="handleLogout"
         @switch-clinic="openSwitchDialog"
       />
+      <p class="truncate text-xs tabular-nums text-muted-foreground/50 group-data-[collapsible=icon]:hidden">
+        {{ feVersion }}|{{ apiVersion }}
+      </p>
     </SidebarFooter>
   </Sidebar>
   <SwitchClinicDialog v-model:open="switchDialogOpen" />
