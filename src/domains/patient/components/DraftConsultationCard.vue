@@ -150,6 +150,7 @@ function formatDate(iso: string): string {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          <span v-if="consultation.type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
           <span class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
             Draft
           </span>

@@ -21,6 +21,7 @@ import {
   FileText,
   FileDown,
   Printer,
+  AlertTriangle,
 } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -69,9 +70,38 @@ const canFinalize = computed(() => authStore.hasPermission('consultations.finali
 const activeTab = ref('triage')
 const showPreviewModal = ref(false)
 const showFinalizeModal = ref(false)
+const showFeeWarningModal = ref(false)
 const showMedCertDialog = ref(false)
 const showFeeDiscountModal = ref(false)
 const loadError = ref<string | null>(null)
+const pendingFinalizeAction = ref<'confirm' | 'pay'>('confirm')
+
+function hasFeeConfigured(): boolean {
+  const isFollowUp = store.current?.type === 'follow_up'
+  const doctorFee = isFollowUp ? authStore.user?.follow_up_fee : authStore.user?.consultation_fee
+  const clinicFee = isFollowUp
+    ? authStore.currentClinic?.settings?.default_follow_up_fee
+    : authStore.currentClinic?.settings?.default_consultation_fee
+  return (!!doctorFee && doctorFee > 0) || (!!clinicFee && clinicFee > 0)
+}
+
+function handleFinalizeClick() {
+  if (!hasFeeConfigured()) {
+    pendingFinalizeAction.value = 'confirm'
+    showFeeWarningModal.value = true
+    return
+  }
+  showFinalizeModal.value = true
+}
+
+function handleFinalizeAndPayClick() {
+  if (!hasFeeConfigured()) {
+    pendingFinalizeAction.value = 'pay'
+    showFeeWarningModal.value = true
+    return
+  }
+  doFinalizeAndPay()
+}
 
 // --- Consultation Summary PDF ---
 const summaryDoc = ref<GeneratedDocumentResponse | null>(null)
@@ -195,7 +225,8 @@ onMounted(async () => {
   try {
     if (route.name === RouteNames.CONSULTATION_NEW) {
       const patientId = route.params.patientId as string
-      const consultation = await store.createForPatient(patientId)
+      const consultationType = (route.query.type as 'default' | 'follow_up') || 'default'
+      const consultation = await store.createForPatient(patientId, consultationType)
 
       await router.replace({
         name: RouteNames.CONSULTATION_DETAIL,
@@ -270,10 +301,19 @@ async function handleFinalizeConfirm(): Promise<void> {
   }
 }
 
-async function handleFinalizeAndPay(): Promise<void> {
+async function doFinalizeAndPay(): Promise<void> {
   await store.finalize()
   if (!store.saveError) {
     activeTab.value = 'payment'
+  }
+}
+
+function proceedAfterFeeWarning() {
+  showFeeWarningModal.value = false
+  if (pendingFinalizeAction.value === 'pay') {
+    doFinalizeAndPay()
+  } else {
+    showFinalizeModal.value = true
   }
 }
 </script>
@@ -311,6 +351,12 @@ async function handleFinalizeAndPay(): Promise<void> {
             <ArrowLeft class="size-3.5" />
             {{ store.current.patient_name }}
           </Button>
+          <Badge
+            v-if="store.current.type === 'follow_up'"
+            variant="secondary"
+          >
+            Follow-up
+          </Badge>
           <Badge
             v-if="store.isDraft"
             class="border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
@@ -389,7 +435,7 @@ async function handleFinalizeAndPay(): Promise<void> {
           <Button
             v-if="canFinalize"
             size="sm"
-            @click="showFinalizeModal = true"
+            @click="handleFinalizeClick"
           >
             <CheckCircle2 class="size-3.5" />
             Finalize
@@ -537,7 +583,7 @@ async function handleFinalizeAndPay(): Promise<void> {
               </Button>
               <Button
                 v-if="store.isDraft && canFinalize"
-                @click="handleFinalizeAndPay"
+                @click="handleFinalizeAndPayClick"
                 :disabled="store.isSaving"
               >
                 <LoaderCircle v-if="store.isSaving" class="size-3.5 animate-spin" />
@@ -588,6 +634,33 @@ async function handleFinalizeAndPay(): Promise<void> {
       @update:open="showFinalizeModal = $event"
       @confirm="handleFinalizeConfirm"
     />
+
+    <!-- Consultation Fee Warning -->
+    <Dialog :open="showFeeWarningModal" @update:open="showFeeWarningModal = $event">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <AlertTriangle class="size-5 text-amber-500" />
+            Consultation Fee Not Set
+          </DialogTitle>
+          <DialogDescription>
+            Your consultation fee is not configured. The invoice will be generated without a consultation fee line item. You can set it in your
+            <button
+              class="inline font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+              @click="showFeeWarningModal = false; router.push({ name: RouteNames.ACCOUNT })"
+            >account settings</button>.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter class="gap-2 sm:gap-0">
+          <Button variant="outline" @click="showFeeWarningModal = false; router.push({ name: RouteNames.ACCOUNT })">
+            Go to Settings
+          </Button>
+          <Button @click="proceedAfterFeeWarning">
+            Continue Anyway
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- Medical Certificate Dialog -->
     <MedCertDialog

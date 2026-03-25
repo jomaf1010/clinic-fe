@@ -27,6 +27,7 @@ export interface CreateAppointmentPayload {
   scheduled_at: string
   reason?: string | null
   notes?: string | null
+  consultation_type?: 'default' | 'follow_up'
 }
 
 export interface CancelAppointmentPayload {

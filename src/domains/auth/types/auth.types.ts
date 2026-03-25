@@ -37,6 +37,8 @@ export interface Membership {
 }
 
 export interface ClinicSettings {
+  default_consultation_fee?: number | null
+  default_follow_up_fee?: number | null
   auto_generate_prescription_pdf?: boolean
   prescription_quantity_mode?: 'absolute' | 'adjusted'
   auto_regenerate_pdf_on_qty_change?: boolean

@@ -1,4 +1,5 @@
 export type ConsultationStatus = 'draft' | 'finalized'
+export type ConsultationType = 'default' | 'follow_up'
 
 export interface ConsultationConsumable {
   consumable_id: string
@@ -71,6 +72,7 @@ export interface ConsultationDocument {
 export interface ConsultationResponse {
   id: string
   patient_id: string
+  type: ConsultationType
   patient_name: string | null
   patient_sex: string | null
   clinic_id: string
@@ -98,6 +100,7 @@ export interface ConsultationResponse {
 
 export interface CreateConsultationPayload {
   patient_id: string
+  type?: ConsultationType
 }
 
 export interface UpdateConsultationPayload {

@@ -3,7 +3,9 @@ import { ref } from 'vue'
 const BASE_URL = import.meta.env.VITE_API_URL as string
 
 // Unique ID per browser tab — used for self-echo prevention in real-time sync
-export const SESSION_ID = crypto.randomUUID()
+export const SESSION_ID = typeof crypto.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
 export const isMaintenanceMode = ref(false)
 

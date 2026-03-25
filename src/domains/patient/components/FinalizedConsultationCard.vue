@@ -188,6 +188,7 @@ const summary = computed(() => {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+      <span v-if="consultation.type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
       <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
         &middot; Dr. {{ consultation.doctor_name }}
       </span>

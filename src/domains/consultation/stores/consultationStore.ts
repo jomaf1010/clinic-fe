@@ -29,11 +29,11 @@ export const useConsultationStore = defineStore('consultation', () => {
   const isFinalized = computed(() => current.value?.status === 'finalized')
   const isDraft = computed(() => current.value?.status === 'draft')
 
-  async function createForPatient(patientId: string): Promise<ConsultationResponse> {
+  async function createForPatient(patientId: string, type: 'default' | 'follow_up' = 'default'): Promise<ConsultationResponse> {
     isLoading.value = true
     saveError.value = null
     try {
-      const response = await consultationApi.create(patientId, { patient_id: patientId })
+      const response = await consultationApi.create(patientId, { patient_id: patientId, type })
       current.value = response.data
       isOfflineCached.value = false
       await cacheConsultation(response.data as unknown as Record<string, unknown>)

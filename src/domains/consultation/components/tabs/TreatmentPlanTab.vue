@@ -161,6 +161,7 @@ async function bookFollowUp(slot: Slot): Promise<void> {
       doctor_id: props.doctorId,
       scheduled_at: slot.start,
       reason: 'Follow-up',
+      consultation_type: 'follow_up',
     })
 
     local.follow_up = selectedDate.value

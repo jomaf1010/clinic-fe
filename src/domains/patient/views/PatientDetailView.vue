@@ -317,15 +317,25 @@ onUnmounted(() => {
           <PlayCircle class="size-3.5" />
           Continue Draft
         </Button>
-        <Button
-          v-else-if="authStore.hasPermission('consultations.create')"
-          size="sm"
-          class="flex-1"
-          @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
-        >
-          <Plus class="size-3.5" />
-          New Consultation
-        </Button>
+        <template v-else-if="authStore.hasPermission('consultations.create')">
+          <Button
+            size="sm"
+            class="flex-1"
+            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
+          >
+            <Plus class="size-3.5" />
+            Consultation
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            class="flex-1"
+            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
+          >
+            <Plus class="size-3.5" />
+            Follow-up
+          </Button>
+        </template>
         <Button variant="outline" size="sm" @click="editDialogOpen = true">
           <Pencil class="size-3.5" />
         </Button>
