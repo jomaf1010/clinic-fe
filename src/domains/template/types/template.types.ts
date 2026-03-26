@@ -39,7 +39,7 @@ const defaultPageSetup: PageSetup = {
 
 const defaultHeader: TemplateHeader = {
   showLogo: true,
-  logoSize: 40,
+  logoSize: 70,
   logoUrl: null,
   showClinicName: true,
   showClinicAddress: true,
