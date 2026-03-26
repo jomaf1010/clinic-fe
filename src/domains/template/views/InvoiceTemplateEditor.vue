@@ -25,6 +25,7 @@ import { templateApi } from '@/domains/template/api/templateApi'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const canHideWatermark = computed(() => authStore.hasFeature('remove_watermark'))
 
 const category = computed(() => route.params.category as string)
 const variation = computed(() => route.params.variation as string)
@@ -145,7 +146,7 @@ async function save() {
                 <Label>Font Size (px)</Label>
                 <span class="text-xs tabular-nums text-muted-foreground">{{ template.fontSize }}</span>
               </div>
-              <Slider :model-value="[template.fontSize]" :min="8" :max="24" :step="1" @update:model-value="template.fontSize = $event[0]" />
+              <Slider :model-value="[template.fontSize]" :min="8" :max="16" :step="1" @update:model-value="template.fontSize = $event[0]" />
             </div>
 
             <div class="col-span-full flex flex-col gap-3">
@@ -298,8 +299,8 @@ async function save() {
                 <Label for="inv-show-page-number" class="font-normal">Show page number</Label>
               </div>
               <div class="flex items-center gap-2">
-                <Checkbox id="inv-show-watermark" :model-value="template.footer.showWatermark" @update:model-value="template.footer.showWatermark = !!$event" />
-                <Label for="inv-show-watermark" class="font-normal text-muted-foreground">Show watermark <span class="text-xs">(Pro accounts can hide this)</span></Label>
+                <Checkbox id="inv-show-watermark" :model-value="canHideWatermark ? template.footer.showWatermark : true" :disabled="!canHideWatermark" @update:model-value="template.footer.showWatermark = canHideWatermark ? !!$event : true" />
+                <Label for="inv-show-watermark" class="font-normal text-muted-foreground">Show watermark <span class="text-xs">({{ canHideWatermark ? 'Pro feature' : 'Upgrade to Pro to hide' }})</span></Label>
               </div>
             </div>
             <div class="flex flex-col gap-2">
