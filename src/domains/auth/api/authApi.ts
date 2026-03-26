@@ -86,7 +86,11 @@ export const authApi = {
   },
 
   async resetPassword(data: { email: string; token: string; password: string; password_confirmation: string }): Promise<MessageResponse> {
-    return http.post<MessageResponse>('/auth/reset-password', data)
+    return http.post<MessageResponse>('/auth/reset-password', {
+      ...data,
+      password: btoa(data.password),
+      password_confirmation: btoa(data.password_confirmation),
+    })
   },
 
   async heartbeat(): Promise<void> {

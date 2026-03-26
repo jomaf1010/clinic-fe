@@ -21,6 +21,7 @@ import { RouteNames } from '@/router/routeNames'
 import { useRecaptcha } from '@/composables/useRecaptcha'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
 import type { ValidationError } from '../types/auth.types'
+import PasswordStrengthBar from '../components/PasswordStrengthBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -209,6 +210,7 @@ const onSubmit = handleSubmit(async (values) => {
                 <p v-if="passwordError" class="text-xs text-destructive">
                   {{ passwordError }}
                 </p>
+                <PasswordStrengthBar :password="password ?? ''" />
               </div>
 
               <div
