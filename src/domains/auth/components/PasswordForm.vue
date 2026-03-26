@@ -12,6 +12,7 @@ import { Lock, KeyRound, LoaderCircle } from 'lucide-vue-next'
 import { authApi } from '../api/authApi'
 import { changePasswordSchema } from '@/lib/validationRules'
 import type { ValidationError } from '../types/auth.types'
+import PasswordStrengthBar from './PasswordStrengthBar.vue'
 
 const { handleSubmit, setFieldError, resetForm } = useForm({
   validationSchema: changePasswordSchema,
@@ -88,8 +89,9 @@ const onSubmit = handleSubmit(async (values) => {
               <KeyRound class="size-3.5 text-muted-foreground" />
               New password
             </Label>
-            <PasswordInput id="new-password" v-model="newPassword" placeholder="Minimum 8 characters" autocomplete="new-password" :disabled="isLoading" :aria-invalid="!!newPasswordError" />
+            <PasswordInput id="new-password" v-model="newPassword" placeholder="Minimum 10 characters" autocomplete="new-password" :disabled="isLoading" :aria-invalid="!!newPasswordError" />
             <p v-if="newPasswordError" class="text-xs text-destructive">{{ newPasswordError }}</p>
+            <PasswordStrengthBar :password="newPassword ?? ''" />
           </div>
 
           <div class="flex flex-col gap-2">

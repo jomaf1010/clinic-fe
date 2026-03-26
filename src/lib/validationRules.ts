@@ -123,7 +123,7 @@ export const loginSchema = {
  */
 export const signupSchema = {
   email: [required('Email'), email('Email')],
-  password: [required('Password'), minLength('Password', 8)],
+  password: [required('Password'), minLength('Password', 10)],
   first_name: [maxLength('First name', 255)],
   last_name: [maxLength('Last name', 255)],
 }
@@ -181,7 +181,7 @@ export const credentialsSchema = {
  */
 export const changePasswordSchema = {
   current_password: [required('Current password')],
-  new_password: [required('New password'), minLength('New password', 8)],
+  new_password: [required('New password'), minLength('New password', 10)],
   new_password_confirmation: [required('Password confirmation')],
 }
 
@@ -198,6 +198,6 @@ export const forgotPasswordSchema = {
  * Pass directly to `useForm({ validationSchema: resetPasswordSchema })`.
  */
 export const resetPasswordSchema = {
-  password: [required('New password'), minLength('New password', 8)],
+  password: [required('New password'), minLength('New password', 10)],
   password_confirmation: [required('Confirm password')],
 }

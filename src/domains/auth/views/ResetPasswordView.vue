@@ -20,6 +20,7 @@ import { RouteNames } from '@/router/routeNames'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
 import { authApi } from '../api/authApi'
 import type { ValidationError } from '../types/auth.types'
+import PasswordStrengthBar from '../components/PasswordStrengthBar.vue'
 
 const route = useRoute()
 const { canvasRef } = useNeuralNetwork()
@@ -187,6 +188,7 @@ const onSubmit = handleSubmit(async (values) => {
                 <p v-if="passwordError" class="text-xs text-destructive">
                   {{ passwordError }}
                 </p>
+                <PasswordStrengthBar :password="password ?? ''" />
               </div>
 
               <div
