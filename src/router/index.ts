@@ -3,6 +3,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import HomeView from '@/views/HomeView.vue'
 import { RouteNames } from './routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { HttpError } from '@/lib/http'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -223,10 +224,10 @@ router.beforeEach(async (to) => {
   if (authStore.isAuthenticated && !authStore.user) {
     try {
       await authStore.fetchUser()
-    } catch {
-      const refreshed = await authStore.silentRefresh()
-      if (!refreshed) {
-        authStore.logout()
+    } catch (error) {
+      // Only redirect on confirmed auth failure (401)
+      // Network/server errors: keep credentials, user can retry when server is back
+      if (error instanceof HttpError && error.status === 401) {
         return { name: RouteNames.LOGIN }
       }
     }

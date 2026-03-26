@@ -32,22 +32,20 @@ class HttpError extends Error {
 let refreshPromise: Promise<boolean> | null = null
 
 async function attemptRefresh(): Promise<boolean> {
-  try {
-    const response = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { Accept: 'application/json' },
-      credentials: 'include',
-    })
-    if (!response.ok) return false
-    const result = await response.json()
-    const newToken = result?.data?.access_token
-    if (!newToken) return false
-    localStorage.setItem('auth_token', newToken)
-    authChannel.postMessage({ type: 'token_updated', token: newToken })
-    return true
-  } catch {
-    return false
-  }
+  // Network errors (TypeError) propagate — callers must distinguish
+  // "server rejected refresh" (false) from "server unreachable" (throw)
+  const response = await fetch(`${BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    credentials: 'include',
+  })
+  if (!response.ok) return false
+  const result = await response.json()
+  const newToken = result?.data?.access_token
+  if (!newToken) return false
+  localStorage.setItem('auth_token', newToken)
+  authChannel.postMessage({ type: 'token_updated', token: newToken })
+  return true
 }
 
 async function handleUnauthorized(): Promise<boolean> {
@@ -69,6 +67,56 @@ authChannel.addEventListener('message', (event) => {
   }
 })
 
+function parseBody(response: Response): Promise<unknown> {
+  const ct = response.headers.get('content-type')
+  return ct && ct.includes('application/json') ? response.json() : response.text()
+}
+
+async function handleResponse<T>(
+  response: Response,
+  headers: Record<string, string>,
+  retry: () => Promise<Response>,
+): Promise<T> {
+  if (response.status === 503) {
+    isMaintenanceMode.value = true
+    throw new HttpError(503, 'Service temporarily unavailable')
+  }
+
+  if (response.status === 401) {
+    let refreshed = false
+    try {
+      refreshed = await handleUnauthorized()
+    } catch {
+      // Network error during refresh — don't destroy credentials
+      throw new HttpError(401, 'Unauthorized')
+    }
+
+    if (refreshed) {
+      const newToken = localStorage.getItem('auth_token')
+      if (newToken) headers['Authorization'] = `Bearer ${newToken}`
+      const retryResponse = await retry()
+      const retryData = await parseBody(retryResponse)
+      if (!retryResponse.ok) {
+        throw new HttpError(retryResponse.status, `Request failed with status ${retryResponse.status}`, retryData)
+      }
+      return retryData as T
+    }
+
+    // Refresh explicitly rejected — auth is confirmed invalid
+    localStorage.removeItem('auth_token')
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+    throw new HttpError(401, 'Unauthorized')
+  }
+
+  const data = await parseBody(response)
+  if (!response.ok) {
+    throw new HttpError(response.status, `Request failed with status ${response.status}`, data)
+  }
+  return data as T
+}
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers: extraHeaders = {} } = options
 
@@ -80,13 +128,10 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   const token = localStorage.getItem('auth_token')
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
   const url = `${BASE_URL}${endpoint}`
-
-  const response = await fetch(url, {
+  const doFetch = () => fetch(url, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -94,137 +139,24 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     cache: 'no-store',
   })
 
-  if (response.status === 503) {
-    isMaintenanceMode.value = true
-    throw new HttpError(503, 'Service temporarily unavailable')
-  }
-
-  if (response.status === 401) {
-    const refreshed = await handleUnauthorized()
-    if (refreshed) {
-      // Retry with new token
-      const newToken = localStorage.getItem('auth_token')
-      if (newToken) {
-        headers['Authorization'] = `Bearer ${newToken}`
-      }
-      const retryResponse = await fetch(url, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        credentials: 'include',
-      })
-
-      let retryData: unknown
-      const retryContentType = retryResponse.headers.get('content-type')
-      if (retryContentType && retryContentType.includes('application/json')) {
-        retryData = await retryResponse.json()
-      } else {
-        retryData = await retryResponse.text()
-      }
-
-      if (!retryResponse.ok) {
-        throw new HttpError(retryResponse.status, `Request failed with status ${retryResponse.status}`, retryData)
-      }
-
-      return retryData as T
-    }
-
-    localStorage.removeItem('auth_token')
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
-    }
-    throw new HttpError(401, 'Unauthorized')
-  }
-
-  let data: unknown
-  const contentType = response.headers.get('content-type')
-  if (contentType && contentType.includes('application/json')) {
-    data = await response.json()
-  } else {
-    data = await response.text()
-  }
-
-  if (!response.ok) {
-    throw new HttpError(response.status, `Request failed with status ${response.status}`, data)
-  }
-
-  return data as T
+  return handleResponse<T>(await doFetch(), headers, doFetch)
 }
 
 async function uploadRequest<T>(endpoint: string, formData: FormData, method: HttpMethod = 'POST'): Promise<T> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
+  const headers: Record<string, string> = { Accept: 'application/json' }
 
   const token = localStorage.getItem('auth_token')
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
   const url = `${BASE_URL}${endpoint}`
-
-  const response = await fetch(url, {
+  const doFetch = () => fetch(url, {
     method,
     headers,
     body: formData,
     credentials: 'include',
   })
 
-  if (response.status === 503) {
-    isMaintenanceMode.value = true
-    throw new HttpError(503, 'Service temporarily unavailable')
-  }
-
-  if (response.status === 401) {
-    const refreshed = await handleUnauthorized()
-    if (refreshed) {
-      // Retry with new token
-      const newToken = localStorage.getItem('auth_token')
-      if (newToken) {
-        headers['Authorization'] = `Bearer ${newToken}`
-      }
-      const retryResponse = await fetch(url, {
-        method,
-        headers,
-        body: formData,
-        credentials: 'include',
-      })
-
-      let retryData: unknown
-      const retryContentType = retryResponse.headers.get('content-type')
-      if (retryContentType && retryContentType.includes('application/json')) {
-        retryData = await retryResponse.json()
-      } else {
-        retryData = await retryResponse.text()
-      }
-
-      if (!retryResponse.ok) {
-        throw new HttpError(retryResponse.status, `Request failed with status ${retryResponse.status}`, retryData)
-      }
-
-      return retryData as T
-    }
-
-    localStorage.removeItem('auth_token')
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
-    }
-    throw new HttpError(401, 'Unauthorized')
-  }
-
-  let data: unknown
-  const contentType = response.headers.get('content-type')
-  if (contentType && contentType.includes('application/json')) {
-    data = await response.json()
-  } else {
-    data = await response.text()
-  }
-
-  if (!response.ok) {
-    throw new HttpError(response.status, `Request failed with status ${response.status}`, data)
-  }
-
-  return data as T
+  return handleResponse<T>(await doFetch(), headers, doFetch)
 }
 
 export const http = {
