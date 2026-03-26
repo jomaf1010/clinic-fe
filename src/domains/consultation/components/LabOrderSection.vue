@@ -262,6 +262,13 @@ async function handleCreate() {
     showCreateForm.value = false
     createFormItems.value = [{ description: '', instruction: '' }]
     emit('lab-updated')
+
+    // Auto-save lab tests to clinic lab services (fire-and-forget, idempotent)
+    for (const item of validItems) {
+      labServiceApi.findOrCreate({ name: item.description }).catch(() => {
+        // silent — clinic lab service creation is best-effort
+      })
+    }
   } finally {
     isCreating.value = false
   }
@@ -296,10 +303,12 @@ function onCreateRowKeydown(e: KeyboardEvent) {
       return
     }
   }
-  // Otherwise Enter adds a new row
+  // Enter submits the form if any row has content
   if (e.key === 'Enter') {
     e.preventDefault()
-    addCreateFormRow()
+    if (createFormItems.value.some((r) => r.description.trim())) {
+      handleCreate()
+    }
   }
 }
 
@@ -317,6 +326,11 @@ async function handleAddItem() {
     await cacheCurrentLabOrder()
     cancelAddForm()
     emit('lab-updated')
+
+    // Auto-save lab test to clinic lab services (fire-and-forget, idempotent)
+    labServiceApi.findOrCreate({ name: desc }).catch(() => {
+      // silent — clinic lab service creation is best-effort
+    })
   } finally {
     isAddingItem.value = false
   }
