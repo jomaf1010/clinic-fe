@@ -262,6 +262,13 @@ async function handleCreate() {
     showCreateForm.value = false
     createFormItems.value = [{ description: '', instruction: '' }]
     emit('lab-updated')
+
+    // Auto-save lab tests to clinic lab services (fire-and-forget, idempotent)
+    for (const item of validItems) {
+      labServiceApi.findOrCreate({ name: item.description }).catch(() => {
+        // silent — clinic lab service creation is best-effort
+      })
+    }
   } finally {
     isCreating.value = false
   }
@@ -317,6 +324,11 @@ async function handleAddItem() {
     await cacheCurrentLabOrder()
     cancelAddForm()
     emit('lab-updated')
+
+    // Auto-save lab test to clinic lab services (fire-and-forget, idempotent)
+    labServiceApi.findOrCreate({ name: desc }).catch(() => {
+      // silent — clinic lab service creation is best-effort
+    })
   } finally {
     isAddingItem.value = false
   }
