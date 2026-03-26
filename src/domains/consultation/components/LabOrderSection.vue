@@ -303,10 +303,12 @@ function onCreateRowKeydown(e: KeyboardEvent) {
       return
     }
   }
-  // Otherwise Enter adds a new row
+  // Enter submits the form if any row has content
   if (e.key === 'Enter') {
     e.preventDefault()
-    addCreateFormRow()
+    if (createFormItems.value.some((r) => r.description.trim())) {
+      handleCreate()
+    }
   }
 }
 
