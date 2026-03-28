@@ -36,6 +36,7 @@ const { value: password, errorMessage: passwordError } = useField<string>('passw
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
+const showResendLink = ref(false)
 const rememberMe = ref(true)
 
 const ready = ref(false)
@@ -47,6 +48,7 @@ onMounted(() => {
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
+  showResendLink.value = false
   isLoading.value = true
 
   try {
@@ -66,7 +68,13 @@ const onSubmit = handleSubmit(async (values) => {
       } else if (err.status === 401) {
         generalError.value = 'Invalid email or password.'
       } else if (err.status === 403) {
-        generalError.value = 'Please verify your email address before signing in.'
+        const body = err.data as { message?: string; error_code?: string }
+        if (body.error_code === 'email_not_verified') {
+          generalError.value = 'Please verify your email address before signing in.'
+          showResendLink.value = true
+        } else {
+          generalError.value = body.message || 'Access denied.'
+        }
       } else {
         generalError.value = 'An unexpected error occurred. Please try again.'
       }
@@ -112,6 +120,13 @@ const onSubmit = handleSubmit(async (values) => {
                 class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
               >
                 {{ generalError }}
+                <RouterLink
+                  v-if="showResendLink"
+                  :to="{ name: RouteNames.VERIFY_EMAIL_NOTICE, query: { email: email } }"
+                  class="mt-1 block font-medium underline underline-offset-4 hover:text-destructive/80"
+                >
+                  Resend verification email
+                </RouterLink>
               </div>
 
               <div
