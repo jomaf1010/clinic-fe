@@ -217,6 +217,16 @@ const router = createRouter({
   ],
 })
 
+router.onError((error) => {
+  if (
+    error instanceof Error &&
+    (error.message.includes('Failed to fetch dynamically imported module') ||
+      error.message.includes('Importing a module script failed'))
+  ) {
+    window.location.assign(window.location.href)
+  }
+})
+
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
