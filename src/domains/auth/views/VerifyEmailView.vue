@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card'
 import { authApi } from '../api/authApi'
 import { RouteNames } from '@/router/routeNames'
-import { CircleCheck, CircleX, LoaderCircle, ArrowRight, UserPlus, ArrowLeft } from 'lucide-vue-next'
+import { CircleCheck, CircleX, LoaderCircle, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-vue-next'
 import AppLogo from '@/components/AppLogo.vue'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
 
@@ -20,6 +20,7 @@ const { canvasRef } = useNeuralNetwork()
 
 const status = ref<'verifying' | 'success' | 'error'>('verifying')
 const errorMessage = ref<string | null>(null)
+const userEmail = ref<string | null>(null)
 
 const ready = ref(false)
 onMounted(() => {
@@ -31,7 +32,16 @@ onMounted(() => {
 onMounted(async () => {
   const token = typeof route.query.token === 'string' ? route.query.token : null
   const encodedEmail = typeof route.query.email === 'string' ? route.query.email : null
-  const email = encodedEmail ? atob(encodedEmail) : null
+
+  let email: string | null = null
+  try {
+    email = encodedEmail ? atob(encodedEmail) : null
+  } catch {
+    status.value = 'error'
+    errorMessage.value = 'Invalid verification link. Please check your email and try again.'
+    return
+  }
+  userEmail.value = email
 
   if (!token || !email) {
     status.value = 'error'
@@ -109,10 +119,10 @@ onMounted(async () => {
               <CardDescription>{{ errorMessage }}</CardDescription>
             </CardHeader>
             <CardContent class="flex flex-col gap-3">
-              <RouterLink :to="{ name: RouteNames.SIGNUP }">
-                <Button variant="outline" class="w-full">
-                  <UserPlus class="size-4" />
-                  Sign up again
+              <RouterLink v-if="userEmail" :to="{ name: RouteNames.VERIFY_EMAIL_NOTICE, query: { email: userEmail } }">
+                <Button class="w-full">
+                  <RefreshCw class="size-4" />
+                  Resend verification email
                 </Button>
               </RouterLink>
               <RouterLink :to="{ name: RouteNames.LOGIN }">
