@@ -4,7 +4,12 @@ import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim()
+let commitHash = 'dev'
+try {
+  commitHash = execSync('git rev-parse --short HEAD').toString().trim()
+} catch {
+  // git not available in container
+}
 
 export default defineConfig({
   plugins: [
