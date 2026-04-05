@@ -205,7 +205,8 @@ onMounted(() => {
     })
   }
 
-  pollInterval = setInterval(silentRefresh, 30000)
+  // Fallback poll every 5 minutes in case Centrifugo disconnects
+  pollInterval = setInterval(silentRefresh, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {

@@ -1,4 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    requiresClinicContext?: boolean
+    requiresGuest?: boolean
+    requiredPermission?: string
+    requiredFeature?: string
+  }
+}
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import HomeView from '@/views/HomeView.vue'
 import { RouteNames } from './routeNames'
@@ -44,6 +54,7 @@ const router = createRouter({
           path: 'appointments',
           name: RouteNames.APPOINTMENT_LIST,
           component: () => import('@/domains/appointment/views/AppointmentListView.vue'),
+          meta: { requiredFeature: 'appointments' },
         },
         {
           path: 'clinic',
@@ -68,6 +79,7 @@ const router = createRouter({
               path: 'medicines',
               name: RouteNames.CLINIC_MEDICINES,
               component: () => import('@/domains/medicine/views/MedicineListView.vue'),
+              meta: { requiredPermission: 'medicines.manage' },
             },
             {
               path: 'consumables',
@@ -88,16 +100,19 @@ const router = createRouter({
               path: 'team',
               name: RouteNames.TEAM,
               component: () => import('@/domains/team/views/TeamManagementView.vue'),
+              meta: { requiredPermission: 'team.manage' },
             },
             {
               path: 'roles',
               name: RouteNames.ROLES,
               component: () => import('@/domains/roles/views/RoleManagementView.vue'),
+              meta: { requiredPermission: 'roles.manage' },
             },
             {
               path: 'logs',
               name: RouteNames.AUDIT_LOG_LIST,
               component: () => import('@/domains/audit-log/views/AuditLogListView.vue'),
+              meta: { requiredPermission: 'audit-logs.view', requiredFeature: 'audit_logs' },
             },
           ],
         },
@@ -110,6 +125,7 @@ const router = createRouter({
           path: 'schedule',
           name: RouteNames.SCHEDULE,
           component: () => import('@/domains/schedule/views/ScheduleView.vue'),
+          meta: { requiredFeature: 'schedule' },
         },
         {
           path: 'queue',
@@ -120,6 +136,7 @@ const router = createRouter({
           path: 'messages',
           name: RouteNames.MESSAGES,
           component: () => import('@/domains/message/views/MessagesView.vue'),
+          meta: { requiredFeature: 'messages' },
         },
         {
           path: 'billing',
@@ -145,6 +162,7 @@ const router = createRouter({
           path: 'logs/:id',
           name: RouteNames.AUDIT_LOG_DETAIL,
           component: () => import('@/domains/audit-log/views/AuditLogDetailView.vue'),
+          meta: { requiredPermission: 'audit-logs.view', requiredFeature: 'audit_logs' },
         },
       ],
     },
@@ -280,6 +298,16 @@ router.beforeEach(async (to) => {
   // Already has context (or has memberships) trying to visit onboarding → HOME
   if (to.name === RouteNames.ONBOARDING_CREATE_CLINIC && authStore.isAuthenticated && !authStore.needsOnboarding) {
     return { name: RouteNames.HOME }
+  }
+
+  // Permission/feature guards — only apply when authenticated with clinic context
+  if (authStore.isAuthenticated && authStore.hasClinicContext) {
+    if (to.meta.requiredFeature && !authStore.hasFeature(to.meta.requiredFeature)) {
+      return { name: RouteNames.HOME }
+    }
+    if (to.meta.requiredPermission && !authStore.hasPermission(to.meta.requiredPermission)) {
+      return { name: RouteNames.HOME }
+    }
   }
 })
 

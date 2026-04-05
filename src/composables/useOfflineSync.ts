@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { getPendingActions, removePendingAction, getPendingActionCount } from '@/lib/offlineDb'
+import { http } from '@/lib/http'
 
 const isOnline = ref(navigator.onLine)
 const pendingCount = ref(0)
@@ -30,23 +31,16 @@ async function flushQueue() {
     if (!actions.length) return
 
     let synced = 0
-    const token = localStorage.getItem('auth_token')
-    const baseUrl = import.meta.env.VITE_API_URL as string
 
     for (const { key, action } of actions) {
       if (!navigator.onLine) break
       try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+        const method = action.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete'
+        if (method === 'post' || method === 'put' || method === 'patch') {
+          await http[method](action.url, action.body)
+        } else {
+          await http[method](action.url)
         }
-        if (token) headers['Authorization'] = `Bearer ${token}`
-
-        await fetch(`${baseUrl}${action.url}`, {
-          method: action.method,
-          headers,
-          body: action.body !== undefined ? JSON.stringify(action.body) : undefined,
-        })
         await removePendingAction(key)
         synced++
       } catch {

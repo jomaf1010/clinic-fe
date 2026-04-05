@@ -2,13 +2,12 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { setAuthToken } from '@/lib/http'
 import { authApi } from '../api/authApi'
 import type { ClinicContext, LoginCredentials, Membership, SignupCredentials, User } from '../types/auth.types'
 
-const TOKEN_KEY = 'auth_token'
-
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
+  const token = ref<string | null>(null)
   const user = ref<User | null>(null)
   const memberships = ref<Membership[]>([])
 
@@ -67,7 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setToken(newToken: string): void {
     token.value = newToken
-    localStorage.setItem(TOKEN_KEY, newToken)
+    setAuthToken(newToken)
   }
 
   async function fetchUser(): Promise<void> {
@@ -117,7 +116,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     user.value = null
     memberships.value = []
-    localStorage.removeItem(TOKEN_KEY)
+    setAuthToken(null)
   }
 
   async function silentRefresh(): Promise<boolean> {

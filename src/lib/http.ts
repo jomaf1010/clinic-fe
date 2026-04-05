@@ -2,6 +2,13 @@ import { ref } from 'vue'
 
 const BASE_URL = import.meta.env.VITE_API_URL as string
 
+// In-memory token store — never persisted to localStorage
+let _authToken: string | null = null
+
+export function setAuthToken(token: string | null): void {
+  _authToken = token
+}
+
 // Unique ID per browser tab — used for self-echo prevention in real-time sync
 export const SESSION_ID = typeof crypto.randomUUID === 'function'
   ? crypto.randomUUID()
@@ -43,8 +50,8 @@ async function attemptRefresh(): Promise<boolean> {
   const result = await response.json()
   const newToken = result?.data?.access_token
   if (!newToken) return false
-  localStorage.setItem('auth_token', newToken)
-  authChannel.postMessage({ type: 'token_updated', token: newToken })
+  setAuthToken(newToken)
+  authChannel.postMessage({ type: 'session_changed' })
   return true
 }
 
@@ -57,10 +64,21 @@ async function handleUnauthorized(): Promise<boolean> {
 // Multi-tab sync
 const authChannel = new BroadcastChannel('auth_token_sync')
 authChannel.addEventListener('message', (event) => {
-  if (event.data?.type === 'token_updated') {
-    localStorage.setItem('auth_token', event.data.token)
+  if (event.data?.type === 'session_changed') {
+    // Another tab refreshed — silently get our own fresh token from the httpOnly cookie
+    fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then((result) => {
+        const newToken = result?.data?.access_token
+        if (newToken) setAuthToken(newToken)
+      })
+      .catch(() => { /* keep existing token on network error */ })
   } else if (event.data?.type === 'logged_out') {
-    localStorage.removeItem('auth_token')
+    setAuthToken(null)
     if (window.location.pathname !== '/login') {
       window.location.href = '/login'
     }
@@ -92,7 +110,7 @@ async function handleResponse<T>(
     }
 
     if (refreshed) {
-      const newToken = localStorage.getItem('auth_token')
+      const newToken = _authToken
       if (newToken) headers['Authorization'] = `Bearer ${newToken}`
       const retryResponse = await retry()
       const retryData = await parseBody(retryResponse)
@@ -103,7 +121,7 @@ async function handleResponse<T>(
     }
 
     // Refresh explicitly rejected — auth is confirmed invalid
-    localStorage.removeItem('auth_token')
+    setAuthToken(null)
     if (window.location.pathname !== '/login') {
       window.location.href = '/login'
     }
@@ -127,7 +145,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     ...extraHeaders,
   }
 
-  const token = localStorage.getItem('auth_token')
+  const token = _authToken
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const url = `${BASE_URL}${endpoint}`
@@ -145,7 +163,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 async function uploadRequest<T>(endpoint: string, formData: FormData, method: HttpMethod = 'POST'): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
 
-  const token = localStorage.getItem('auth_token')
+  const token = _authToken
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const url = `${BASE_URL}${endpoint}`
@@ -157,6 +175,15 @@ async function uploadRequest<T>(endpoint: string, formData: FormData, method: Ht
   })
 
   return handleResponse<T>(await doFetch(), headers, doFetch)
+}
+
+async function blobRequest(url: string): Promise<Blob> {
+  const headers: Record<string, string> = {}
+  const token = _authToken
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const response = await fetch(url, { headers, credentials: 'include', cache: 'no-store' })
+  if (!response.ok) throw new HttpError(response.status, `Request failed with status ${response.status}`)
+  return response.blob()
 }
 
 export const http = {
@@ -177,6 +204,9 @@ export const http = {
   },
   upload<T>(endpoint: string, formData: FormData, method?: HttpMethod): Promise<T> {
     return uploadRequest<T>(endpoint, formData, method)
+  },
+  download(url: string): Promise<Blob> {
+    return blobRequest(url)
   },
 }
 
