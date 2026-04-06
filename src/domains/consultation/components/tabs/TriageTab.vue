@@ -15,6 +15,7 @@ import VitalsSummary from '../VitalsSummary.vue'
 import { patientApi } from '@/domains/patient/api/patientApi'
 import type { ConsultationTriage } from '../../types/consultation.types'
 import LabOrderSection from '../LabOrderSection.vue'
+import type { LabOrderResponse } from '../../types/labOrder.types'
 
 const props = defineProps<{
   triage: ConsultationTriage
@@ -23,6 +24,7 @@ const props = defineProps<{
   patientConditions: string[]
   consultationId: string
   disabled: boolean
+  labOrderUpdate?: LabOrderResponse | null
 }>()
 
 const emit = defineEmits<{
@@ -558,7 +560,7 @@ function onUpdateNumber(field: 'hr' | 'rr' | 'temp' | 'spo2' | 'blood_sugar', va
     </div>
 
     <!-- Lab Orders -->
-    <LabOrderSection v-if="hasLabOrders" :consultation-id="consultationId" :disabled="disabled" @lab-updated="emit('lab-updated')" />
+    <LabOrderSection v-if="hasLabOrders" :consultation-id="consultationId" :disabled="disabled" :realtime-update="labOrderUpdate" @lab-updated="emit('lab-updated')" />
 
     <!-- Notes -->
     <div class="flex flex-col gap-2">

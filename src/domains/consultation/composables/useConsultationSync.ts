@@ -24,7 +24,6 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
 
   function onEvent(ctx: PublicationContext) {
     const event = ctx.data as ConsultationRealtimeEvent
-
     if (event.type.startsWith('consultation.')) {
       if (isSelf(event)) return
       consultationStore.handleRealtimeEvent(event)
