@@ -245,6 +245,9 @@ async function bootstrap(): Promise<void> {
     visits.value = data.visits
     isLoading.value = false
 
+    // Remove token from URL so it doesn't linger in browser history or referrer headers
+    window.history.replaceState(null, '', '/queue-display')
+
     initCentrifuge(
       data.centrifugo.connection_token,
       data.centrifugo.subscription_token,

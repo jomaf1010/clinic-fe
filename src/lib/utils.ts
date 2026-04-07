@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { http } from '@/lib/http'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -94,8 +95,7 @@ export function printPdf(url: string): void {
     // relative URL, keep as-is
   }
 
-  fetch(url, { credentials: 'include' })
-    .then((res) => res.blob())
+  http.download(url)
     .then((blob) => {
       const blobUrl = URL.createObjectURL(blob)
       const iframe = document.createElement('iframe')

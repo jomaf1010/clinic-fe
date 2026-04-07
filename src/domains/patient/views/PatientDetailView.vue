@@ -49,6 +49,7 @@ import VitalsComparisonCard from '@/domains/patient/components/VitalsComparisonC
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
+import { usePatientSync } from '../composables/usePatientSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,6 +59,12 @@ const notificationStore = useNotificationStore()
 const patient = ref<PatientResponse | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+
+const patientIdRef = computed(() => route.params.id as string)
+const clinicIdRef = computed(() => authStore.currentClinic?.id)
+usePatientSync(patientIdRef, clinicIdRef, (updated) => {
+  patient.value = updated
+})
 
 const avatarCropOpen = ref(false)
 const isUploadingAvatar = ref(false)

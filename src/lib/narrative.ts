@@ -4,9 +4,10 @@
  * stay consistent across re-renders.
  */
 
+import DOMPurify from 'dompurify'
 import { FREQUENCY_HUMAN } from '@/domains/medicine/constants'
 import type { ConsultationTriage } from '@/domains/consultation/types/consultation.types'
-import { parseBp, compareBp, classifyBp, isBpConcerning } from '@/lib/vitals'
+import { parseBp, compareBp, classifyBp, isBpConcerning, DEFAULT_VITALS_CONFIG, type VitalsConfig } from '@/lib/vitals'
 
 // -- Stable hash --------------------------------------------------------
 
@@ -127,7 +128,7 @@ export function buildNarrative(input: NarrativeInput): string {
   }
 
   if (!parts.length) return ''
-  return parts.join(', ') + '.'
+  return DOMPurify.sanitize(parts.join(', ') + '.', { ALLOWED_TAGS: ['strong'], ALLOWED_ATTR: [] })
 }
 
 // -- Vitals comparison narrative ----------------------------------------
@@ -214,7 +215,7 @@ const vitalsIntroPhrases = [
   'Versus the previous visit, ',
 ]
 
-function collectChanges(current: ConsultationTriage, previous: ConsultationTriage): VitalChange[] {
+function collectChanges(current: ConsultationTriage, previous: ConsultationTriage, config: VitalsConfig): VitalChange[] {
   const result: VitalChange[] = []
   const curr = current.vitals
   const prev = previous.vitals
@@ -223,30 +224,30 @@ function collectChanges(current: ConsultationTriage, previous: ConsultationTriag
   const currBp = parseBp(curr.bp)
   const prevBp = parseBp(prev.bp)
   if (currBp && prevBp && curr.bp !== prev.bp) {
-    const comparison = compareBp(currBp, prevBp)
-    const currClass = classifyBp(currBp)
-    const prevClass = classifyBp(prevBp)
+    const comparison = compareBp(currBp, prevBp, config)
+    const currClass = classifyBp(currBp, config)
+    const prevClass = classifyBp(prevBp, config)
     if (comparison !== 'same') {
-      result.push({ label: 'Blood Pressure', prev: `${prev.bp} (${prevClass.label})`, curr: `${curr.bp} (${currClass.label})`, direction: comparison, concern: isBpConcerning(currBp) })
+      result.push({ label: 'Blood Pressure', prev: `${prev.bp} (${prevClass.label})`, curr: `${curr.bp} (${currClass.label})`, direction: comparison, concern: isBpConcerning(currBp, config) })
     } else {
-      result.push({ label: 'Blood Pressure', prev: prev.bp!, curr: curr.bp!, direction: 'up', concern: isBpConcerning(currBp), extra: `still classified as ${currClass.label}` })
+      result.push({ label: 'Blood Pressure', prev: prev.bp!, curr: curr.bp!, direction: 'up', concern: isBpConcerning(currBp, config), extra: `still classified as ${currClass.label}` })
     }
   }
 
   if (curr.hr != null && prev.hr != null && curr.hr !== prev.hr)
-    result.push({ label: 'Heart Rate', prev: `${prev.hr} bpm`, curr: `${curr.hr} bpm`, direction: curr.hr > prev.hr ? 'up' : 'down', concern: curr.hr > 100 || curr.hr < 60 })
+    result.push({ label: 'Heart Rate', prev: `${prev.hr} bpm`, curr: `${curr.hr} bpm`, direction: curr.hr > prev.hr ? 'up' : 'down', concern: curr.hr > config.hr_high || curr.hr < config.hr_low })
 
   if (curr.temp != null && prev.temp != null && Math.abs(curr.temp - prev.temp) >= 0.1)
-    result.push({ label: 'Temperature', prev: `${prev.temp}°C`, curr: `${curr.temp}°C`, direction: curr.temp > prev.temp ? 'up' : 'down', concern: curr.temp > 37.5 || curr.temp < 36 })
+    result.push({ label: 'Temperature', prev: `${prev.temp}°C`, curr: `${curr.temp}°C`, direction: curr.temp > prev.temp ? 'up' : 'down', concern: curr.temp > config.temp_normal_max || curr.temp < config.temp_hypothermia })
 
   if (curr.spo2 != null && prev.spo2 != null && curr.spo2 !== prev.spo2)
-    result.push({ label: 'Oxygen Level', prev: `${prev.spo2}%`, curr: `${curr.spo2}%`, direction: curr.spo2 > prev.spo2 ? 'up' : 'down', concern: curr.spo2 < 95 })
+    result.push({ label: 'Oxygen Level', prev: `${prev.spo2}%`, curr: `${curr.spo2}%`, direction: curr.spo2 > prev.spo2 ? 'up' : 'down', concern: curr.spo2 < config.spo2_normal })
 
   if (curr.rr != null && prev.rr != null && curr.rr !== prev.rr)
-    result.push({ label: 'Breathing Rate', prev: `${prev.rr}/min`, curr: `${curr.rr}/min`, direction: curr.rr > prev.rr ? 'up' : 'down', concern: curr.rr > 20 || curr.rr < 12 })
+    result.push({ label: 'Breathing Rate', prev: `${prev.rr}/min`, curr: `${curr.rr}/min`, direction: curr.rr > prev.rr ? 'up' : 'down', concern: curr.rr > config.rr_high || curr.rr < config.rr_low })
 
   if (curr.blood_sugar != null && prev.blood_sugar != null && curr.blood_sugar !== prev.blood_sugar)
-    result.push({ label: 'Blood Sugar', prev: `${prev.blood_sugar} mg/dL`, curr: `${curr.blood_sugar} mg/dL`, direction: curr.blood_sugar > prev.blood_sugar ? 'up' : 'down', concern: curr.blood_sugar > 125 || curr.blood_sugar < 70 })
+    result.push({ label: 'Blood Sugar', prev: `${prev.blood_sugar} mg/dL`, curr: `${curr.blood_sugar} mg/dL`, direction: curr.blood_sugar > prev.blood_sugar ? 'up' : 'down', concern: curr.blood_sugar > config.bs_prediabetic || curr.blood_sugar < config.bs_hypoglycemia })
 
   if (current.weight != null && previous.weight != null && current.weight !== previous.weight)
     result.push({ label: 'Weight', prev: `${previous.weight} kg`, curr: `${current.weight} kg`, direction: current.weight > previous.weight ? 'up' : 'down', concern: false })
@@ -255,7 +256,7 @@ function collectChanges(current: ConsultationTriage, previous: ConsultationTriag
     result.push({ label: 'Height', prev: `${previous.height} cm`, curr: `${current.height} cm`, direction: current.height > previous.height ? 'up' : 'down', concern: false })
 
   if (current.pain_score != null && previous.pain_score != null && current.pain_score !== previous.pain_score)
-    result.push({ label: 'Pain Level', prev: `${previous.pain_score}/10`, curr: `${current.pain_score}/10`, direction: current.pain_score > previous.pain_score ? 'up' : 'down', concern: current.pain_score >= 7 })
+    result.push({ label: 'Pain Level', prev: `${previous.pain_score}/10`, curr: `${current.pain_score}/10`, direction: current.pain_score > previous.pain_score ? 'up' : 'down', concern: current.pain_score >= config.pain_high })
 
   return result
 }
@@ -282,8 +283,8 @@ function collectUnchanged(current: ConsultationTriage, previous: ConsultationTri
  * Build a verbal narrative comparing vitals between two triage records.
  * Returns an HTML string, or empty string if nothing to compare.
  */
-export function buildVitalsNarrative(id: string, current: ConsultationTriage, previous: ConsultationTriage): string {
-  const changes = collectChanges(current, previous)
+export function buildVitalsNarrative(id: string, current: ConsultationTriage, previous: ConsultationTriage, config: VitalsConfig = DEFAULT_VITALS_CONFIG): string {
+  const changes = collectChanges(current, previous, config)
   const unchanged = collectUnchanged(current, previous)
 
   if (!changes.length && !unchanged.length) return ''
@@ -334,5 +335,5 @@ export function buildVitalsNarrative(id: string, current: ConsultationTriage, pr
     result += (result ? ' ' : '') + fn(joined) + '.'
   }
 
-  return result
+  return result ? DOMPurify.sanitize(result, { ALLOWED_TAGS: ['strong'], ALLOWED_ATTR: [] }) : result
 }

@@ -121,12 +121,15 @@ export const loginSchema = {
  * Validation schema for the signup form.
  * Pass directly to `useForm({ validationSchema: signupSchema })`.
  */
-export const signupSchema = {
-  email: [required('Email'), email('Email')],
-  password: [required('Password'), minLength('Password', 10)],
-  first_name: [maxLength('First name', 255)],
-  last_name: [maxLength('Last name', 255)],
+export function createSignupSchema(minPwLen = 10) {
+  return {
+    email: [required('Email'), email('Email')],
+    password: [required('Password'), minLength('Password', minPwLen)],
+    first_name: [maxLength('First name', 255)],
+    last_name: [maxLength('Last name', 255)],
+  }
 }
+export const signupSchema = createSignupSchema()
 
 /**
  * Validation schema for the clinic creation (onboarding) form.
@@ -179,11 +182,14 @@ export const credentialsSchema = {
  * Validation schema for the change password form.
  * Pass directly to `useForm({ validationSchema: changePasswordSchema })`.
  */
-export const changePasswordSchema = {
-  current_password: [required('Current password')],
-  new_password: [required('New password'), minLength('New password', 10)],
-  new_password_confirmation: [required('Password confirmation')],
+export function createChangePasswordSchema(minPwLen = 10) {
+  return {
+    current_password: [required('Current password')],
+    new_password: [required('New password'), minLength('New password', minPwLen)],
+    new_password_confirmation: [required('Password confirmation')],
+  }
 }
+export const changePasswordSchema = createChangePasswordSchema()
 
 /**
  * Validation schema for the forgot password form.
@@ -197,7 +203,10 @@ export const forgotPasswordSchema = {
  * Validation schema for the reset password form.
  * Pass directly to `useForm({ validationSchema: resetPasswordSchema })`.
  */
-export const resetPasswordSchema = {
-  password: [required('New password'), minLength('New password', 10)],
-  password_confirmation: [required('Confirm password')],
+export function createResetPasswordSchema(minPwLen = 10) {
+  return {
+    password: [required('New password'), minLength('New password', minPwLen)],
+    password_confirmation: [required('Confirm password')],
+  }
 }
+export const resetPasswordSchema = createResetPasswordSchema()

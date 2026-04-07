@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import { http, getAuthToken } from '@/lib/http'
 import {
   FlaskConical,
   Plus,
@@ -445,13 +446,16 @@ async function viewResult(item: LabOrderItem) {
   previewOpen.value = true
 
   try {
-    const token = localStorage.getItem('auth_token')
-    const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
+    const apiBase = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
     const files = await Promise.all(
       item.result_files.map(async (fileUrl) => {
-        const res = await fetch(`${baseUrl}${fileUrl}`, {
+        const url = `${apiBase}${fileUrl}`
+        const token = getAuthToken()
+        const res = await fetch(url, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
         })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const blob = await res.blob()
         return {
           url: URL.createObjectURL(blob),

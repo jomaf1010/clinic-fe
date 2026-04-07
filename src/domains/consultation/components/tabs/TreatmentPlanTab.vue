@@ -61,6 +61,11 @@ watch(
   (v) => {
     local.advice = v.advice ?? ''
     local.follow_up = v.follow_up ?? null
+    if (v.follow_up && v.follow_up_appointment_id) {
+      appointmentBooked.value = true
+    } else if (!v.follow_up) {
+      appointmentBooked.value = false
+    }
   },
   { deep: true },
 )
@@ -156,7 +161,7 @@ async function bookFollowUp(slot: Slot): Promise<void> {
   isBooking.value = true
 
   try {
-    await appointmentApi.create({
+    const response = await appointmentApi.create({
       patient_id: props.patientId,
       doctor_id: props.doctorId,
       scheduled_at: slot.start,
@@ -164,8 +169,9 @@ async function bookFollowUp(slot: Slot): Promise<void> {
       consultation_type: 'follow_up',
     })
 
+    const appointmentId = response.data.id
     local.follow_up = selectedDate.value
-    emit('save', { treatment_plan: { follow_up: selectedDate.value } })
+    emit('save', { treatment_plan: { follow_up: selectedDate.value, follow_up_appointment_id: appointmentId } })
     appointmentBooked.value = true
     toast.success('Follow-up appointment booked')
   } catch {
@@ -182,7 +188,7 @@ function clearFollowUp(): void {
   selectedSlot.value = null
   slots.value = []
   appointmentBooked.value = false
-  emit('save', { treatment_plan: { follow_up: null } })
+  emit('save', { treatment_plan: { follow_up: null, follow_up_appointment_id: null } })
 }
 
 function onAdviceBlur(): void {

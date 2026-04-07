@@ -51,6 +51,7 @@ import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import { openNewTab, printPdf } from '@/lib/utils'
 import type { UpdateConsultationPayload } from '../types/consultation.types'
 import { useConsultationSync } from '../composables/useConsultationSync'
+import { usePatientSync } from '@/domains/patient/composables/usePatientSync'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,7 +61,14 @@ const { isOnline, pendingCount } = useOfflineSync()
 
 const consultationId = computed(() => store.current?.id)
 const clinicId = computed(() => store.current?.clinic_id)
+const patientId = computed(() => store.current?.patient_id)
 const { prescriptionUpdate, labOrderUpdate, documentUpdate } = useConsultationSync(consultationId, clinicId)
+usePatientSync(patientId, clinicId, (updated) => {
+  if (store.current) {
+    store.current.patient_allergies = updated.allergies
+    store.current.patient_conditions = updated.chronic_conditions
+  }
+})
 
 const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
 const canEditAssessment = computed(() => authStore.hasPermission('consultations.edit-assessment'))
@@ -496,6 +504,7 @@ function proceedAfterFeeWarning() {
             :patient-conditions="store.current.patient_conditions ?? []"
             :consultation-id="store.current.id"
             :disabled="store.isFinalized || !canEditTriage"
+            :lab-order-update="labOrderUpdate"
             @save="handleSave"
             @patient-updated="store.loadConsultation(store.current!.id)"
             @lab-updated="store.loadConsultation(store.current!.id)"

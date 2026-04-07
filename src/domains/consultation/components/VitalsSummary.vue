@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { getAuthToken } from '@/lib/http'
 import { AlertTriangle, CheckCircle2, ShieldAlert, HeartPulse, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -10,7 +11,8 @@ import { VisXYContainer, VisLine, VisAxis, VisArea, VisScatter, VisTooltip } fro
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { http } from '@/lib/http'
 import type { ConsultationTriage, ConsultationResponse, LabOrderSummary } from '../types/consultation.types'
-import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar } from '@/lib/vitals'
+import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyBmi } from '@/lib/vitals'
+import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import { labOrderApi } from '../api/labOrderApi'
 import FinalizeModal from './FinalizeModal.vue'
 
@@ -30,6 +32,8 @@ const props = defineProps<{
   showTrendsButton?: boolean
   labOrderSummary?: LabOrderSummary | null
 }>()
+
+const vitalsConfig = useVitalsConfigStore()
 
 const pastDiagnoses = ref<PastDiagnosis[]>([])
 const showTrends = ref(false)
@@ -120,7 +124,7 @@ const bpSystolic = (d: BPDataPoint) => d.systolic
 const bpDiastolic = (d: BPDataPoint) => d.diastolic
 
 function bpStatusColor(systolic: number, diastolic: number): { label: string; color: string } {
-  const s = classifyBpAsStatus(`${systolic}/${diastolic}`)
+  const s = classifyBpAsStatus(`${systolic}/${diastolic}`, vitalsConfig.config)
   if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
   if (s.severity === 'elevated' || s.severity === 'low') return { label: s.label, color: '#d97706' }
   return { label: s.label, color: '#dc2626' }
@@ -141,9 +145,10 @@ function weightBmiStatus(weight: number): { label: string; color: string } | nul
   if (!height) return null
   const heightM = height / 100
   const bmiVal = weight / (heightM * heightM)
-  if (bmiVal < 18.5) return { label: `BMI ${bmiVal.toFixed(1)} · Underweight`, color: '#2563eb' }
-  if (bmiVal < 25) return { label: `BMI ${bmiVal.toFixed(1)} · Normal`, color: '#16a34a' }
-  if (bmiVal < 30) return { label: `BMI ${bmiVal.toFixed(1)} · Overweight`, color: '#d97706' }
+  const cfg = vitalsConfig.config
+  if (bmiVal < cfg.bmi_underweight) return { label: `BMI ${bmiVal.toFixed(1)} · Underweight`, color: '#2563eb' }
+  if (bmiVal < cfg.bmi_normal)      return { label: `BMI ${bmiVal.toFixed(1)} · Normal`, color: '#16a34a' }
+  if (bmiVal < cfg.bmi_overweight)  return { label: `BMI ${bmiVal.toFixed(1)} · Overweight`, color: '#d97706' }
   return { label: `BMI ${bmiVal.toFixed(1)} · Obese`, color: '#dc2626' }
 }
 
@@ -154,7 +159,7 @@ const bsX = (_: BSDataPoint, i: number) => i
 const bsY = (d: BSDataPoint) => d.blood_sugar
 
 function bsStatusColor(val: number): { label: string; color: string } {
-  const s = classifyBloodSugar(val)
+  const s = classifyBloodSugar(val, vitalsConfig.config)
   if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
   if (s.severity === 'low') return { label: s.label, color: '#2563eb' }
   if (s.severity === 'elevated') return { label: s.label, color: '#d97706' }
@@ -204,13 +209,15 @@ async function viewLabResult(description: string) {
       return
     }
 
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
     const files = await Promise.all(
       item.result_files.map(async (fileUrl) => {
         const res = await fetch(`${baseUrl}${fileUrl}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
         })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const blob = await res.blob()
         return {
           url: URL.createObjectURL(blob),
@@ -295,45 +302,43 @@ const bmi = computed(() => {
 })
 
 const bmiCategory = computed(() => {
-  if (bmi.value === null) return null
-  if (bmi.value < 18.5) return { label: 'Underweight', color: 'text-blue-600' }
-  if (bmi.value < 25) return { label: 'Normal', color: 'text-green-600' }
-  if (bmi.value < 30) return { label: 'Overweight', color: 'text-amber-600' }
-  return { label: 'Obese', color: 'text-red-600' }
+  const result = classifyBmi(bmi.value, vitalsConfig.config)
+  if (!result) return null
+  return { label: result.label, color: result.color }
 })
 
 const tempStatus = computed(() => {
-  const s = classifyTemp(props.triage.vitals?.temp)
+  const s = classifyTemp(props.triage.vitals?.temp, vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bpStatus = computed(() => {
-  const s = classifyBpAsStatus(props.triage.vitals?.bp)
+  const s = classifyBpAsStatus(props.triage.vitals?.bp, vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const hrStatus = computed(() => {
-  const s = classifyHr(props.triage.vitals?.hr)
+  const s = classifyHr(props.triage.vitals?.hr, vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const spo2Status = computed(() => {
-  const s = classifySpo2(props.triage.vitals?.spo2)
+  const s = classifySpo2(props.triage.vitals?.spo2, vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const rrStatus = computed(() => {
-  const s = classifyRr(props.triage.vitals?.rr)
+  const s = classifyRr(props.triage.vitals?.rr, vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bsStatus = computed(() => {
-  const s = classifyBloodSugar(props.triage.vitals?.blood_sugar)
+  const s = classifyBloodSugar(props.triage.vitals?.blood_sugar, vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
@@ -370,12 +375,13 @@ const vitalBadges = computed(() => {
   const badges: VitalBadge[] = []
 
   if (bmi.value !== null && bmiCategory.value) {
-    const isNormal = bmi.value >= 18.5 && bmi.value < 25
+    const cfg = vitalsConfig.config
+    const isNormal = bmi.value >= cfg.bmi_underweight && bmi.value < cfg.bmi_normal
     badges.push({
       label: 'BMI',
       value: `${bmi.value}`,
       status: bmiCategory.value.label,
-      badgeClass: isNormal ? BADGE_GREEN : bmi.value < 18.5 ? BADGE_BLUE : bmi.value < 30 ? BADGE_AMBER : BADGE_RED,
+      badgeClass: isNormal ? BADGE_GREEN : bmi.value < cfg.bmi_underweight ? BADGE_BLUE : bmi.value < cfg.bmi_overweight ? BADGE_AMBER : BADGE_RED,
     })
   }
 

@@ -41,6 +41,7 @@ export interface ConsultationAssessment {
 export interface ConsultationTreatmentPlan {
   advice: string | null
   follow_up: string | null
+  follow_up_appointment_id: string | null
 }
 
 export interface ConsultationPayment {

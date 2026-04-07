@@ -11,6 +11,7 @@ import { timeAgo } from '@/lib/utils'
 import { classifyBpString, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyPain } from '@/lib/vitals'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { buildNarrative } from '@/lib/narrative'
+import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 
 const props = defineProps<{
   consultation: ConsultationResponse
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const authStore = useAuthStore()
+const vitalsConfig = useVitalsConfigStore()
 
 const doctorInitials = computed(() => {
   const name = props.consultation.doctor_name ?? ''
@@ -50,37 +52,39 @@ const abnormalVitals = computed(() => {
 
   const alerts: VitalAlert[] = []
 
-  const bp = classifyBpString(vitals.bp)
+  const cfg = vitalsConfig.config
+
+  const bp = classifyBpString(vitals.bp, cfg)
   if (bp && bp.severity >= 1) {
     alerts.push({ label: 'BP', value: `${vitals.bp} · ${bp.label}`, status: bp.label, color: bp.severity >= 2 ? BADGE_RED : BADGE_AMBER })
   }
 
-  const hr = classifyHr(vitals.hr)
+  const hr = classifyHr(vitals.hr, cfg)
   if (hr && hr.severity !== 'normal') {
     alerts.push({ label: 'HR', value: `${vitals.hr} bpm`, status: hr.label, color: badgeColor(hr.severity) })
   }
 
-  const temp = classifyTemp(vitals.temp)
+  const temp = classifyTemp(vitals.temp, cfg)
   if (temp && temp.severity !== 'normal') {
     alerts.push({ label: 'Temp', value: `${vitals.temp}°C`, status: temp.label, color: badgeColor(temp.severity) })
   }
 
-  const spo2 = classifySpo2(vitals.spo2)
+  const spo2 = classifySpo2(vitals.spo2, cfg)
   if (spo2 && spo2.severity !== 'normal') {
     alerts.push({ label: 'SpO2', value: `${vitals.spo2}%`, status: spo2.label, color: badgeColor(spo2.severity) })
   }
 
-  const rr = classifyRr(vitals.rr)
+  const rr = classifyRr(vitals.rr, cfg)
   if (rr && rr.severity !== 'normal') {
     alerts.push({ label: 'RR', value: `${vitals.rr}/min`, status: rr.label, color: badgeColor(rr.severity) })
   }
 
-  const bs = classifyBloodSugar(vitals.blood_sugar)
+  const bs = classifyBloodSugar(vitals.blood_sugar, cfg)
   if (bs && bs.severity !== 'normal') {
     alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: bs.label, color: badgeColor(bs.severity) })
   }
 
-  const pain = classifyPain(props.consultation.triage?.pain_score)
+  const pain = classifyPain(props.consultation.triage?.pain_score, cfg)
   if (pain) {
     alerts.push({ label: 'Pain', value: `${props.consultation.triage?.pain_score}/10`, status: pain.label, color: BADGE_RED })
   }
