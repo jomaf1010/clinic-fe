@@ -16,8 +16,6 @@ import {
   WifiOff,
   Eye,
   ArrowLeft,
-  PercentCircle,
-  FileCheck,
   FileText,
   FileDown,
   Printer,
@@ -26,7 +24,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -38,7 +35,6 @@ import {
 import { useOfflineSync } from '@/composables/useOfflineSync'
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { consultationApi } from '../api/consultationApi'
 import { useConsultationStore } from '../stores/consultationStore'
 import TriageTab from '../components/tabs/TriageTab.vue'
 import AssessmentTab from '../components/tabs/AssessmentTab.vue'
@@ -46,7 +42,6 @@ import TreatmentPlanTab from '../components/tabs/TreatmentPlanTab.vue'
 import PaymentTab from '../components/tabs/PaymentTab.vue'
 import VitalsSummary from '../components/VitalsSummary.vue'
 import FinalizeModal from '../components/FinalizeModal.vue'
-import MedCertDialog from '../components/MedCertDialog.vue'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import { openNewTab, printPdf } from '@/lib/utils'
 import type { UpdateConsultationPayload } from '../types/consultation.types'
@@ -79,8 +74,7 @@ const activeTab = ref('triage')
 const showPreviewModal = ref(false)
 const showFinalizeModal = ref(false)
 const showFeeWarningModal = ref(false)
-const showMedCertDialog = ref(false)
-const showFeeDiscountModal = ref(false)
+const autoOpenMedCert = ref(false)
 const loadError = ref<string | null>(null)
 const pendingFinalizeAction = ref<'confirm' | 'pay'>('confirm')
 
@@ -188,46 +182,6 @@ async function downloadSummary() {
   }
 }
 
-// Fee discount state
-const feeDiscountType = ref<'percentage' | 'fixed'>('percentage')
-const feeDiscountValue = ref('')
-const isSavingDiscount = ref(false)
-
-function openFeeDiscountModal() {
-  const payment = store.current?.payment
-  feeDiscountType.value = (payment?.fee_discount_type as 'percentage' | 'fixed') ?? 'percentage'
-  feeDiscountValue.value = payment?.fee_discount_value ? String(payment.fee_discount_value) : ''
-  showFeeDiscountModal.value = true
-}
-
-async function saveFeeDiscount() {
-  if (!store.current) return
-  isSavingDiscount.value = true
-  try {
-    const val = parseFloat(feeDiscountValue.value) || 0
-    await consultationApi.saveFeeDiscount(store.current.id, {
-      fee_discount_type: val > 0 ? feeDiscountType.value : null,
-      fee_discount_value: val > 0 ? val : null,
-    })
-    // Update local state
-    if (store.current) {
-      store.current = {
-        ...store.current,
-        payment: {
-          ...store.current.payment,
-          fee_discount_type: val > 0 ? feeDiscountType.value : null,
-          fee_discount_value: val > 0 ? val : null,
-        },
-      }
-    }
-    showFeeDiscountModal.value = false
-  } catch {
-    // silent
-  } finally {
-    isSavingDiscount.value = false
-  }
-}
-
 onMounted(async () => {
   loadError.value = null
   try {
@@ -250,9 +204,10 @@ onMounted(async () => {
       loadSummaryDoc()
     }
 
-    // Auto-open med cert dialog from notification
+    // Auto-open med cert dialog from notification — switch to payment tab
     if (route.query.openMedCert === '1') {
-      showMedCertDialog.value = true
+      activeTab.value = 'payment'
+      autoOpenMedCert.value = true
       router.replace({ ...route, query: { ...route.query, openMedCert: undefined } })
     }
   } catch (err) {
@@ -267,7 +222,8 @@ onMounted(async () => {
 // Handle openMedCert query when navigating to same consultation (component reuse)
 watch(() => route.query.openMedCert, (val) => {
   if (val === '1') {
-    showMedCertDialog.value = true
+    activeTab.value = 'payment'
+    autoOpenMedCert.value = true
     router.replace({ ...route, query: { ...route.query, openMedCert: undefined } })
   }
 })
@@ -295,11 +251,18 @@ const visibleTabs = computed(() =>
   }),
 )
 const currentTabIndex = computed(() => visibleTabs.value.indexOf(activeTab.value as (typeof allTabs)[number]))
-const prevTabLabel = computed(() => currentTabIndex.value > 0 ? tabLabels[visibleTabs.value[currentTabIndex.value - 1]] : null)
-const nextTabLabel = computed(() => currentTabIndex.value < visibleTabs.value.length - 1 ? tabLabels[visibleTabs.value[currentTabIndex.value + 1]] : null)
+const prevTabLabel = computed(() => {
+  const idx = currentTabIndex.value - 1
+  return idx >= 0 ? tabLabels[visibleTabs.value[idx]!] : null
+})
+const nextTabLabel = computed(() => {
+  const idx = currentTabIndex.value + 1
+  return idx < visibleTabs.value.length ? tabLabels[visibleTabs.value[idx]!] : null
+})
 function goToTab(direction: 'prev' | 'next') {
   const idx = currentTabIndex.value + (direction === 'next' ? 1 : -1)
-  if (idx >= 0 && idx < visibleTabs.value.length) activeTab.value = visibleTabs.value[idx]
+  const tab = visibleTabs.value[idx]
+  if (tab) activeTab.value = tab
 }
 
 async function handleFinalizeConfirm(): Promise<void> {
@@ -567,30 +530,6 @@ function proceedAfterFeeWarning() {
             </Button>
             <div class="flex items-center gap-2">
               <Button
-                v-if="store.isDraft"
-                variant="outline"
-                size="sm"
-                @click="openFeeDiscountModal"
-              >
-                <PercentCircle class="size-3.5" />
-                <span class="hidden sm:inline">Fee Discount</span>
-              </Button>
-              <Badge
-                v-if="store.current?.payment?.fee_discount_value"
-                variant="outline"
-                class="border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
-              >
-                {{ store.current.payment.fee_discount_type === 'percentage' ? `${store.current.payment.fee_discount_value}% off` : `₱${store.current.payment.fee_discount_value} off` }}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                @click="showMedCertDialog = true"
-              >
-                <FileCheck class="size-3.5" />
-                Medical Certificate
-              </Button>
-              <Button
                 v-if="store.isDraft && canFinalize"
                 @click="handleFinalizeAndPayClick"
                 :disabled="store.isSaving"
@@ -613,6 +552,19 @@ function proceedAfterFeeWarning() {
               :disabled="store.isFinalized"
               :consultation-id="store.current.id"
               :status="store.current.status"
+              :consultation-type="store.current.type"
+              :patient-id="store.current.patient_id"
+              :diagnoses="store.current.assessment?.diagnoses ?? []"
+              :document-update="documentUpdate"
+              :consumables="store.current.consumables ?? []"
+              :prescription-summary="store.current.prescription_summary"
+              :lab-order-summary="store.current.lab_order_summary"
+              :payment="store.current.payment"
+              :open-med-cert-on-mount="autoOpenMedCert"
+              :can-finalize="store.isDraft && canFinalize"
+              :is-saving="store.isSaving"
+              @update:payment="(p) => { if (store.current) store.current.payment = p }"
+              @finalize="handleFinalizeAndPayClick"
             />
           <div class="mt-8 flex justify-start border-t pt-4">
             <Button variant="outline" @click="goToTab('prev')">
@@ -671,74 +623,5 @@ function proceedAfterFeeWarning() {
       </DialogContent>
     </Dialog>
 
-    <!-- Medical Certificate Dialog -->
-    <MedCertDialog
-      v-if="store.current"
-      :open="showMedCertDialog"
-      :consultation-id="store.current.id"
-      :diagnoses="store.current.assessment?.diagnoses ?? []"
-      :document-update="documentUpdate"
-      @update:open="showMedCertDialog = $event"
-    />
-
-    <!-- Fee Discount Modal -->
-    <Dialog v-model:open="showFeeDiscountModal">
-      <DialogContent class="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <PercentCircle class="size-5 text-primary" />
-            Consultation Fee Discount
-          </DialogTitle>
-          <DialogDescription>
-            Set a discount on the consultation fee for this visit.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div class="flex flex-col gap-4">
-          <div class="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              :variant="feeDiscountType === 'percentage' ? 'default' : 'outline'"
-              @click="feeDiscountType = 'percentage'"
-            >
-              Percentage (%)
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              :variant="feeDiscountType === 'fixed' ? 'default' : 'outline'"
-              @click="feeDiscountType = 'fixed'"
-            >
-              Fixed (₱)
-            </Button>
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-muted-foreground">
-              {{ feeDiscountType === 'percentage' ? 'Discount %' : 'Discount Amount (₱)' }}
-            </label>
-            <Input
-              v-model="feeDiscountValue"
-              type="number"
-              min="0"
-              :max="feeDiscountType === 'percentage' ? '100' : undefined"
-              step="0.01"
-              :placeholder="feeDiscountType === 'percentage' ? 'e.g. 20' : 'e.g. 100'"
-              :disabled="isSavingDiscount"
-            />
-          </div>
-        </div>
-
-        <DialogFooter class="gap-2 sm:gap-0">
-          <Button variant="outline" :disabled="isSavingDiscount" @click="showFeeDiscountModal = false">
-            Cancel
-          </Button>
-          <Button :disabled="isSavingDiscount" @click="saveFeeDiscount">
-            <LoaderCircle v-if="isSavingDiscount" class="size-3.5 animate-spin" />
-            Save Discount
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   </Tabs>
 </template>

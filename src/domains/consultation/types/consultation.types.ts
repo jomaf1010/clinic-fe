@@ -61,7 +61,14 @@ export interface LabOrderSummary {
 
 export interface PrescriptionSummary {
   total: number
-  items: { drug_name: string; dose: string; frequency: string; duration: string }[]
+  items: {
+    drug_name: string
+    dose: string
+    frequency: string
+    duration: string
+    quantity?: number | null
+    unit_price?: number | null
+  }[]
 }
 
 export interface ConsultationDocument {
