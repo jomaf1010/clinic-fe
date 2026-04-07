@@ -19,8 +19,10 @@ import {
   classifyRr,
   classifyBloodSugar,
   classifyPain,
+  classifyBmi,
   type VitalStatus,
 } from '@/lib/vitals'
+import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import type { ConsultationResponse } from '../types/consultation.types'
 
 const props = withDefaults(defineProps<{
@@ -37,6 +39,8 @@ const emit = defineEmits<{
   confirm: []
 }>()
 
+const vitalsConfig = useVitalsConfigStore()
+
 function formatValue(val: string | number | null | undefined): string {
   if (val === null || val === undefined || val === '') return '—'
   return String(val)
@@ -51,13 +55,13 @@ function vitalIndicator(status: VitalStatus | null): { icon: typeof ArrowUp | ty
   return { icon: ArrowUp, class: 'text-red-600 dark:text-red-400' }
 }
 
-const bpInd = computed(() => vitalIndicator(classifyBpAsStatus(vitals.value?.bp)))
-const hrInd = computed(() => vitalIndicator(classifyHr(vitals.value?.hr)))
-const rrInd = computed(() => vitalIndicator(classifyRr(vitals.value?.rr)))
-const tempInd = computed(() => vitalIndicator(classifyTemp(vitals.value?.temp)))
-const spo2Ind = computed(() => vitalIndicator(classifySpo2(vitals.value?.spo2)))
-const bsInd = computed(() => vitalIndicator(classifyBloodSugar(vitals.value?.blood_sugar)))
-const painInd = computed(() => vitalIndicator(classifyPain(props.consultation.triage.pain_score)))
+const bpInd = computed(() => vitalIndicator(classifyBpAsStatus(vitals.value?.bp, vitalsConfig.config)))
+const hrInd = computed(() => vitalIndicator(classifyHr(vitals.value?.hr, vitalsConfig.config)))
+const rrInd = computed(() => vitalIndicator(classifyRr(vitals.value?.rr, vitalsConfig.config)))
+const tempInd = computed(() => vitalIndicator(classifyTemp(vitals.value?.temp, vitalsConfig.config)))
+const spo2Ind = computed(() => vitalIndicator(classifySpo2(vitals.value?.spo2, vitalsConfig.config)))
+const bsInd = computed(() => vitalIndicator(classifyBloodSugar(vitals.value?.blood_sugar, vitalsConfig.config)))
+const painInd = computed(() => vitalIndicator(classifyPain(props.consultation.triage.pain_score, vitalsConfig.config)))
 
 const bmi = computed(() => {
   const w = props.consultation.triage.weight
@@ -67,11 +71,9 @@ const bmi = computed(() => {
 })
 
 const bmiCategory = computed(() => {
-  if (bmi.value === null) return null
-  if (bmi.value < 18.5) return { label: 'Underweight', color: 'text-blue-600' }
-  if (bmi.value < 25) return { label: 'Normal', color: 'text-green-600' }
-  if (bmi.value < 30) return { label: 'Overweight', color: 'text-amber-600' }
-  return { label: 'Obese', color: 'text-red-600' }
+  const result = classifyBmi(bmi.value, vitalsConfig.config)
+  if (!result) return null
+  return { label: result.label, color: result.color }
 })
 </script>
 

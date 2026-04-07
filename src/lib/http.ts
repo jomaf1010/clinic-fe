@@ -9,6 +9,10 @@ export function setAuthToken(token: string | null): void {
   _authToken = token
 }
 
+export function getAuthToken(): string | null {
+  return _authToken
+}
+
 // Unique ID per browser tab — used for self-echo prevention in real-time sync
 export const SESSION_ID = typeof crypto.randomUUID === 'function'
   ? crypto.randomUUID()
@@ -178,10 +182,23 @@ async function uploadRequest<T>(endpoint: string, formData: FormData, method: Ht
 }
 
 async function blobRequest(url: string): Promise<Blob> {
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = {
+    Accept: '*/*',
+  }
   const token = _authToken
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const response = await fetch(url, { headers, credentials: 'include', cache: 'no-store' })
+
+  const doFetch = () => fetch(url, { headers, credentials: 'include', cache: 'no-store' })
+  let response = await doFetch()
+
+  if (response.status === 401) {
+    const refreshed = await handleUnauthorized().catch(() => false)
+    if (refreshed && _authToken) {
+      headers['Authorization'] = `Bearer ${_authToken}`
+      response = await doFetch()
+    }
+  }
+
   if (!response.ok) throw new HttpError(response.status, `Request failed with status ${response.status}`)
   return response.blob()
 }
@@ -204,6 +221,9 @@ export const http = {
   },
   upload<T>(endpoint: string, formData: FormData, method?: HttpMethod): Promise<T> {
     return uploadRequest<T>(endpoint, formData, method)
+  },
+  getBlob(endpoint: string): Promise<Blob> {
+    return blobRequest(`${BASE_URL}${endpoint}`)
   },
   download(url: string): Promise<Blob> {
     return blobRequest(url)

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { ConsultationTriage } from '@/domains/consultation/types/consultation.types'
 import { buildVitalsNarrative } from '@/lib/narrative'
+import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 
 const props = defineProps<{
   current: ConsultationTriage
@@ -9,8 +10,10 @@ const props = defineProps<{
   consultationId: string
 }>()
 
+const vitalsConfig = useVitalsConfigStore()
+
 const narrative = computed(() =>
-  buildVitalsNarrative(props.consultationId, props.current, props.previous),
+  buildVitalsNarrative(props.consultationId, props.current, props.previous, vitalsConfig.config),
 )
 </script>
 

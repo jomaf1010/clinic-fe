@@ -3,6 +3,7 @@ import { onMounted, onUnmounted } from 'vue'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
+import AnnouncementBanners from '@/components/layout/AnnouncementBanners.vue'
 import TrialBanner from '@/components/layout/TrialBanner.vue'
 import GracePeriodBanner from '@/components/layout/GracePeriodBanner.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
@@ -11,6 +12,7 @@ import { useMessageStore } from '@/domains/message/stores/messageStore'
 import { useNotificationRealtime } from '@/domains/notification/composables/useNotificationRealtime'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { useAnnouncementStore } from '@/stores/announcementStore'
 
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
@@ -18,6 +20,7 @@ const notificationStore = useNotificationStore()
 const { start: startDmRealtime, stop: stopDmRealtime } = useDmRealtime()
 const { start: startNotificationRealtime, stop: stopNotificationRealtime } = useNotificationRealtime()
 useOnlineStatus()
+const announcementStore = useAnnouncementStore()
 
 let notificationPollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -27,6 +30,8 @@ onMounted(() => {
     messageStore.fetchConversations()
     messageStore.fetchUnreadCounts()
   }
+
+  announcementStore.fetchActive()
 
   // Notifications — always enabled for all users
   startNotificationRealtime()
@@ -50,6 +55,7 @@ onUnmounted(() => {
     <AppSidebar />
     <SidebarInset>
       <SiteHeader />
+      <AnnouncementBanners />
       <TrialBanner />
       <GracePeriodBanner />
       <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4">
