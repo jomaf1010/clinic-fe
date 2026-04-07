@@ -1,18 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  CheckCircle2,
   DollarSign,
   FileText,
+  FileCheck,
   ExternalLink,
   LoaderCircle,
   RefreshCw,
-  Receipt,
   CreditCard,
   Banknote,
   Pencil,
-  Check,
-  X,
+  Printer,
+  FileDown,
+  PercentCircle,
+  Pill,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
@@ -21,16 +24,47 @@ import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useBillingStore } from '@/domains/billing/stores/billingStore'
-import { documentApi } from '../../api/documentApi'
+import { documentApi, type GeneratedDocumentResponse } from '../../api/documentApi'
+import { openNewTab, printPdf } from '@/lib/utils'
+import { useFeeDiscount } from '../../composables/useFeeDiscount'
+import MedCertDialog from '../MedCertDialog.vue'
 import InvoiceStatusBadge from '@/domains/billing/components/InvoiceStatusBadge.vue'
 import RecordPaymentDialog from '@/domains/billing/components/RecordPaymentDialog.vue'
 import type { InvoiceResponse } from '@/domains/billing/types/billing.types'
+import type {
+  ConsultationPayment,
+  ConsultationConsumable,
+  PrescriptionSummary,
+  LabOrderSummary,
+  AssessmentDiagnosis,
+  ConsultationType,
+} from '../../types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   disabled: boolean
   consultationId: string
   status: 'draft' | 'finalized'
+  consultationType: ConsultationType
+  patientId: string
+  diagnoses: AssessmentDiagnosis[]
+  documentUpdate?: GeneratedDocumentResponse | null
+  consumables: ConsultationConsumable[]
+  prescriptionSummary: PrescriptionSummary | null
+  labOrderSummary: LabOrderSummary | null
+  payment: ConsultationPayment
+  openMedCertOnMount?: boolean
+  canFinalize?: boolean
+  isSaving?: boolean
+}>(), {
+  openMedCertOnMount: false,
+  canFinalize: false,
+  isSaving: false,
+})
+
+const emit = defineEmits<{
+  'update:payment': [payment: ConsultationPayment]
+  'finalize': []
 }>()
 
 const router = useRouter()
@@ -41,13 +75,207 @@ const invoice = ref<InvoiceResponse | null>(null)
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
 const showPaymentDialog = ref(false)
+const showMedCertDialog = ref(false)
 
 const isDraft = computed(() => props.status === 'draft')
 const isFinalized = computed(() => props.status === 'finalized')
 const hasInvoice = computed(() => invoice.value !== null)
 const canManage = computed(() => authStore.hasPermission('billing.manage'))
+const canGenerate = computed(() => authStore.hasPermission('consultations.edit-treatment-plan'))
 
-// Edit mode
+// Documents
+const prescriptionDoc = ref<GeneratedDocumentResponse | null>(null)
+const medCertDoc = ref<GeneratedDocumentResponse | null>(null)
+const isLoadingDocs = ref(false)
+
+async function loadDocuments() {
+  isLoadingDocs.value = true
+  try {
+    const res = await documentApi.list(props.consultationId)
+    prescriptionDoc.value = res.data.find((d) => d.type === 'prescription') ?? null
+    medCertDoc.value = res.data.find((d) => d.type === 'medical-certificate') ?? null
+  } catch {
+    // ignore
+  } finally {
+    isLoadingDocs.value = false
+  }
+}
+
+watch(() => props.documentUpdate, (update) => {
+  if (update && update.type === 'prescription') {
+    prescriptionDoc.value = update
+    if (update.status === 'completed' || update.status === 'failed') {
+      stopPrescriptionPolling()
+      isGeneratingPrescription.value = false
+    }
+  }
+  if (update && update.type === 'medical-certificate') {
+    medCertDoc.value = update
+  }
+})
+
+const hasPrescription = computed(() =>
+  (props.prescriptionSummary?.items?.length ?? 0) > 0,
+)
+
+const prescriptionReady = computed(() => prescriptionDoc.value?.status === 'completed')
+const medCertReady = computed(() => medCertDoc.value?.status === 'completed')
+
+async function ensureMedCertDocId(): Promise<string | null> {
+  if (medCertDoc.value?.id) return medCertDoc.value.id
+  await loadDocuments()
+  return medCertDoc.value?.id ?? null
+}
+
+async function printMedCert() {
+  const docId = await ensureMedCertDocId()
+  if (!docId) return
+  try {
+    const url = await documentApi.getSignedUrl(docId)
+    printPdf(url)
+  } catch {
+    toast.error('Failed to get medical certificate')
+  }
+}
+
+async function downloadMedCert() {
+  const docId = await ensureMedCertDocId()
+  if (!docId) return
+  const tab = openNewTab()
+  try {
+    const url = await documentApi.getSignedUrl(docId)
+    tab.navigate(url)
+  } catch {
+    tab.close()
+    toast.error('Failed to get medical certificate')
+  }
+}
+const isGeneratingPrescription = ref(false)
+
+async function generatePrescription() {
+  isGeneratingPrescription.value = true
+  try {
+    const res = await documentApi.generate(props.consultationId, 'prescription')
+    prescriptionDoc.value = res.data
+    startPrescriptionPolling()
+  } catch {
+    toast.error('Failed to generate prescription PDF')
+    isGeneratingPrescription.value = false
+  }
+}
+
+let prescriptionPollTimer: ReturnType<typeof setInterval> | null = null
+
+function startPrescriptionPolling() {
+  stopPrescriptionPolling()
+  prescriptionPollTimer = setInterval(async () => {
+    await loadDocuments()
+    if (prescriptionDoc.value?.status === 'completed' || prescriptionDoc.value?.status === 'failed') {
+      stopPrescriptionPolling()
+      isGeneratingPrescription.value = false
+      if (prescriptionDoc.value.status === 'completed') {
+        toast.success('Prescription PDF is ready')
+      }
+    }
+  }, 3000)
+}
+
+function stopPrescriptionPolling() {
+  if (prescriptionPollTimer) {
+    clearInterval(prescriptionPollTimer)
+    prescriptionPollTimer = null
+  }
+}
+
+async function ensurePrescriptionDocId(): Promise<string | null> {
+  if (prescriptionDoc.value?.id) return prescriptionDoc.value.id
+  // Real-time update may not include the id — reload from API
+  await loadDocuments()
+  return prescriptionDoc.value?.id ?? null
+}
+
+async function openPrescriptionPdf() {
+  const docId = await ensurePrescriptionDocId()
+  if (!docId) return
+  const tab = openNewTab()
+  try {
+    const url = await documentApi.getSignedUrl(docId)
+    tab.navigate(url)
+  } catch {
+    tab.close()
+    toast.error('Failed to get prescription PDF')
+  }
+}
+
+async function printPrescription() {
+  const docId = await ensurePrescriptionDocId()
+  if (!docId) return
+  try {
+    const url = await documentApi.getSignedUrl(docId)
+    printPdf(url)
+  } catch {
+    toast.error('Failed to get prescription PDF')
+  }
+}
+
+// Fee discount
+const {
+  feeDiscountType,
+  feeDiscountValue,
+  isSavingDiscount,
+  showFeeDiscountModal,
+  openFeeDiscountModal,
+  saveFeeDiscount,
+} = useFeeDiscount(
+  () => ({
+    id: props.consultationId,
+    payment: props.payment,
+  } as any),
+  (updated) => {
+    if (updated.payment) {
+      emit('update:payment', updated.payment)
+    }
+  },
+)
+
+// Estimated charges (draft mode)
+const consultationFee = computed(() => {
+  const isFollowUp = props.consultationType === 'follow_up'
+  const doctorFee = isFollowUp ? authStore.user?.follow_up_fee : authStore.user?.consultation_fee
+  const clinicFee = isFollowUp
+    ? authStore.currentClinic?.settings?.default_follow_up_fee
+    : authStore.currentClinic?.settings?.default_consultation_fee
+  return doctorFee ?? clinicFee ?? 0
+})
+
+const medicinesTotalEstimate = computed(() => {
+  if (!props.prescriptionSummary?.items?.length) return 0
+  return props.prescriptionSummary.items.reduce((sum, item) => {
+    const qty = (item as any).quantity ?? 0
+    const price = (item as any).unit_price ?? 0
+    return sum + qty * price
+  }, 0)
+})
+
+const consumablesTotalEstimate = computed(() => {
+  return props.consumables.reduce((sum, c) => sum + c.quantity * (c.unit_price ?? 0), 0)
+})
+
+const discountAmount = computed(() => {
+  const fee = consultationFee.value
+  const type = props.payment?.fee_discount_type
+  const val = props.payment?.fee_discount_value ?? 0
+  if (!type || val <= 0) return 0
+  if (type === 'percentage') return fee * Math.min(val, 100) / 100
+  return Math.min(val, fee)
+})
+
+const estimatedTotal = computed(() => {
+  const fee = consultationFee.value - discountAmount.value
+  return Math.max(0, fee) + medicinesTotalEstimate.value + consumablesTotalEstimate.value
+})
+
+// Edit mode (finalized)
 const isEditing = ref(false)
 const editedQuantities = ref<Record<string, number>>({})
 
@@ -84,11 +312,10 @@ async function saveItemQty(itemId: string) {
 
   try {
     await billingStore.updateInvoice(invoice.value.id, [
-      { id: itemId, quantity: editedQuantities.value[itemId] },
+      { id: itemId, quantity: editedQuantities.value[itemId] ?? 0 },
     ])
     invoice.value = billingStore.currentInvoice
 
-    // If a medicine quantity changed, handle PDF regeneration based on clinic settings
     if (isMedicine) {
       const settings = authStore.currentClinic?.settings
       const isAdjustedMode = settings?.prescription_quantity_mode === 'adjusted'
@@ -101,7 +328,6 @@ async function saveItemQty(itemId: string) {
       }
     }
   } catch {
-    // Revert on failure
     editedQuantities.value[itemId] = original.quantity
   }
 }
@@ -186,7 +412,6 @@ async function fetchInvoice() {
 }
 
 function onPaymentRecorded() {
-  // Refresh invoice data after payment
   fetchInvoice()
 }
 
@@ -194,7 +419,13 @@ function goToBilling() {
   router.push({ name: RouteNames.BILLING })
 }
 
+// Auto-open med cert from notification deep link
+watch(() => props.openMedCertOnMount, (val) => {
+  if (val) showMedCertDialog.value = true
+}, { immediate: true })
+
 onMounted(() => {
+  loadDocuments()
   if (isFinalized.value) {
     fetchInvoice()
   }
@@ -202,17 +433,235 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Draft state -->
-  <div v-if="isDraft" class="flex flex-col items-center justify-center gap-4 py-16 text-center">
-    <div class="flex size-12 items-center justify-center rounded-full bg-muted">
-      <Receipt class="size-6 text-muted-foreground" />
+  <!-- Documents section (always visible) -->
+  <div class="flex flex-col gap-3">
+    <h3 class="text-sm font-medium text-muted-foreground">Documents</h3>
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <!-- Prescription PDF -->
+      <div
+        v-if="hasPrescription"
+        class="flex items-center justify-between rounded-lg border p-3"
+      >
+        <div class="flex items-center gap-2">
+          <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
+            <Pill class="size-4 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p class="text-sm font-medium">Prescription</p>
+            <p class="text-xs text-muted-foreground">{{ prescriptionSummary?.total ?? 0 }} item(s)</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <Button
+            v-if="prescriptionReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            @click.stop="printPrescription"
+          >
+            <Printer class="size-3" />
+            <span class="hidden sm:inline">Print</span>
+          </Button>
+          <Button
+            v-if="prescriptionReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            @click.stop="openPrescriptionPdf"
+          >
+            <FileDown class="size-3" />
+            <span class="hidden sm:inline">Download</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            :disabled="isGeneratingPrescription"
+            @click.stop="generatePrescription"
+          >
+            <LoaderCircle v-if="isGeneratingPrescription" class="size-3 animate-spin" />
+            <FileText v-else class="size-3" />
+            <span class="hidden sm:inline">{{ isGeneratingPrescription ? 'Generating...' : prescriptionReady ? 'Regenerate' : 'Generate PDF' }}</span>
+          </Button>
+        </div>
+      </div>
+
+      <!-- Medical Certificate -->
+      <div class="flex items-center justify-between rounded-lg border p-3">
+        <div class="flex items-center gap-2">
+          <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-950">
+            <FileCheck class="size-4 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <p class="text-sm font-medium">Medical Certificate</p>
+            <p class="text-xs text-muted-foreground">
+              {{ medCertReady ? 'Ready' : canGenerate ? 'Not generated' : 'View certificate' }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <Button
+            v-if="medCertReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            @click="printMedCert"
+          >
+            <Printer class="size-3" />
+            <span class="hidden sm:inline">Print</span>
+          </Button>
+          <Button
+            v-if="medCertReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            @click="downloadMedCert"
+          >
+            <FileDown class="size-3" />
+            <span class="hidden sm:inline">Download</span>
+          </Button>
+          <Button
+            v-if="canGenerate"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            @click="showMedCertDialog = true"
+          >
+            <FileCheck class="size-3" />
+            <span class="hidden sm:inline">{{ medCertReady ? 'Regenerate' : 'Generate' }}</span>
+          </Button>
+          <Button
+            v-else-if="!medCertReady"
+            variant="outline"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            disabled
+          >
+            <span class="text-xs text-muted-foreground">Not generated</span>
+          </Button>
+        </div>
+      </div>
     </div>
-    <div>
-      <p class="font-medium text-muted-foreground">Invoice will be generated when consultation is finalized</p>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Billable items (consultation fee, medicines, consumables, lab services) will be automatically added.
-      </p>
+  </div>
+
+  <Separator class="my-4" />
+
+  <!-- Draft state — Estimated Charges + Fee Discount -->
+  <div v-if="isDraft" class="flex flex-col gap-6">
+    <!-- Estimated Charges -->
+    <div class="flex flex-col gap-3">
+      <h3 class="text-sm font-medium text-muted-foreground">Estimated Charges</h3>
+      <div class="flex flex-col gap-1.5 rounded-lg border p-4">
+        <div class="flex justify-between text-sm">
+          <span class="text-muted-foreground">
+            {{ consultationType === 'follow_up' ? 'Follow-up Fee' : 'Consultation Fee' }}
+          </span>
+          <span class="tabular-nums">{{ formatCurrency(consultationFee) }}</span>
+        </div>
+        <div v-if="discountAmount > 0" class="flex justify-between text-sm">
+          <span class="text-muted-foreground">
+            Discount
+            <span v-if="payment?.fee_discount_type === 'percentage'">({{ payment.fee_discount_value }}%)</span>
+          </span>
+          <span class="tabular-nums text-green-600">-{{ formatCurrency(discountAmount) }}</span>
+        </div>
+        <div v-if="medicinesTotalEstimate > 0" class="flex justify-between text-sm">
+          <span class="text-muted-foreground">Medicines</span>
+          <span class="tabular-nums">{{ formatCurrency(medicinesTotalEstimate) }}</span>
+        </div>
+        <div v-if="consumablesTotalEstimate > 0" class="flex justify-between text-sm">
+          <span class="text-muted-foreground">Consumables</span>
+          <span class="tabular-nums">{{ formatCurrency(consumablesTotalEstimate) }}</span>
+        </div>
+        <div v-if="labOrderSummary && labOrderSummary.total > 0" class="flex justify-between text-sm">
+          <span class="text-muted-foreground">Lab Services ({{ labOrderSummary.total }})</span>
+          <span class="text-xs text-muted-foreground italic">calculated at finalization</span>
+        </div>
+        <Separator class="my-1" />
+        <div class="flex justify-between text-sm font-semibold">
+          <span>Estimated Total</span>
+          <span class="tabular-nums">{{ formatCurrency(estimatedTotal) }}</span>
+        </div>
+      </div>
     </div>
+
+    <!-- Fee Discount -->
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-muted-foreground">Fee Discount</h3>
+        <Button
+          v-if="payment?.fee_discount_value"
+          variant="ghost"
+          size="sm"
+          class="h-6 gap-1 px-2 text-xs text-green-600"
+          @click="openFeeDiscountModal"
+        >
+          {{ payment.fee_discount_type === 'percentage' ? `${payment.fee_discount_value}% off` : `₱${payment.fee_discount_value} off` }}
+          <Pencil class="size-3" />
+        </Button>
+      </div>
+      <div v-if="!showFeeDiscountModal" class="flex items-center gap-2">
+        <Button variant="outline" size="sm" @click="openFeeDiscountModal">
+          <PercentCircle class="size-3.5" />
+          {{ payment?.fee_discount_value ? 'Edit Discount' : 'Add Discount' }}
+        </Button>
+      </div>
+      <div v-else class="flex flex-col gap-3 rounded-lg border p-4">
+        <div class="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            :variant="feeDiscountType === 'percentage' ? 'default' : 'outline'"
+            @click="feeDiscountType = 'percentage'"
+          >
+            Percentage (%)
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            :variant="feeDiscountType === 'fixed' ? 'default' : 'outline'"
+            @click="feeDiscountType = 'fixed'"
+          >
+            Fixed (₱)
+          </Button>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-muted-foreground">
+            {{ feeDiscountType === 'percentage' ? 'Discount %' : 'Discount Amount (₱)' }}
+          </label>
+          <Input
+            v-model="feeDiscountValue"
+            type="number"
+            min="0"
+            :max="feeDiscountType === 'percentage' ? '100' : undefined"
+            step="0.01"
+            :placeholder="feeDiscountType === 'percentage' ? 'e.g. 20' : 'e.g. 100'"
+            :disabled="isSavingDiscount"
+          />
+        </div>
+        <div class="flex justify-end gap-2">
+          <Button variant="outline" size="sm" :disabled="isSavingDiscount" @click="showFeeDiscountModal = false">
+            Cancel
+          </Button>
+          <Button size="sm" :disabled="isSavingDiscount" @click="saveFeeDiscount">
+            <LoaderCircle v-if="isSavingDiscount" class="size-3.5 animate-spin" />
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Finalize button -->
+    <Button
+      v-if="canFinalize"
+      class="w-full"
+      :disabled="isSaving"
+      @click="emit('finalize')"
+    >
+      <LoaderCircle v-if="isSaving" class="size-4 animate-spin" />
+      <CheckCircle2 v-else class="size-4" />
+      Finalize Consultation
+    </Button>
   </div>
 
   <!-- Loading -->
@@ -392,4 +841,14 @@ onMounted(() => {
       @recorded="onPaymentRecorded"
     />
   </div>
+
+  <!-- Medical Certificate Dialog -->
+  <MedCertDialog
+    :open="showMedCertDialog"
+    :consultation-id="consultationId"
+    :diagnoses="diagnoses"
+    :document-update="documentUpdate"
+    :can-generate="canGenerate"
+    @update:open="showMedCertDialog = $event"
+  />
 </template>

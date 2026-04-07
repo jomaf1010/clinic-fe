@@ -23,12 +23,15 @@ import { openNewTab, printPdf } from '@/lib/utils'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { AssessmentDiagnosis } from '../types/consultation.types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   consultationId: string
   diagnoses: AssessmentDiagnosis[]
   documentUpdate?: GeneratedDocumentResponse | null
-}>()
+  canGenerate?: boolean
+}>(), {
+  canGenerate: true,
+})
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -180,19 +183,19 @@ const isReady = computed(() => medCertDoc.value?.status === 'completed')
           Medical Certificate
         </DialogTitle>
         <DialogDescription>
-          Fill in the details below. Diagnosis is pre-filled from the assessment.
+          {{ canGenerate ? 'Fill in the details below. Diagnosis is pre-filled from the assessment.' : 'View or download the medical certificate.' }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-2">
           <Label for="mc-diagnosis">Diagnosis / Findings</Label>
-          <Textarea id="mc-diagnosis" v-model="diagnosis" rows="2" placeholder="e.g., Upper Respiratory Tract Infection" />
+          <Textarea id="mc-diagnosis" v-model="diagnosis" rows="2" placeholder="e.g., Upper Respiratory Tract Infection" :disabled="!canGenerate" />
         </div>
 
         <div class="flex flex-col gap-2">
           <Label for="mc-recommendation">Recommendation</Label>
-          <Textarea id="mc-recommendation" v-model="recommendation" rows="2" placeholder="e.g., Rest for 3 days. Fit to resume work after rest period." />
+          <Textarea id="mc-recommendation" v-model="recommendation" rows="2" placeholder="e.g., Rest for 3 days. Fit to resume work after rest period." :disabled="!canGenerate" />
         </div>
 
         <div class="flex flex-col gap-2">
@@ -224,7 +227,7 @@ const isReady = computed(() => medCertDoc.value?.status === 'completed')
               {{ preset }}
             </button>
           </div>
-          <Input id="mc-purpose" v-model="purpose" placeholder="Or type a custom purpose..." />
+          <Input id="mc-purpose" v-model="purpose" placeholder="Or type a custom purpose..." :disabled="!canGenerate" />
         </div>
 
         <!-- Download/Print if ready -->
@@ -244,7 +247,7 @@ const isReady = computed(() => medCertDoc.value?.status === 'completed')
 
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Close</Button>
-        <Button :disabled="isGenerating || !diagnosis.trim()" @click="generate">
+        <Button v-if="canGenerate" :disabled="isGenerating || !diagnosis.trim()" @click="generate">
           <LoaderCircle v-if="isGenerating" class="size-4 animate-spin" />
           <FileCheck v-else class="size-4" />
           {{ isGenerating ? 'Generating...' : isReady ? 'Regenerate' : 'Generate' }}
