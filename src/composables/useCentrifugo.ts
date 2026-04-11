@@ -29,12 +29,12 @@ export function useCentrifugo() {
     })
 
     client.on('disconnected', (ctx) => {
-      console.warn('[Centrifugo] disconnected:', ctx)
+      if (import.meta.env.DEV) console.warn('[Centrifugo] disconnected:', ctx)
       isConnected.value = false
     })
 
     client.on('error', (ctx) => {
-      console.error('[Centrifugo] client error:', ctx)
+      if (import.meta.env.DEV) console.error('[Centrifugo] client error:', ctx)
     })
 
     client.connect()
@@ -63,7 +63,7 @@ export function useCentrifugo() {
 
     sub.on('publication', onPublication)
     sub.on('error', (ctx) => {
-      console.warn(`[Centrifugo] subscription error on ${channel}:`, ctx)
+      if (import.meta.env.DEV) console.warn(`[Centrifugo] subscription error on ${channel}:`, ctx)
     })
     sub.subscribe()
     subscriptions.set(channel, sub)

@@ -39,7 +39,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     checkoutLoading.value = true
     try {
       const response = await subscriptionApi.createCheckout()
-      window.location.href = response.data.checkout_url
+      const checkoutUrl = response.data.checkout_url
+      if (!checkoutUrl.startsWith('https://')) {
+        throw new Error('Invalid checkout URL returned from server')
+      }
+      window.location.href = checkoutUrl
     } finally {
       checkoutLoading.value = false
     }

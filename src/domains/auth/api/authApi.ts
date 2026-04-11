@@ -1,4 +1,4 @@
-import { http } from '@/lib/http'
+import { http, getAuthToken } from '@/lib/http'
 import type { LoginCredentials, LoginResponse, MeResponse, MessageResponse, RefreshResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
 
 export const authApi = {
@@ -65,7 +65,7 @@ export const authApi = {
 
   async logout(): Promise<void> {
     const BASE_URL = import.meta.env.VITE_API_URL as string
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`

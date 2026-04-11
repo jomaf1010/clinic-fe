@@ -218,7 +218,7 @@ function handleSend() {
   emit('send', text)
 
   if (editorRef.value) {
-    editorRef.value.innerHTML = ''
+    editorRef.value.textContent = ''
   }
   isEditorEmpty.value = true
 }
