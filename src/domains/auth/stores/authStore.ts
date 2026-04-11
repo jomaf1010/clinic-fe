@@ -113,6 +113,14 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // BroadcastChannel not supported — fine
     }
+    // Clear PHI draft keys from localStorage
+    localStorage.removeItem('create-patient')
+    // Wipe offline IndexedDB to prevent PHI leaking between sessions
+    try {
+      indexedDB.deleteDatabase('clinicapp-offline')
+    } catch {
+      // Not supported or already absent — fine
+    }
     token.value = null
     user.value = null
     memberships.value = []

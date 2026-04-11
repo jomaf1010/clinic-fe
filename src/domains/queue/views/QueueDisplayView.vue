@@ -215,7 +215,7 @@ function initCentrifuge(
   })
 
   sub.on('error', (ctx) => {
-    console.warn('[QueueDisplay] subscription error:', ctx)
+    if (import.meta.env.DEV) console.warn('[QueueDisplay] subscription error:', ctx)
   })
 
   sub.subscribe()
@@ -255,7 +255,7 @@ async function bootstrap(): Promise<void> {
     )
   } catch (err) {
     isLoading.value = false
-    console.error('[QueueDisplay] bootstrap error:', err)
+    if (import.meta.env.DEV) console.error('[QueueDisplay] bootstrap error:', err)
     const message = err instanceof Error ? err.message : ''
     displayError.value = message === 'INVALID_TOKEN' ? 'INVALID_TOKEN' : 'NETWORK_ERROR'
   }
