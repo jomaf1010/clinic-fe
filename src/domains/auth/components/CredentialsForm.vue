@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { HttpError } from '@/lib/http'
+import { HttpError, http } from '@/lib/http'
 import { toast } from 'vue-sonner'
 import { Stethoscope, BadgeCheck, LoaderCircle } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/authStore'
@@ -16,13 +17,24 @@ import type { ValidationError } from '../types/auth.types'
 
 const authStore = useAuthStore()
 
+// Specialty options from API
+const specialtyOptions = ref<{ key: string; display_name: string }[]>([])
+onMounted(async () => {
+  try {
+    const response = await http.get<{ data: { key: string; display_name: string }[] }>('/specialties')
+    specialtyOptions.value = response.data
+  } catch {
+    // Silently fail — dropdown will be empty
+  }
+})
+
 const { handleSubmit, setFieldError } = useForm({
   validationSchema: credentialsSchema,
   initialValues: {
     prc_license_number: authStore.user?.prc_license_number ?? '',
     ptr_number: authStore.user?.ptr_number ?? '',
     s2_license_number: authStore.user?.s2_license_number ?? '',
-    specialty: authStore.user?.specialty ?? '',
+    specialty: authStore.user?.specialty || 'none',
     sub_specialty: authStore.user?.sub_specialty ?? '',
   },
 })
@@ -44,7 +56,7 @@ const onSubmit = handleSubmit(async (values) => {
       prc_license_number: values.prc_license_number || null,
       ptr_number: values.ptr_number || null,
       s2_license_number: values.s2_license_number || null,
-      specialty: values.specialty || null,
+      specialty: values.specialty && values.specialty !== 'none' ? values.specialty : null,
       sub_specialty: values.sub_specialty || null,
     })
     await authStore.fetchUser()
@@ -88,7 +100,17 @@ const onSubmit = handleSubmit(async (values) => {
               Specialty
               <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
             </Label>
-            <Input id="cred-specialty" v-model="specialty" type="text" placeholder="e.g. Internal Medicine" :disabled="isLoading" :aria-invalid="!!specialtyError" />
+            <Select v-model="specialty" :disabled="isLoading">
+              <SelectTrigger id="cred-specialty" :aria-invalid="!!specialtyError">
+                <SelectValue placeholder="Select specialty" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem v-for="opt in specialtyOptions" :key="opt.key" :value="opt.key">
+                  {{ opt.display_name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <p v-if="specialtyError" class="text-xs text-destructive">{{ specialtyError }}</p>
           </div>
 

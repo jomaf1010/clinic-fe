@@ -24,6 +24,7 @@ export interface ConsultationTriage {
   height: number | null
   pain_score: number | null
   notes: string | null
+  extended_vitals?: Record<string, string | number | null>
 }
 
 export interface AssessmentDiagnosis {
@@ -109,6 +110,7 @@ export interface ConsultationResponse {
 export interface CreateConsultationPayload {
   patient_id: string
   type?: ConsultationType
+  specialty?: string | null
 }
 
 export interface UpdateConsultationPayload {

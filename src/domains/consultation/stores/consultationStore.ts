@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import { HttpError } from '@/lib/http'
 import { consultationApi } from '../api/consultationApi'
 import type { ConsultationResponse, UpdateConsultationPayload } from '../types/consultation.types'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ConsultationRealtimeEvent } from '../types/realtime.types'
 import {
   cacheConsultation,
@@ -33,7 +34,8 @@ export const useConsultationStore = defineStore('consultation', () => {
     isLoading.value = true
     saveError.value = null
     try {
-      const response = await consultationApi.create(patientId, { patient_id: patientId, type })
+      const authStore = useAuthStore()
+      const response = await consultationApi.create(patientId, { patient_id: patientId, type, specialty: authStore.user?.specialty ?? null })
       current.value = response.data
       isOfflineCached.value = false
       await cacheConsultation(response.data as unknown as Record<string, unknown>)

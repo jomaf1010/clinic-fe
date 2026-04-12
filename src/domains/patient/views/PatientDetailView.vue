@@ -50,6 +50,7 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { usePatientSync } from '../composables/usePatientSync'
+import PatientSpecialtyFactory from '../components/specialties/PatientSpecialtyFactory.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -461,6 +462,9 @@ onUnmounted(() => {
 
     <!-- Right panel -->
     <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+      <!-- Specialty-specific patient sections (between patient info and consultation timeline) -->
+      <PatientSpecialtyFactory class="mb-6" />
+
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <Stethoscope class="size-4 text-muted-foreground" />

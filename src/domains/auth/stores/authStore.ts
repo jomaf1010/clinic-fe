@@ -76,6 +76,12 @@ export const useAuthStore = defineStore('auth', () => {
     if (response.data.theme) {
       useTheme().setTheme(response.data.theme)
     }
+    // Load specialty config if user has a specialty set
+    if (response.data.specialty) {
+      const { useSpecialtyConfigStore } = await import('@/stores/specialtyConfigStore')
+      const specialtyStore = useSpecialtyConfigStore()
+      specialtyStore.fetchConfig(response.data.specialty)
+    }
   }
 
   async function selectClinic(clinicId: string): Promise<void> {
