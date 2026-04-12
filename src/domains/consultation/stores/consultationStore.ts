@@ -129,6 +129,7 @@ export const useConsultationStore = defineStore('consultation', () => {
     const updated = { ...current.value }
     if (payload.triage) updated.triage = { ...updated.triage, ...payload.triage }
     if (payload.assessment) updated.assessment = { ...updated.assessment, ...payload.assessment }
+    if (payload.specialty_assessment) updated.specialty_assessment = { ...(updated.specialty_assessment ?? {}), ...payload.specialty_assessment }
     if (payload.treatment_plan) updated.treatment_plan = { ...updated.treatment_plan, ...payload.treatment_plan }
     current.value = updated
 

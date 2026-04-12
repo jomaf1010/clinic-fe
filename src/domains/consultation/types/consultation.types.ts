@@ -1,6 +1,28 @@
 export type ConsultationStatus = 'draft' | 'finalized'
 export type ConsultationType = 'default' | 'follow_up'
 
+export interface LifestyleData {
+  smoking?: 'never' | 'former' | 'current' | null
+  pack_years?: number | null
+  alcohol?: 'none' | 'occasional' | 'regular' | null
+  exercise?: 'sedentary' | 'light' | 'moderate' | 'active' | null
+  diet?: 'good' | 'fair' | 'poor' | null
+  medication_adherence?: 'good' | 'fair' | 'poor' | null
+}
+
+export interface ProblemSoapNote {
+  problem_id: string
+  condition: string
+  subjective: string | null
+  objective: string | null
+  assessment: string | null
+  plan: string | null
+}
+
+export interface FMSpecialtyAssessment {
+  problem_notes?: ProblemSoapNote[]
+}
+
 export interface ConsultationConsumable {
   consumable_id: string
   name: string
@@ -25,6 +47,9 @@ export interface ConsultationTriage {
   pain_score: number | null
   notes: string | null
   extended_vitals?: Record<string, string | number | null>
+  specialty_data?: {
+    lifestyle?: LifestyleData
+  } | null
 }
 
 export interface AssessmentDiagnosis {
@@ -93,6 +118,7 @@ export interface ConsultationResponse {
   patient_allergies: string[]
   patient_conditions: string[]
   assessment: ConsultationAssessment
+  specialty_assessment?: FMSpecialtyAssessment | null
   treatment_plan: ConsultationTreatmentPlan
   consumables: ConsultationConsumable[]
   payment: ConsultationPayment
@@ -116,6 +142,7 @@ export interface CreateConsultationPayload {
 export interface UpdateConsultationPayload {
   triage?: Partial<ConsultationTriage>
   assessment?: Partial<ConsultationAssessment>
+  specialty_assessment?: Record<string, unknown>
   treatment_plan?: Partial<ConsultationTreatmentPlan>
 }
 

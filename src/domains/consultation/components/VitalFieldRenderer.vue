@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { VitalFieldConfig } from '@/domains/specialty/types/specialty.types'
+import type { VitalFieldConfig, VitalAgeRange } from '@/domains/specialty/types/specialty.types'
 
 const props = defineProps<{
   fieldConfig: VitalFieldConfig
@@ -18,6 +18,38 @@ const props = defineProps<{
   disabled?: boolean
   error?: string
 }>()
+
+// ── Age-based range resolution ────────────────────────────────────────────────
+
+const resolvedAgeRange = computed<VitalAgeRange | null>(() => {
+  const ranges = props.fieldConfig.age_ranges
+  if (!ranges?.length || props.patientAgeDays === undefined) return null
+  return (
+    ranges.find(
+      (r) => props.patientAgeDays! >= r.days_min && (r.days_max === null || props.patientAgeDays! <= r.days_max),
+    ) ?? null
+  )
+})
+
+const ageRangeHint = computed<string | null>(() => {
+  const r = resolvedAgeRange.value
+  if (!r) return null
+  const unit = props.fieldConfig.unit
+  if (r.min !== null && r.max !== null) return `Normal: ${r.min}–${r.max}${unit ? ' ' + unit : ''}`
+  if (r.min !== null) return `Normal: ≥${r.min}${unit ? ' ' + unit : ''}`
+  if (r.max !== null) return `Normal: ≤${r.max}${unit ? ' ' + unit : ''}`
+  return null
+})
+
+const valueStatus = computed<{ label: string; cls: string } | null>(() => {
+  const r = resolvedAgeRange.value
+  if (!r || props.modelValue === null || props.modelValue === undefined || String(props.modelValue) === '') return null
+  const val = Number(props.modelValue)
+  if (isNaN(val)) return null
+  if (r.min !== null && val < r.min) return { label: 'Low', cls: 'text-blue-600 dark:text-blue-400' }
+  if (r.max !== null && val > r.max) return { label: 'High', cls: 'text-red-600 dark:text-red-400' }
+  return { label: 'Normal', cls: 'text-green-600 dark:text-green-400' }
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number | null]
@@ -81,14 +113,18 @@ function onNumberUpdate(val: string | number) {
 }
 
 // ── Select ───────────────────────────────────────────────────────────────────
-function onSelectChange(val: string) {
-  emit('update:modelValue', val || null)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function onSelectChange(val: any) {
+  emit('update:modelValue', val ? String(val) : null)
 }
 </script>
 
 <template>
   <div v-if="isVisible" class="flex flex-col gap-2">
-    <Label :for="fieldId">{{ labelText }}</Label>
+    <div class="flex items-baseline justify-between gap-2">
+      <Label :for="fieldId">{{ labelText }}</Label>
+      <span v-if="ageRangeHint" class="text-xs text-muted-foreground">{{ ageRangeHint }}</span>
+    </div>
 
     <!-- Blood pressure: single text input with auto-slash formatting -->
     <template v-if="fieldConfig.input_type === 'paired_number' || fieldConfig.input_type === 'paired_text'">
@@ -142,6 +178,9 @@ function onSelectChange(val: string) {
       </Select>
     </template>
 
-    <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+    <div v-if="valueStatus || error" class="flex items-center gap-2">
+      <span v-if="valueStatus" class="text-xs font-medium" :class="valueStatus.cls">{{ valueStatus.label }}</span>
+      <p v-if="error" class="text-xs text-destructive">{{ error }}</p>
+    </div>
   </div>
 </template>

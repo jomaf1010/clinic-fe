@@ -1,14 +1,18 @@
 import { http } from '@/lib/http'
 import type {
+  ChronicTrendsResponse,
   CreatePatientPayload,
   CreatePatientResponse,
+  CreateProblemPayload,
   PatientDetailResponse,
   PatientListFilters,
   PatientListResponse,
   PatientSearchResponse,
+  Problem,
   SearchSuggestionsResponse,
   UpdatePatientPayload,
   UpdatePatientResponse,
+  UpdateProblemPayload,
 } from '../types/patient.types'
 
 export const patientApi = {
@@ -50,5 +54,25 @@ export const patientApi = {
     const formData = new FormData()
     formData.append('avatar', file)
     return http.upload(`/patients/${uuid}/avatar`, formData)
+  },
+
+  getProblems(uuid: string): Promise<{ data: Problem[] }> {
+    return http.get<{ data: Problem[] }>(`/patients/${uuid}/problems`)
+  },
+
+  addProblem(uuid: string, payload: CreateProblemPayload): Promise<{ data: Problem }> {
+    return http.post<{ data: Problem }>(`/patients/${uuid}/problems`, payload)
+  },
+
+  updateProblem(uuid: string, payload: UpdateProblemPayload): Promise<{ data: Problem }> {
+    return http.patch<{ data: Problem }>(`/problems/${uuid}`, payload)
+  },
+
+  deleteProblem(uuid: string): Promise<void> {
+    return http.delete<void>(`/problems/${uuid}`)
+  },
+
+  getChronicTrends(uuid: string): Promise<ChronicTrendsResponse> {
+    return http.get<ChronicTrendsResponse>(`/patients/${uuid}/chronic-trends`)
   },
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import { MessageSquare } from 'lucide-vue-next'
@@ -10,6 +10,7 @@ import VitalFieldRenderer from '../../VitalFieldRenderer.vue'
 import LabOrderSection from '../../LabOrderSection.vue'
 import PatientHistorySection from '../PatientHistorySection.vue'
 import { CORE_VITAL_KEYS, splitVitalsForApi } from '../../../utils/vitalsHelper'
+import { patientApi } from '@/domains/patient/api/patientApi'
 import type { ConsultationTriage } from '../../../types/consultation.types'
 import type { LabOrderResponse } from '../../../types/labOrder.types'
 
@@ -34,6 +35,25 @@ const specialtyConfigStore = useSpecialtyConfigStore()
 const hasLabOrders = computed(() => authStore.hasFeature('lab_orders'))
 
 const vitalFields = computed(() => specialtyConfigStore.config?.vitals ?? [])
+
+// ── Patient age (for age-based vital ranges) ──────────────────────────────────
+const patientDob = ref<string | null>(null)
+
+const patientAgeDays = computed<number | undefined>(() => {
+  if (!patientDob.value) return undefined
+  const dob = new Date(patientDob.value)
+  const now = new Date()
+  return Math.floor((now.getTime() - dob.getTime()) / (1000 * 60 * 60 * 24))
+})
+
+onMounted(async () => {
+  try {
+    const res = await patientApi.get(props.patientId)
+    patientDob.value = res.data.date_of_birth ?? null
+  } catch {
+    // silent — age ranges will just be hidden
+  }
+})
 
 // ── Local state ───────────────────────────────────────────────────────────
 // Single flat record for ALL vitals — core 6 + any specialty-specific extras
@@ -153,6 +173,7 @@ function emitSave() {
           :key="field.key"
           :field-config="field"
           :model-value="allVitals[field.key] ?? null"
+          :patient-age-days="patientAgeDays"
           :disabled="disabled"
           :error="errors[field.key]"
           @update:model-value="(v) => { allVitals[field.key] = v }"

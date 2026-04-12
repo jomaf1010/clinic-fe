@@ -120,3 +120,48 @@ export interface PatientSearchResult {
 export interface PatientSearchResponse {
   data: PatientSearchResult[]
 }
+
+export type ProblemStatus = 'active' | 'controlled' | 'uncontrolled' | 'resolved'
+
+export interface Problem {
+  uuid: string
+  description: string
+  icd_code: string | null
+  status: ProblemStatus
+  onset_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProblemPayload {
+  description: string
+  icd_code?: string | null
+  status?: ProblemStatus
+  onset_date?: string | null
+}
+
+export interface UpdateProblemPayload {
+  description?: string
+  icd_code?: string | null
+  status?: ProblemStatus
+  onset_date?: string | null
+}
+
+export interface ChronicTrendPoint {
+  date: string
+  value?: number
+  systolic?: number
+  diastolic?: number
+  classification?: string | null
+}
+
+export interface ChronicTrendsData {
+  bp?: ChronicTrendPoint[]
+  blood_sugar?: ChronicTrendPoint[]
+  weight?: ChronicTrendPoint[]
+  bmi?: ChronicTrendPoint[]
+}
+
+export interface ChronicTrendsResponse {
+  data: ChronicTrendsData
+}
