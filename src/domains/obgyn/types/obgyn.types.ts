@@ -113,6 +113,33 @@ export interface LabsDueItem {
   result: string | null
 }
 
+export interface BpTrendPoint {
+  date: string
+  gestational_age_weeks: number | null
+  systolic: number
+  diastolic: number
+}
+
+export interface WeightTrendPoint {
+  date: string
+  gestational_age_weeks: number | null
+  cumulative_gain: number
+  status: string | null
+}
+
+export interface FundalHeightTrendPoint {
+  date: string
+  gestational_age_weeks: number | null
+  fundal_height: number
+  expected: number | null
+}
+
+export interface FhrTrendPoint {
+  date: string
+  gestational_age_weeks: number | null
+  fetal_heart_rate: number
+}
+
 export interface PregnancyDashboard {
   pregnancy: Pregnancy
   visit_count: number
@@ -120,4 +147,9 @@ export interface PregnancyDashboard {
   next_visit_date: string | null
   labs_due_count: number
   danger_signs_last_visit: string[]
+  bp_trend: BpTrendPoint[]
+  weight_trend: WeightTrendPoint[]
+  fundal_height_trend: FundalHeightTrendPoint[]
+  fhr_trend: FhrTrendPoint[]
+  visit_summary: PrenatalVisit[]
 }

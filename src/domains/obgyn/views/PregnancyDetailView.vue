@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Activity,
   Weight,
+  LayoutDashboard,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +21,7 @@ import { usePregnancyStore } from '../stores/pregnancyStore'
 import PregnancySetupForm from '../components/PregnancySetupForm.vue'
 import GACalculator from '../components/GACalculator.vue'
 import RiskClassificationBadge from '../components/RiskClassificationBadge.vue'
+import PregnancyDashboard from '../components/PregnancyDashboard.vue'
 import type { Pregnancy } from '../types/obgyn.types'
 
 const route = useRoute()
@@ -174,6 +176,10 @@ function goToVisit(visitId: string): void {
               {{ store.visits.length }}
             </Badge>
           </TabsTrigger>
+          <TabsTrigger v-if="!isNew && store.visits.length > 0" value="dashboard">
+            <LayoutDashboard class="size-4" />
+            Dashboard
+          </TabsTrigger>
         </TabsList>
 
         <div class="flex-1 overflow-y-auto px-4 pb-8 pt-4 md:px-8">
@@ -185,6 +191,16 @@ function goToVisit(visitId: string): void {
                 :pregnancy="store.currentPregnancy ?? undefined"
                 @saved="handleSetupSaved"
                 @cancel="router.back()"
+              />
+            </TabsContent>
+
+            <!-- Dashboard Tab -->
+            <TabsContent v-if="!isNew && store.visits.length > 0" value="dashboard" class="mt-0">
+              <PregnancyDashboard
+                v-if="store.currentPregnancy"
+                :patient-id="patientId"
+                :pregnancy-id="pregnancyId"
+                :pregnancy="store.currentPregnancy"
               />
             </TabsContent>
 

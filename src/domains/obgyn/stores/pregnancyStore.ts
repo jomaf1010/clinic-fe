@@ -3,15 +3,19 @@ import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { obgynApi } from '../api/obgynApi'
 import type { CreatePregnancyPayload, CreateVisitPayload } from '../api/obgynApi'
-import type { Pregnancy, PrenatalVisit } from '../types/obgyn.types'
+import type { LabsDueItem, Pregnancy, PregnancyDashboard, PrenatalVisit } from '../types/obgyn.types'
 
 export const usePregnancyStore = defineStore('pregnancy', () => {
   const pregnancies = ref<Pregnancy[]>([])
   const currentPregnancy = ref<Pregnancy | null>(null)
   const visits = ref<PrenatalVisit[]>([])
   const currentVisit = ref<PrenatalVisit | null>(null)
+  const dashboard = ref<PregnancyDashboard | null>(null)
+  const labsDue = ref<LabsDueItem[]>([])
   const isLoading = ref(false)
   const isSaving = ref(false)
+  const isDashboardLoading = ref(false)
+  const isLabsLoading = ref(false)
 
   const activePregnancy = computed(() =>
     pregnancies.value.find((p) => p.status === 'active') ?? null,
@@ -74,6 +78,26 @@ export const usePregnancyStore = defineStore('pregnancy', () => {
     }
   }
 
+  async function loadDashboard(patientId: string, pregnancyId: string): Promise<void> {
+    isDashboardLoading.value = true
+    try {
+      const res = await obgynApi.getDashboard(patientId, pregnancyId)
+      dashboard.value = res.data
+    } finally {
+      isDashboardLoading.value = false
+    }
+  }
+
+  async function loadLabsDue(patientId: string, pregnancyId: string): Promise<void> {
+    isLabsLoading.value = true
+    try {
+      const res = await obgynApi.getLabsDue(patientId, pregnancyId)
+      labsDue.value = res.data
+    } finally {
+      isLabsLoading.value = false
+    }
+  }
+
   async function loadVisits(patientId: string, pregnancyId: string): Promise<void> {
     isLoading.value = true
     try {
@@ -131,8 +155,12 @@ export const usePregnancyStore = defineStore('pregnancy', () => {
     currentPregnancy.value = null
     visits.value = []
     currentVisit.value = null
+    dashboard.value = null
+    labsDue.value = []
     isLoading.value = false
     isSaving.value = false
+    isDashboardLoading.value = false
+    isLabsLoading.value = false
   }
 
   return {
@@ -140,9 +168,13 @@ export const usePregnancyStore = defineStore('pregnancy', () => {
     currentPregnancy,
     visits,
     currentVisit,
+    dashboard,
+    labsDue,
     activePregnancy,
     isLoading,
     isSaving,
+    isDashboardLoading,
+    isLabsLoading,
     loadPregnancies,
     loadPregnancy,
     createPregnancy,
@@ -150,6 +182,8 @@ export const usePregnancyStore = defineStore('pregnancy', () => {
     loadVisits,
     createVisit,
     updateVisit,
+    loadDashboard,
+    loadLabsDue,
     $reset,
   }
 })
