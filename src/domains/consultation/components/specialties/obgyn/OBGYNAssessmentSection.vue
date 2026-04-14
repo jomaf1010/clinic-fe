@@ -16,7 +16,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: [payload: { assessment: ConsultationAssessment }]
+  save: [payload: { assessment: ConsultationAssessment; specialty_assessment?: Record<string, unknown> }]
 }>()
 
 // ── Local state ───────────────────────────────────────────────────────────
@@ -25,9 +25,13 @@ const local = reactive<ConsultationAssessment>({
   notes: props.assessment?.notes ?? null,
 })
 
+// Load GYN exam data from specialty_assessment on the consultation
+import { useConsultationStore } from '../../../stores/consultationStore'
+const consultationStore = useConsultationStore()
+
 const gynNotes = reactive({
-  pelvic_exam: (props.assessment as ConsultationAssessment & { pelvic_exam?: string | null }).pelvic_exam ?? null,
-  breast_exam: (props.assessment as ConsultationAssessment & { breast_exam?: string | null }).breast_exam ?? null,
+  pelvic_exam: (consultationStore.current?.specialty_assessment as Record<string, string | null> | null)?.pelvic_exam ?? null,
+  breast_exam: (consultationStore.current?.specialty_assessment as Record<string, string | null> | null)?.breast_exam ?? null,
 })
 
 watch(
@@ -35,9 +39,9 @@ watch(
   (val) => {
     local.diagnoses = [...(val?.diagnoses ?? [])]
     local.notes = val?.notes ?? null
-    const ext = val as ConsultationAssessment & { pelvic_exam?: string | null; breast_exam?: string | null }
-    gynNotes.pelvic_exam = ext.pelvic_exam ?? null
-    gynNotes.breast_exam = ext.breast_exam ?? null
+    const sa = consultationStore.current?.specialty_assessment as Record<string, string | null> | null
+    gynNotes.pelvic_exam = sa?.pelvic_exam ?? null
+    gynNotes.breast_exam = sa?.breast_exam ?? null
   },
   { deep: true },
 )
@@ -158,9 +162,11 @@ function emitSave() {
     assessment: {
       diagnoses: [...local.diagnoses],
       notes: local.notes,
-      // Include GYN exam fields via spread — backend stores in specialty_assessment
-      ...gynNotes,
-    } as ConsultationAssessment,
+    },
+    specialty_assessment: {
+      pelvic_exam: gynNotes.pelvic_exam,
+      breast_exam: gynNotes.breast_exam,
+    },
   })
 }
 </script>
