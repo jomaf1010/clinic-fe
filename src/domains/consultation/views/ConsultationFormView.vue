@@ -58,12 +58,7 @@ const consultationId = computed(() => store.current?.id)
 const clinicId = computed(() => store.current?.clinic_id)
 const patientId = computed(() => store.current?.patient_id)
 const { prescriptionUpdate, labOrderUpdate, documentUpdate } = useConsultationSync(consultationId, clinicId)
-usePatientSync(patientId, clinicId, (updated) => {
-  if (store.current) {
-    store.current.patient_allergies = updated.allergies
-    store.current.patient_conditions = updated.chronic_conditions
-  }
-})
+usePatientSync(patientId, clinicId, () => {})
 
 const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
 const canEditAssessment = computed(() => authStore.hasPermission('consultations.edit-assessment'))
@@ -463,13 +458,10 @@ function proceedAfterFeeWarning() {
           <TriageTab
             :triage="store.current.triage"
             :patient-id="store.current.patient_id"
-            :patient-allergies="store.current.patient_allergies ?? []"
-            :patient-conditions="store.current.patient_conditions ?? []"
             :consultation-id="store.current.id"
             :disabled="store.isFinalized || !canEditTriage"
             :lab-order-update="labOrderUpdate"
             @save="handleSave"
-            @patient-updated="store.loadConsultation(store.current!.id)"
             @lab-updated="store.loadConsultation(store.current!.id)"
           />
           <div class="mt-8 flex justify-end border-t pt-4">
@@ -483,8 +475,6 @@ function proceedAfterFeeWarning() {
         <TabsContent v-if="canEditAssessment" value="assessment" class="mt-0 flex flex-col gap-6">
           <VitalsSummary
               :triage="store.current.triage"
-              :allergies="store.current.patient_allergies ?? []"
-              :conditions="store.current.patient_conditions ?? []"
               :patient-id="store.current.patient_id"
               :consultation-id="store.current.id"
               :lab-order-summary="store.current.lab_order_summary"

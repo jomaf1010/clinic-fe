@@ -15,17 +15,20 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 // ── Props ─────────────────────────────────────────────────────────────────
 interface Props {
+  /** Computed from patient DOB */
+  patientAge?: number | null
   /** From store.current.patient_sex */
   patientSex?: string | null
   /** From triage.vitals.bp, format "120/80" */
   triageBp?: string | null
-  /** From triage.specialty_data.lifestyle.smoking */
+  /** From patient lifestyle record (GET /patients/{uuid}/lifestyle) */
   smokingStatus?: string | null
-  /** From patient_conditions (checked for "diabetes" keyword) */
+  /** Pre-populate the diabetes checkbox */
   hasDiabetesCondition?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  patientAge: null,
   patientSex: null,
   triageBp: null,
   smokingStatus: null,
@@ -48,6 +51,9 @@ const hasDiabetes = ref(false)
 // Pre-populate from consultation context when section is opened
 watch(open, (isOpen) => {
   if (!isOpen) return
+
+  // Age
+  if (props.patientAge != null) age.value = props.patientAge
 
   // Sex
   if (props.patientSex === 'female') sex.value = 'female'
@@ -282,35 +288,20 @@ const isOutOfRange = computed(() => age.value !== null && (age.value < 40 || age
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <!-- Age -->
+          <!-- Age (read-only) -->
           <div class="flex flex-col gap-1.5">
             <Label class="text-xs">Age (years)</Label>
-            <Input
-              :model-value="age ?? undefined"
-              type="number"
-              min="40"
-              max="79"
-              placeholder="40–79"
-              class="h-8 text-sm"
-              @update:model-value="(v) => age = v ? Number(v) : null"
-            />
+            <div class="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm">
+              {{ age ?? '—' }}
+            </div>
           </div>
 
-          <!-- Sex -->
+          <!-- Sex (read-only) -->
           <div class="flex flex-col gap-1.5">
             <Label class="text-xs">Sex</Label>
-            <Select
-              :model-value="sex"
-              @update:model-value="(v) => sex = v as 'male' | 'female'"
-            >
-              <SelectTrigger class="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">Male</SelectItem>
-                <SelectItem value="female">Female</SelectItem>
-              </SelectContent>
-            </Select>
+            <div class="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm capitalize">
+              {{ sex }}
+            </div>
           </div>
 
           <!-- Race -->
@@ -359,18 +350,12 @@ const isOutOfRange = computed(() => age.value !== null && (age.value < 40 || age
             />
           </div>
 
-          <!-- Systolic BP -->
+          <!-- Systolic BP (read-only) -->
           <div class="flex flex-col gap-1.5">
             <Label class="text-xs">Systolic BP (mmHg)</Label>
-            <Input
-              :model-value="systolicBp ?? undefined"
-              type="number"
-              min="90"
-              max="200"
-              placeholder="e.g. 130"
-              class="h-8 text-sm"
-              @update:model-value="(v) => systolicBp = v ? Number(v) : null"
-            />
+            <div class="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm">
+              {{ systolicBp ?? '—' }}
+            </div>
           </div>
 
           <!-- BP Treatment -->

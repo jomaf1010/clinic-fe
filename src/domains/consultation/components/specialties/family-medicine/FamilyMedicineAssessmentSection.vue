@@ -253,9 +253,34 @@ onMounted(async () => {
   } finally {
     isLoadingProblems.value = false
   }
+
+  // Load patient DOB for ASCVD age
+  try {
+    const patient = await patientApi.get(patientId.value)
+    const dob = patient.data.date_of_birth
+    if (dob) {
+      const birthDate = new Date(dob)
+      const today = new Date()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--
+      ascvdPatientAge.value = age
+    }
+  } catch {
+    // non-critical
+  }
+
+  // Load patient lifestyle for ASCVD smoking status
+  try {
+    const res = await patientApi.getLifestyle(patientId.value)
+    ascvdSmokingStatus.value = res.data?.smoking ?? null
+  } catch {
+    // non-critical
+  }
 })
 
 // ── ASCVD Calculator context ──────────────────────────────────────────────
+const ascvdPatientAge = ref<number | null>(null)
 const ascvdPatientSex = computed(() => store.current?.patient_sex ?? null)
 
 const ascvdTriageBp = computed(() => {
@@ -263,17 +288,8 @@ const ascvdTriageBp = computed(() => {
   return vitals?.bp ?? null
 })
 
-const ascvdSmokingStatus = computed(() => {
-  const lifestyle = store.current?.triage?.specialty_data?.lifestyle
-  return lifestyle?.smoking ?? null
-})
+const ascvdSmokingStatus = ref<string | null>(null)
 
-const ascvdHasDiabetes = computed(() => {
-  const conditions = store.current?.patient_conditions ?? []
-  return conditions.some((c) =>
-    /\bdiabetes\b/i.test(c) || /\bdiabetic\b/i.test(c),
-  )
-})
 </script>
 
 <template>
@@ -465,10 +481,10 @@ const ascvdHasDiabetes = computed(() => {
 
     <!-- ASCVD 10-Year Risk Calculator -->
     <AscvdCalculator
+      :patient-age="ascvdPatientAge"
       :patient-sex="ascvdPatientSex"
       :triage-bp="ascvdTriageBp"
       :smoking-status="ascvdSmokingStatus"
-      :has-diabetes-condition="ascvdHasDiabetes"
     />
   </div>
 </template>

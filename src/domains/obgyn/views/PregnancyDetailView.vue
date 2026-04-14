@@ -89,7 +89,7 @@ function handleSetupSaved(pregnancy: Pregnancy): void {
   if (isNew.value) {
     router.replace({
       name: RouteNames.PREGNANCY_DETAIL,
-      params: { patientId: patientId.value, pregnancyId: pregnancy.uuid },
+      params: { patientId: patientId.value, pregnancyId: pregnancy.id },
     })
   }
 }
@@ -243,9 +243,9 @@ function goToVisit(visitId: string): void {
                 <div v-else class="flex flex-col gap-3">
                   <Card
                     v-for="v in store.visits"
-                    :key="v.uuid"
+                    :key="v.id"
                     class="cursor-pointer transition-colors hover:bg-muted/30"
-                    @click="goToVisit(v.uuid)"
+                    @click="goToVisit(v.id)"
                   >
                     <CardHeader class="pb-2 pt-3">
                       <div class="flex items-center justify-between">

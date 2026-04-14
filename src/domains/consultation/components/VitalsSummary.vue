@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { getAuthToken } from '@/lib/http'
-import { AlertTriangle, CheckCircle2, ShieldAlert, HeartPulse, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
+import { AlertTriangle, CheckCircle2, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -25,8 +25,6 @@ interface PastDiagnosis {
 
 const props = defineProps<{
   triage: ConsultationTriage
-  allergies?: string[]
-  conditions?: string[]
   patientId?: string
   consultationId?: string
   showTrendsButton?: boolean
@@ -55,9 +53,15 @@ interface BSDataPoint {
   blood_sugar: number
 }
 
+interface BMIDataPoint {
+  date: string
+  bmi: number
+}
+
 const weightData = ref<WeightDataPoint[]>([])
 const bpData = ref<BPDataPoint[]>([])
 const bsData = ref<BSDataPoint[]>([])
+const bmiData = ref<BMIDataPoint[]>([])
 
 function parseBPString(bp: string | null): { systolic: number; diastolic: number } | null {
   if (!bp) return null
@@ -77,6 +81,7 @@ async function openTrends() {
     const weightPoints: WeightDataPoint[] = []
     const bpPoints: BPDataPoint[] = []
     const bsPoints: BSDataPoint[] = []
+    const bmiPoints: BMIDataPoint[] = []
 
     for (const page of pages) {
       if (weightPoints.length >= 50 && bpPoints.length >= 50 && bsPoints.length >= 50) break
@@ -85,15 +90,30 @@ async function openTrends() {
       )
       for (const c of res.data) {
         const date = (c.finalized_at ?? c.created_at).split('T')[0]
-        if (c.triage?.weight && c.triage.weight > 0 && weightPoints.length < 50) {
-          weightPoints.push({ date, weight: c.triage.weight })
+        const weight = c.triage?.vitals?.weight as number | undefined
+        const height = c.triage?.vitals?.height as number | undefined
+        if (weight && weight > 0 && weightPoints.length < 50) {
+          weightPoints.push({ date, weight })
         }
-        const bp = parseBPString(c.triage?.vitals?.bp ?? null)
-        if (bp && bpPoints.length < 50) {
-          bpPoints.push({ date, systolic: bp.systolic, diastolic: bp.diastolic })
+        // BMI from weight + height
+        if (weight && weight > 0 && height && height > 0 && bmiPoints.length < 50) {
+          const heightM = height / 100
+          bmiPoints.push({ date, bmi: +(weight / (heightM * heightM)).toFixed(1) })
         }
-        if (c.triage?.vitals?.blood_sugar && c.triage.vitals.blood_sugar > 0 && bsPoints.length < 50) {
-          bsPoints.push({ date, blood_sugar: c.triage.vitals.blood_sugar })
+        // BP: try paired fields first (specialty system), then combined string
+        const vitals = c.triage?.vitals
+        const bpSys = vitals?.bp_systolic as number | undefined
+        const bpDia = vitals?.bp_diastolic as number | undefined
+        if (bpSys && bpDia && bpPoints.length < 50) {
+          bpPoints.push({ date, systolic: bpSys, diastolic: bpDia })
+        } else {
+          const bp = parseBPString(vitals?.bp ?? null)
+          if (bp && bpPoints.length < 50) {
+            bpPoints.push({ date, systolic: bp.systolic, diastolic: bp.diastolic })
+          }
+        }
+        if (vitals?.blood_sugar && vitals.blood_sugar > 0 && bsPoints.length < 50) {
+          bsPoints.push({ date, blood_sugar: vitals.blood_sugar })
         }
       }
       if (page >= res.meta.pagination.last_page) break
@@ -102,6 +122,7 @@ async function openTrends() {
     weightData.value = weightPoints.reverse()
     bpData.value = bpPoints.reverse()
     bsData.value = bsPoints.reverse()
+    bmiData.value = bmiPoints.reverse()
   } catch {
     // silent
   } finally {
@@ -141,7 +162,7 @@ function bpTooltipTemplate(d: BPDataPoint): string {
 }
 
 function weightBmiStatus(weight: number): { label: string; color: string } | null {
-  const height = props.triage.height
+  const height = props.triage.vitals?.height as number | undefined
   if (!height) return null
   const heightM = height / 100
   const bmiVal = weight / (heightM * heightM)
@@ -150,6 +171,23 @@ function weightBmiStatus(weight: number): { label: string; color: string } | nul
   if (bmiVal < cfg.bmi_normal)      return { label: `BMI ${bmiVal.toFixed(1)} · Normal`, color: '#16a34a' }
   if (bmiVal < cfg.bmi_overweight)  return { label: `BMI ${bmiVal.toFixed(1)} · Overweight`, color: '#d97706' }
   return { label: `BMI ${bmiVal.toFixed(1)} · Obese`, color: '#dc2626' }
+}
+
+const bmiChartConfig: ChartConfig = {
+  bmi: { label: 'BMI', color: 'hsl(var(--chart-5))' },
+}
+const bmiX = (_: BMIDataPoint, i: number) => i
+const bmiY = (d: BMIDataPoint) => d.bmi
+
+function bmiTooltipTemplate(d: BMIDataPoint): string {
+  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const status = classifyBmi(d.bmi, vitalsConfig.config)
+  const borderColor = status ? `${status.color}40` : 'var(--border)'
+  return `<div style="background: var(--popover); border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
+    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">BMI ${d.bmi}</div>
+    ${status ? `<div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>` : ''}
+    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
+  </div>`
 }
 
 const bsChartConfig: ChartConfig = {
@@ -296,9 +334,11 @@ function formatShortDate(iso: string): string {
 }
 
 const bmi = computed(() => {
-  if (!props.triage.weight || !props.triage.height) return null
-  const heightM = props.triage.height / 100
-  return +(props.triage.weight / (heightM * heightM)).toFixed(1)
+  const w = props.triage.vitals?.weight as number | undefined
+  const h = props.triage.vitals?.height as number | undefined
+  if (!w || !h) return null
+  const heightM = h / 100
+  return +(w / (heightM * heightM)).toFixed(1)
 })
 
 const bmiCategory = computed(() => {
@@ -342,9 +382,6 @@ const bsStatus = computed(() => {
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
-
-const hasAllergies = computed(() => (props.allergies?.length ?? 0) > 0)
-const hasConditions = computed(() => (props.conditions?.length ?? 0) > 0)
 
 const hasAnyVital = computed(() =>
   bmi.value !== null || tempStatus.value !== null || bpStatus.value !== null ||
@@ -444,7 +481,7 @@ const vitalBadges = computed(() => {
 
 const showDisclaimer = ref(false)
 
-const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || hasConditions.value || hasPastDiagnoses.value || hasLabResults.value)
+const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value || hasLabResults.value)
 </script>
 
 <template>
@@ -484,25 +521,6 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
       </p>
     </div>
 
-    <!-- Allergies & Conditions -->
-    <div v-if="hasAllergies || hasConditions" class="flex flex-wrap gap-1.5">
-      <span
-        v-for="allergy in allergies"
-        :key="'a-' + allergy"
-        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600"
-      >
-        <ShieldAlert class="size-3" />
-        {{ allergy }}
-      </span>
-      <span
-        v-for="condition in conditions"
-        :key="'c-' + condition"
-        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600"
-      >
-        <HeartPulse class="size-3" />
-        {{ condition }}
-      </span>
-    </div>
     <!-- Past Diagnoses -->
     <div v-if="hasPastDiagnoses" class="flex flex-col gap-1 text-xs">
       <span class="flex items-center gap-1 font-medium text-muted-foreground">
@@ -583,7 +601,7 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
         </div>
 
         <!-- No data -->
-        <div v-else-if="weightData.length === 0 && bpData.length === 0 && bsData.length === 0" class="flex flex-col items-center justify-center gap-3 py-12 text-center">
+        <div v-else-if="weightData.length === 0 && bpData.length === 0 && bsData.length === 0 && bmiData.length === 0" class="flex flex-col items-center justify-center gap-3 py-12 text-center">
           <div class="flex size-12 items-center justify-center rounded-full bg-muted">
             <TrendingUp class="size-6 text-muted-foreground" />
           </div>
@@ -605,6 +623,10 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
             <TabsTrigger v-if="bsData.length > 0" value="bs" class="flex-1">
               Blood Sugar
               <span class="ml-1 text-xs text-muted-foreground">({{ bsData.length }})</span>
+            </TabsTrigger>
+            <TabsTrigger v-if="bmiData.length > 0" value="bmi" class="flex-1">
+              BMI
+              <span class="ml-1 text-xs text-muted-foreground">({{ bmiData.length }})</span>
             </TabsTrigger>
           </TabsList>
 
@@ -747,6 +769,45 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
                   :grid-line="true"
                 />
                 <ChartCrosshair color="hsl(var(--chart-4))" :template="bsTooltipTemplate" />
+                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
+              </VisXYContainer>
+            </ChartContainer>
+          </TabsContent>
+
+          <!-- BMI chart -->
+          <TabsContent v-if="bmiData.length > 0" value="bmi" class="mt-3">
+            <ChartContainer :config="bmiChartConfig" class="h-[300px] w-full">
+              <VisXYContainer :data="bmiData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
+                <VisArea
+                  :x="bmiX"
+                  :y="bmiY"
+                  color="hsl(var(--chart-5))"
+                  :opacity="0.1"
+                />
+                <VisLine
+                  :x="bmiX"
+                  :y="bmiY"
+                  color="hsl(var(--chart-5))"
+                  :line-width="2"
+                />
+                <VisScatter
+                  :x="bmiX"
+                  :y="bmiY"
+                  color="hsl(var(--chart-5))"
+                  :size="5"
+                />
+                <VisAxis
+                  type="x"
+                  :tick-format="(i: number) => bmiData[i]?.date ? new Date(bmiData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
+                  :num-ticks="Math.min(bmiData.length, 8)"
+                  :grid-line="false"
+                />
+                <VisAxis
+                  type="y"
+                  :tick-format="(v: number) => `${v}`"
+                  :grid-line="true"
+                />
+                <ChartCrosshair color="hsl(var(--chart-5))" :template="bmiTooltipTemplate" />
                 <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
               </VisXYContainer>
             </ChartContainer>

@@ -66,7 +66,7 @@ export const usePregnancyStore = defineStore('pregnancy', () => {
     try {
       const res = await obgynApi.updatePregnancy(patientId, pregnancyId, payload)
       currentPregnancy.value = res.data
-      const idx = pregnancies.value.findIndex((p) => p.uuid === pregnancyId)
+      const idx = pregnancies.value.findIndex((p) => p.id === pregnancyId)
       if (idx !== -1) pregnancies.value[idx] = res.data
       toast.success('Pregnancy record updated')
       return res.data
@@ -138,7 +138,7 @@ export const usePregnancyStore = defineStore('pregnancy', () => {
     try {
       const res = await obgynApi.updateVisit(patientId, pregnancyId, visitId, payload)
       currentVisit.value = res.data
-      const idx = visits.value.findIndex((v) => v.uuid === visitId)
+      const idx = visits.value.findIndex((v) => v.id === visitId)
       if (idx !== -1) visits.value[idx] = res.data
       toast.success('Prenatal visit updated')
       return res.data

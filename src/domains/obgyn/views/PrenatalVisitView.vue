@@ -41,7 +41,7 @@ onMounted(async () => {
     await Promise.all(tasks)
 
     if (!isNew.value && visitId.value) {
-      const found = store.visits.find((v) => v.uuid === visitId.value)
+      const found = store.visits.find((v) => v.id === visitId.value)
       if (found) {
         store.currentVisit = found
       }

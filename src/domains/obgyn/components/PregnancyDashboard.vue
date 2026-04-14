@@ -183,7 +183,7 @@ const visitSummary = computed(() => dashboardData.value?.visit_summary ?? [])
           <div class="flex flex-col gap-2">
             <div
               v-for="v in visitSummary"
-              :key="v.uuid"
+              :key="v.id"
               class="flex flex-col gap-1.5 rounded-md border px-3 py-2.5"
               :class="v.danger_signs.length > 0 ? 'border-l-2 border-l-red-400 bg-red-50/40 dark:bg-red-950/20' : 'bg-card'"
             >

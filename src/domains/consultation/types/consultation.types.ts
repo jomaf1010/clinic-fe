@@ -4,10 +4,10 @@ export type ConsultationType = 'default' | 'follow_up'
 export interface LifestyleData {
   smoking?: 'never' | 'former' | 'current' | null
   pack_years?: number | null
-  alcohol?: 'none' | 'occasional' | 'regular' | null
-  exercise?: 'sedentary' | 'light' | 'moderate' | 'active' | null
-  diet?: 'good' | 'fair' | 'poor' | null
-  medication_adherence?: 'good' | 'fair' | 'poor' | null
+  alcohol?: 'none' | 'social' | 'moderate' | 'heavy' | null
+  exercise?: 'none' | 'light' | 'moderate' | 'vigorous' | null
+  diet?: 'poor' | 'fair' | 'good' | 'excellent' | null
+  medication_adherence?: 'non_adherent' | 'partial' | 'adherent' | null
 }
 
 export interface ProblemSoapNote {
@@ -30,23 +30,10 @@ export interface ConsultationConsumable {
   unit_price: number | null
 }
 
-export interface TriageVitals {
-  bp: string | null
-  hr: number | null
-  rr: number | null
-  temp: number | null
-  spo2: number | null
-  blood_sugar: number | null
-}
-
 export interface ConsultationTriage {
   chief_complaint: string | null
-  vitals: TriageVitals
-  weight: number | null
-  height: number | null
-  pain_score: number | null
+  vitals: Record<string, string | number | null>
   notes: string | null
-  extended_vitals?: Record<string, string | number | null>
   specialty_data?: {
     lifestyle?: LifestyleData
   } | null
@@ -115,8 +102,6 @@ export interface ConsultationResponse {
   doctor_avatar_url: string | null
   status: ConsultationStatus
   triage: ConsultationTriage
-  patient_allergies: string[]
-  patient_conditions: string[]
   assessment: ConsultationAssessment
   specialty_assessment?: FMSpecialtyAssessment | null
   treatment_plan: ConsultationTreatmentPlan

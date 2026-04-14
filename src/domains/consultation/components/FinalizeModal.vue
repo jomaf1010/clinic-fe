@@ -61,11 +61,11 @@ const rrInd = computed(() => vitalIndicator(classifyRr(vitals.value?.rr, vitalsC
 const tempInd = computed(() => vitalIndicator(classifyTemp(vitals.value?.temp, vitalsConfig.config)))
 const spo2Ind = computed(() => vitalIndicator(classifySpo2(vitals.value?.spo2, vitalsConfig.config)))
 const bsInd = computed(() => vitalIndicator(classifyBloodSugar(vitals.value?.blood_sugar, vitalsConfig.config)))
-const painInd = computed(() => vitalIndicator(classifyPain(props.consultation.triage.pain_score, vitalsConfig.config)))
+const painInd = computed(() => vitalIndicator(classifyPain(vitals.value?.pain_score as number | null, vitalsConfig.config)))
 
 const bmi = computed(() => {
-  const w = props.consultation.triage.weight
-  const h = props.consultation.triage.height
+  const w = vitals.value?.weight as number | null
+  const h = vitals.value?.height as number | null
   if (!w || !h) return null
   return +(w / ((h / 100) ** 2)).toFixed(1)
 })
@@ -151,20 +151,20 @@ const bmiCategory = computed(() => {
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Weight</span>
               <span class="font-medium">
-                {{ consultation.triage.weight != null ? `${consultation.triage.weight} kg` : '—' }}
+                {{ vitals?.weight != null ? `${vitals.weight} kg` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Height</span>
               <span class="font-medium">
-                {{ consultation.triage.height != null ? `${consultation.triage.height} cm` : '—' }}
+                {{ vitals?.height != null ? `${vitals.height} cm` : '—' }}
               </span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="text-muted-foreground">Pain</span>
               <span class="flex items-center gap-1 font-medium">
                 <component :is="painInd.icon" v-if="painInd" class="size-3" :class="painInd.class" />
-                {{ consultation.triage.pain_score != null ? `${consultation.triage.pain_score}/10` : '—' }}
+                {{ vitals?.pain_score != null ? `${vitals.pain_score}/10` : '—' }}
               </span>
             </div>
             <div v-if="bmi" class="flex justify-between gap-2">
@@ -172,22 +172,6 @@ const bmiCategory = computed(() => {
               <span class="font-medium" :class="bmiCategory?.color">
                 {{ bmi }} <span class="text-xs font-normal">{{ bmiCategory?.label }}</span>
               </span>
-            </div>
-          </div>
-          <div v-if="consultation.patient_allergies?.length" class="rounded-md border bg-muted/30 p-3">
-            <p class="mb-1 text-xs text-muted-foreground">Allergies</p>
-            <div class="flex flex-wrap gap-1">
-              <Badge v-for="allergy in consultation.patient_allergies" :key="allergy" variant="secondary" class="text-xs">
-                {{ allergy }}
-              </Badge>
-            </div>
-          </div>
-          <div v-if="consultation.patient_conditions?.length" class="rounded-md border bg-muted/30 p-3">
-            <p class="mb-1 text-xs text-muted-foreground">Chronic Conditions</p>
-            <div class="flex flex-wrap gap-1">
-              <Badge v-for="condition in consultation.patient_conditions" :key="condition" variant="secondary" class="text-xs">
-                {{ condition }}
-              </Badge>
             </div>
           </div>
           <div v-if="consultation.triage.notes" class="rounded-md border bg-muted/30 p-3">

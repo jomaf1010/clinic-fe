@@ -68,34 +68,50 @@ interface FormState {
 }
 
 function buildInitialState(): FormState {
-  const p = props.pregnancy
+  const p = props.pregnancy as any
   return {
     lmp: p?.lmp ?? '',
     edd: p?.edd ?? '',
     edd_source: p?.edd_source ?? '',
-    first_ultrasound_date: '',
-    first_ultrasound_ga: '',
+    first_ultrasound_date: p?.first_ultrasound_date ?? '',
+    first_ultrasound_ga: p?.first_ultrasound_ga ?? '',
     gravidity: p?.gravidity ?? null,
     parity_term: p?.parity_term ?? null,
     parity_preterm: p?.parity_preterm ?? null,
     abortions: p?.abortions ?? null,
     living_children: p?.living_children ?? null,
-    medical_conditions: '',
-    surgical_history: '',
-    blood_type: '',
-    smoking: '',
-    alcohol: '',
-    ipv_screened: false,
+    medical_conditions: p?.medical_conditions ?? '',
+    surgical_history: p?.surgical_history ?? '',
+    blood_type: p?.blood_type_rh ?? '',
+    smoking: p?.smoking ?? '',
+    alcohol: p?.alcohol ?? '',
+    ipv_screened: p?.ipv_screened ?? false,
     pre_pregnancy_weight: p?.pre_pregnancy_weight ?? null,
-    height: null,
+    height: p?.height ?? null,
     risk_level: p?.risk_level ?? '',
-    risk_factors: p?.risk_factors?.join('\n') ?? '',
+    risk_factors: Array.isArray(p?.risk_factors) ? p.risk_factors.join('\n') : '',
   }
 }
 
 const form = reactive<FormState>(buildInitialState())
 
-// Auto-calculate EDD from LMP
+// Re-populate form when pregnancy prop loads asynchronously
+watch(
+  () => props.pregnancy,
+  (p) => {
+    if (!p) return
+    Object.assign(form, buildInitialState())
+  },
+)
+
+// Parse GA string like "15w3d" or "15w" into total days
+function parseGAToDays(ga: string): number | null {
+  const match = ga.match(/^(\d+)w(?:(\d+)d)?$/)
+  if (!match) return null
+  return parseInt(match[1]!) * 7 + parseInt(match[2] ?? '0')
+}
+
+// Auto-calculate EDD from LMP (when source is lmp)
 watch(
   () => form.lmp,
   (lmp) => {
@@ -105,6 +121,23 @@ watch(
     const eddDate = new Date(lmpDate.getTime() + 280 * 24 * 60 * 60 * 1000)
     form.edd = eddDate.toISOString().split('T')[0]!
     if (!form.edd_source) form.edd_source = 'lmp'
+  },
+)
+
+// Auto-calculate EDD from ultrasound (when source is ultrasound)
+// EDD = ultrasound_date + (280 - GA_in_days)
+watch(
+  () => [form.edd_source, form.first_ultrasound_date, form.first_ultrasound_ga],
+  () => {
+    if (form.edd_source !== 'ultrasound') return
+    if (!form.first_ultrasound_date || !form.first_ultrasound_ga) return
+    const usDate = new Date(form.first_ultrasound_date)
+    if (isNaN(usDate.getTime())) return
+    const gaDays = parseGAToDays(form.first_ultrasound_ga)
+    if (gaDays === null) return
+    const remainingDays = 280 - gaDays
+    const eddDate = new Date(usDate.getTime() + remainingDays * 24 * 60 * 60 * 1000)
+    form.edd = eddDate.toISOString().split('T')[0]!
   },
 )
 
@@ -141,12 +174,22 @@ async function handleSubmit(): Promise<void> {
     lmp: form.lmp || null,
     edd: form.edd || null,
     edd_source: (form.edd_source as 'lmp' | 'ultrasound' | 'adjusted') || null,
+    first_ultrasound_date: form.first_ultrasound_date || null,
+    first_ultrasound_ga: form.first_ultrasound_ga || null,
     gravidity: form.gravidity,
     parity_term: form.parity_term,
     parity_preterm: form.parity_preterm,
     abortions: form.abortions,
     living_children: form.living_children,
     pre_pregnancy_weight: form.pre_pregnancy_weight,
+    height: form.height,
+    medical_conditions: form.medical_conditions || null,
+    surgical_history: form.surgical_history || null,
+    blood_type_rh: form.blood_type || null,
+    ...(form.smoking ? { smoking: form.smoking } : {}),
+    ...(form.alcohol ? { alcohol: form.alcohol } : {}),
+    ipv_screened: form.ipv_screened,
+    risk_level: form.risk_level || null,
     risk_factors: form.risk_factors
       ? form.risk_factors.split('\n').map((s) => s.trim()).filter(Boolean)
       : [],
@@ -154,7 +197,7 @@ async function handleSubmit(): Promise<void> {
 
   let result: Pregnancy
   if (props.pregnancy) {
-    result = await store.updatePregnancy(props.patientId, props.pregnancy.uuid, payload)
+    result = await store.updatePregnancy(props.patientId, props.pregnancy.id, payload)
   } else {
     result = await store.createPregnancy(props.patientId, payload)
   }

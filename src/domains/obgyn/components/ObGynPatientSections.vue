@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { RouteNames } from '@/router/routeNames'
 import { toast } from 'vue-sonner'
 import {
   Heart,
@@ -12,6 +13,7 @@ import {
   Pencil,
   Trash2,
   CalendarDays,
+  ExternalLink,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +40,22 @@ import type { GynProfile, Pregnancy } from '../types/obgyn.types'
 import type { UpsertGynProfilePayload, CreatePregnancyPayload } from '../api/obgynApi'
 
 const route = useRoute()
+const router = useRouter()
 const patientId = computed(() => route.params.id as string)
+
+function navigateToPregnancy(pregnancyUuid: string) {
+  showPregDialog.value = false
+  const target = {
+    name: RouteNames.PREGNANCY_DETAIL,
+    params: { patientId: patientId.value, pregnancyId: pregnancyUuid },
+  }
+  console.log('[OB-GYN] Navigating to:', target)
+  router.push(target).then(() => {
+    console.log('[OB-GYN] Navigation succeeded')
+  }).catch((err) => {
+    console.error('[OB-GYN] Navigation failed:', err)
+  })
+}
 
 function formatDate(d: string | null): string {
   if (!d) return ''
@@ -49,6 +66,8 @@ function formatDate(d: string | null): string {
 const gynProfile = ref<GynProfile | null>(null)
 const isLoadingGyn = ref(false)
 const showGynDialog = ref(false)
+const showScreeningDialog = ref(false)
+const showContraceptionDialog = ref(false)
 const isSavingGyn = ref(false)
 const gynEditing = ref(false)
 
@@ -224,7 +243,7 @@ async function deletePregnancy(uuid: string) {
   deletingPregId.value = uuid
   try {
     await obgynApi.deletePregnancy(patientId.value, uuid)
-    pregnancies.value = pregnancies.value.filter((p) => p.uuid !== uuid)
+    pregnancies.value = pregnancies.value.filter((p) => p.id !== uuid)
   } catch {
     toast.error('Failed to delete pregnancy record')
   } finally {
@@ -324,7 +343,7 @@ onMounted(() => {
       title="Cervical Screening"
       :detail="cervicalWidgetDetail"
       :loading="isLoadingGyn"
-      @click="openGynDialog"
+      @click="showScreeningDialog = true"
     />
 
     <!-- Contraception Widget -->
@@ -334,7 +353,7 @@ onMounted(() => {
       title="Contraception"
       :detail="contraceptionDetail"
       :loading="isLoadingGyn"
-      @click="openGynDialog"
+      @click="showContraceptionDialog = true"
     />
 
     <!-- GYN Profile Dialog -->
@@ -706,9 +725,11 @@ onMounted(() => {
           </div>
 
           <!-- Active pregnancy highlight -->
-          <div
+          <button
             v-else-if="activePregnancy"
-            class="rounded-lg border-2 border-purple-200 bg-purple-50/50 p-3 mb-1"
+            type="button"
+            class="w-full rounded-lg border-2 border-purple-200 bg-purple-50/50 p-3 mb-1 text-left transition-colors hover:bg-purple-50 cursor-pointer"
+            @click.stop="navigateToPregnancy(activePregnancy!.id)"
           >
             <div class="flex items-start justify-between gap-2">
               <div>
@@ -735,21 +756,13 @@ onMounted(() => {
                   LMP: {{ formatDate(activePregnancy.lmp) }}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="size-6 shrink-0"
-                title="Delete"
-                @click="deletePregnancy(activePregnancy.uuid)"
-              >
-                <Trash2 class="size-3.5 text-muted-foreground" />
-              </Button>
+              <ExternalLink class="size-4 text-muted-foreground shrink-0" />
             </div>
-          </div>
+          </button>
 
           <!-- Pregnancy list (non-active) -->
           <template v-if="pregnancies.length > 0">
-            <template v-for="preg in pregnancies" :key="preg.uuid">
+            <template v-for="preg in pregnancies" :key="preg.id">
             <div
               v-if="preg.status !== 'active'"
               class="flex items-start gap-2 rounded-lg border bg-card p-2.5"
@@ -777,18 +790,19 @@ onMounted(() => {
                 size="icon"
                 class="size-6 shrink-0"
                 title="Delete"
-                :disabled="deletingPregId === preg.uuid"
-                @click="deletePregnancy(preg.uuid)"
+                :disabled="deletingPregId === preg.id"
+                @click="deletePregnancy(preg.id)"
               >
-                <LoaderCircle v-if="deletingPregId === preg.uuid" class="size-3.5 animate-spin" />
+                <LoaderCircle v-if="deletingPregId === preg.id" class="size-3.5 animate-spin" />
                 <Trash2 v-else class="size-3.5 text-muted-foreground" />
               </Button>
             </div>
           </template>
+          </template>
         </div>
 
         <DialogFooter class="justify-end">
-          <Button variant="secondary" @click="showAddPregDialog = true">
+          <Button v-if="!activePregnancy" variant="secondary" @click="showAddPregDialog = true">
             <Plus class="size-4 mr-1" />
             Add Pregnancy
           </Button>
@@ -917,6 +931,87 @@ onMounted(() => {
           <Button size="sm" :disabled="isSavingPreg" @click="savePregnancy">
             <LoaderCircle v-if="isSavingPreg" class="size-3 animate-spin mr-1" />
             Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Cervical Screening Dialog -->
+    <Dialog v-model:open="showScreeningDialog">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <ShieldCheck class="size-4 text-teal-600" />
+            Cervical Screening
+          </DialogTitle>
+        </DialogHeader>
+        <div v-if="gynProfile" class="space-y-3">
+          <div v-if="gynProfile.last_pap_date" class="flex items-start gap-2 text-sm">
+            <span class="text-muted-foreground shrink-0">Last Pap:</span>
+            <span class="font-medium">{{ formatDate(gynProfile.last_pap_date) }}</span>
+          </div>
+          <div v-if="gynProfile.last_pap_result" class="flex items-start gap-2 text-sm">
+            <span class="text-muted-foreground shrink-0">Result:</span>
+            <span class="font-medium">{{ gynProfile.last_pap_result }}</span>
+          </div>
+          <div v-if="gynProfile.hpv_status" class="flex items-start gap-2 text-sm">
+            <span class="text-muted-foreground shrink-0">HPV Status:</span>
+            <span class="font-medium capitalize">{{ gynProfile.hpv_status }}</span>
+          </div>
+          <div v-if="gynProfile.screening_interval" class="flex items-start gap-2 text-sm">
+            <span class="text-muted-foreground shrink-0">Interval:</span>
+            <span class="font-medium">{{ gynProfile.screening_interval }}</span>
+          </div>
+          <div v-if="!gynProfile.last_pap_date && !gynProfile.hpv_status" class="py-6 text-center text-sm text-muted-foreground">
+            No screening data recorded. Edit GYN Profile to add.
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" size="sm" @click="showScreeningDialog = false; openGynDialog()">
+            Edit in GYN Profile
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Contraception Dialog -->
+    <Dialog v-model:open="showContraceptionDialog">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <Pill class="size-4 text-blue-600" />
+            Contraception
+          </DialogTitle>
+        </DialogHeader>
+        <div v-if="gynProfile" class="space-y-4">
+          <div v-if="gynProfile.current_contraception?.method">
+            <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Method</p>
+            <p class="text-sm font-medium capitalize">{{ gynProfile.current_contraception.method.replace(/_/g, ' ') }}</p>
+            <p v-if="gynProfile.current_contraception.start_date" class="text-xs text-muted-foreground mt-0.5">
+              Since {{ formatDate(gynProfile.current_contraception.start_date) }}
+            </p>
+          </div>
+          <div v-if="gynProfile.contraceptive_history?.length">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">History</p>
+            <div class="space-y-2">
+              <div v-for="(entry, i) in gynProfile.contraceptive_history" :key="i" class="rounded-md border p-2 text-sm">
+                <span class="font-medium capitalize">{{ entry.method?.replace(/_/g, ' ') }}</span>
+                <span v-if="entry.start_date" class="ml-1 text-xs text-muted-foreground">
+                  {{ formatDate(entry.start_date) }} – {{ entry.end_date ? formatDate(entry.end_date) : 'ongoing' }}
+                </span>
+                <p v-if="entry.reason_discontinued" class="mt-0.5 text-xs text-muted-foreground">
+                  Stopped: {{ entry.reason_discontinued }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div v-if="!gynProfile.current_contraception?.method && !gynProfile.contraceptive_history?.length" class="py-6 text-center text-sm text-muted-foreground">
+            No contraception data recorded. Edit GYN Profile to add.
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" size="sm" @click="showContraceptionDialog = false; openGynDialog()">
+            Edit in GYN Profile
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -26,7 +26,7 @@ export interface GynSurgery {
 }
 
 export interface GynProfile {
-  uuid: string
+  id: string
   patient_id: string
   clinic_id: string
   menarche_age: number | null
@@ -52,20 +52,29 @@ export interface GynProfile {
 }
 
 export interface Pregnancy {
-  uuid: string
+  id: string
   patient_id: string
   clinic_id: string
   lmp: string | null
   edd: string | null
   edd_source: 'lmp' | 'ultrasound' | 'adjusted' | null
+  first_ultrasound_date: string | null
+  first_ultrasound_ga: string | null
   gravidity: number | null
   parity_term: number | null
   parity_preterm: number | null
   abortions: number | null
   living_children: number | null
+  medical_conditions: string | null
+  surgical_history: string | null
+  blood_type_rh: string | null
+  smoking: string | null
+  alcohol: string | null
+  ipv_screened: boolean | null
   pre_pregnancy_weight: number | null
+  height: number | null
   pre_pregnancy_bmi: number | null
-  recommended_weight_gain: { min: number; max: number } | null
+  recommended_weight_gain: string | null
   risk_level: 'low' | 'high' | null
   risk_factors: string[]
   status: 'active' | 'delivered' | 'lost' | 'postpartum' | 'inactive'
@@ -76,7 +85,7 @@ export interface Pregnancy {
 }
 
 export interface PrenatalVisit {
-  uuid: string
+  id: string
   pregnancy_id: string
   visit_number: number
   visit_date: string

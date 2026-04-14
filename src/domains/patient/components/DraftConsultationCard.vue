@@ -84,9 +84,9 @@ const abnormalVitals = computed(() => {
     alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: bs.label, color: badgeColor(bs.severity) })
   }
 
-  const pain = classifyPain(props.consultation.triage?.pain_score, cfg)
+  const pain = classifyPain(vitals.pain_score, cfg)
   if (pain) {
-    alerts.push({ label: 'Pain', value: `${props.consultation.triage?.pain_score}/10`, status: pain.label, color: BADGE_RED })
+    alerts.push({ label: 'Pain', value: `${vitals.pain_score}/10`, status: pain.label, color: BADGE_RED })
   }
 
   return alerts

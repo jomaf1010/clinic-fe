@@ -24,12 +24,22 @@ export interface CreatePregnancyPayload {
   lmp?: string | null
   edd?: string | null
   edd_source?: 'lmp' | 'ultrasound' | 'adjusted' | null
+  first_ultrasound_date?: string | null
+  first_ultrasound_ga?: string | null
   gravidity?: number | null
   parity_term?: number | null
   parity_preterm?: number | null
   abortions?: number | null
   living_children?: number | null
   pre_pregnancy_weight?: number | null
+  height?: number | null
+  medical_conditions?: string | null
+  surgical_history?: string | null
+  blood_type_rh?: string | null
+  smoking?: string | null
+  alcohol?: string | null
+  ipv_screened?: boolean
+  risk_level?: string | null
   risk_factors?: string[]
 }
 

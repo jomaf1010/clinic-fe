@@ -28,13 +28,10 @@ import {
   Phone,
   Mail,
   LoaderCircle,
-  ShieldAlert,
-  HeartPulse,
   StickyNote,
   CheckCircle2,
 } from 'lucide-vue-next'
 import DateOfBirthPicker from '@/components/DateOfBirthPicker.vue'
-import TagInput from '@/components/TagInput.vue'
 import AddressForm from '@/components/AddressForm.vue'
 import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
@@ -72,8 +69,6 @@ const addressPrefill = clinicAddress?.region_code && clinicAddress?.province_cod
 
 const name = ref<PatientName | null>(null)
 const address = ref<PatientAddress | null>(null)
-const allergies = ref<string[]>([])
-const chronicConditions = ref<string[]>([])
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
@@ -86,10 +81,6 @@ const { clearDraft } = useFormDraft(
     contact_number: contactNumber,
     email,
     note,
-  },
-  {
-    allergies,
-    chronic_conditions: chronicConditions,
   },
 )
 
@@ -128,8 +119,6 @@ const onSubmit = handleSubmit(async (values) => {
       sex: values.sex,
       ...(values.contact_number ? { contact_number: values.contact_number } : {}),
       ...(values.email ? { email: values.email } : {}),
-      ...(allergies.value.length > 0 ? { allergies: allergies.value } : {}),
-      ...(chronicConditions.value.length > 0 ? { chronic_conditions: chronicConditions.value } : {}),
       ...(values.note ? { note: values.note } : {}),
     })
 
@@ -137,8 +126,6 @@ const onSubmit = handleSubmit(async (values) => {
     resetForm()
     name.value = null
     address.value = null
-    allergies.value = []
-    chronicConditions.value = []
     emit('created')
     emit('update:open', false)
   } catch (err) {
@@ -263,31 +250,6 @@ const onSubmit = handleSubmit(async (values) => {
         </div>
 
         <Separator />
-
-        <!-- Additional Information -->
-        <div class="flex flex-col gap-2">
-          <Label class="flex items-center gap-1.5">
-            <ShieldAlert class="size-3.5 text-muted-foreground" />
-            Allergies <span class="text-muted-foreground">(optional)</span>
-          </Label>
-          <TagInput
-            v-model="allergies"
-            :search-fn="patientApi.searchAllergies"
-            placeholder="Type allergy and press Enter..."
-          />
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <Label class="flex items-center gap-1.5">
-            <HeartPulse class="size-3.5 text-muted-foreground" />
-            Chronic conditions <span class="text-muted-foreground">(optional)</span>
-          </Label>
-          <TagInput
-            v-model="chronicConditions"
-            :search-fn="patientApi.searchConditions"
-            placeholder="Type condition and press Enter..."
-          />
-        </div>
 
         <div class="flex flex-col gap-2">
           <Label for="dlg_note" class="flex items-center gap-1.5">

@@ -40,8 +40,6 @@ export interface CreatePatientPayload {
   sex: string
   contact_number?: string
   email?: string
-  allergies?: string[]
-  chronic_conditions?: string[]
   note?: string
 }
 
@@ -59,8 +57,6 @@ export interface PatientResponse {
   sex: string
   contact_number: string | null
   email: string | null
-  allergies: string[]
-  chronic_conditions: string[]
   note: string | null
   avatar_url: string | null
   status: PatientStatus
@@ -98,8 +94,6 @@ export interface UpdatePatientPayload {
   sex?: string
   contact_number?: string | null
   email?: string | null
-  allergies?: string[]
-  chronic_conditions?: string[]
   note?: string | null
 }
 

@@ -183,7 +183,7 @@ async function handleSubmit(): Promise<void> {
 
   let result: PrenatalVisit
   if (props.visit) {
-    result = await store.updateVisit(props.patientId, props.pregnancyId, props.visit.uuid, payload)
+    result = await store.updateVisit(props.patientId, props.pregnancyId, props.visit.id, payload)
   } else {
     result = await store.createVisit(props.patientId, props.pregnancyId, payload)
   }

@@ -9,7 +9,6 @@ import { Slider } from '@/components/ui/slider'
 import VitalsSummary from '../../VitalsSummary.vue'
 import VitalFieldRenderer from '../../VitalFieldRenderer.vue'
 import LabOrderSection from '../../LabOrderSection.vue'
-import PatientHistorySection from '../PatientHistorySection.vue'
 import type { ConsultationTriage } from '../../../types/consultation.types'
 import type { VitalFieldConfig } from '@/domains/specialty/types/specialty.types'
 import type { LabOrderResponse } from '../../../types/labOrder.types'
@@ -17,8 +16,6 @@ import type { LabOrderResponse } from '../../../types/labOrder.types'
 const props = defineProps<{
   triage: ConsultationTriage
   patientId: string
-  patientAllergies: string[]
-  patientConditions: string[]
   consultationId: string
   disabled: boolean
   labOrderUpdate?: LabOrderResponse | null
@@ -26,7 +23,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   save: [payload: { triage: ConsultationTriage }]
-  'patient-updated': []
   'lab-updated': []
 }>()
 
@@ -67,65 +63,26 @@ const DEFAULT_VITAL_FIELDS: VitalFieldConfig[] = [
   },
 ]
 
-const CORE_VITAL_KEYS = new Set(['bp', 'hr', 'rr', 'temp', 'spo2', 'blood_sugar'])
-
 // ── Local state ───────────────────────────────────────────────────────────
-const local = reactive<ConsultationTriage>({
-  chief_complaint: props.triage.chief_complaint,
-  vitals: {
-    bp: props.triage.vitals?.bp ?? null,
-    hr: props.triage.vitals?.hr ?? null,
-    rr: props.triage.vitals?.rr ?? null,
-    temp: props.triage.vitals?.temp ?? null,
-    spo2: props.triage.vitals?.spo2 ?? null,
-    blood_sugar: props.triage.vitals?.blood_sugar ?? null,
-  },
-  weight: props.triage.weight,
-  height: props.triage.height,
-  pain_score: props.triage.pain_score,
-  notes: props.triage.notes,
+const allVitals = reactive<Record<string, string | number | null>>({
+  ...(props.triage.vitals ?? {}),
 })
 
-const localExtendedVitals = reactive<Record<string, string | number | null>>(
-  { ...(props.triage.extended_vitals ?? {}) },
-)
+const local = reactive({
+  chief_complaint: props.triage.chief_complaint,
+  notes: props.triage.notes,
+})
 
 watch(
   () => props.triage,
   (t) => {
     local.chief_complaint = t.chief_complaint
-    local.vitals.bp = t.vitals?.bp ?? null
-    local.vitals.hr = t.vitals?.hr ?? null
-    local.vitals.rr = t.vitals?.rr ?? null
-    local.vitals.temp = t.vitals?.temp ?? null
-    local.vitals.spo2 = t.vitals?.spo2 ?? null
-    local.vitals.blood_sugar = t.vitals?.blood_sugar ?? null
-    local.weight = t.weight
-    local.height = t.height
-    local.pain_score = t.pain_score
     local.notes = t.notes
-    const newExtended = t.extended_vitals ?? {}
-    Object.keys(localExtendedVitals).forEach((k) => delete localExtendedVitals[k])
-    Object.assign(localExtendedVitals, newExtended)
+    for (const key of Object.keys(allVitals)) delete allVitals[key]
+    Object.assign(allVitals, { ...(t.vitals ?? {}) })
   },
   { deep: true },
 )
-
-// ── Vital value accessors ─────────────────────────────────────────────────
-function getVitalValue(key: string): string | number | null {
-  if (CORE_VITAL_KEYS.has(key)) {
-    return (local.vitals as Record<string, string | number | null>)[key] ?? null
-  }
-  return localExtendedVitals[key] ?? null
-}
-
-function setVitalValue(key: string, val: string | number | null) {
-  if (CORE_VITAL_KEYS.has(key)) {
-    ;(local.vitals as Record<string, string | number | null>)[key] = val
-  } else {
-    localExtendedVitals[key] = val
-  }
-}
 
 // ── Height unit toggle ────────────────────────────────────────────────────
 const heightUnit = ref<'cm' | 'ft'>('cm')
@@ -148,7 +105,7 @@ function cmToFtIn(cm: number | null): { feet: number; inches: number } | null {
 
 function toggleHeightUnit() {
   if (heightUnit.value === 'cm') {
-    const converted = cmToFtIn(local.height)
+    const converted = cmToFtIn(allVitals['height'] as number | null)
     heightFeet.value = converted?.feet ?? null
     heightInches.value = converted?.inches ?? null
     heightUnit.value = 'ft'
@@ -158,15 +115,16 @@ function toggleHeightUnit() {
 }
 
 function onFtInUpdate() {
-  local.height = ftInToCm(heightFeet.value, heightInches.value)
+  allVitals['height'] = ftInToCm(heightFeet.value, heightInches.value)
   onBlur()
 }
 
 // ── Pain score ────────────────────────────────────────────────────────────
 const painLabel = computed(() => {
-  if (local.pain_score === null || local.pain_score === 0) return null
-  if (local.pain_score <= 3) return { label: 'Mild', color: 'text-green-600' }
-  if (local.pain_score <= 6) return { label: 'Moderate', color: 'text-amber-600' }
+  const score = allVitals['pain_score'] as number | null
+  if (score === null || score === 0) return null
+  if (score <= 3) return { label: 'Mild', color: 'text-green-600' }
+  if (score <= 6) return { label: 'Moderate', color: 'text-amber-600' }
   return { label: 'Severe', color: 'text-red-600' }
 })
 
@@ -178,7 +136,7 @@ function validate(): boolean {
 
   for (const field of DEFAULT_VITAL_FIELDS) {
     if (field.type === 'bp' || field.type === 'enum') continue
-    const val = getVitalValue(field.key)
+    const val = allVitals[field.key]
     if (val === null || val === undefined || String(val) === '') continue
     const num = Number(val)
     if (field.min !== null && num < field.min) {
@@ -188,9 +146,11 @@ function validate(): boolean {
     }
   }
 
-  if (local.weight !== null && (local.weight < 0.5 || local.weight > 500))
+  const weight = allVitals['weight'] as number | null
+  const height = allVitals['height'] as number | null
+  if (weight !== null && (weight < 0.5 || weight > 500))
     e.weight = 'Must be between 0.5 and 500 kg'
-  if (local.height !== null && (local.height < 30 || local.height > 300))
+  if (height !== null && (height < 30 || height > 300))
     e.height = 'Must be between 30 and 300 cm'
 
   errors.value = e
@@ -203,7 +163,7 @@ function onBlur(): void {
 }
 
 function onPainScoreChange(val: number[]) {
-  local.pain_score = val[0]
+  allVitals['pain_score'] = val[0]
   emitSave()
 }
 
@@ -211,12 +171,8 @@ function emitSave() {
   emit('save', {
     triage: {
       chief_complaint: local.chief_complaint,
-      vitals: { ...local.vitals },
-      weight: local.weight,
-      height: local.height,
-      pain_score: local.pain_score,
+      vitals: { ...allVitals },
       notes: local.notes,
-      extended_vitals: { ...localExtendedVitals },
     },
   })
 }
@@ -225,7 +181,7 @@ function emitSave() {
 <template>
   <div class="flex flex-col gap-6">
     <!-- Quick Assessment Summary -->
-    <VitalsSummary :triage="local" />
+    <VitalsSummary :triage="{ chief_complaint: local.chief_complaint, vitals: { ...allVitals }, notes: local.notes }" />
 
     <!-- Chief Complaint -->
     <div class="flex flex-col gap-2">
@@ -252,10 +208,10 @@ function emitSave() {
           v-for="field in DEFAULT_VITAL_FIELDS"
           :key="field.key"
           :field-config="field"
-          :model-value="getVitalValue(field.key)"
+          :model-value="allVitals[field.key] ?? null"
           :disabled="disabled"
           :error="errors[field.key]"
-          @update:model-value="(v) => { setVitalValue(field.key, v) }"
+          @update:model-value="(v) => { allVitals[field.key] = v }"
           @blur="onBlur"
         />
       </div>
@@ -274,12 +230,12 @@ function emitSave() {
           </div>
           <Input
             id="weight"
-            :model-value="local.weight ?? undefined"
+            :model-value="(allVitals['weight'] as number | null) ?? undefined"
             type="number"
             placeholder="70"
             step="0.1"
             :disabled="disabled"
-            @update:model-value="(v: string | number) => { const n = Number(v); local.weight = isNaN(n) ? null : n }"
+            @update:model-value="(v: string | number) => { const n = Number(v); allVitals['weight'] = isNaN(n) ? null : n }"
             @blur="onBlur"
           />
           <p v-if="errors.weight" class="text-xs text-destructive">{{ errors.weight }}</p>
@@ -303,11 +259,11 @@ function emitSave() {
           <Input
             v-if="heightUnit === 'cm'"
             id="height"
-            :model-value="local.height ?? undefined"
+            :model-value="(allVitals['height'] as number | null) ?? undefined"
             type="number"
             placeholder="170"
             :disabled="disabled"
-            @update:model-value="(v: string | number) => { const n = Number(v); local.height = isNaN(n) ? null : n }"
+            @update:model-value="(v: string | number) => { const n = Number(v); allVitals['height'] = isNaN(n) ? null : n }"
             @blur="onBlur"
           />
           <div v-else class="flex items-center gap-2">
@@ -340,8 +296,8 @@ function emitSave() {
             <Label class="flex items-center gap-1.5">
               <Activity class="size-3.5 text-muted-foreground" />
               Pain Score
-              <span v-if="local.pain_score !== null" class="ml-1 font-mono text-base font-semibold">
-                {{ local.pain_score }}/10
+              <span v-if="allVitals['pain_score'] !== null" class="ml-1 font-mono text-base font-semibold">
+                {{ allVitals['pain_score'] }}/10
               </span>
               <span v-if="painLabel" :class="painLabel.color" class="text-xs font-medium">
                 ({{ painLabel.label }})
@@ -349,7 +305,7 @@ function emitSave() {
             </Label>
           </div>
           <Slider
-            :model-value="[local.pain_score ?? 0]"
+            :model-value="[(allVitals['pain_score'] as number | null) ?? 0]"
             :min="0"
             :max="10"
             :step="1"
@@ -391,13 +347,5 @@ function emitSave() {
       />
     </div>
 
-    <!-- Patient History (Allergies & Conditions) -->
-    <PatientHistorySection
-      :patient-id="patientId"
-      :patient-allergies="patientAllergies"
-      :patient-conditions="patientConditions"
-      :disabled="disabled"
-      @patient-updated="emit('patient-updated')"
-    />
   </div>
 </template>

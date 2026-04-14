@@ -28,13 +28,10 @@ import {
   Phone,
   Mail,
   LoaderCircle,
-  ShieldAlert,
-  HeartPulse,
   StickyNote,
   CheckCircle2,
 } from 'lucide-vue-next'
 import DateOfBirthPicker from '@/components/DateOfBirthPicker.vue'
-import TagInput from '@/components/TagInput.vue'
 import AddressForm from '@/components/AddressForm.vue'
 import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
@@ -65,8 +62,6 @@ const { value: note, errorMessage: noteError } = useField<string>('note')
 
 const name = ref<PatientName | null>(null)
 const address = ref<PatientAddress | null>(null)
-const allergies = ref<string[]>([])
-const chronicConditions = ref<string[]>([])
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
@@ -86,8 +81,6 @@ function populateForm() {
     suffix: props.patient.suffix,
   }
   address.value = props.patient.address
-  allergies.value = [...props.patient.allergies]
-  chronicConditions.value = [...props.patient.chronic_conditions]
 }
 
 watch(
@@ -126,8 +119,6 @@ const onSubmit = handleSubmit(async (values) => {
       sex: values.sex,
       contact_number: values.contact_number || null,
       email: values.email || null,
-      allergies: allergies.value,
-      chronic_conditions: chronicConditions.value,
       note: values.note || null,
     })
 
@@ -256,31 +247,6 @@ const onSubmit = handleSubmit(async (values) => {
         </div>
 
         <Separator />
-
-        <!-- Additional Information -->
-        <div class="flex flex-col gap-2">
-          <Label class="flex items-center gap-1.5">
-            <ShieldAlert class="size-3.5 text-muted-foreground" />
-            Allergies <span class="text-muted-foreground">(optional)</span>
-          </Label>
-          <TagInput
-            v-model="allergies"
-            :search-fn="patientApi.searchAllergies"
-            placeholder="Type allergy and press Enter..."
-          />
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <Label class="flex items-center gap-1.5">
-            <HeartPulse class="size-3.5 text-muted-foreground" />
-            Chronic conditions <span class="text-muted-foreground">(optional)</span>
-          </Label>
-          <TagInput
-            v-model="chronicConditions"
-            :search-fn="patientApi.searchConditions"
-            placeholder="Type condition and press Enter..."
-          />
-        </div>
 
         <div class="flex flex-col gap-2">
           <Label for="edit_note" class="flex items-center gap-1.5">
