@@ -4,6 +4,7 @@ import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import GeneralAssessmentSection from './general/GeneralAssessmentSection.vue'
 import PediatricsAssessmentSection from './pediatrics/PediatricsAssessmentSection.vue'
 import FamilyMedicineAssessmentSection from './family-medicine/FamilyMedicineAssessmentSection.vue'
+import OBGYNAssessmentSection from './obgyn/OBGYNAssessmentSection.vue'
 import type { ConsultationAssessment } from '../../types/consultation.types'
 
 // inheritAttrs: false so $attrs (event listeners from parent) are forwarded via v-bind
@@ -21,7 +22,9 @@ const specialtyStore = useSpecialtyConfigStore()
 const currentComponent = computed(() => {
   switch (specialtyStore.config?.key) {
     case 'pediatrics': return PediatricsAssessmentSection
-    case 'family_medicine': return FamilyMedicineAssessmentSection
+    case 'family_medicine':
+    case 'internal_medicine': return FamilyMedicineAssessmentSection
+    case 'obgyn': return OBGYNAssessmentSection
     default: return GeneralAssessmentSection
   }
 })

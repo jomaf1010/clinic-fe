@@ -51,6 +51,30 @@ const router = createRouter({
           meta: { requiresAuth: true, requiresClinicContext: true },
         },
         {
+          path: 'patients/:patientId/pregnancies/new',
+          name: RouteNames.PREGNANCY_CREATE,
+          component: () => import('@/domains/obgyn/views/PregnancyDetailView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/:pregnancyId',
+          name: RouteNames.PREGNANCY_DETAIL,
+          component: () => import('@/domains/obgyn/views/PregnancyDetailView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/:pregnancyId/visits/new',
+          name: RouteNames.PRENATAL_VISIT_CREATE,
+          component: () => import('@/domains/obgyn/views/PrenatalVisitView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/:pregnancyId/visits/:visitId',
+          name: RouteNames.PRENATAL_VISIT_DETAIL,
+          component: () => import('@/domains/obgyn/views/PrenatalVisitView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true },
+        },
+        {
           path: 'appointments',
           name: RouteNames.APPOINTMENT_LIST,
           component: () => import('@/domains/appointment/views/AppointmentListView.vue'),

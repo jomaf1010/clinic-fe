@@ -36,6 +36,10 @@ export const RouteNames = {
   TEMPLATE_EDITOR: 'template-editor',
   FORGOT_PASSWORD: 'forgot-password',
   RESET_PASSWORD: 'reset-password',
+  PREGNANCY_CREATE: 'pregnancy-create',
+  PREGNANCY_DETAIL: 'pregnancy-detail',
+  PRENATAL_VISIT_CREATE: 'prenatal-visit-create',
+  PRENATAL_VISIT_DETAIL: 'prenatal-visit-detail',
 } as const
 
 export type RouteName = (typeof RouteNames)[keyof typeof RouteNames]

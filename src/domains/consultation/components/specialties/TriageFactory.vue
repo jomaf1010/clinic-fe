@@ -4,6 +4,7 @@ import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import GeneralTriageSection from './general/GeneralTriageSection.vue'
 import PediatricsTriageSection from './pediatrics/PediatricsTriageSection.vue'
 import FamilyMedicineTriageSection from './family-medicine/FamilyMedicineTriageSection.vue'
+import OBGYNTriageSection from './obgyn/OBGYNTriageSection.vue'
 import type { ConsultationTriage } from '../../types/consultation.types'
 import type { LabOrderResponse } from '../../types/labOrder.types'
 
@@ -13,8 +14,6 @@ defineOptions({ inheritAttrs: false })
 defineProps<{
   triage: ConsultationTriage
   patientId: string
-  patientAllergies: string[]
-  patientConditions: string[]
   consultationId: string
   disabled: boolean
   labOrderUpdate?: LabOrderResponse | null
@@ -27,7 +26,9 @@ const specialtyStore = useSpecialtyConfigStore()
 const currentComponent = computed(() => {
   switch (specialtyStore.config?.key) {
     case 'pediatrics': return PediatricsTriageSection
-    case 'family_medicine': return FamilyMedicineTriageSection
+    case 'family_medicine':
+    case 'internal_medicine': return FamilyMedicineTriageSection
+    case 'obgyn': return OBGYNTriageSection
     default: return GeneralTriageSection
   }
 })
