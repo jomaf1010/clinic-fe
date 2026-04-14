@@ -7,22 +7,20 @@ import {
   CalendarDays,
   Phone,
   Mail,
-  ShieldAlert,
-  HeartPulse,
   StickyNote,
   LoaderCircle,
   Stethoscope,
-  Plus,
   Pencil,
   PlayCircle,
-  Filter,
   X,
   FlaskConical,
   CheckCircle2,
   Clock,
   ArrowLeft,
   ChevronDown,
+  ChevronUp,
   Camera,
+  ArrowRight,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
@@ -40,7 +38,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import EditPatientDialog from '../components/EditPatientDialog.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
 import { patientApi } from '../api/patientApi'
-import type { PatientResponse } from '../types/patient.types'
+import type { PatientResponse, Problem } from '../types/patient.types'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
 import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
@@ -151,7 +149,10 @@ async function fetchPatient() {
     const response = await patientApi.get(route.params.id as string)
     patient.value = response.data
 
-    await consultationStore.loadForPatient(response.data.id)
+    await Promise.all([
+      consultationStore.loadForPatient(response.data.id),
+      fetchProblems(response.data.id),
+    ])
   } catch {
     error.value = 'Failed to load patient details. Please try again.'
   } finally {
@@ -170,6 +171,52 @@ watch(() => notificationStore.notifications[0], (newest) => {
 
 const editDialogOpen = ref(false)
 const mobileCardExpanded = ref(false)
+
+// Problems count for stats row
+const patientProblems = ref<Problem[]>([])
+const activeProblemsCount = computed(() =>
+  patientProblems.value.filter(p => p.status !== 'resolved').length,
+)
+
+async function fetchProblems(patientId: string) {
+  try {
+    const res = await patientApi.getProblems(patientId)
+    patientProblems.value = res.data
+  } catch {
+    patientProblems.value = []
+  }
+}
+
+// Profile completeness (0 to 1)
+const profileCompleteness = computed(() => {
+  if (!patient.value) return 0
+  let filled = 0
+  const total = 6
+  if (patient.value.date_of_birth) filled++
+  if (patient.value.contact_number) filled++
+  if (patient.value.email) filled++
+  if (patient.value.formatted_address) filled++
+  if (displayAvatarUrl.value) filled++
+  if (patient.value.note) filled++
+  return filled / total
+})
+
+// Last visit date from finalized consultations
+const lastVisitDate = computed(() => {
+  const finalized = visibleConsultations.value.find(c => c.status === 'finalized')
+  if (!finalized) return null
+  return new Date(finalized.created_at)
+})
+
+const lastVisitFormatted = computed(() => {
+  if (!lastVisitDate.value) return '—'
+  const now = new Date()
+  const opts: Intl.DateTimeFormatOptions =
+    lastVisitDate.value.getFullYear() === now.getFullYear()
+      ? { month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' }
+  return lastVisitDate.value.toLocaleDateString('en-US', opts)
+})
 
 const labOrderDialogOpen = ref(false)
 const labOrderDialogData = ref<LabOrderSummary | null>(null)
@@ -270,7 +317,8 @@ onUnmounted(() => {
     class="-mx-4 -mt-4 -mb-4 flex flex-1 flex-col gap-0 overflow-y-auto md:min-h-0 md:flex-row md:overflow-y-hidden"
   >
     <!-- Left panel -->
-    <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-6">
+    <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-5">
+      <!-- Back button -->
       <Button
         variant="outline"
         size="sm"
@@ -281,180 +329,196 @@ onUnmounted(() => {
         Back
       </Button>
 
-      <!-- Header — always visible -->
-      <div class="flex items-center gap-3 md:flex-col md:items-center md:text-center">
-        <!-- Patient avatar -->
-        <div class="group relative shrink-0">
-          <PatientAvatar
-            :avatar-url="displayAvatarUrl"
-            :sex="patient.sex"
-            :name="patient.full_name"
-            class="size-12 md:size-16"
-          />
+      <!-- Profile card -->
+      <div class="rounded-3xl border shadow-sm bg-card overflow-hidden">
+        <!-- Inset banner -->
+        <div class="m-2 rounded-2xl bg-gradient-to-br from-blue-400/30 to-blue-500/30 h-[120px] sm:h-[140px]" />
 
+        <!-- Avatar with rainbow completeness ring -->
+        <div class="-mt-12 flex justify-center relative z-10">
+          <div class="relative">
+            <!-- Rainbow ring track (full circle, gray) -->
+            <div
+              class="absolute inset-0 rounded-full ring-track"
+              style="padding: 3px;"
+            >
+              <div class="w-full h-full rounded-full bg-muted/60" />
+            </div>
+            <!-- Rainbow ring fill (conic-gradient, clipped to completeness) -->
+            <div
+              class="absolute inset-0 rounded-full rainbow-ring-fill"
+              :style="`--completeness-deg: ${Math.round(profileCompleteness * 360)}deg`"
+            />
+            <!-- Avatar -->
+            <div class="group relative p-[5px]">
+              <PatientAvatar
+                :avatar-url="displayAvatarUrl"
+                :sex="patient.sex"
+                :name="patient.full_name"
+                class="size-24 ring-2 ring-card ring-offset-0"
+              />
+              <button
+                v-if="authStore.hasPermission('patients.edit')"
+                type="button"
+                class="absolute inset-[5px] flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                :disabled="isUploadingAvatar"
+                aria-label="Upload patient photo"
+                @click="avatarCropOpen = true"
+              >
+                <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
+                <Camera v-else class="size-4 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Name + meta -->
+        <div class="mt-2 px-4 text-center">
+          <h2 class="text-lg font-bold leading-tight">{{ patient.full_name }}</h2>
+          <div class="mt-1 flex items-center justify-center gap-1.5 flex-wrap">
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+              :class="patient.status === 'active' || patient.status === 'returning'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : patient.status === 'new'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'bg-muted text-muted-foreground'"
+            >
+              {{ patient.status.charAt(0).toUpperCase() + patient.status.slice(1) }}
+            </span>
+            <template v-if="age !== null">
+              <span class="text-muted-foreground text-xs">·</span>
+              <span class="text-xs text-muted-foreground">{{ age }}y/o</span>
+            </template>
+            <span class="text-muted-foreground text-xs">·</span>
+            <span class="text-xs text-muted-foreground">{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="mx-3 my-3 bg-muted/50 rounded-2xl py-3 px-2">
+          <div class="grid grid-cols-3 divide-x divide-border">
+            <!-- Visits -->
+            <div class="flex flex-col items-center gap-0.5 px-2">
+              <span class="text-base font-bold leading-none">{{ visibleConsultations.filter(c => c.status === 'finalized').length }}</span>
+              <span class="text-[10px] text-muted-foreground mt-0.5">Visits</span>
+            </div>
+            <!-- Problems -->
+            <div class="flex flex-col items-center gap-0.5 px-2">
+              <span class="text-base font-bold leading-none">{{ activeProblemsCount }}</span>
+              <span class="text-[10px] text-muted-foreground mt-0.5">Problems</span>
+            </div>
+            <!-- Last visit -->
+            <div class="flex flex-col items-center gap-0.5 px-2">
+              <span class="text-base font-bold leading-none truncate max-w-full">{{ lastVisitFormatted }}</span>
+              <span class="text-[10px] text-muted-foreground mt-0.5">Last Visit</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action grid -->
+        <div class="grid grid-cols-3 gap-2 mx-3 mb-3">
+          <!-- Edit Profile -->
           <button
-            v-if="authStore.hasPermission('patients.edit')"
             type="button"
-            class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            :disabled="isUploadingAvatar"
-            aria-label="Upload patient photo"
-            @click="avatarCropOpen = true"
+            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+            @click="editDialogOpen = true"
           >
-            <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
-            <Camera v-else class="size-4 text-white" />
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-500 to-slate-400 flex items-center justify-center text-white">
+              <Pencil class="size-4" />
+            </div>
+            <span class="text-[11px] font-medium text-center leading-tight">Edit Profile</span>
           </button>
-        </div>
-        <div class="min-w-0 flex-1 md:mt-2 md:w-full md:flex-none">
-          <h2 class="text-base font-semibold md:text-lg">{{ patient.full_name }}</h2>
-          <p v-if="patient.formatted_address" class="mt-0.5 flex max-w-full items-center gap-1 text-sm text-muted-foreground md:justify-center" :title="patient.formatted_address">
-            <MapPin class="size-3.5 shrink-0" />
-            <span class="truncate">{{ patient.formatted_address }}</span>
-          </p>
-        </div>
-      </div>
 
-      <!-- Action buttons — always visible -->
-      <div class="mt-3 flex gap-2">
-        <Button
-          v-if="draftConsultation"
-          size="sm"
-          variant="secondary"
-          class="flex-1"
-          @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
-        >
-          <PlayCircle class="size-3.5" />
-          Continue Draft
-        </Button>
-        <template v-else-if="authStore.hasPermission('consultations.create')">
-          <Button
-            size="sm"
-            class="flex-1"
-            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
-          >
-            <Plus class="size-3.5" />
-            Consultation
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            class="flex-1"
+          <!-- Follow Up -->
+          <button
+            v-if="authStore.hasPermission('consultations.create')"
+            type="button"
+            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
             @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
           >
-            <Plus class="size-3.5" />
-            Follow-up
-          </Button>
-        </template>
-        <Button variant="outline" size="sm" @click="editDialogOpen = true">
-          <Pencil class="size-3.5" />
-        </Button>
-      </div>
-
-      <!-- Mobile expand toggle -->
-      <button
-        type="button"
-        class="mt-3 flex w-full items-center justify-center gap-1 text-xs text-muted-foreground md:hidden"
-        @click="mobileCardExpanded = !mobileCardExpanded"
-      >
-        {{ mobileCardExpanded ? 'Show less' : 'Show more details' }}
-        <ChevronDown class="size-3.5 transition-transform" :class="mobileCardExpanded ? 'rotate-180' : ''" />
-      </button>
-
-      <!-- Expandable sections — hidden on mobile unless expanded, always visible on desktop -->
-      <div :class="mobileCardExpanded ? '' : 'hidden md:block'">
-        <!-- Medical (top priority) -->
-        <div
-          v-if="patient.allergies.length > 0 || patient.chronic_conditions.length > 0"
-          class="mt-5 border-t pt-4"
-        >
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Medical
-          </h3>
-          <div class="space-y-3">
-            <div v-if="patient.allergies.length > 0">
-              <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
-                <ShieldAlert class="size-4 shrink-0" />
-                Allergies
-              </div>
-              <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="allergy in patient.allergies"
-                  :key="allergy"
-                  class="rounded-md border border-red-300 bg-red-100 px-2.5 py-1 text-sm font-medium text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400"
-                >
-                  {{ allergy }}
-                </span>
-              </div>
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
+              <ArrowRight class="size-4" />
             </div>
-            <div v-if="patient.chronic_conditions.length > 0">
-              <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
-                <HeartPulse class="size-4 shrink-0" />
-                Conditions
-              </div>
-              <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="condition in patient.chronic_conditions"
-                  :key="condition"
-                  class="rounded-md border border-amber-300 bg-amber-100 px-2.5 py-1 text-sm font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
-                >
-                  {{ condition }}
-                </span>
-              </div>
+            <span class="text-[11px] font-medium text-center leading-tight">Follow Up</span>
+          </button>
+          <!-- Placeholder if no create permission -->
+          <div v-else />
+
+          <!-- New Consultation / Continue Draft -->
+          <button
+            v-if="draftConsultation"
+            type="button"
+            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+            @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+          >
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
+              <PlayCircle class="size-4" />
             </div>
-          </div>
+            <span class="text-[11px] font-medium text-center leading-tight">Continue Draft</span>
+          </button>
+          <button
+            v-else-if="authStore.hasPermission('consultations.create')"
+            type="button"
+            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
+          >
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
+              <Stethoscope class="size-4" />
+            </div>
+            <span class="text-[11px] font-medium text-center leading-tight">New Consult</span>
+          </button>
+          <div v-else />
         </div>
 
-        <!-- Basic Info -->
-        <div class="mt-5 border-t pt-4">
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Basic Info
-          </h3>
-          <div class="space-y-2.5">
-            <div v-if="age !== null" class="flex items-start gap-2 text-sm">
-              <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Age: </span>
-                {{ age }} yrs old
-              </div>
+        <!-- Expandable details toggle (mobile only) -->
+        <div class="flex justify-center pb-3 md:hidden">
+          <button
+            type="button"
+            class="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground transition-colors hover:bg-muted/80"
+            :aria-label="mobileCardExpanded ? 'Collapse details' : 'Expand details'"
+            @click="mobileCardExpanded = !mobileCardExpanded"
+          >
+            <ChevronDown v-if="!mobileCardExpanded" class="size-3.5" />
+            <ChevronUp v-else class="size-3.5" />
+          </button>
+        </div>
+
+        <!-- Detail rows — always visible on desktop, toggled on mobile -->
+        <div :class="mobileCardExpanded ? 'block' : 'hidden md:block'">
+          <div class="px-4 pb-4 space-y-2.5 border-t pt-3">
+            <!-- Note -->
+            <div v-if="patient.note" class="flex items-start gap-2 text-sm">
+              <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <p class="whitespace-pre-wrap text-muted-foreground">{{ patient.note }}</p>
             </div>
+            <!-- DOB -->
             <div class="flex items-start gap-2 text-sm">
               <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               <div>
-                <span class="text-muted-foreground">DOB: </span>
-                {{ formatDate(patient.date_of_birth) }}
+                <span class="text-muted-foreground">Born </span>{{ formatDate(patient.date_of_birth) }}
               </div>
             </div>
+            <!-- Sex -->
             <div class="flex items-start gap-2 text-sm">
               <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Sex: </span>
-                {{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}
-              </div>
+              <span>{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
             </div>
+            <!-- Phone -->
             <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
               <Phone class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Phone: </span>
-                {{ patient.contact_number }}
-              </div>
+              <span>{{ patient.contact_number }}</span>
             </div>
+            <!-- Email -->
             <div v-if="patient.email" class="flex items-start gap-2 text-sm">
               <Mail class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Email: </span>
-                {{ patient.email }}
-              </div>
+              <span class="break-all">{{ patient.email }}</span>
             </div>
-          </div>
-        </div>
-
-        <!-- Notes -->
-        <div v-if="patient.note" class="mt-5 border-t pt-4">
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Notes
-          </h3>
-          <div class="flex items-start gap-2 text-sm">
-            <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <p class="whitespace-pre-wrap">{{ patient.note }}</p>
+            <!-- Address -->
+            <div v-if="patient.formatted_address" class="flex items-start gap-2 text-sm">
+              <MapPin class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <span class="text-muted-foreground">{{ patient.formatted_address }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -463,7 +527,7 @@ onUnmounted(() => {
     <!-- Right panel -->
     <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
       <!-- Specialty-specific patient sections (between patient info and consultation timeline) -->
-      <PatientSpecialtyFactory class="mb-6" />
+      <PatientSpecialtyFactory :patient-sex="patient.sex" class="mb-6" />
 
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
@@ -684,5 +748,23 @@ onUnmounted(() => {
 @keyframes pulse-primary {
   0% { box-shadow: 0 0 0 0 oklch(0.283 0.090 253.827 / 0.5); }
   100% { box-shadow: 0 0 0 10px oklch(0.283 0.090 253.827 / 0); }
+}
+
+/* Rainbow completeness ring */
+.rainbow-ring-fill {
+  background: conic-gradient(
+    #f87171 0deg,
+    #fb923c 60deg,
+    #facc15 120deg,
+    #4ade80 180deg,
+    #38bdf8 240deg,
+    #818cf8 300deg,
+    #f472b6 var(--completeness-deg),
+    transparent var(--completeness-deg)
+  );
+  -webkit-mask:
+    radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
+  mask:
+    radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
 }
 </style>
