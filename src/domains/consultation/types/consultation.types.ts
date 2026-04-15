@@ -1,3 +1,4 @@
+/** @deprecated Status is now on EncounterResponse. Use EncounterStatus from encounter.types. */
 export type ConsultationStatus = 'draft' | 'finalized'
 export type ConsultationType = 'default' | 'follow_up'
 
@@ -90,6 +91,12 @@ export interface ConsultationDocument {
   status: string
 }
 
+/**
+ * @deprecated Encounter-centric API: use EncounterResponse from encounter.types instead.
+ * This type is kept for backward compatibility with existing views/components that
+ * have not yet been migrated. Identity, status, and billing fields have moved to
+ * EncounterResponse; clinical data is now nested under the `consultation` key there.
+ */
 export interface ConsultationResponse {
   id: string
   patient_id: string

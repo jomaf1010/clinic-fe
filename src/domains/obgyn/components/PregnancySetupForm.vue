@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, onMounted, reactive, watch } from 'vue'
 import {
   CalendarDays,
   Weight,
-  HeartPulse,
   Leaf,
   ShieldCheck,
   LoaderCircle,
   FlaskConical,
+  Baby,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,8 +22,10 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import { usePregnancyStore } from '../stores/pregnancyStore'
 import type { Pregnancy } from '../types/obgyn.types'
+import { obgynApi } from '../api/obgynApi'
 import type { CreatePregnancyPayload } from '../api/obgynApi'
 
 const props = defineProps<{
@@ -45,12 +47,9 @@ interface FormState {
   edd_source: 'lmp' | 'ultrasound' | 'adjusted' | ''
   first_ultrasound_date: string
   first_ultrasound_ga: string
-  // GPAL
-  gravidity: number | null
-  parity_term: number | null
-  parity_preterm: number | null
-  abortions: number | null
-  living_children: number | null
+  // Fetus
+  fetus_count: number
+  fetuses: { label: string; sex: 'male' | 'female' | 'unknown' }[]
   // Medical history
   medical_conditions: string
   surgical_history: string
@@ -75,11 +74,8 @@ function buildInitialState(): FormState {
     edd_source: p?.edd_source ?? '',
     first_ultrasound_date: p?.first_ultrasound_date ?? '',
     first_ultrasound_ga: p?.first_ultrasound_ga ?? '',
-    gravidity: p?.gravidity ?? null,
-    parity_term: p?.parity_term ?? null,
-    parity_preterm: p?.parity_preterm ?? null,
-    abortions: p?.abortions ?? null,
-    living_children: p?.living_children ?? null,
+    fetus_count: p?.fetus_count ?? 1,
+    fetuses: p?.fetuses?.length ? [...p.fetuses] : [{ label: 'Baby', sex: 'unknown' as const }],
     medical_conditions: p?.medical_conditions ?? '',
     surgical_history: p?.surgical_history ?? '',
     blood_type: p?.blood_type_rh ?? '',
@@ -101,6 +97,26 @@ watch(
   (p) => {
     if (!p) return
     Object.assign(form, buildInitialState())
+  },
+)
+
+// Sync fetuses array when fetus_count changes
+watch(
+  () => form.fetus_count,
+  (count) => {
+    const labels = ['Baby', 'Baby A', 'Baby B', 'Baby C', 'Baby D', 'Baby E', 'Baby F', 'Baby G', 'Baby H']
+    if (count <= 1) {
+      form.fetuses = [{ label: 'Baby', sex: form.fetuses[0]?.sex ?? 'unknown' }]
+      return
+    }
+    const updated: { label: string; sex: 'male' | 'female' | 'unknown' }[] = []
+    for (let i = 0; i < count; i++) {
+      updated.push({
+        label: form.fetuses[i]?.label ?? labels[i + 1] ?? `Baby ${String.fromCharCode(65 + i)}`,
+        sex: form.fetuses[i]?.sex ?? 'unknown',
+      })
+    }
+    form.fetuses = updated
   },
 )
 
@@ -176,11 +192,8 @@ async function handleSubmit(): Promise<void> {
     edd_source: (form.edd_source as 'lmp' | 'ultrasound' | 'adjusted') || null,
     first_ultrasound_date: form.first_ultrasound_date || null,
     first_ultrasound_ga: form.first_ultrasound_ga || null,
-    gravidity: form.gravidity,
-    parity_term: form.parity_term,
-    parity_preterm: form.parity_preterm,
-    abortions: form.abortions,
-    living_children: form.living_children,
+    fetus_count: form.fetus_count,
+    fetuses: form.fetuses,
     pre_pregnancy_weight: form.pre_pregnancy_weight,
     height: form.height,
     medical_conditions: form.medical_conditions || null,
@@ -218,13 +231,8 @@ async function handleSubmit(): Promise<void> {
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div class="flex flex-col gap-1.5">
-          <Label for="lmp" class="text-xs">LMP Date <span class="text-destructive">*</span></Label>
-          <Input
-            id="lmp"
-            v-model="form.lmp"
-            type="date"
-            class="h-8 text-sm"
-          />
+          <Label class="text-xs">LMP Date <span class="text-destructive">*</span></Label>
+          <MFDatePicker v-model="form.lmp" disable-future />
         </div>
 
         <div class="flex flex-col gap-1.5">
@@ -252,13 +260,8 @@ async function handleSubmit(): Promise<void> {
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <Label for="first_us_date" class="text-xs">First Ultrasound Date</Label>
-          <Input
-            id="first_us_date"
-            v-model="form.first_ultrasound_date"
-            type="date"
-            class="h-8 text-sm"
-          />
+          <Label class="text-xs">First Ultrasound Date</Label>
+          <MFDatePicker v-model="form.first_ultrasound_date" disable-future />
         </div>
 
         <div class="flex flex-col gap-1.5 sm:col-span-2">
@@ -275,78 +278,54 @@ async function handleSubmit(): Promise<void> {
 
     <Separator />
 
-    <!-- B. Obstetric History (GPAL) -->
+    <!-- B. Fetus Information -->
     <section class="flex flex-col gap-4">
       <div class="flex items-center gap-2">
-        <HeartPulse class="size-3.5 text-muted-foreground" />
+        <Baby class="size-3.5 text-muted-foreground" />
         <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Obstetric History (GPAL)
+          Fetus
         </h3>
       </div>
 
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div class="flex flex-col gap-3">
         <div class="flex flex-col gap-1.5">
-          <Label for="gravidity" class="text-xs">Gravidity (G)</Label>
-          <Input
-            id="gravidity"
-            :model-value="form.gravidity ?? undefined"
-            type="number"
-            min="0"
-            placeholder="0"
-            class="h-8 text-sm"
-            @update:model-value="(v) => (form.gravidity = v ? Number(v) : null)"
-          />
+          <Label for="fetus-count" class="text-xs">Number of Fetuses</Label>
+          <Select
+            :model-value="String(form.fetus_count)"
+            @update:model-value="(v) => { form.fetus_count = Number(v) }"
+          >
+            <SelectTrigger class="h-8 w-32 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 — Singleton</SelectItem>
+              <SelectItem value="2">2 — Twins</SelectItem>
+              <SelectItem value="3">3 — Triplets</SelectItem>
+              <SelectItem value="4">4 — Quadruplets</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="parity_term" class="text-xs">Term (P)</Label>
-          <Input
-            id="parity_term"
-            :model-value="form.parity_term ?? undefined"
-            type="number"
-            min="0"
-            placeholder="0"
-            class="h-8 text-sm"
-            @update:model-value="(v) => (form.parity_term = v ? Number(v) : null)"
-          />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="parity_preterm" class="text-xs">Preterm</Label>
-          <Input
-            id="parity_preterm"
-            :model-value="form.parity_preterm ?? undefined"
-            type="number"
-            min="0"
-            placeholder="0"
-            class="h-8 text-sm"
-            @update:model-value="(v) => (form.parity_preterm = v ? Number(v) : null)"
-          />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="abortions" class="text-xs">Abortions (A)</Label>
-          <Input
-            id="abortions"
-            :model-value="form.abortions ?? undefined"
-            type="number"
-            min="0"
-            placeholder="0"
-            class="h-8 text-sm"
-            @update:model-value="(v) => (form.abortions = v ? Number(v) : null)"
-          />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="living_children" class="text-xs">Living (L)</Label>
-          <Input
-            id="living_children"
-            :model-value="form.living_children ?? undefined"
-            type="number"
-            min="0"
-            placeholder="0"
-            class="h-8 text-sm"
-            @update:model-value="(v) => (form.living_children = v ? Number(v) : null)"
-          />
+
+        <!-- Gender per fetus -->
+        <div class="grid gap-3" :class="form.fetus_count > 1 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2'">
+          <div v-for="(fetus, idx) in form.fetuses" :key="idx" class="flex flex-col gap-1.5">
+            <Label class="text-xs">{{ form.fetus_count > 1 ? fetus.label : 'Sex' }}</Label>
+            <Select
+              :model-value="fetus.sex"
+              @update:model-value="(v) => { form.fetuses[idx].sex = v as 'male' | 'female' | 'unknown' }"
+            >
+              <SelectTrigger class="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Unknown</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="male">Male</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
-      <p class="text-xs text-muted-foreground">G=Gravidity · P=Term · (Preterm) · (Abortions) · (Living)</p>
     </section>
 
     <Separator />

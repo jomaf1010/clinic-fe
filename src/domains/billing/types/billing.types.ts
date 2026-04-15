@@ -32,7 +32,7 @@ export interface InvoiceResponse {
   id: string
   clinic_id: string
   patient_id: string
-  consultation_id: string | null
+  encounter_id: string | null
   patient_name: string | null
   created_by: string
   created_by_name: string | null
@@ -97,7 +97,7 @@ export interface CreateInvoiceLineItemPayload {
 
 export interface CreateInvoicePayload {
   patient_id: string
-  consultation_id?: string | null
+  encounter_id?: string | null
   line_items: CreateInvoiceLineItemPayload[]
   discount_type?: DiscountType | null
   discount_value?: number | null

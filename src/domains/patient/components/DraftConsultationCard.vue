@@ -121,7 +121,7 @@ const canContinue = computed(() => isMine.value || isOwner.value || canEditTriag
 
 function openDraft() {
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
+    name: RouteNames.ENCOUNTER_DETAIL,
     params: { patientId: props.patientId, id: props.consultation.id },
   })
 }

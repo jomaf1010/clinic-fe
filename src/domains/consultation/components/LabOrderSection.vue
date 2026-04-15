@@ -106,7 +106,7 @@ async function cacheCurrentLabOrder() {
 async function loadLabOrder() {
   isLoading.value = true
   try {
-    const res = await labOrderApi.getForConsultation(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.consultationId)
     labOrder.value = res.data ?? null
     if (res.data) await cacheCurrentLabOrder()
   } catch {

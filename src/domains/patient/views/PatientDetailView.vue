@@ -45,7 +45,7 @@ import DraftConsultationCard from '@/domains/patient/components/DraftConsultatio
 import FinalizedConsultationCard from '@/domains/patient/components/FinalizedConsultationCard.vue'
 import VitalsComparisonCard from '@/domains/patient/components/VitalsComparisonCard.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
+import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { usePatientSync } from '../composables/usePatientSync'
 import PatientSpecialtyFactory from '../components/specialties/PatientSpecialtyFactory.vue'
@@ -53,7 +53,7 @@ import PatientSpecialtyFactory from '../components/specialties/PatientSpecialtyF
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const consultationStore = useConsultationStore()
+const encounterStore = useEncounterStore()
 const notificationStore = useNotificationStore()
 const patient = ref<PatientResponse | null>(null)
 const isLoading = ref(false)
@@ -88,10 +88,10 @@ async function handleAvatarCrop(blob: Blob) {
 
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
 const currentUserId = computed(() => authStore.user?.id)
-const canSeeDrafts = computed(() => isOwner.value || authStore.hasPermission('consultations.edit-triage'))
+const canSeeDrafts = computed(() => isOwner.value || authStore.hasPermission('encounters.edit-triage'))
 
 const visibleConsultations = computed(() =>
-  consultationStore.patientConsultations.filter(c =>
+  encounterStore.patientEncounters.filter(c =>
     c.status !== 'draft' || canSeeDrafts.value || c.created_by === currentUserId.value,
   ),
 )
@@ -150,7 +150,7 @@ async function fetchPatient() {
     patient.value = response.data
 
     await Promise.all([
-      consultationStore.loadForPatient(response.data.id),
+      encounterStore.loadForPatient(response.data.id),
       fetchProblems(response.data.id),
     ])
   } catch {
@@ -165,7 +165,7 @@ watch(() => route.params.id, () => fetchPatient(), { immediate: true })
 // Refresh timeline when a med cert is generated
 watch(() => notificationStore.notifications[0], (newest) => {
   if (newest?.type === 'medcert.completed' || newest?.type === 'document.generated') {
-    consultationStore.loadForPatient(patient.value?.id ?? '')
+    encounterStore.loadForPatient(patient.value?.id ?? '')
   }
 })
 
@@ -262,14 +262,14 @@ function applyFilter() {
   const filters: { month?: number; year?: number } = {}
   if (filterMonth.value) filters.month = Number(filterMonth.value)
   if (filterYear.value) filters.year = Number(filterYear.value)
-  consultationStore.loadForPatient(patient.value.id, filters)
+  encounterStore.loadForPatient(patient.value.id, filters)
 }
 
 function clearFilter() {
   filterMonth.value = ''
   filterYear.value = ''
   if (!patient.value) return
-  consultationStore.loadForPatient(patient.value.id)
+  encounterStore.loadForPatient(patient.value.id)
 }
 
 watch([filterMonth, filterYear], () => {
@@ -285,7 +285,7 @@ watch(sentinel, (el) => {
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && patient.value) {
-        consultationStore.loadMoreForPatient(patient.value.id)
+        encounterStore.loadMoreForPatient(patient.value.id)
       }
     },
     { rootMargin: '100px' },
@@ -295,7 +295,7 @@ watch(sentinel, (el) => {
 
 onUnmounted(() => {
   observer?.disconnect()
-  consultationStore.clearPatientConsultations()
+  encounterStore.clearPatientEncounters()
 })
 </script>
 
@@ -435,7 +435,7 @@ onUnmounted(() => {
             v-if="authStore.hasPermission('consultations.create')"
             type="button"
             class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
+            @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
           >
             <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
               <ArrowRight class="size-4" />
@@ -450,7 +450,7 @@ onUnmounted(() => {
             v-if="draftConsultation"
             type="button"
             class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+            @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
           >
             <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
               <PlayCircle class="size-4" />
@@ -461,7 +461,7 @@ onUnmounted(() => {
             v-else-if="authStore.hasPermission('consultations.create')"
             type="button"
             class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
+            @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id } })"
           >
             <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
               <Stethoscope class="size-4" />
@@ -503,6 +503,11 @@ onUnmounted(() => {
             <div class="flex items-start gap-2 text-sm">
               <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               <span>{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
+            </div>
+            <!-- Blood Type -->
+            <div v-if="patient.blood_type" class="flex items-start gap-2 text-sm">
+              <FlaskConical class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <span>{{ patient.blood_type }}</span>
             </div>
             <!-- Phone -->
             <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
@@ -573,7 +578,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Skeleton loading state -->
-      <div v-if="consultationStore.isLoadingConsultations" class="mt-4">
+      <div v-if="encounterStore.isLoadingConsultations" class="mt-4">
         <div
           v-for="n in 5"
           :key="n"
@@ -625,7 +630,7 @@ onUnmounted(() => {
               "
             />
             <div
-              v-if="index < visibleConsultations.length - 1 || consultationStore.hasMore"
+              v-if="index < visibleConsultations.length - 1 || encounterStore.hasMore"
               class="mt-1 flex-1 w-[2px]"
               :class="consultation.status === 'draft' ? 'bg-amber-300' : 'bg-foreground/15'"
             />
@@ -660,7 +665,7 @@ onUnmounted(() => {
         <!-- Infinite scroll sentinel -->
         <!-- Infinite scroll sentinel (skeleton card) -->
         <div
-          v-if="consultationStore.hasMore"
+          v-if="encounterStore.hasMore"
           ref="sentinel"
           class="flex gap-3"
         >

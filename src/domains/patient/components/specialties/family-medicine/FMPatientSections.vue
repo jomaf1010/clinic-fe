@@ -818,7 +818,7 @@ onMounted(() => {
   <div class="contents">
     <PatientSectionWidget
         :icon="Pill"
-        icon-color="bg-blue-500/10 text-blue-600"
+        icon-color="bg-gradient-to-br from-blue-500 to-blue-600"
         title="Medications"
         :detail="activeMeds.length > 0 ? `${activeMeds.length} active` : 'None recorded'"
         :sub-detail="discontinuedMeds.length > 0 ? `${discontinuedMeds.length} discontinued` : undefined"
@@ -829,7 +829,7 @@ onMounted(() => {
       />
       <PatientSectionWidget
         :icon="TrendingUp"
-        icon-color="bg-orange-500/10 text-orange-500"
+        icon-color="bg-gradient-to-br from-orange-500 to-orange-600"
         title="Patient Trends"
         :detail="trendsWidgetDetail"
         :loading="trendsLoading"
@@ -837,7 +837,7 @@ onMounted(() => {
       />
       <PatientSectionWidget
         :icon="Activity"
-        icon-color="bg-green-500/10 text-green-600"
+        icon-color="bg-gradient-to-br from-green-500 to-green-600"
         title="Lifestyle"
         :detail="hasLifestyleData ? 'Recorded' : 'Not recorded'"
         :loading="lifestyleLoading"
@@ -845,7 +845,7 @@ onMounted(() => {
       />
       <PatientSectionWidget
         :icon="Users"
-        icon-color="bg-purple-500/10 text-purple-600"
+        icon-color="bg-gradient-to-br from-purple-500 to-purple-600"
         title="Family History"
         :detail="familyHistory.length > 0 ? `${familyHistory.length} relatives` : 'None recorded'"
         :badge-text="familyHistory.length > 0 ? String(familyHistory.length) : undefined"
@@ -856,7 +856,7 @@ onMounted(() => {
       <PatientSectionWidget
         v-if="hasPreventiveCare"
         :icon="ClipboardCheck"
-        icon-color="bg-amber-500/10 text-amber-600"
+        icon-color="bg-gradient-to-br from-amber-500 to-amber-600"
         title="Preventive Care"
         :detail="overdueScreenings.length > 0 ? `${overdueScreenings.length} overdue` : `${preventiveCare.length} screenings`"
         :badge-text="overdueScreenings.length > 0 ? String(overdueScreenings.length) : undefined"

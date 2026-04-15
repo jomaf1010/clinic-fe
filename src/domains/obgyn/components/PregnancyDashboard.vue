@@ -5,36 +5,51 @@ import {
   Activity,
   Weight,
   CalendarDays,
-  Baby,
-  Hash,
   AlertTriangle,
+  ShieldAlert,
+  HeartPulse,
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import PregnantIcon from '@/components/icons/PregnantIcon.vue'
+import PregnantWeeksIcon from '@/components/icons/PregnantWeeksIcon.vue'
+import FetusIcon from '@/components/icons/FetusIcon.vue'
+import ChartLineIcon from '@/components/icons/ChartLineIcon.vue'
 import GACalculator from './GACalculator.vue'
 import RiskClassificationBadge from './RiskClassificationBadge.vue'
 import PrenatalTrendCharts from './PrenatalTrendCharts.vue'
-import PrenatalLabTracker from './PrenatalLabTracker.vue'
+import PrenatalCareChecklist from './PrenatalCareChecklist.vue'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { obgynApi } from '../api/obgynApi'
-import type { Pregnancy, PregnancyDashboard as PregnancyDashboardData } from '../types/obgyn.types'
+import type { GynProfile, Pregnancy, PregnancyDashboard as PregnancyDashboardData } from '../types/obgyn.types'
+import type { PatientResponse } from '@/domains/patient/types/patient.types'
 
 const props = defineProps<{
   patientId: string
   pregnancyId: string
   pregnancy: Pregnancy
+  patient?: PatientResponse | null
 }>()
 
 const dashboardData = ref<PregnancyDashboardData | null>(null)
+const gynProfile = ref<GynProfile | null>(null)
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
+const timelineAnimated = ref(false)
 
 onMounted(async () => {
   isLoading.value = true
   loadError.value = null
   try {
-    const res = await obgynApi.getDashboard(props.patientId, props.pregnancyId)
-    dashboardData.value = res.data
+    const [dashRes, gynRes] = await Promise.all([
+      obgynApi.getDashboard(props.patientId, props.pregnancyId),
+      obgynApi.getGynProfile(props.patientId).catch(() => null),
+    ])
+    dashboardData.value = dashRes.data
+    if (gynRes) gynProfile.value = gynRes.data
+    // Trigger timeline animation after render
+    setTimeout(() => { timelineAnimated.value = true }, 100)
   } catch {
     loadError.value = 'Failed to load dashboard data.'
   } finally {
@@ -47,23 +62,79 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+const patientInitials = computed(() => {
+  if (!props.patient) return '?'
+  return `${props.patient.first_name.charAt(0)}${props.patient.last_name.charAt(0)}`.toUpperCase()
+})
+
+const patientAge = computed(() => {
+  if (!props.patient?.date_of_birth) return null
+  const dob = new Date(props.patient.date_of_birth)
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const m = today.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
+  return age
+})
+
+// ── GA timeline ────────────────────────────────────────────────────
+const TOTAL_WEEKS = 42
+const gaWeeks = computed(() => props.pregnancy.current_ga?.weeks ?? 0)
+const gaDays = computed(() => props.pregnancy.current_ga?.days ?? 0)
+const gaProgressTarget = computed(() => Math.min(100, ((gaWeeks.value + gaDays.value / 7) / TOTAL_WEEKS) * 100))
+const gaProgress = computed(() => timelineAnimated.value ? gaProgressTarget.value : 0)
+const trimesterLabel = computed(() => {
+  const w = gaWeeks.value
+  if (w <= 13) return '1st Trimester'
+  if (w <= 27) return '2nd Trimester'
+  return '3rd Trimester'
+})
+const weekMarkers = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
+
+function sexEmoji(sex: string | undefined): string {
+  if (sex === 'male') return '👦'
+  if (sex === 'female') return '👧'
+  return '👶'
+}
+
+const babyEmoji = computed(() => {
+  const fetuses = props.pregnancy.fetuses
+  if (!fetuses?.length || fetuses.length === 1) {
+    return sexEmoji(fetuses?.[0]?.sex)
+  }
+  return fetuses.map((f) => sexEmoji(f.sex)).join('')
+})
+
+const babyRingColor = computed(() => {
+  const sex = props.pregnancy.fetuses?.[0]?.sex
+  if (sex === 'female') return 'ring-pink-400'
+  if (sex === 'male') return 'ring-blue-400'
+  return 'ring-purple-400'
+})
+
+const babyPingColor = computed(() => {
+  const sex = props.pregnancy.fetuses?.[0]?.sex
+  if (sex === 'female') return 'bg-pink-400/30'
+  if (sex === 'male') return 'bg-blue-400/30'
+  return 'bg-purple-400/30'
+})
+
 const gpal = computed(() => {
-  const p = props.pregnancy
-  const g = p.gravidity ?? '?'
-  const t = p.parity_term ?? '?'
-  const pt = p.parity_preterm ?? '?'
-  const a = p.abortions ?? '?'
-  const l = p.living_children ?? '?'
+  const gp = gynProfile.value
+  if (!gp) return '—'
+  const g = gp.gravidity ?? '?'
+  const t = gp.parity_term ?? '?'
+  const pt = gp.parity_preterm ?? '?'
+  const a = gp.abortions ?? '?'
+  const l = gp.living_children ?? '?'
   return `G${g}P${t}${pt}A${a}L${l}`
 })
 
 const weeksRemaining = computed(() => {
   if (!props.pregnancy.edd) return null
-  const eddDate = new Date(props.pregnancy.edd)
-  const today = new Date()
-  const diffMs = eddDate.getTime() - today.getTime()
-  if (diffMs <= 0) return 0
-  return Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000))
+  const currentWeeks = gaWeeks.value
+  const remaining = 40 - currentWeeks
+  return remaining > 0 ? remaining : 0
 })
 
 const statusConfig = computed(() => {
@@ -74,8 +145,8 @@ const statusConfig = computed(() => {
       return { label: 'Postpartum', class: 'border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400' }
     case 'delivered':
       return { label: 'Delivered', class: 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400' }
-    case 'lost':
-      return { label: 'Lost', class: 'border-red-200 bg-red-100 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400' }
+    case 'resolved':
+      return { label: 'Resolved', class: 'border-red-200 bg-red-100 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400' }
     default:
       return { label: 'Inactive', class: '' }
   }
@@ -102,77 +173,172 @@ const visitSummary = computed(() => dashboardData.value?.visit_summary ?? [])
     </div>
 
     <template v-else-if="dashboardData">
-      <!-- A. Summary Header ─────────────────────────────────────────────── -->
-      <Card>
-        <CardContent class="pt-4 pb-4">
-          <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <!-- GPAL -->
-            <div class="flex flex-col gap-0.5">
-              <span class="flex items-center gap-1 text-xs text-muted-foreground">
-                <Baby class="size-3.5 text-muted-foreground" />
-                Obstetric Hx
-              </span>
-              <span class="font-mono text-sm font-semibold">{{ gpal }}</span>
-            </div>
-
-            <!-- Current GA -->
-            <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-muted-foreground">Gestational Age</span>
-              <GACalculator v-if="pregnancy.edd" :edd="pregnancy.edd" />
-              <span v-else class="text-sm text-muted-foreground">—</span>
-            </div>
-
-            <!-- EDD -->
-            <div class="flex flex-col gap-0.5">
-              <span class="flex items-center gap-1 text-xs text-muted-foreground">
-                <CalendarDays class="size-3.5 text-muted-foreground" />
-                EDD
-              </span>
-              <span class="text-sm font-semibold">{{ formatDate(pregnancy.edd) }}</span>
-              <span v-if="weeksRemaining !== null && weeksRemaining > 0" class="text-xs text-muted-foreground">
-                {{ weeksRemaining }}w remaining
-              </span>
-              <span v-else-if="weeksRemaining === 0" class="text-xs text-green-600 dark:text-green-400">
-                Past EDD
-              </span>
-            </div>
-
-            <!-- Risk -->
-            <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-muted-foreground">Risk Level</span>
-              <RiskClassificationBadge
-                v-if="pregnancy.risk_level"
-                :level="pregnancy.risk_level"
-                :factors="pregnancy.risk_factors"
-              />
-              <span v-else class="text-xs text-muted-foreground">Not assessed</span>
-            </div>
-
-            <!-- Status -->
-            <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-muted-foreground">Status</span>
-              <Badge variant="outline" class="w-fit text-xs" :class="statusConfig.class">
-                {{ statusConfig.label }}
-              </Badge>
-            </div>
-
-            <!-- Total Visits -->
-            <div class="flex flex-col gap-0.5">
-              <span class="flex items-center gap-1 text-xs text-muted-foreground">
-                <Hash class="size-3.5 text-muted-foreground" />
-                Total Visits
-              </span>
-              <span class="text-2xl font-bold tabular-nums">{{ dashboardData.visit_count }}</span>
+      <!-- A. Patient Card + GA Timeline ────────────────────────────────── -->
+      <div v-if="patient" class="flex flex-col gap-4 rounded-xl border bg-card p-4">
+        <!-- Patient info row -->
+        <div class="flex items-center gap-4">
+          <Avatar class="size-12">
+            <AvatarImage v-if="patient.avatar_url" :src="patient.avatar_url" :alt="patient.full_name" />
+            <AvatarFallback class="bg-gradient-to-br from-purple-500 to-pink-500 text-lg font-semibold text-white">
+              {{ patientInitials }}
+            </AvatarFallback>
+          </Avatar>
+          <div class="min-w-0 flex-1">
+            <h2 class="text-lg font-bold leading-tight">{{ patient.full_name }}</h2>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              <span v-if="patientAge !== null">{{ patientAge }} yrs old</span>
+              <span v-if="patient.sex">&middot; {{ patient.sex === 'female' ? 'Female' : patient.sex }}</span>
+              <span v-if="patient.blood_type">&middot; {{ patient.blood_type }}</span>
+              <span v-if="patient.contact_number">&middot; {{ patient.contact_number }}</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div class="hidden sm:flex items-center gap-2">
+            <Badge variant="outline" class="text-xs" :class="statusConfig.class">
+              {{ statusConfig.label }}
+            </Badge>
+          </div>
+        </div>
+
+        <!-- GA Timeline Ruler -->
+        <div v-if="pregnancy.edd && pregnancy.status === 'active'" class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>{{ trimesterLabel }}</span>
+            <span class="font-medium text-foreground">{{ gaWeeks }}w {{ gaDays }}d</span>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="relative mt-2 mb-3">
+            <!-- Track -->
+            <div class="h-3 w-full overflow-hidden rounded-full bg-muted">
+              <!-- Trimester dividers -->
+              <div class="absolute left-[33.3%] top-0 h-3 w-px bg-border/50 z-10" />
+              <div class="absolute left-[66.6%] top-0 h-3 w-px bg-border/50 z-10" />
+
+              <!-- Rainbow progress -->
+              <div
+                class="absolute inset-y-0 left-0 h-3 rounded-full transition-all duration-1000 ease-out"
+                :style="{ width: `${gaProgress}%`, background: 'linear-gradient(90deg, #a78bfa, #ec4899, #f97316, #eab308, #22c55e, #06b6d4)' }"
+              />
+            </div>
+
+            <!-- Baby marker (outside overflow container) -->
+            <div
+              class="absolute top-1/2 -translate-y-1/2 z-20 transition-all duration-1000 ease-out"
+              :style="{ left: `${gaProgress}%` }"
+            >
+              <div class="group relative flex items-center justify-center" :class="pregnancy.fetus_count > 1 ? '-ml-3.5 size-7' : '-ml-2.5 size-5'">
+                <span class="absolute inset-0 animate-ping rounded-full" :class="babyPingColor" />
+                <span class="relative flex items-center justify-center overflow-visible rounded-full bg-white shadow-md ring-2 whitespace-nowrap cursor-pointer" :class="[babyRingColor, pregnancy.fetus_count > 1 ? 'size-7' : 'size-5']">
+                  <span :class="pregnancy.fetus_count > 1 ? 'text-sm' : 'text-lg'">{{ babyEmoji }}</span>
+                </span>
+                <!-- Hover tooltip -->
+                <div class="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[10px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                  {{ babyEmoji }} {{ weeksRemaining !== null && weeksRemaining > 0 ? `${weeksRemaining} weeks to go · EDD ${formatDate(pregnancy.edd)}` : 'Due any day!' }}
+                  <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 size-2 rotate-45 bg-foreground" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week markers -->
+          <div class="relative h-3 w-full">
+            <div
+              v-for="w in weekMarkers"
+              :key="w"
+              class="absolute flex flex-col items-center"
+              :style="{ left: `${(w / TOTAL_WEEKS) * 100}%` }"
+            >
+              <div class="h-1.5 w-px bg-muted-foreground/30" />
+              <span class="mt-0.5 text-[8px] tabular-nums text-muted-foreground/60 -translate-x-1/2">{{ w }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- B. Summary Cards ─────────────────────────────────────────────── -->
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <!-- Obstetric Hx -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
+            <PregnantIcon class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Obstetric Hx</p>
+            <p class="font-mono text-lg font-bold">{{ gpal }}</p>
+          </div>
+        </div>
+
+        <!-- Gestational Age -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-sm">
+            <PregnantWeeksIcon class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">GA</p>
+            <GACalculator v-if="pregnancy.edd" :edd="pregnancy.edd" class="text-sm font-bold" />
+            <p v-else class="text-sm text-muted-foreground">—</p>
+          </div>
+        </div>
+
+        <!-- EDD -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-sm">
+            <CalendarDays class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">EDD</p>
+            <p class="text-lg font-bold">{{ formatDate(pregnancy.edd) }}</p>
+            <p v-if="weeksRemaining !== null && weeksRemaining > 0" class="text-[10px] text-muted-foreground">
+              {{ weeksRemaining }}w remaining
+            </p>
+            <p v-else-if="weeksRemaining === 0" class="text-[10px] text-green-600 dark:text-green-400">
+              Past EDD
+            </p>
+          </div>
+        </div>
+
+        <!-- Risk Level -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div
+            class="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+            :class="pregnancy.risk_level === 'high'
+              ? 'bg-gradient-to-br from-red-500 to-orange-500'
+              : 'bg-gradient-to-br from-emerald-500 to-green-500'"
+          >
+            <ShieldAlert class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Risk</p>
+            <RiskClassificationBadge
+              v-if="pregnancy.risk_level"
+              :level="pregnancy.risk_level"
+              :factors="pregnancy.risk_factors"
+            />
+            <p v-else class="text-xs text-muted-foreground">Not assessed</p>
+          </div>
+        </div>
+
+        <!-- Total Visits -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
+            <ChartLineIcon class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Visits</p>
+            <p class="text-lg font-bold tabular-nums">{{ dashboardData.visit_summary?.count ?? 0 }}</p>
+          </div>
+        </div>
+      </div>
 
       <!-- B. Trend Charts ──────────────────────────────────────────────── -->
       <PrenatalTrendCharts :dashboard-data="dashboardData" />
 
       <!-- C. Lab Tracker ──────────────────────────────────────────────── -->
-      <PrenatalLabTracker :patient-id="patientId" :pregnancy-id="pregnancyId" />
+      <PrenatalCareChecklist
+        :patient-id="patientId"
+        :pregnancy-id="pregnancyId"
+        :disabled="pregnancy.status !== 'active'"
+      />
 
       <!-- D. Visit Timeline ───────────────────────────────────────────── -->
       <Card v-if="visitSummary.length > 0">

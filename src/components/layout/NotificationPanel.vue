@@ -47,11 +47,11 @@ function handleClick(notification: typeof store.notifications[number]) {
 
   // Navigate based on type
   const data = notification.data
-  if (notification.type === 'document.generated' && data.consultation_id) {
+  if (notification.type === 'document.generated' && data.encounter_id) {
     if (data.patient_id) {
       router.push({
-        name: RouteNames.CONSULTATION_DETAIL,
-        params: { patientId: data.patient_id as string, id: data.consultation_id as string },
+        name: RouteNames.ENCOUNTER_DETAIL,
+        params: { patientId: data.patient_id as string, id: data.encounter_id as string },
       })
     }
   } else if (notification.type === 'queue.patient_assigned' && data.patient_id) {
@@ -64,10 +64,10 @@ function handleClick(notification: typeof store.notifications[number]) {
       name: RouteNames.PATIENT_DETAIL,
       params: { id: data.patient_id as string },
     })
-  } else if (notification.type === 'medcert.requested' && data.consultation_id && data.patient_id) {
+  } else if (notification.type === 'medcert.requested' && data.encounter_id && data.patient_id) {
     router.push({
-      name: RouteNames.CONSULTATION_DETAIL,
-      params: { patientId: data.patient_id as string, id: data.consultation_id as string },
+      name: RouteNames.ENCOUNTER_DETAIL,
+      params: { patientId: data.patient_id as string, id: data.encounter_id as string },
       query: { openMedCert: '1' },
     })
   } else if (notification.type === 'medcert.completed' && data.patient_id) {

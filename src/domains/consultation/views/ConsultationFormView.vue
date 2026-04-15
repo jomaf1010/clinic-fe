@@ -35,7 +35,7 @@ import {
 import { useOfflineSync } from '@/composables/useOfflineSync'
 import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { useConsultationStore } from '../stores/consultationStore'
+import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import TriageTab from '../components/tabs/TriageTab.vue'
 import AssessmentTab from '../components/tabs/AssessmentTab.vue'
 import TreatmentPlanTab from '../components/tabs/TreatmentPlanTab.vue'
@@ -44,20 +44,20 @@ import VitalsSummary from '../components/VitalsSummary.vue'
 import FinalizeModal from '../components/FinalizeModal.vue'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import { openNewTab, printPdf } from '@/lib/utils'
-import type { UpdateConsultationPayload } from '../types/consultation.types'
-import { useConsultationSync } from '../composables/useConsultationSync'
+import type { UpdateEncounterPayload } from '@/domains/encounter/types/encounter.types'
+import { useEncounterSync } from '@/domains/encounter/composables/useEncounterSync'
 import { usePatientSync } from '@/domains/patient/composables/usePatientSync'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const store = useConsultationStore()
+const store = useEncounterStore()
 const { isOnline, pendingCount } = useOfflineSync()
 
-const consultationId = computed(() => store.current?.id)
+const encounterId = computed(() => store.current?.id)
 const clinicId = computed(() => store.current?.clinic_id)
 const patientId = computed(() => store.current?.patient_id)
-const { prescriptionUpdate, labOrderUpdate, documentUpdate } = useConsultationSync(consultationId, clinicId)
+const { prescriptionUpdate, labOrderUpdate, documentUpdate } = useEncounterSync(encounterId, clinicId)
 usePatientSync(patientId, clinicId, () => {})
 
 const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
@@ -74,7 +74,7 @@ const loadError = ref<string | null>(null)
 const pendingFinalizeAction = ref<'confirm' | 'pay'>('confirm')
 
 function hasFeeConfigured(): boolean {
-  const isFollowUp = store.current?.type === 'follow_up'
+  const isFollowUp = store.current?.consultation?.type === 'follow_up'
   const doctorFee = isFollowUp ? authStore.user?.follow_up_fee : authStore.user?.consultation_fee
   const clinicFee = isFollowUp
     ? authStore.currentClinic?.settings?.default_follow_up_fee
@@ -107,9 +107,9 @@ const summaryReady = computed(() => summaryDoc.value?.status === 'completed')
 let summaryPollTimer: ReturnType<typeof setInterval> | null = null
 
 async function loadSummaryDoc() {
-  if (!consultationId.value) return
+  if (!encounterId.value) return
   try {
-    const res = await documentApi.list(consultationId.value)
+    const res = await documentApi.list(encounterId.value)
     summaryDoc.value = res.data.find((d) => d.type === 'consultation-summary') ?? null
   } catch {
     // ignore
@@ -129,10 +129,10 @@ watch(documentUpdate, async (update) => {
 })
 
 async function generateSummary() {
-  if (!consultationId.value) return
+  if (!encounterId.value) return
   isGeneratingSummary.value = true
   try {
-    const res = await documentApi.generate(consultationId.value, 'consultation-summary')
+    const res = await documentApi.generate(encounterId.value, 'consultation-summary')
     summaryDoc.value = res.data
     startSummaryPolling()
   } catch {
@@ -180,18 +180,18 @@ async function downloadSummary() {
 onMounted(async () => {
   loadError.value = null
   try {
-    if (route.name === RouteNames.CONSULTATION_NEW) {
+    if (route.name === RouteNames.ENCOUNTER_NEW) {
       const patientId = route.params.patientId as string
       const consultationType = (route.query.type as 'default' | 'follow_up') || 'default'
       const consultation = await store.createForPatient(patientId, consultationType)
 
       await router.replace({
-        name: RouteNames.CONSULTATION_DETAIL,
+        name: RouteNames.ENCOUNTER_DETAIL,
         params: { patientId, id: consultation.id },
       })
     } else {
       const id = route.params.id as string
-      await store.loadConsultation(id)
+      await store.loadEncounter(id)
     }
 
     // Load summary doc status if finalized
@@ -228,7 +228,7 @@ onUnmounted(() => {
   store.clearCurrent()
 })
 
-async function handleSave(payload: UpdateConsultationPayload): Promise<void> {
+async function handleSave(payload: UpdateEncounterPayload): Promise<void> {
   await store.saveSection(payload)
 }
 
@@ -456,13 +456,13 @@ function proceedAfterFeeWarning() {
       <div class="mx-auto max-w-4xl">
         <TabsContent value="triage" class="mt-0">
           <TriageTab
-            :triage="store.current.triage"
+            :triage="store.current.consultation?.triage"
             :patient-id="store.current.patient_id"
             :consultation-id="store.current.id"
             :disabled="store.isFinalized || !canEditTriage"
             :lab-order-update="labOrderUpdate"
             @save="handleSave"
-            @lab-updated="store.loadConsultation(store.current!.id)"
+            @lab-updated="store.loadEncounter(store.current!.id)"
           />
           <div class="mt-8 flex justify-end border-t pt-4">
             <Button variant="outline" @click="goToTab('next')">
@@ -474,14 +474,14 @@ function proceedAfterFeeWarning() {
 
         <TabsContent v-if="canEditAssessment" value="assessment" class="mt-0 flex flex-col gap-6">
           <VitalsSummary
-              :triage="store.current.triage"
+              :triage="store.current.consultation?.triage"
               :patient-id="store.current.patient_id"
               :consultation-id="store.current.id"
               :lab-order-summary="store.current.lab_order_summary"
               show-trends-button
             />
           <AssessmentTab
-            :assessment="store.current.assessment"
+            :assessment="store.current.consultation?.assessment"
             :disabled="store.isFinalized"
             @save="handleSave"
           />
@@ -499,11 +499,12 @@ function proceedAfterFeeWarning() {
 
         <TabsContent value="treatment-plan" class="mt-0 flex flex-col gap-6">
           <TreatmentPlanTab
-            :treatment-plan="store.current.treatment_plan ?? { advice: null, follow_up: null }"
+            :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null }"
             :consultation-id="store.current.id"
             :patient-id="store.current.patient_id"
-            :doctor-id="store.current.created_by"
+            :doctor-id="store.current.doctor_id"
             :consumables="store.current.consumables ?? []"
+            :procedures="store.current.procedures ?? []"
             :disabled="store.isFinalized || !canEditTreatmentPlan"
             :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
             :prescription-update="prescriptionUpdate"
@@ -511,7 +512,8 @@ function proceedAfterFeeWarning() {
             :document-update="documentUpdate"
             @save="handleSave"
             @update:consumables="(c) => { if (store.current) store.current.consumables = c }"
-            @lab-updated="store.loadConsultation(store.current!.id)"
+            @procedures-updated="(p) => { if (store.current) store.current.procedures = p }"
+            @lab-updated="store.loadEncounter(store.current!.id)"
           />
           <div class="mt-8 flex items-center justify-between border-t pt-4">
             <Button variant="outline" @click="goToTab('prev')">
@@ -544,7 +546,7 @@ function proceedAfterFeeWarning() {
               :status="store.current.status"
               :consultation-type="store.current.type"
               :patient-id="store.current.patient_id"
-              :diagnoses="store.current.assessment?.diagnoses ?? []"
+              :diagnoses="store.current.consultation?.assessment?.diagnoses ?? []"
               :document-update="documentUpdate"
               :consumables="store.current.consumables ?? []"
               :prescription-summary="store.current.prescription_summary"

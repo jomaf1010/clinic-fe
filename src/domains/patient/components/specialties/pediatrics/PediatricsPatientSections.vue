@@ -607,7 +607,7 @@ onMounted(() => {
   <div class="contents">
     <PatientSectionWidget
         :icon="Baby"
-        icon-color="bg-pink-500/10 text-pink-500"
+        icon-color="bg-gradient-to-br from-pink-500 to-pink-600"
         title="Birth History"
         :detail="birthWidgetDetail"
         :loading="birthLoading"
@@ -615,7 +615,7 @@ onMounted(() => {
       />
       <PatientSectionWidget
         :icon="Syringe"
-        icon-color="bg-blue-500/10 text-blue-500"
+        icon-color="bg-gradient-to-br from-blue-500 to-blue-600"
         title="Immunizations"
         :detail="overdueCount > 0 ? `${overdueCount} overdue` : 'Up to date'"
         :badge-text="overdueCount > 0 ? String(overdueCount) : undefined"
@@ -625,7 +625,7 @@ onMounted(() => {
       />
       <PatientSectionWidget
         :icon="TrendingUp"
-        icon-color="bg-green-500/10 text-green-500"
+        icon-color="bg-gradient-to-br from-green-500 to-green-600"
         title="Growth Charts"
         :detail="growthWidgetDetail"
         :sub-detail="growthWidgetSubDetail"
@@ -634,7 +634,7 @@ onMounted(() => {
       />
       <PatientSectionWidget
         :icon="Brain"
-        icon-color="bg-purple-500/10 text-purple-500"
+        icon-color="bg-gradient-to-br from-purple-500 to-purple-600"
         title="Milestones"
         :detail="milestoneWidgetDetail"
         :badge-text="milestoneBadgeCount > 0 ? String(milestoneBadgeCount) : undefined"

@@ -402,7 +402,7 @@ async function fetchInvoice() {
   isLoading.value = true
   loadError.value = null
   try {
-    const result = await billingStore.fetchForConsultation(props.consultationId)
+    const result = await billingStore.fetchForEncounter(props.consultationId)
     invoice.value = result
   } catch {
     loadError.value = 'Failed to load invoice.'

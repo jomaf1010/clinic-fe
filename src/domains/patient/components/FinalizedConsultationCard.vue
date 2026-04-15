@@ -35,7 +35,7 @@ const authStore = useAuthStore()
 
 function openConsultation() {
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
+    name: RouteNames.ENCOUNTER_DETAIL,
     params: { patientId: props.patientId, id: props.consultation.id },
   })
 }

@@ -24,13 +24,14 @@ function shortDate(d: string): string {
   return `${dt.getMonth() + 1}/${dt.getDate()}`
 }
 
-function gaLabel(weeks: number | null, date: string): string {
-  return weeks !== null ? `${weeks}w` : shortDate(date)
+function gaLabel(weeks: number | null | undefined, date: string): string {
+  return weeks != null ? `${weeks}w` : shortDate(date)
 }
 
-const baseGrid = { top: 20, right: 20, bottom: 36, left: 52 }
+const baseGrid = { top: 8, right: 8, bottom: 28, left: 40 }
 
-const baseAxisLabel = { fontSize: 11 }
+const baseAxisLabel = { fontSize: 10 }
+const baseXAxisLabel = { fontSize: 9 }
 const baseAxisLine = { lineStyle: { color: 'hsl(var(--border))' } }
 const baseSplitLine = { lineStyle: { color: 'hsl(var(--border))', opacity: 0.15, type: 'dotted' as const } }
 
@@ -58,7 +59,7 @@ const bpOption = computed(() => {
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
-      axisLabel: baseAxisLabel,
+      axisLabel: baseXAxisLabel,
       axisLine: baseAxisLine,
       splitLine: { show: false },
     },
@@ -148,7 +149,7 @@ const weightOption = computed(() => {
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
-      axisLabel: baseAxisLabel,
+      axisLabel: baseXAxisLabel,
       axisLine: baseAxisLine,
       splitLine: { show: false },
     },
@@ -233,7 +234,7 @@ const fundalOption = computed(() => {
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
-      axisLabel: baseAxisLabel,
+      axisLabel: baseXAxisLabel,
       axisLine: baseAxisLine,
       splitLine: { show: false },
     },
@@ -317,7 +318,7 @@ const fhrOption = computed(() => {
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
-      axisLabel: baseAxisLabel,
+      axisLabel: baseXAxisLabel,
       axisLine: baseAxisLine,
       splitLine: { show: false },
     },
@@ -378,13 +379,13 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
     <!-- Blood Pressure -->
     <Card>
-      <CardHeader class="pb-2 pt-3">
-        <CardTitle class="text-sm font-semibold">Blood Pressure Trend</CardTitle>
+      <CardHeader class="px-3 pb-0 pt-2.5">
+        <CardTitle class="text-[11px] font-semibold">Blood Pressure Trend</CardTitle>
       </CardHeader>
-      <CardContent class="pb-3">
+      <CardContent class="px-2 pb-1.5">
         <div v-if="!hasBpData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No blood pressure data recorded
         </div>
@@ -392,17 +393,17 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="bpOption"
           autoresize
-          style="height: 260px; width: 100%"
+          style="height: 220px; width: 100%"
         />
       </CardContent>
     </Card>
 
     <!-- Weight Gain -->
     <Card>
-      <CardHeader class="pb-2 pt-3">
-        <CardTitle class="text-sm font-semibold">Weight Gain Trend</CardTitle>
+      <CardHeader class="px-3 pb-0 pt-2.5">
+        <CardTitle class="text-[11px] font-semibold">Weight Gain Trend</CardTitle>
       </CardHeader>
-      <CardContent class="pb-3">
+      <CardContent class="px-2 pb-1.5">
         <div v-if="!hasWeightData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No weight data recorded
         </div>
@@ -410,17 +411,17 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="weightOption"
           autoresize
-          style="height: 260px; width: 100%"
+          style="height: 220px; width: 100%"
         />
       </CardContent>
     </Card>
 
     <!-- Fundal Height -->
     <Card>
-      <CardHeader class="pb-2 pt-3">
-        <CardTitle class="text-sm font-semibold">Fundal Height Trend</CardTitle>
+      <CardHeader class="px-3 pb-0 pt-2.5">
+        <CardTitle class="text-[11px] font-semibold">Fundal Height Trend</CardTitle>
       </CardHeader>
-      <CardContent class="pb-3">
+      <CardContent class="px-2 pb-1.5">
         <div v-if="!hasFundalData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No fundal height data recorded
         </div>
@@ -428,17 +429,17 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="fundalOption"
           autoresize
-          style="height: 260px; width: 100%"
+          style="height: 220px; width: 100%"
         />
       </CardContent>
     </Card>
 
     <!-- Fetal Heart Rate -->
     <Card>
-      <CardHeader class="pb-2 pt-3">
-        <CardTitle class="text-sm font-semibold">Fetal Heart Rate Trend</CardTitle>
+      <CardHeader class="px-3 pb-0 pt-2.5">
+        <CardTitle class="text-[11px] font-semibold">Fetal Heart Rate Trend</CardTitle>
       </CardHeader>
-      <CardContent class="pb-3">
+      <CardContent class="px-2 pb-1.5">
         <div v-if="!hasFhrData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No FHR data recorded
         </div>
@@ -446,7 +447,7 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="fhrOption"
           autoresize
-          style="height: 260px; width: 100%"
+          style="height: 220px; width: 100%"
         />
       </CardContent>
     </Card>

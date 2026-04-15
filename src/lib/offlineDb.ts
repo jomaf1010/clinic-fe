@@ -2,7 +2,7 @@ const DB_NAME = 'clinicapp-offline'
 const DB_VERSION = 1
 
 const STORES = {
-  consultations: 'consultations',
+  encounters: 'encounters',
   labOrders: 'labOrders',
   pendingActions: 'pendingActions',
 } as const
@@ -12,11 +12,11 @@ function openDb(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = () => {
       const db = request.result
-      if (!db.objectStoreNames.contains(STORES.consultations)) {
-        db.createObjectStore(STORES.consultations, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(STORES.encounters)) {
+        db.createObjectStore(STORES.encounters, { keyPath: 'id' })
       }
       if (!db.objectStoreNames.contains(STORES.labOrders)) {
-        db.createObjectStore(STORES.labOrders, { keyPath: 'consultation_id' })
+        db.createObjectStore(STORES.labOrders, { keyPath: 'encounter_id' })
       }
       if (!db.objectStoreNames.contains(STORES.pendingActions)) {
         db.createObjectStore(STORES.pendingActions, { autoIncrement: true })
@@ -42,35 +42,35 @@ function req<T>(r: IDBRequest<T>): Promise<T> {
   })
 }
 
-// --- Consultations ---
+// --- Encounters ---
 
-export async function cacheConsultation(data: Record<string, unknown>): Promise<void> {
+export async function cacheEncounter(data: Record<string, unknown>): Promise<void> {
   const db = await openDb()
-  await req(tx(db, STORES.consultations, 'readwrite').put(JSON.parse(JSON.stringify(data))))
+  await req(tx(db, STORES.encounters, 'readwrite').put(JSON.parse(JSON.stringify(data))))
 }
 
-export async function getCachedConsultation(id: string): Promise<Record<string, unknown> | undefined> {
+export async function getCachedEncounter(id: string): Promise<Record<string, unknown> | undefined> {
   const db = await openDb()
-  return req(tx(db, STORES.consultations, 'readonly').get(id))
+  return req(tx(db, STORES.encounters, 'readonly').get(id))
 }
 
 // --- Lab Orders ---
 
-export async function cacheLabOrder(consultationId: string, data: Record<string, unknown>): Promise<void> {
+export async function cacheLabOrder(encounterId: string, data: Record<string, unknown>): Promise<void> {
   const db = await openDb()
-  const plain = JSON.parse(JSON.stringify({ ...data, consultation_id: consultationId }))
+  const plain = JSON.parse(JSON.stringify({ ...data, encounter_id: encounterId }))
   await req(tx(db, STORES.labOrders, 'readwrite').put(plain))
 }
 
-export async function getCachedLabOrder(consultationId: string): Promise<Record<string, unknown> | undefined> {
+export async function getCachedLabOrder(encounterId: string): Promise<Record<string, unknown> | undefined> {
   const db = await openDb()
-  return req(tx(db, STORES.labOrders, 'readonly').get(consultationId))
+  return req(tx(db, STORES.labOrders, 'readonly').get(encounterId))
 }
 
 // --- Pending Actions (offline queue) ---
 
 export interface PendingAction {
-  type: 'update-consultation' | 'update-lab-order-item' | 'add-lab-order-item' | 'remove-lab-order-item'
+  type: 'update-encounter' | 'update-lab-order-item' | 'add-lab-order-item' | 'remove-lab-order-item'
   url: string
   method: 'POST' | 'PATCH' | 'DELETE'
   body?: unknown

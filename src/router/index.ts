@@ -39,15 +39,15 @@ const router = createRouter({
           component: () => import('@/domains/patient/views/PatientDetailView.vue'),
         },
         {
-          path: 'patients/:patientId/consultations/new',
-          name: RouteNames.CONSULTATION_NEW,
-          component: () => import('@/domains/consultation/views/ConsultationFormView.vue'),
+          path: 'patients/:patientId/encounters/new',
+          name: RouteNames.ENCOUNTER_NEW,
+          component: () => import('@/domains/encounter/views/EncounterFormRouter.vue'),
           meta: { requiresAuth: true, requiresClinicContext: true },
         },
         {
-          path: 'patients/:patientId/consultations/:id',
-          name: RouteNames.CONSULTATION_DETAIL,
-          component: () => import('@/domains/consultation/views/ConsultationFormView.vue'),
+          path: 'patients/:patientId/encounters/:id',
+          name: RouteNames.ENCOUNTER_DETAIL,
+          component: () => import('@/domains/encounter/views/EncounterFormRouter.vue'),
           meta: { requiresAuth: true, requiresClinicContext: true },
         },
         {
@@ -114,6 +114,11 @@ const router = createRouter({
               path: 'lab-services',
               name: RouteNames.CLINIC_LAB_SERVICES,
               component: () => import('@/domains/labService/views/LabServiceListView.vue'),
+            },
+            {
+              path: 'services',
+              name: RouteNames.CLINIC_SERVICES,
+              component: () => import('@/domains/service/views/ServiceListView.vue'),
             },
             {
               path: 'templates',

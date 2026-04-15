@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label'
 
 const props = defineProps<{
   modelValue: string[]
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -54,9 +55,10 @@ function toggle(key: string): void {
     >
       <Checkbox
         :id="`danger-sign-${sign.key}`"
-        :checked="isChecked(sign.key)"
+        :model-value="isChecked(sign.key)"
+        :disabled="disabled"
         class="mt-0.5 shrink-0"
-        @update:checked="toggle(sign.key)"
+        @update:model-value="toggle(sign.key)"
       />
       <div class="flex flex-col gap-0.5">
         <Label

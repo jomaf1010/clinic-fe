@@ -2,15 +2,15 @@ import { http } from '@/lib/http'
 import type { LabOrderResponse, SystemLabItem } from '../types/labOrder.types'
 
 export const labOrderApi = {
-  getForConsultation(consultationId: string): Promise<{ data: LabOrderResponse }> {
-    return http.get<{ data: LabOrderResponse }>(`/consultations/${consultationId}/lab-order`)
+  getForEncounter(encounterId: string): Promise<{ data: LabOrderResponse }> {
+    return http.get<{ data: LabOrderResponse }>(`/encounters/${encounterId}/lab-order`)
   },
 
   create(
-    consultationId: string,
+    encounterId: string,
     items: { description: string; instruction?: string }[],
   ): Promise<{ data: LabOrderResponse }> {
-    return http.post<{ data: LabOrderResponse }>(`/consultations/${consultationId}/lab-order`, {
+    return http.post<{ data: LabOrderResponse }>(`/encounters/${encounterId}/lab-order`, {
       items,
     })
   },

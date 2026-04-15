@@ -23,28 +23,32 @@ defineEmits<{ click: [] }>()
     @click="$emit('click')"
   >
     <!-- Icon -->
-    <div
-      class="flex size-10 shrink-0 items-center justify-center rounded-lg"
-      :class="iconColor ?? 'bg-primary/10 text-primary'"
-    >
-      <component :is="icon" class="size-5" />
+    <div class="relative shrink-0">
+      <div
+        class="flex size-10 items-center justify-center rounded-xl text-white shadow-sm"
+        :class="iconColor ?? 'bg-gradient-to-br from-primary to-primary/80'"
+      >
+        <component :is="icon" class="size-6" />
+      </div>
+      <span
+        v-if="badgeText"
+        class="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full text-[10px] font-semibold shadow-sm ring-2 ring-card"
+        :class="badgeVariant === 'destructive' ? 'bg-destructive text-destructive-foreground' : 'bg-muted-foreground text-white'"
+      >
+        {{ badgeText }}
+      </span>
     </div>
 
     <!-- Content -->
     <div class="min-w-0 flex-1">
-      <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold leading-tight">{{ title }}</span>
-        <Badge v-if="badgeText" :variant="badgeVariant ?? 'secondary'" class="text-[10px] px-1.5 py-0">
-          {{ badgeText }}
-        </Badge>
-      </div>
+      <span class="text-sm font-semibold leading-tight">{{ title }}</span>
 
       <!-- Loading skeleton -->
       <template v-if="loading">
         <div class="mt-1.5 h-3 w-16 animate-pulse rounded bg-muted" />
       </template>
       <template v-else>
-        <p v-if="detail" class="mt-0.5 text-xs leading-tight text-muted-foreground">
+        <p v-if="detail" class="mt-0.5 line-clamp-2 text-xs leading-tight text-muted-foreground">
           {{ detail }}
         </p>
         <p v-if="subDetail" class="text-xs leading-tight text-muted-foreground">

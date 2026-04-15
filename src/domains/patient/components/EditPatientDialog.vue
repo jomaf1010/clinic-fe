@@ -60,8 +60,11 @@ const { value: contactNumber, errorMessage: contactNumberError } = useField<stri
 const { value: email, errorMessage: emailError } = useField<string>('email')
 const { value: note, errorMessage: noteError } = useField<string>('note')
 
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
+
 const name = ref<PatientName | null>(null)
 const address = ref<PatientAddress | null>(null)
+const bloodType = ref<string>('')
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
@@ -81,6 +84,7 @@ function populateForm() {
     suffix: props.patient.suffix,
   }
   address.value = props.patient.address
+  bloodType.value = props.patient.blood_type ?? ''
 }
 
 watch(
@@ -117,6 +121,7 @@ const onSubmit = handleSubmit(async (values) => {
       address: address.value,
       date_of_birth: values.date_of_birth,
       sex: values.sex,
+      blood_type: bloodType.value || null,
       contact_number: values.contact_number || null,
       email: values.email || null,
       note: values.note || null,
@@ -200,6 +205,26 @@ const onSubmit = handleSubmit(async (values) => {
               </SelectContent>
             </Select>
             <p v-if="sexError" class="text-xs text-destructive">{{ sexError }}</p>
+          </div>
+        </div>
+
+        <!-- Blood Type -->
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="flex flex-col gap-2">
+            <Label for="edit_blood_type" class="flex items-center gap-1.5">
+              <User class="size-3.5 text-muted-foreground" />
+              Blood type <span class="text-muted-foreground">(optional)</span>
+            </Label>
+            <Select v-model="bloodType">
+              <SelectTrigger id="edit_blood_type">
+                <SelectValue placeholder="Select blood type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="bt in BLOOD_TYPES" :key="bt" :value="bt">
+                  {{ bt }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

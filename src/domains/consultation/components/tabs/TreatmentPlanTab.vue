@@ -26,6 +26,7 @@ import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import LabOrderSection from '../LabOrderSection.vue'
 import PrescriptionSection from '../PrescriptionSection.vue'
 import ConsumableSection from '../ConsumableSection.vue'
+import ProcedureSection from '@/domains/service/components/ProcedureSection.vue'
 
 const props = defineProps<{
   treatmentPlan: ConsultationTreatmentPlan
@@ -33,6 +34,7 @@ const props = defineProps<{
   patientId: string
   doctorId: string
   consumables: ConsultationConsumable[]
+  procedures: Array<{ service_id: string; name: string; quantity: number; unit_price: number | null; notes: string | null }>
   disabled: boolean
   labOrderDisabled: boolean
   prescriptionUpdate?: PrescriptionResponse | null
@@ -44,6 +46,7 @@ const emit = defineEmits<{
   save: [payload: { treatment_plan: Partial<ConsultationTreatmentPlan> }]
   'update:consumables': [consumables: ConsultationConsumable[]]
   'lab-updated': []
+  'procedures-updated': [procedures: Array<{ service_id: string; name: string; quantity: number; unit_price: number | null; notes: string | null }>]
 }>()
 
 const authStore = useAuthStore()
@@ -221,6 +224,16 @@ function applyPreset(days: number): void {
   <div class="flex flex-col gap-6">
     <!-- Prescription -->
     <PrescriptionSection :consultation-id="consultationId" :disabled="disabled" :realtime-update="prescriptionUpdate" :document-update="documentUpdate" />
+
+    <hr class="border-border" />
+
+    <!-- Procedures -->
+    <ProcedureSection
+      :encounter-id="consultationId"
+      :procedures="procedures"
+      :disabled="disabled"
+      @update="(p) => emit('procedures-updated', p)"
+    />
 
     <hr class="border-border" />
 

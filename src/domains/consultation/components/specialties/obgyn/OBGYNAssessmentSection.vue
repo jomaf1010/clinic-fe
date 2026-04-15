@@ -26,12 +26,12 @@ const local = reactive<ConsultationAssessment>({
 })
 
 // Load GYN exam data from specialty_assessment on the consultation
-import { useConsultationStore } from '../../../stores/consultationStore'
-const consultationStore = useConsultationStore()
+import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
+const encounterStore = useEncounterStore()
 
 const gynNotes = reactive({
-  pelvic_exam: (consultationStore.current?.specialty_assessment as Record<string, string | null> | null)?.pelvic_exam ?? null,
-  breast_exam: (consultationStore.current?.specialty_assessment as Record<string, string | null> | null)?.breast_exam ?? null,
+  pelvic_exam: (encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null)?.pelvic_exam ?? null,
+  breast_exam: (encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null)?.breast_exam ?? null,
 })
 
 watch(
@@ -39,7 +39,7 @@ watch(
   (val) => {
     local.diagnoses = [...(val?.diagnoses ?? [])]
     local.notes = val?.notes ?? null
-    const sa = consultationStore.current?.specialty_assessment as Record<string, string | null> | null
+    const sa = encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null
     gynNotes.pelvic_exam = sa?.pelvic_exam ?? null
     gynNotes.breast_exam = sa?.breast_exam ?? null
   },

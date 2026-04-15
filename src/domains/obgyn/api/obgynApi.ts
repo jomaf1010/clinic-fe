@@ -1,5 +1,5 @@
 import { http } from '@/lib/http'
-import type { GynProfile, Pregnancy, PrenatalVisit, LabsDueItem, PregnancyDashboard } from '../types/obgyn.types'
+import type { GynProfile, Pregnancy, PregnancyOutcome, PrenatalVisit, LabsDueItem, PregnancyDashboard, ChecklistItem, DueReminders } from '../types/obgyn.types'
 
 export interface UpsertGynProfilePayload {
   menarche_age?: number | null
@@ -13,11 +13,8 @@ export interface UpsertGynProfilePayload {
   parity_preterm?: number | null
   abortions?: number | null
   living_children?: number | null
-  last_pap_date?: string | null
-  last_pap_result?: string | null
-  hpv_status?: string | null
-  screening_interval?: string | null
-  current_contraception?: { method: string; started_date?: string | null } | null
+  screenings?: Array<{ date: string; type: string; result?: string | null; notes?: string | null }> | null
+  contraception?: Array<{ method: string[]; start_date: string; end_date?: string | null; notes?: string | null }> | null
 }
 
 export interface CreatePregnancyPayload {
@@ -26,11 +23,8 @@ export interface CreatePregnancyPayload {
   edd_source?: 'lmp' | 'ultrasound' | 'adjusted' | null
   first_ultrasound_date?: string | null
   first_ultrasound_ga?: string | null
-  gravidity?: number | null
-  parity_term?: number | null
-  parity_preterm?: number | null
-  abortions?: number | null
-  living_children?: number | null
+  fetus_count?: number
+  fetuses?: { label: string; sex: 'male' | 'female' | 'unknown' }[]
   pre_pregnancy_weight?: number | null
   height?: number | null
   medical_conditions?: string | null
@@ -116,5 +110,45 @@ export const obgynApi = {
 
   deleteVisit(patientId: string, pregnancyId: string, visitId: string): Promise<void> {
     return http.delete<void>(`/patients/${patientId}/pregnancies/${pregnancyId}/visits/${visitId}`)
+  },
+
+  // Prenatal Care Checklist
+  getChecklist(patientId: string, pregnancyId: string): Promise<{ data: ChecklistItem[] }> {
+    return http.get<{ data: ChecklistItem[] }>(`/patients/${patientId}/pregnancies/${pregnancyId}/labs-due`)
+  },
+
+  toggleChecklistItem(
+    patientId: string,
+    pregnancyId: string,
+    payload: { key: string; completed: boolean; notes?: string | null },
+  ): Promise<{ data: ChecklistItem[] }> {
+    return http.post<{ data: ChecklistItem[] }>(
+      `/patients/${patientId}/pregnancies/${pregnancyId}/checklist`,
+      payload,
+    )
+  },
+
+  getReminders(patientId: string, pregnancyId: string): Promise<{ data: DueReminders }> {
+    return http.get<{ data: DueReminders }>(`/patients/${patientId}/pregnancies/${pregnancyId}/reminders`)
+  },
+
+  // Resolve Pregnancy
+  resolvePregnancy(
+    patientId: string,
+    pregnancyId: string,
+    payload: {
+      outcome: PregnancyOutcome
+      outcome_date: string
+      management?: string | null
+      ectopic_location?: string | null
+      ectopic_confirmation?: string | null
+      hcg_surveillance?: boolean | null
+      notes?: string | null
+    },
+  ): Promise<{ data: Pregnancy; encounter_id: string | null }> {
+    return http.post<{ data: Pregnancy; encounter_id: string | null }>(
+      `/patients/${patientId}/pregnancies/${pregnancyId}/resolve`,
+      payload,
+    )
   },
 }

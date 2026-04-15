@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { consultationApi } from '../../../api/consultationApi'
 import { patientApi } from '@/domains/patient/api/patientApi'
-import { useConsultationStore } from '../../../stores/consultationStore'
+import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import AscvdCalculator from './AscvdCalculator.vue'
 import type { DiagnosisSearchResult } from '../../../api/consultationApi'
 import type { ConsultationAssessment, AssessmentDiagnosis, ProblemSoapNote } from '../../../types/consultation.types'
@@ -26,7 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
-const store = useConsultationStore()
+const store = useEncounterStore()
 
 // patientId available from route param (patients/:patientId/consultations/:id)
 const patientId = computed(() => (route.params.patientId as string) || store.current?.patient_id || '')
@@ -189,7 +189,7 @@ function toggleProblem(id: string) {
 
 function initSoapNote(p: Problem) {
   if (!soapNotes[p.uuid]) {
-    const existing = (store.current?.specialty_assessment?.problem_notes ?? [])
+    const existing = (store.current?.consultation?.specialty_assessment?.problem_notes ?? [])
       .find((n) => n.problem_id === p.uuid)
     soapNotes[p.uuid] = {
       problem_id: p.uuid,
@@ -227,7 +227,7 @@ async function saveSoapNote(problemId: string) {
 
 // Sync notes when store updates from realtime
 watch(
-  () => store.current?.specialty_assessment?.problem_notes,
+  () => store.current?.consultation?.specialty_assessment?.problem_notes,
   (newNotes) => {
     if (!newNotes) return
     for (const note of newNotes) {
@@ -284,7 +284,7 @@ const ascvdPatientAge = ref<number | null>(null)
 const ascvdPatientSex = computed(() => store.current?.patient_sex ?? null)
 
 const ascvdTriageBp = computed(() => {
-  const vitals = store.current?.triage?.vitals
+  const vitals = store.current?.consultation?.triage?.vitals
   return vitals?.bp ?? null
 })
 

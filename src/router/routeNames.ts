@@ -10,8 +10,8 @@ export const RouteNames = {
   PATIENT_DETAIL: 'patient-detail',
   AUDIT_LOG_LIST: 'audit-log-list',
   AUDIT_LOG_DETAIL: 'audit-log-detail',
-  CONSULTATION_NEW: 'consultation-new',
-  CONSULTATION_DETAIL: 'consultation-detail',
+  ENCOUNTER_NEW: 'encounter-new',
+  ENCOUNTER_DETAIL: 'encounter-detail',
   CLINIC: 'clinic',
   CLINIC_PROFILE: 'clinic-profile',
   CLINIC_SETTINGS: 'clinic-settings',
@@ -38,6 +38,7 @@ export const RouteNames = {
   RESET_PASSWORD: 'reset-password',
   PREGNANCY_CREATE: 'pregnancy-create',
   PREGNANCY_DETAIL: 'pregnancy-detail',
+  CLINIC_SERVICES: 'clinic-services',
   PRENATAL_VISIT_CREATE: 'prenatal-visit-create',
   PRENATAL_VISIT_DETAIL: 'prenatal-visit-detail',
 } as const

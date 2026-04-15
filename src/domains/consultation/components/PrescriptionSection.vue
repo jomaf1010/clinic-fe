@@ -347,7 +347,7 @@ function parseDuration(duration: string): { value: string; unit: string } {
 async function loadPrescription() {
   isLoading.value = true
   try {
-    const res = await prescriptionApi.getForConsultation(props.consultationId)
+    const res = await prescriptionApi.getForEncounter(props.consultationId)
     prescription.value = res.data ?? null
   } catch {
     // silent

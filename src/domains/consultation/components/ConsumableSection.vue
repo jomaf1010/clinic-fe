@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { consultationApi } from '../api/consultationApi'
+import { encounterApi } from '@/domains/encounter/api/encounterApi'
 import { consumableApi } from '@/domains/consumable/api/consumableApi'
 import type { ClinicConsumable } from '@/domains/consumable/types/consumable.types'
 import type { ConsultationConsumable } from '../types/consultation.types'
@@ -118,7 +118,7 @@ async function handleSave() {
 
   isSaving.value = true
   try {
-    const res = await consultationApi.saveConsumables(props.consultationId, consumables)
+    const res = await encounterApi.saveConsumables(props.consultationId, consumables)
     emit('update', res.data.consumables)
     closeModal()
     toast.success('Consumables saved')
@@ -132,7 +132,7 @@ async function handleSave() {
 async function removeConsumable(consumableId: string) {
   const updated = props.consumables.filter((c) => c.consumable_id !== consumableId)
   try {
-    const res = await consultationApi.saveConsumables(props.consultationId, updated)
+    const res = await encounterApi.saveConsumables(props.consultationId, updated)
     emit('update', res.data.consumables)
     toast.success('Consumable removed')
   } catch {

@@ -38,6 +38,7 @@ export interface CreatePatientPayload {
   address: PatientAddress
   date_of_birth: string
   sex: string
+  blood_type?: string | null
   contact_number?: string
   email?: string
   note?: string
@@ -55,6 +56,7 @@ export interface PatientResponse {
   formatted_address: string
   date_of_birth: string
   sex: string
+  blood_type: string | null
   contact_number: string | null
   email: string | null
   note: string | null
@@ -92,6 +94,7 @@ export interface UpdatePatientPayload {
   address?: PatientAddress
   date_of_birth?: string
   sex?: string
+  blood_type?: string | null
   contact_number?: string | null
   email?: string | null
   note?: string | null

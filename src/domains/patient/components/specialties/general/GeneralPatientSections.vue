@@ -425,22 +425,22 @@ onMounted(async () => {
   <div class="contents">
     <PatientSectionWidget
         :icon="ListChecks"
-        icon-color="bg-primary/10 text-primary"
+        icon-color="bg-gradient-to-br from-primary to-primary/80"
         title="Problem List"
         :detail="problemsWidgetDetail"
         :sub-detail="problemsWidgetSubDetail"
         :badge-text="activeProblems.length > 0 ? String(activeProblems.length) : undefined"
-        badge-variant="secondary"
+        badge-variant="destructive"
         :loading="isLoading"
         @click="showProblemsModal = true"
       />
       <PatientSectionWidget
         :icon="ShieldAlert"
-        icon-color="bg-destructive/10 text-destructive"
+        icon-color="bg-gradient-to-br from-red-500 to-red-600"
         title="Allergies"
         :detail="allergiesWidgetDetail"
         :badge-text="allergies.length > 0 ? String(allergies.length) : undefined"
-        :badge-variant="allergiesWidgetBadgeVariant"
+        badge-variant="destructive"
         :loading="isLoadingAllergies"
         @click="showAllergiesModal = true"
       />

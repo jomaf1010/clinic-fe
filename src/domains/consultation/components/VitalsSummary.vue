@@ -86,7 +86,7 @@ async function openTrends() {
     for (const page of pages) {
       if (weightPoints.length >= 50 && bpPoints.length >= 50 && bsPoints.length >= 50) break
       const res = await http.get<{ data: ConsultationResponse[]; meta: { pagination: { last_page: number } } }>(
-        `/patients/${props.patientId}/consultations?per_page=10&page=${page}`,
+        `/patients/${props.patientId}/encounters?per_page=10&page=${page}`,
       )
       for (const c of res.data) {
         const date = (c.finalized_at ?? c.created_at).split('T')[0]
@@ -240,7 +240,7 @@ async function viewLabResult(description: string) {
   labPreviewOpen.value = true
 
   try {
-    const res = await labOrderApi.getForConsultation(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.consultationId)
     const item = res.data?.items.find((i) => i.description === description && i.status === 'completed')
     if (!item?.result_files.length) {
       labPreviewOpen.value = false
@@ -290,7 +290,7 @@ async function fetchPastDiagnoses() {
   if (!props.patientId) return
   try {
     const res = await http.get<{ data: ConsultationResponse[]; meta: unknown }>(
-      `/patients/${props.patientId}/consultations?per_page=3&page=1`,
+      `/patients/${props.patientId}/encounters?per_page=3&page=1`,
     )
     const diagnoses: PastDiagnosis[] = []
     let count = 0

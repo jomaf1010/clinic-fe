@@ -110,21 +110,21 @@ function formatStatus(status: string): string {
 
 const callingId = ref<string | null>(null)
 
-async function handleCall(item: { id: string; patient_id: string; consultation_id: string | null }) {
+async function handleCall(item: { id: string; patient_id: string; encounter_id: string | null }) {
   callingId.value = item.id
   try {
     const response = await queueApi.call(item.id)
     toast.success('Patient called')
 
-    const consultationId = response.data.consultation_id ?? item.consultation_id
-    if (consultationId) {
+    const encounterId = response.data.encounter_id ?? item.encounter_id
+    if (encounterId) {
       router.push({
-        name: RouteNames.CONSULTATION_DETAIL,
-        params: { patientId: item.patient_id, id: consultationId },
+        name: RouteNames.ENCOUNTER_DETAIL,
+        params: { patientId: item.patient_id, id: encounterId },
       })
     } else {
       router.push({
-        name: RouteNames.CONSULTATION_NEW,
+        name: RouteNames.ENCOUNTER_NEW,
         params: { patientId: item.patient_id },
       })
     }
@@ -390,7 +390,7 @@ onUnmounted(() => {
               v-for="draft in stats.draft_consultations_list"
               :key="draft.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
-              @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: draft.patient_id, id: draft.id } })"
+              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: draft.patient_id, id: draft.id } })"
             >
               <PatientAvatar
                 :avatar-url="draft.patient_avatar_url"

@@ -130,7 +130,7 @@ export interface QueueItem {
   patient_id: string
   patient_sex: string | null
   patient_avatar_url: string | null
-  consultation_id: string | null
+  encounter_id: string | null
   status: string
   queued_at: string
 }

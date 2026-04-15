@@ -14,6 +14,7 @@ import {
   Trash2,
   CalendarDays,
   ExternalLink,
+  FileText,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -34,10 +35,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
+import MenstrualCycleIcon from '@/components/icons/MenstrualCycleIcon.vue'
+import PregnantIcon from '@/components/icons/PregnantIcon.vue'
+import PregnantWeeksIcon from '@/components/icons/PregnantWeeksIcon.vue'
+import CervicalScreeningIcon from '@/components/icons/CervicalScreeningIcon.vue'
+import FamilyPlanningIcon from '@/components/icons/FamilyPlanningIcon.vue'
 import PatientSectionWidget from '@/domains/patient/components/specialties/PatientSectionWidget.vue'
 import { obgynApi } from '../api/obgynApi'
-import type { GynProfile, Pregnancy } from '../types/obgyn.types'
-import type { UpsertGynProfilePayload, CreatePregnancyPayload } from '../api/obgynApi'
+import type { GynProfile, Pregnancy, ContraceptiveEntry, ScreeningEntry } from '../types/obgyn.types'
+import { CONTRACEPTION_OPTIONS, contraceptionLabel, SCREENING_TYPE_OPTIONS, screeningTypeLabel } from '../types/obgyn.types'
+import type { UpsertGynProfilePayload } from '../api/obgynApi'
+import { useClinicalSummary } from '../composables/useClinicalSummary'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,11 +74,11 @@ function formatDate(d: string | null): string {
 // ── GYN Profile ───────────────────────────────────────────────────────────
 const gynProfile = ref<GynProfile | null>(null)
 const isLoadingGyn = ref(false)
-const showGynDialog = ref(false)
+const showMenstrualDialog = ref(false)
+const showGpalDialog = ref(false)
 const showScreeningDialog = ref(false)
 const showContraceptionDialog = ref(false)
 const isSavingGyn = ref(false)
-const gynEditing = ref(false)
 
 const gynForm = reactive<UpsertGynProfilePayload>({
   menarche_age: null,
@@ -83,11 +92,6 @@ const gynForm = reactive<UpsertGynProfilePayload>({
   parity_preterm: null,
   abortions: null,
   living_children: null,
-  last_pap_date: null,
-  last_pap_result: null,
-  hpv_status: null,
-  screening_interval: null,
-  current_contraception: null,
 })
 
 const gpalString = computed(() => {
@@ -102,12 +106,21 @@ const gpalString = computed(() => {
   return `G${g ?? 0}P${pt ?? 0}(${pp ?? 0})(${a ?? 0})(${l ?? 0})`
 })
 
-const gynWidgetDetail = computed(() => {
-  if (!gynProfile.value) return 'Not recorded'
-  return gpalString.value ?? 'Recorded'
+const menstrualWidgetDetail = computed(() => {
+  const p = gynProfile.value
+  if (!p) return 'Not recorded'
+  const parts: string[] = []
+  if (p.cycle_length) parts.push(`${p.cycle_length}d cycle`)
+  if (p.regularity) parts.push(p.regularity)
+  if (p.flow) parts.push(p.flow)
+  return parts.length ? parts.join(' · ') : 'Not recorded'
 })
 
-function openGynDialog() {
+const gpalWidgetDetail = computed(() => {
+  return gpalString.value ?? 'Not recorded'
+})
+
+function openMenstrualDialog() {
   if (gynProfile.value) {
     gynForm.menarche_age = gynProfile.value.menarche_age
     gynForm.cycle_length = gynProfile.value.cycle_length
@@ -115,23 +128,19 @@ function openGynDialog() {
     gynForm.duration = gynProfile.value.duration
     gynForm.flow = gynProfile.value.flow
     gynForm.dysmenorrhea = gynProfile.value.dysmenorrhea
+  }
+  showMenstrualDialog.value = true
+}
+
+function openGpalDialog() {
+  if (gynProfile.value) {
     gynForm.gravidity = gynProfile.value.gravidity
     gynForm.parity_term = gynProfile.value.parity_term
     gynForm.parity_preterm = gynProfile.value.parity_preterm
     gynForm.abortions = gynProfile.value.abortions
     gynForm.living_children = gynProfile.value.living_children
-    gynForm.last_pap_date = gynProfile.value.last_pap_date
-    gynForm.last_pap_result = gynProfile.value.last_pap_result
-    gynForm.hpv_status = gynProfile.value.hpv_status
-    gynForm.screening_interval = gynProfile.value.screening_interval
-    gynForm.current_contraception = gynProfile.value.current_contraception
-      ? { ...gynProfile.value.current_contraception }
-      : null
-    gynEditing.value = false
-  } else {
-    gynEditing.value = true
   }
-  showGynDialog.value = true
+  showGpalDialog.value = true
 }
 
 async function loadGynProfile() {
@@ -146,15 +155,42 @@ async function loadGynProfile() {
   }
 }
 
-async function saveGynProfile() {
+async function saveMenstrualHistory() {
   isSavingGyn.value = true
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { ...gynForm })
+    const res = await obgynApi.upsertGynProfile(patientId.value, {
+      menarche_age: gynForm.menarche_age,
+      cycle_length: gynForm.cycle_length,
+      regularity: gynForm.regularity,
+      duration: gynForm.duration,
+      flow: gynForm.flow,
+      dysmenorrhea: gynForm.dysmenorrhea,
+    })
     gynProfile.value = res.data
-    gynEditing.value = false
-    toast.success('GYN profile saved')
+    showMenstrualDialog.value = false
+    toast.success('Menstrual history updated')
   } catch {
-    toast.error('Failed to save GYN profile')
+    toast.error('Failed to save')
+  } finally {
+    isSavingGyn.value = false
+  }
+}
+
+async function saveGpal() {
+  isSavingGyn.value = true
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, {
+      gravidity: gynForm.gravidity,
+      parity_term: gynForm.parity_term,
+      parity_preterm: gynForm.parity_preterm,
+      abortions: gynForm.abortions,
+      living_children: gynForm.living_children,
+    })
+    gynProfile.value = res.data
+    showGpalDialog.value = false
+    toast.success('GPAL updated')
+  } catch {
+    toast.error('Failed to save')
   } finally {
     isSavingGyn.value = false
   }
@@ -164,8 +200,6 @@ async function saveGynProfile() {
 const pregnancies = ref<Pregnancy[]>([])
 const isLoadingPreg = ref(false)
 const showPregDialog = ref(false)
-const showAddPregDialog = ref(false)
-const isSavingPreg = ref(false)
 const deletingPregId = ref<string | null>(null)
 
 const activePregnancy = computed(() =>
@@ -186,32 +220,6 @@ const pregBadgeText = computed(() =>
   activePregnancy.value ? '1' : undefined,
 )
 
-const pregForm = reactive<CreatePregnancyPayload>({
-  lmp: null,
-  edd: null,
-  edd_source: null,
-  gravidity: null,
-  parity_term: null,
-  parity_preterm: null,
-  abortions: null,
-  living_children: null,
-  pre_pregnancy_weight: null,
-  risk_factors: [],
-})
-
-function resetPregForm() {
-  pregForm.lmp = null
-  pregForm.edd = null
-  pregForm.edd_source = null
-  pregForm.gravidity = null
-  pregForm.parity_term = null
-  pregForm.parity_preterm = null
-  pregForm.abortions = null
-  pregForm.living_children = null
-  pregForm.pre_pregnancy_weight = null
-  pregForm.risk_factors = []
-}
-
 async function loadPregnancies() {
   isLoadingPreg.value = true
   try {
@@ -221,21 +229,6 @@ async function loadPregnancies() {
     // silently fail
   } finally {
     isLoadingPreg.value = false
-  }
-}
-
-async function savePregnancy() {
-  isSavingPreg.value = true
-  try {
-    const res = await obgynApi.createPregnancy(patientId.value, { ...pregForm })
-    pregnancies.value.unshift(res.data)
-    showAddPregDialog.value = false
-    resetPregForm()
-    toast.success('Pregnancy record created')
-  } catch {
-    toast.error('Failed to create pregnancy record')
-  } finally {
-    isSavingPreg.value = false
   }
 }
 
@@ -256,7 +249,7 @@ function pregnancyStatusClass(status: Pregnancy['status']): string {
     case 'active': return 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100'
     case 'postpartum': return 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100'
     case 'delivered': return 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100'
-    case 'lost': return 'bg-red-100 text-red-600 border-red-200 hover:bg-red-100'
+    case 'resolved': return 'bg-red-100 text-red-600 border-red-200 hover:bg-red-100'
     default: return 'bg-muted text-muted-foreground border-border hover:bg-muted'
   }
 }
@@ -266,43 +259,191 @@ function pregnancyStatusLabel(status: Pregnancy['status']): string {
     case 'active': return 'Active'
     case 'postpartum': return 'Postpartum'
     case 'delivered': return 'Delivered'
-    case 'lost': return 'Lost'
+    case 'resolved': return 'Resolved'
     case 'inactive': return 'Inactive'
   }
 }
 
-// ── Cervical Screening (derived from GYN profile) ─────────────────────────
-const cervicalWidgetDetail = computed(() => {
-  const p = gynProfile.value
-  if (!p || !p.last_pap_date) return 'Not recorded'
-  const parts = [formatDate(p.last_pap_date)]
-  if (p.last_pap_result) parts.push(p.last_pap_result)
-  return parts.join(' · ')
+// ── Screenings (derived from GYN profile) ────────────────────────────────
+const screeningWidgetDetail = computed(() => {
+  const screenings = gynProfile.value?.screenings
+  if (!screenings?.length) return 'No screenings recorded'
+  const latest = screenings[screenings.length - 1]
+  return `${screeningTypeLabel(latest.type)} — ${formatDate(latest.date)}`
 })
+
+const showAddScreeningForm = ref(false)
+const newScreening = reactive<{ date: string; type: string; result: string; notes: string }>({
+  date: '', type: '', result: '', notes: '',
+})
+
+function resetNewScreening() {
+  newScreening.date = ''
+  newScreening.type = ''
+  newScreening.result = ''
+  newScreening.notes = ''
+  showAddScreeningForm.value = false
+}
+
+async function addScreening() {
+  if (!newScreening.date || !newScreening.type) return
+  const current = gynProfile.value?.screenings ?? []
+  const updated = [...current, {
+    date: newScreening.date,
+    type: newScreening.type,
+    result: newScreening.result || null,
+    notes: newScreening.notes || null,
+  }]
+  // Sort by date descending
+  updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, { screenings: updated })
+    gynProfile.value = res.data
+    resetNewScreening()
+    toast.success('Screening record added')
+  } catch {
+    toast.error('Failed to add screening')
+  }
+}
+
+const editingScreeningIndex = ref<number | null>(null)
+const editScreening = reactive<{ result: string; notes: string }>({ result: '', notes: '' })
+
+function startEditScreening(index: number) {
+  const entry = gynProfile.value?.screenings?.[index]
+  if (!entry) return
+  editScreening.result = entry.result ?? ''
+  editScreening.notes = entry.notes ?? ''
+  editingScreeningIndex.value = index
+}
+
+function cancelEditScreening() {
+  editingScreeningIndex.value = null
+}
+
+async function saveEditScreening() {
+  const idx = editingScreeningIndex.value
+  if (idx === null) return
+  const current = gynProfile.value?.screenings ?? []
+  const updated = current.map((e: ScreeningEntry, i: number) =>
+    i === idx ? { ...e, result: editScreening.result || null, notes: editScreening.notes || null } : e,
+  )
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, { screenings: updated })
+    gynProfile.value = res.data
+    editingScreeningIndex.value = null
+    toast.success('Screening updated')
+  } catch {
+    toast.error('Failed to update')
+  }
+}
+
+async function removeScreening(index: number) {
+  const current = gynProfile.value?.screenings ?? []
+  const updated = current.filter((_: ScreeningEntry, i: number) => i !== index)
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, { screenings: updated })
+    gynProfile.value = res.data
+    toast.success('Screening removed')
+  } catch {
+    toast.error('Failed to remove screening')
+  }
+}
 
 // ── Contraception (derived from GYN profile) ──────────────────────────────
 const contraceptionDetail = computed(() => {
-  const cc = gynProfile.value?.current_contraception
-  if (!cc?.method) return 'None recorded'
-  return cc.method
+  const entries = gynProfile.value?.contraception
+  if (!entries?.length) return 'None recorded'
+  const current = entries.filter((e: ContraceptiveEntry) => !e.end_date)
+  if (current.length === 0) return 'None active'
+  return current.flatMap((e: ContraceptiveEntry) => e.method.map(contraceptionLabel)).join(', ')
 })
 
-// ── Contraception method input within GYN dialog ─────────────────────────
-const contraMethodInput = computed({
-  get() {
-    return gynForm.current_contraception?.method ?? ''
-  },
-  set(val: string) {
-    if (val) {
-      gynForm.current_contraception = {
-        method: val,
-        started_date: gynForm.current_contraception?.started_date ?? null,
-      }
-    } else {
-      gynForm.current_contraception = null
-    }
-  },
+const showAddContraceptionForm = ref(false)
+const newContraception = reactive<{ method: string[]; start_date: string; end_date: string; notes: string }>({
+  method: [], start_date: '', end_date: '', notes: '',
 })
+
+function toggleNewContraMethod(m: string) {
+  const idx = newContraception.method.indexOf(m)
+  if (idx === -1) newContraception.method.push(m)
+  else newContraception.method.splice(idx, 1)
+}
+
+function resetNewContraception() {
+  newContraception.method = []
+  newContraception.start_date = ''
+  newContraception.end_date = ''
+  newContraception.notes = ''
+  showAddContraceptionForm.value = false
+}
+
+async function addContraception() {
+  if (!newContraception.method.length || !newContraception.start_date) return
+  const current = gynProfile.value?.contraception ?? []
+  const updated = [...current, {
+    method: newContraception.method,
+    start_date: newContraception.start_date,
+    end_date: newContraception.end_date || null,
+    notes: newContraception.notes || null,
+  }]
+  updated.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, { contraception: updated })
+    gynProfile.value = res.data
+    resetNewContraception()
+    toast.success('Contraception record added')
+  } catch {
+    toast.error('Failed to add record')
+  }
+}
+
+const editingContraceptionIndex = ref<number | null>(null)
+const editContraception = reactive<{ end_date: string; notes: string }>({ end_date: '', notes: '' })
+
+function startEditContraception(index: number) {
+  const entry = gynProfile.value?.contraception?.[index]
+  if (!entry) return
+  editContraception.end_date = entry.end_date ?? ''
+  editContraception.notes = entry.notes ?? ''
+  editingContraceptionIndex.value = index
+}
+
+function cancelEditContraception() {
+  editingContraceptionIndex.value = null
+}
+
+async function saveEditContraception() {
+  const idx = editingContraceptionIndex.value
+  if (idx === null) return
+  const current = gynProfile.value?.contraception ?? []
+  const updated = current.map((e: ContraceptiveEntry, i: number) =>
+    i === idx ? { ...e, end_date: editContraception.end_date || null, notes: editContraception.notes || null } : e,
+  )
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, { contraception: updated })
+    gynProfile.value = res.data
+    editingContraceptionIndex.value = null
+    toast.success('Record updated')
+  } catch {
+    toast.error('Failed to update')
+  }
+}
+
+async function removeContraception(index: number) {
+  const current = gynProfile.value?.contraception ?? []
+  const updated = current.filter((_: ContraceptiveEntry, i: number) => i !== index)
+  try {
+    const res = await obgynApi.upsertGynProfile(patientId.value, { contraception: updated })
+    gynProfile.value = res.data
+    toast.success('Record removed')
+  } catch {
+    toast.error('Failed to remove record')
+  }
+}
+
+// ── Clinical Summary Narrative ────────────────────────────────────────────
+const { clinicalSummary: gynNarrativeSummary } = useClinicalSummary(gynProfile, activePregnancy, gpalString)
 
 // ── Load ──────────────────────────────────────────────────────────────────
 onMounted(() => {
@@ -314,20 +455,30 @@ onMounted(() => {
 
 <template>
   <div class="contents">
-    <!-- GYN Profile Widget -->
+    <!-- Menstrual Cycle Widget -->
     <PatientSectionWidget
-      :icon="Heart"
-      icon-color="bg-pink-500/10 text-pink-600"
-      title="GYN Profile"
-      :detail="gynWidgetDetail"
+      :icon="MenstrualCycleIcon"
+      icon-color="bg-gradient-to-br from-pink-500 to-pink-600"
+      title="Menstrual Cycle"
+      :detail="menstrualWidgetDetail"
       :loading="isLoadingGyn"
-      @click="openGynDialog"
+      @click="openMenstrualDialog"
+    />
+
+    <!-- GPAL Widget -->
+    <PatientSectionWidget
+      :icon="PregnantIcon"
+      icon-color="bg-gradient-to-br from-violet-500 to-violet-600"
+      title="GPAL"
+      :detail="gpalWidgetDetail"
+      :loading="isLoadingGyn"
+      @click="openGpalDialog"
     />
 
     <!-- Pregnancies Widget -->
     <PatientSectionWidget
-      :icon="Baby"
-      icon-color="bg-purple-500/10 text-purple-600"
+      :icon="PregnantWeeksIcon"
+      icon-color="bg-gradient-to-br from-purple-500 to-purple-600"
       title="Pregnancies"
       :detail="pregnancyWidgetDetail"
       :badge-text="pregBadgeText"
@@ -336,365 +487,236 @@ onMounted(() => {
       @click="showPregDialog = true"
     />
 
-    <!-- Cervical Screening Widget -->
+    <!-- Screenings Widget -->
     <PatientSectionWidget
-      :icon="ShieldCheck"
-      icon-color="bg-teal-500/10 text-teal-600"
-      title="Cervical Screening"
-      :detail="cervicalWidgetDetail"
+      :icon="CervicalScreeningIcon"
+      icon-color="bg-gradient-to-br from-teal-500 to-teal-600"
+      title="Screenings"
+      :detail="screeningWidgetDetail"
+      :badge-text="gynProfile?.screenings?.length ? String(gynProfile.screenings.length) : undefined"
+      badge-variant="secondary"
       :loading="isLoadingGyn"
       @click="showScreeningDialog = true"
     />
 
     <!-- Contraception Widget -->
     <PatientSectionWidget
-      :icon="Pill"
-      icon-color="bg-blue-500/10 text-blue-600"
+      :icon="FamilyPlanningIcon"
+      icon-color="bg-gradient-to-br from-blue-500 to-blue-600"
       title="Contraception"
       :detail="contraceptionDetail"
       :loading="isLoadingGyn"
       @click="showContraceptionDialog = true"
     />
 
-    <!-- GYN Profile Dialog -->
-    <Dialog v-model:open="showGynDialog">
-      <DialogContent class="flex sm:max-w-2xl min-h-[40vh] max-h-[85vh] flex-col overflow-y-auto">
+    <!-- Clinical Summary — full-width card -->
+    <div class="col-span-full rounded-xl border bg-card p-4">
+      <div class="flex items-start gap-3">
+        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-600 text-white shadow-sm">
+          <FileText class="size-5" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold leading-tight">Clinical Summary</p>
+          <p v-if="gynNarrativeSummary" class="mt-1.5 text-xs leading-relaxed text-muted-foreground [&_b]:text-foreground [&_b]:font-semibold" v-html="gynNarrativeSummary" />
+          <p v-else class="mt-1 text-xs text-muted-foreground/50 italic">
+            Summary will appear as patient data is recorded.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manage Pregnancy — full-width button spanning all columns -->
+    <Button
+      v-if="activePregnancy"
+      variant="outline"
+      class="col-span-full h-auto justify-start gap-3 rounded-lg border-purple-200 bg-purple-50/50 px-4 py-3 text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950/50 dark:text-purple-400 dark:hover:bg-purple-900"
+      @click="navigateToPregnancy(activePregnancy!.id)"
+    >
+      <Baby class="size-5 shrink-0" />
+      <div class="flex flex-col items-start gap-0.5">
+        <span class="text-sm font-semibold">Manage Pregnancy</span>
+        <span class="text-xs font-normal text-purple-600/70 dark:text-purple-400/70">
+          {{ activePregnancy.current_ga ? `${activePregnancy.current_ga.weeks}w${activePregnancy.current_ga.days}d — ${activePregnancy.current_ga.trimester}` : 'Active' }}
+          <template v-if="activePregnancy.edd"> · EDD {{ formatDate(activePregnancy.edd) }}</template>
+        </span>
+      </div>
+      <Badge
+        v-if="activePregnancy.risk_level"
+        variant="outline"
+        class="ml-auto text-[10px]"
+        :class="activePregnancy.risk_level === 'high' ? 'border-red-200 bg-red-50 text-red-700' : activePregnancy.risk_level === 'moderate' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-green-200 bg-green-50 text-green-700'"
+      >
+        {{ activePregnancy.risk_level }} risk
+      </Badge>
+      <ExternalLink class="size-4 shrink-0 text-purple-400" />
+    </Button>
+
+    <!-- Menstrual Cycle Dialog -->
+    <Dialog v-model:open="showMenstrualDialog">
+      <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">
-            <Heart class="size-5" />
-            GYN Profile
+            <Heart class="size-5 text-pink-600" />
+            Menstrual Cycle
           </DialogTitle>
         </DialogHeader>
 
-        <div class="flex flex-1 flex-col gap-4">
-          <!-- Loading -->
-          <div v-if="isLoadingGyn" class="flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle class="size-3.5 animate-spin" />
-            Loading...
+        <div class="flex flex-col gap-4">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Menarche Age</Label>
+              <Input
+                :model-value="gynForm.menarche_age ?? ''"
+                type="number"
+                placeholder="yrs"
+                class="h-8 text-sm"
+                @update:model-value="(v) => gynForm.menarche_age = v ? Number(v) : null"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Cycle Length</Label>
+              <Input
+                :model-value="gynForm.cycle_length ?? ''"
+                type="number"
+                placeholder="days"
+                class="h-8 text-sm"
+                @update:model-value="(v) => gynForm.cycle_length = v ? Number(v) : null"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Duration</Label>
+              <Input
+                :model-value="gynForm.duration ?? ''"
+                type="number"
+                placeholder="days"
+                class="h-8 text-sm"
+                @update:model-value="(v) => gynForm.duration = v ? Number(v) : null"
+              />
+            </div>
           </div>
-
-          <!-- View mode -->
-          <template v-else-if="!gynEditing">
-            <div v-if="!gynProfile" class="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
-              <Heart class="size-10 text-muted-foreground/30" />
-              <p class="text-sm font-medium text-muted-foreground">No GYN profile recorded</p>
-              <p class="max-w-sm text-xs text-muted-foreground/70">Record menstrual history, GPAL, cervical screening, and contraception details.</p>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Regularity</Label>
+              <Select :model-value="gynForm.regularity ?? undefined" @update:model-value="(v) => gynForm.regularity = v || null">
+                <SelectTrigger class="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="regular">Regular</SelectItem>
+                  <SelectItem value="irregular">Irregular</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div v-else class="flex flex-col gap-5">
-              <!-- Menstrual History -->
-              <div>
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Menstrual History</p>
-                <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-                  <div v-if="gynProfile.menarche_age !== null" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Menarche Age</span>
-                    <span class="text-sm font-medium">{{ gynProfile.menarche_age }} yrs</span>
-                  </div>
-                  <div v-if="gynProfile.cycle_length !== null" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Cycle Length</span>
-                    <span class="text-sm font-medium">{{ gynProfile.cycle_length }} days</span>
-                  </div>
-                  <div v-if="gynProfile.duration !== null" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Duration</span>
-                    <span class="text-sm font-medium">{{ gynProfile.duration }} days</span>
-                  </div>
-                  <div v-if="gynProfile.regularity" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Regularity</span>
-                    <span class="text-sm font-medium capitalize">{{ gynProfile.regularity }}</span>
-                  </div>
-                  <div v-if="gynProfile.flow" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Flow</span>
-                    <span class="text-sm font-medium capitalize">{{ gynProfile.flow }}</span>
-                  </div>
-                  <div v-if="gynProfile.dysmenorrhea" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Dysmenorrhea</span>
-                    <span class="text-sm font-medium capitalize">{{ gynProfile.dysmenorrhea }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- GPAL -->
-              <div v-if="gpalString">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Obstetric History</p>
-                <span class="font-mono text-base font-semibold">{{ gpalString }}</span>
-                <p class="mt-0.5 text-xs text-muted-foreground">G=Gravidity · P=Term · (Preterm) · (Abortions) · (Living)</p>
-              </div>
-
-              <!-- Cervical Screening -->
-              <div v-if="gynProfile.last_pap_date || gynProfile.hpv_status">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cervical Screening</p>
-                <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-                  <div v-if="gynProfile.last_pap_date" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Last Pap</span>
-                    <span class="text-sm font-medium">{{ formatDate(gynProfile.last_pap_date) }}</span>
-                  </div>
-                  <div v-if="gynProfile.last_pap_result" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Result</span>
-                    <span class="text-sm font-medium">{{ gynProfile.last_pap_result }}</span>
-                  </div>
-                  <div v-if="gynProfile.hpv_status" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">HPV Status</span>
-                    <span class="text-sm font-medium">{{ gynProfile.hpv_status }}</span>
-                  </div>
-                  <div v-if="gynProfile.screening_interval" class="flex flex-col gap-0.5">
-                    <span class="text-xs text-muted-foreground">Screening Interval</span>
-                    <span class="text-sm font-medium">{{ gynProfile.screening_interval }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Contraception -->
-              <div v-if="gynProfile.current_contraception">
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Contraception</p>
-                <span class="text-sm font-medium">{{ gynProfile.current_contraception.method }}</span>
-                <span v-if="gynProfile.current_contraception.started_date" class="ml-2 text-xs text-muted-foreground">
-                  since {{ formatDate(gynProfile.current_contraception.started_date) }}
-                </span>
-              </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Flow</Label>
+              <Select :model-value="gynForm.flow ?? undefined" @update:model-value="(v) => gynForm.flow = v || null">
+                <SelectTrigger class="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="moderate">Moderate</SelectItem>
+                  <SelectItem value="heavy">Heavy</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </template>
-
-          <!-- Edit mode -->
-          <template v-else>
-            <!-- Menstrual History -->
-            <div>
-              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Menstrual History</p>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Menarche Age (yrs)</Label>
-                  <Input
-                    :model-value="gynForm.menarche_age ?? undefined"
-                    type="number"
-                    min="8"
-                    max="20"
-                    placeholder="e.g. 13"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.menarche_age = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Cycle Length (days)</Label>
-                  <Input
-                    :model-value="gynForm.cycle_length ?? undefined"
-                    type="number"
-                    min="21"
-                    max="45"
-                    placeholder="e.g. 28"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.cycle_length = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Duration (days)</Label>
-                  <Input
-                    :model-value="gynForm.duration ?? undefined"
-                    type="number"
-                    min="1"
-                    max="10"
-                    placeholder="e.g. 5"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.duration = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Regularity</Label>
-                  <Select
-                    :model-value="gynForm.regularity ?? ''"
-                    @update:model-value="(v) => { gynForm.regularity = (v || null) as typeof gynForm.regularity }"
-                  >
-                    <SelectTrigger class="h-8 text-sm">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="regular">Regular</SelectItem>
-                      <SelectItem value="irregular">Irregular</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Flow</Label>
-                  <Select
-                    :model-value="gynForm.flow ?? ''"
-                    @update:model-value="(v) => { gynForm.flow = (v || null) as typeof gynForm.flow }"
-                  >
-                    <SelectTrigger class="h-8 text-sm">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="moderate">Moderate</SelectItem>
-                      <SelectItem value="heavy">Heavy</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Dysmenorrhea</Label>
-                  <Select
-                    :model-value="gynForm.dysmenorrhea ?? ''"
-                    @update:model-value="(v) => { gynForm.dysmenorrhea = (v || null) as typeof gynForm.dysmenorrhea }"
-                  >
-                    <SelectTrigger class="h-8 text-sm">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="mild">Mild</SelectItem>
-                      <SelectItem value="moderate">Moderate</SelectItem>
-                      <SelectItem value="severe">Severe</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Dysmenorrhea</Label>
+              <Select :model-value="gynForm.dysmenorrhea ?? undefined" @update:model-value="(v) => gynForm.dysmenorrhea = v || null">
+                <SelectTrigger class="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="mild">Mild</SelectItem>
+                  <SelectItem value="moderate">Moderate</SelectItem>
+                  <SelectItem value="severe">Severe</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <!-- GPAL -->
-            <div>
-              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Obstetric History (GPAL)</p>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Gravidity (G)</Label>
-                  <Input
-                    :model-value="gynForm.gravidity ?? undefined"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.gravidity = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Term (P)</Label>
-                  <Input
-                    :model-value="gynForm.parity_term ?? undefined"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.parity_term = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Preterm</Label>
-                  <Input
-                    :model-value="gynForm.parity_preterm ?? undefined"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.parity_preterm = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Abortions (A)</Label>
-                  <Input
-                    :model-value="gynForm.abortions ?? undefined"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.abortions = v ? Number(v) : null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Living (L)</Label>
-                  <Input
-                    :model-value="gynForm.living_children ?? undefined"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.living_children = v ? Number(v) : null"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Cervical Screening -->
-            <div>
-              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cervical Screening</p>
-              <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Last Pap Date</Label>
-                  <Input
-                    :model-value="gynForm.last_pap_date ?? ''"
-                    type="date"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.last_pap_date = String(v) || null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Pap Result</Label>
-                  <Input
-                    :model-value="gynForm.last_pap_result ?? ''"
-                    placeholder="e.g. Normal"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.last_pap_result = String(v) || null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">HPV Status</Label>
-                  <Input
-                    :model-value="gynForm.hpv_status ?? ''"
-                    placeholder="e.g. Negative"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.hpv_status = String(v) || null"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5 sm:col-span-2">
-                  <Label class="text-xs">Screening Interval</Label>
-                  <Input
-                    :model-value="gynForm.screening_interval ?? ''"
-                    placeholder="e.g. Every 3 years"
-                    class="h-8 text-sm"
-                    @update:model-value="(v) => gynForm.screening_interval = String(v) || null"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- Contraception -->
-            <div>
-              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Contraception</p>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Method</Label>
-                  <Input
-                    v-model="contraMethodInput"
-                    placeholder="e.g. Oral contraceptive pills"
-                    class="h-8 text-sm"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <Label class="text-xs">Start Date</Label>
-                  <Input
-                    :model-value="gynForm.current_contraception?.started_date ?? ''"
-                    type="date"
-                    class="h-8 text-sm"
-                    :disabled="!gynForm.current_contraception"
-                    @update:model-value="(v) => {
-                      if (gynForm.current_contraception) {
-                        gynForm.current_contraception.started_date = String(v) || null
-                      }
-                    }"
-                  />
-                </div>
-              </div>
-            </div>
-          </template>
+          </div>
         </div>
 
-        <DialogFooter class="justify-end">
-          <template v-if="gynEditing">
-            <Button variant="ghost" @click="gynEditing = gynProfile ? false : (showGynDialog = false)">
-              Cancel
-            </Button>
-            <Button :disabled="isSavingGyn" @click="saveGynProfile">
-              <LoaderCircle v-if="isSavingGyn" class="size-4 mr-1 animate-spin" />
-              Save
-            </Button>
-          </template>
-          <Button v-else-if="!isLoadingGyn" variant="secondary" @click="gynEditing = true">
-            <Pencil class="size-4 mr-1" />
-            Edit Profile
+        <DialogFooter>
+          <Button variant="ghost" @click="showMenstrualDialog = false">Cancel</Button>
+          <Button :disabled="isSavingGyn" @click="saveMenstrualHistory">
+            <LoaderCircle v-if="isSavingGyn" class="size-4 animate-spin mr-1" />
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- GPAL Dialog -->
+    <Dialog v-model:open="showGpalDialog">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2">
+            <Baby class="size-5 text-violet-600" />
+            Obstetric History (GPAL)
+          </DialogTitle>
+        </DialogHeader>
+
+        <div class="flex flex-col gap-4">
+          <!-- GPAL display -->
+          <div v-if="gpalString" class="rounded-md bg-muted/50 px-3 py-2 text-center">
+            <span class="font-mono text-lg font-semibold">{{ gpalString }}</span>
+            <p class="mt-0.5 text-xs text-muted-foreground">G · P · Preterm · Abortions · Living</p>
+          </div>
+
+          <div class="grid grid-cols-5 gap-2">
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs text-center">G</Label>
+              <Input
+                :model-value="gynForm.gravidity ?? ''"
+                type="number"
+                min="0"
+                class="h-8 text-sm text-center"
+                @update:model-value="(v) => gynForm.gravidity = v ? Number(v) : null"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs text-center">P (Term)</Label>
+              <Input
+                :model-value="gynForm.parity_term ?? ''"
+                type="number"
+                min="0"
+                class="h-8 text-sm text-center"
+                @update:model-value="(v) => gynForm.parity_term = v ? Number(v) : null"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs text-center">Preterm</Label>
+              <Input
+                :model-value="gynForm.parity_preterm ?? ''"
+                type="number"
+                min="0"
+                class="h-8 text-sm text-center"
+                @update:model-value="(v) => gynForm.parity_preterm = v ? Number(v) : null"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs text-center">A</Label>
+              <Input
+                :model-value="gynForm.abortions ?? ''"
+                type="number"
+                min="0"
+                class="h-8 text-sm text-center"
+                @update:model-value="(v) => gynForm.abortions = v ? Number(v) : null"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs text-center">L</Label>
+              <Input
+                :model-value="gynForm.living_children ?? ''"
+                type="number"
+                min="0"
+                class="h-8 text-sm text-center"
+                @update:model-value="(v) => gynForm.living_children = v ? Number(v) : null"
+              />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" @click="showGpalDialog = false">Cancel</Button>
+          <Button :disabled="isSavingGyn" @click="saveGpal">
+            <LoaderCircle v-if="isSavingGyn" class="size-4 animate-spin mr-1" />
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -802,7 +824,7 @@ onMounted(() => {
         </div>
 
         <DialogFooter class="justify-end">
-          <Button v-if="!activePregnancy" variant="secondary" @click="showAddPregDialog = true">
+          <Button v-if="!activePregnancy" variant="secondary" @click="router.push({ name: RouteNames.PREGNANCY_CREATE, params: { patientId: patientId } })">
             <Plus class="size-4 mr-1" />
             Add Pregnancy
           </Button>
@@ -810,165 +832,115 @@ onMounted(() => {
       </DialogContent>
     </Dialog>
 
-    <!-- Add Pregnancy Dialog -->
-    <Dialog v-model:open="showAddPregDialog">
-      <DialogContent class="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Add Pregnancy Record</DialogTitle>
-        </DialogHeader>
-
-        <div class="flex flex-col gap-4 py-2">
-          <!-- LMP + EDD -->
-          <div class="grid grid-cols-2 gap-3">
-            <div class="flex flex-col gap-1.5">
-              <Label class="text-xs">LMP Date</Label>
-              <Input
-                :model-value="pregForm.lmp ?? ''"
-                type="date"
-                class="h-8 text-sm"
-                @update:model-value="(v) => pregForm.lmp = String(v) || null"
-              />
-            </div>
-            <div class="flex flex-col gap-1.5">
-              <Label class="text-xs">EDD</Label>
-              <Input
-                :model-value="pregForm.edd ?? ''"
-                type="date"
-                class="h-8 text-sm"
-                @update:model-value="(v) => pregForm.edd = String(v) || null"
-              />
-            </div>
-          </div>
-
-          <!-- EDD source -->
-          <div class="flex flex-col gap-1.5">
-            <Label class="text-xs">EDD Source</Label>
-            <Select
-              :model-value="pregForm.edd_source ?? ''"
-              @update:model-value="(v) => { pregForm.edd_source = (v || null) as typeof pregForm.edd_source }"
-            >
-              <SelectTrigger class="h-8 text-sm">
-                <SelectValue placeholder="Select..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lmp">LMP</SelectItem>
-                <SelectItem value="ultrasound">Ultrasound</SelectItem>
-                <SelectItem value="adjusted">Adjusted</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <!-- GPAL -->
-          <div>
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Obstetric History</p>
-            <div class="grid grid-cols-5 gap-2">
-              <div class="flex flex-col gap-1">
-                <Label class="text-[10px] text-muted-foreground">G</Label>
-                <Input
-                  :model-value="pregForm.gravidity ?? undefined"
-                  type="number" min="0" placeholder="0"
-                  class="h-7 text-xs"
-                  @update:model-value="(v) => pregForm.gravidity = v ? Number(v) : null"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <Label class="text-[10px] text-muted-foreground">Term</Label>
-                <Input
-                  :model-value="pregForm.parity_term ?? undefined"
-                  type="number" min="0" placeholder="0"
-                  class="h-7 text-xs"
-                  @update:model-value="(v) => pregForm.parity_term = v ? Number(v) : null"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <Label class="text-[10px] text-muted-foreground">Preterm</Label>
-                <Input
-                  :model-value="pregForm.parity_preterm ?? undefined"
-                  type="number" min="0" placeholder="0"
-                  class="h-7 text-xs"
-                  @update:model-value="(v) => pregForm.parity_preterm = v ? Number(v) : null"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <Label class="text-[10px] text-muted-foreground">Abort.</Label>
-                <Input
-                  :model-value="pregForm.abortions ?? undefined"
-                  type="number" min="0" placeholder="0"
-                  class="h-7 text-xs"
-                  @update:model-value="(v) => pregForm.abortions = v ? Number(v) : null"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <Label class="text-[10px] text-muted-foreground">Living</Label>
-                <Input
-                  :model-value="pregForm.living_children ?? undefined"
-                  type="number" min="0" placeholder="0"
-                  class="h-7 text-xs"
-                  @update:model-value="(v) => pregForm.living_children = v ? Number(v) : null"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Pre-pregnancy weight -->
-          <div class="flex flex-col gap-1.5">
-            <Label class="text-xs">Pre-pregnancy Weight (kg)</Label>
-            <Input
-              :model-value="pregForm.pre_pregnancy_weight ?? undefined"
-              type="number"
-              min="30"
-              max="200"
-              step="0.1"
-              placeholder="e.g. 58.5"
-              class="h-8 text-sm"
-              @update:model-value="(v) => pregForm.pre_pregnancy_weight = v ? Number(v) : null"
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" size="sm" @click="showAddPregDialog = false">Cancel</Button>
-          <Button size="sm" :disabled="isSavingPreg" @click="savePregnancy">
-            <LoaderCircle v-if="isSavingPreg" class="size-3 animate-spin mr-1" />
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- Cervical Screening Dialog -->
+    <!-- Screenings Dialog -->
     <Dialog v-model:open="showScreeningDialog">
-      <DialogContent class="max-w-md">
+      <DialogContent class="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">
             <ShieldCheck class="size-4 text-teal-600" />
-            Cervical Screening
+            Screenings
           </DialogTitle>
         </DialogHeader>
-        <div v-if="gynProfile" class="space-y-3">
-          <div v-if="gynProfile.last_pap_date" class="flex items-start gap-2 text-sm">
-            <span class="text-muted-foreground shrink-0">Last Pap:</span>
-            <span class="font-medium">{{ formatDate(gynProfile.last_pap_date) }}</span>
+
+        <div class="flex flex-col gap-3">
+          <!-- Add form -->
+          <div v-if="showAddScreeningForm" class="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="flex flex-col gap-1.5">
+                <Label class="text-xs">Date</Label>
+                <MFDatePicker v-model="newScreening.date" placeholder="Select date" disable-future class="h-8 text-sm" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <Label class="text-xs">Type</Label>
+                <Select v-model="newScreening.type">
+                  <SelectTrigger class="h-8 text-sm">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="opt in SCREENING_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
+                      {{ opt.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Result</Label>
+              <Input v-model="newScreening.result" placeholder="e.g. NILM, ASCUS, HPV 16+" class="h-8 text-sm" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Notes</Label>
+              <Textarea v-model="newScreening.notes" placeholder="Additional notes..." class="text-sm" :rows="2" />
+            </div>
+            <div class="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" @click="resetNewScreening">Cancel</Button>
+              <Button size="sm" :disabled="!newScreening.date || !newScreening.type" @click="addScreening">Save</Button>
+            </div>
           </div>
-          <div v-if="gynProfile.last_pap_result" class="flex items-start gap-2 text-sm">
-            <span class="text-muted-foreground shrink-0">Result:</span>
-            <span class="font-medium">{{ gynProfile.last_pap_result }}</span>
+
+          <!-- Screening list -->
+          <div v-if="!gynProfile?.screenings?.length && !showAddScreeningForm" class="py-8 text-center text-sm text-muted-foreground">
+            No screenings recorded
           </div>
-          <div v-if="gynProfile.hpv_status" class="flex items-start gap-2 text-sm">
-            <span class="text-muted-foreground shrink-0">HPV Status:</span>
-            <span class="font-medium capitalize">{{ gynProfile.hpv_status }}</span>
-          </div>
-          <div v-if="gynProfile.screening_interval" class="flex items-start gap-2 text-sm">
-            <span class="text-muted-foreground shrink-0">Interval:</span>
-            <span class="font-medium">{{ gynProfile.screening_interval }}</span>
-          </div>
-          <div v-if="!gynProfile.last_pap_date && !gynProfile.hpv_status" class="py-6 text-center text-sm text-muted-foreground">
-            No screening data recorded. Edit GYN Profile to add.
+
+          <div v-for="(s, i) in (gynProfile?.screenings ?? [])" :key="i" class="rounded-lg border bg-card p-2.5">
+            <!-- Viewing mode -->
+            <template v-if="editingScreeningIndex !== i">
+              <div class="flex items-start gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                    <Badge variant="outline" class="text-[10px] px-1.5 py-0 border-teal-200 bg-teal-50 text-teal-700">
+                      {{ screeningTypeLabel(s.type) }}
+                    </Badge>
+                    <span class="text-xs text-muted-foreground">{{ formatDate(s.date) }}</span>
+                  </div>
+                  <p v-if="s.result" class="text-sm font-medium">{{ s.result }}</p>
+                  <p v-if="s.notes" class="text-xs text-muted-foreground mt-0.5">{{ s.notes }}</p>
+                </div>
+                <Button variant="ghost" size="icon" class="size-6 shrink-0" @click="startEditScreening(i)">
+                  <Pencil class="size-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            </template>
+
+            <!-- Editing mode -->
+            <template v-else>
+              <div class="flex flex-col gap-2.5">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <Badge variant="outline" class="text-[10px] px-1.5 py-0 border-teal-200 bg-teal-50 text-teal-700">
+                    {{ screeningTypeLabel(s.type) }}
+                  </Badge>
+                  <span class="text-xs text-muted-foreground">{{ formatDate(s.date) }}</span>
+                </div>
+                <div class="flex flex-col gap-2">
+                  <div class="flex flex-col gap-1">
+                    <Label class="text-xs">Result</Label>
+                    <Input v-model="editScreening.result" placeholder="e.g. NILM, ASCUS, HPV 16+" class="h-8 text-sm" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <Label class="text-xs">Notes</Label>
+                    <Input v-model="editScreening.notes" placeholder="Additional notes..." class="h-8 text-sm" />
+                  </div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="removeScreening(i)">
+                    <Trash2 class="size-3.5 mr-1" />
+                    Delete
+                  </Button>
+                  <div class="flex gap-2">
+                    <Button variant="ghost" size="sm" @click="cancelEditScreening">Cancel</Button>
+                    <Button size="sm" @click="saveEditScreening">Save</Button>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
+
         <DialogFooter>
-          <Button variant="secondary" size="sm" @click="showScreeningDialog = false; openGynDialog()">
-            Edit in GYN Profile
+          <Button v-if="!showAddScreeningForm" variant="secondary" size="sm" @click="showAddScreeningForm = true">
+            <Plus class="size-4 mr-1" />
+            Add Screening
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -976,42 +948,124 @@ onMounted(() => {
 
     <!-- Contraception Dialog -->
     <Dialog v-model:open="showContraceptionDialog">
-      <DialogContent class="max-w-md">
+      <DialogContent class="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2">
             <Pill class="size-4 text-blue-600" />
             Contraception
           </DialogTitle>
         </DialogHeader>
-        <div v-if="gynProfile" class="space-y-4">
-          <div v-if="gynProfile.current_contraception?.method">
-            <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Method</p>
-            <p class="text-sm font-medium capitalize">{{ gynProfile.current_contraception.method.replace(/_/g, ' ') }}</p>
-            <p v-if="gynProfile.current_contraception.start_date" class="text-xs text-muted-foreground mt-0.5">
-              Since {{ formatDate(gynProfile.current_contraception.start_date) }}
-            </p>
-          </div>
-          <div v-if="gynProfile.contraceptive_history?.length">
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">History</p>
-            <div class="space-y-2">
-              <div v-for="(entry, i) in gynProfile.contraceptive_history" :key="i" class="rounded-md border p-2 text-sm">
-                <span class="font-medium capitalize">{{ entry.method?.replace(/_/g, ' ') }}</span>
-                <span v-if="entry.start_date" class="ml-1 text-xs text-muted-foreground">
-                  {{ formatDate(entry.start_date) }} – {{ entry.end_date ? formatDate(entry.end_date) : 'ongoing' }}
-                </span>
-                <p v-if="entry.reason_discontinued" class="mt-0.5 text-xs text-muted-foreground">
-                  Stopped: {{ entry.reason_discontinued }}
-                </p>
+
+        <div class="flex flex-col gap-3">
+          <!-- Add form -->
+          <div v-if="showAddContraceptionForm" class="rounded-lg border bg-muted/30 p-3 space-y-3">
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Methods</Label>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="opt in CONTRACEPTION_OPTIONS.filter(o => o.value !== 'none')"
+                  :key="opt.value"
+                  type="button"
+                  class="rounded-full border px-2.5 py-1 text-xs transition-colors"
+                  :class="newContraception.method.includes(opt.value) ? 'border-blue-300 bg-blue-50 text-blue-700 font-medium' : 'hover:bg-muted/50'"
+                  @click="toggleNewContraMethod(opt.value)"
+                >
+                  {{ opt.label }}
+                </button>
               </div>
             </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="flex flex-col gap-1.5">
+                <Label class="text-xs">Start Date</Label>
+                <MFDatePicker v-model="newContraception.start_date" placeholder="Start date" disable-future class="h-8 text-sm" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <Label class="text-xs">End Date <span class="text-muted-foreground">(empty = current)</span></Label>
+                <MFDatePicker v-model="newContraception.end_date" placeholder="Still using" disable-future class="h-8 text-sm" />
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Notes</Label>
+              <Input v-model="newContraception.notes" placeholder="e.g. Side effects, reason stopped..." class="h-8 text-sm" />
+            </div>
+            <div class="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" @click="resetNewContraception">Cancel</Button>
+              <Button size="sm" :disabled="!newContraception.method.length || !newContraception.start_date" @click="addContraception">Save</Button>
+            </div>
           </div>
-          <div v-if="!gynProfile.current_contraception?.method && !gynProfile.contraceptive_history?.length" class="py-6 text-center text-sm text-muted-foreground">
-            No contraception data recorded. Edit GYN Profile to add.
+
+          <!-- Empty state -->
+          <div v-if="!gynProfile?.contraception?.length && !showAddContraceptionForm" class="py-8 text-center text-sm text-muted-foreground">
+            No contraception recorded
+          </div>
+
+          <!-- Entry list -->
+          <div v-for="(c, i) in (gynProfile?.contraception ?? [])" :key="i" class="rounded-lg border bg-card p-2.5">
+            <!-- Viewing mode -->
+            <template v-if="editingContraceptionIndex !== i">
+              <div class="flex items-start gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="flex flex-wrap items-center gap-1 mb-0.5">
+                    <Badge
+                      v-for="m in c.method"
+                      :key="m"
+                      variant="outline"
+                      class="text-[10px] px-1.5 py-0"
+                      :class="!c.end_date ? 'border-blue-200 bg-blue-50 text-blue-700' : ''"
+                    >
+                      {{ contraceptionLabel(m) }}
+                    </Badge>
+                    <span v-if="!c.end_date" class="text-[10px] font-medium text-blue-600">Active</span>
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    {{ formatDate(c.start_date) }} — {{ c.end_date ? formatDate(c.end_date) : 'Present' }}
+                  </p>
+                  <p v-if="c.notes" class="text-xs text-muted-foreground mt-0.5">{{ c.notes }}</p>
+                </div>
+                <Button variant="ghost" size="icon" class="size-6 shrink-0" @click="startEditContraception(i)">
+                  <Pencil class="size-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            </template>
+
+            <!-- Editing mode -->
+            <template v-else>
+              <div class="flex flex-col gap-2.5">
+                <div class="flex flex-wrap items-center gap-1">
+                  <Badge v-for="m in c.method" :key="m" variant="outline" class="text-[10px] px-1.5 py-0">
+                    {{ contraceptionLabel(m) }}
+                  </Badge>
+                  <span class="text-xs text-muted-foreground">from {{ formatDate(c.start_date) }}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="flex flex-col gap-1">
+                    <Label class="text-xs">End Date</Label>
+                    <MFDatePicker v-model="editContraception.end_date" placeholder="Still using" disable-future class="h-8 text-sm" />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <Label class="text-xs">Notes</Label>
+                    <Input v-model="editContraception.notes" placeholder="Reason stopped..." class="h-8 text-sm" />
+                  </div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive" @click="removeContraception(i)">
+                    <Trash2 class="size-3.5 mr-1" />
+                    Delete
+                  </Button>
+                  <div class="flex gap-2">
+                    <Button variant="ghost" size="sm" @click="cancelEditContraception">Cancel</Button>
+                    <Button size="sm" @click="saveEditContraception">Save</Button>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
+
         <DialogFooter>
-          <Button variant="secondary" size="sm" @click="showContraceptionDialog = false; openGynDialog()">
-            Edit in GYN Profile
+          <Button v-if="!showAddContraceptionForm" variant="secondary" size="sm" @click="showAddContraceptionForm = true">
+            <Plus class="size-4 mr-1" />
+            Add Record
           </Button>
         </DialogFooter>
       </DialogContent>

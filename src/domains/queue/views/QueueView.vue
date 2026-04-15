@@ -123,12 +123,12 @@ async function handleCall(id: string) {
     await store.callPatient(id)
     toast.success('Patient called')
 
-    if (visit?.consultation_id && visit?.patient_id) {
+    if (visit?.encounter_id && visit?.patient_id) {
       router.push({
-        name: RouteNames.CONSULTATION_DETAIL,
+        name: RouteNames.ENCOUNTER_DETAIL,
         params: {
           patientId: visit.patient_id,
-          id: visit.consultation_id,
+          id: visit.encounter_id,
         },
       })
     }
