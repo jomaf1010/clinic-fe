@@ -191,7 +191,9 @@ onMounted(async () => {
       })
     } else {
       const id = route.params.id as string
-      await store.loadEncounter(id)
+      if (!store.current || store.current.id !== id) {
+        await store.loadEncounter(id)
+      }
     }
 
     // Load summary doc status if finalized
