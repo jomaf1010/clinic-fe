@@ -22,7 +22,7 @@ import type { LifestyleData } from '@/domains/consultation/types/consultation.ty
 import type { ChronicTrendsData } from '@/domains/patient/types/patient.types'
 import { obgynApi } from '@/domains/obgyn/api/obgynApi'
 import type { CreatePregnancyPayload, UpsertGynProfilePayload } from '@/domains/obgyn/api/obgynApi'
-import type { GynProfile, Pregnancy, PregnancyDashboard, PrenatalVisit, LabsDueItem } from '@/domains/obgyn/types/obgyn.types'
+import type { GynProfile, Pregnancy, PregnancyDashboard, PrenatalVisit, ChecklistItem } from '@/domains/obgyn/types/obgyn.types'
 import { pediatricsApi } from '@/domains/patient/api/pediatricsApi'
 import type {
   BirthHistoryResponse,
@@ -64,7 +64,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   const currentPregnancy = ref<Pregnancy | null>(null)
   const pregnancyDashboard = ref<PregnancyDashboard | null>(null)
   const pregnancyVisits = ref<PrenatalVisit[]>([])
-  const labsDue = ref<LabsDueItem[]>([])
+  const prenatalChecklist = ref<ChecklistItem[]>([])
 
   // ── Loading flags ─────────────────────────────────────────────────────────
   const isLoading = ref(false)
@@ -391,12 +391,24 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       obgynApi.getPregnancy(id, pregnancyId),
       obgynApi.getDashboard(id, pregnancyId).catch(() => ({ data: null })),
       obgynApi.listVisits(id, pregnancyId).catch(() => ({ data: [] })),
-      obgynApi.getLabsDue(id, pregnancyId).catch(() => ({ data: [] })),
+      obgynApi.getChecklist(id, pregnancyId).catch(() => ({ data: [] })),
     ])
     currentPregnancy.value = pregRes.data
     pregnancyDashboard.value = dashRes.data as PregnancyDashboard | null
     pregnancyVisits.value = visitsRes.data as PrenatalVisit[]
-    labsDue.value = labsRes.data as LabsDueItem[]
+    prenatalChecklist.value = labsRes.data as ChecklistItem[]
+  }
+
+  async function reloadChecklist(pregnancyId: string): Promise<void> {
+    if (!patientId.value) return
+    const res = await obgynApi.getChecklist(patientId.value, pregnancyId)
+    prenatalChecklist.value = res.data
+  }
+
+  async function toggleChecklistItem(pregnancyId: string, payload: { key: string; completed: boolean; notes?: string | null }): Promise<void> {
+    if (!patientId.value) return
+    const res = await obgynApi.toggleChecklistItem(patientId.value, pregnancyId, payload)
+    prenatalChecklist.value = res.data
   }
 
   async function reloadDashboard(pregnancyId: string): Promise<void> {
@@ -497,7 +509,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     currentPregnancy.value = null
     pregnancyDashboard.value = null
     pregnancyVisits.value = []
-    labsDue.value = []
+    prenatalChecklist.value = []
     // Flags
     isLoading.value = false
     isLoadingCore.value = false
@@ -553,7 +565,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     currentPregnancy,
     pregnancyDashboard,
     pregnancyVisits,
-    labsDue,
+    prenatalChecklist,
     activePregnancy,
     isLoadingObgyn,
     isSavingObgyn,
@@ -565,6 +577,8 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     updatePregnancy,
     deletePregnancy,
     loadPregnancyDetail,
+    reloadChecklist,
+    toggleChecklistItem,
     reloadDashboard,
     evaluateRisk,
 

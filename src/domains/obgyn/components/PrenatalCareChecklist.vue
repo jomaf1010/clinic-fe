@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { CheckCircle2, Circle, AlertCircle, LoaderCircle, ClipboardList, Clock } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { obgynApi } from '../api/obgynApi'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { ChecklistItem } from '../types/obgyn.types'
 
 const props = defineProps<{
@@ -24,25 +24,14 @@ const props = defineProps<{
   disabled?: boolean
 }>()
 
-const items = ref<ChecklistItem[]>([])
-const isLoading = ref(false)
+const pdStore = usePatientDetailStore()
+const items = computed(() => pdStore.prenatalChecklist)
+const isLoading = computed(() => pdStore.isLoadingObgyn)
 const togglingKey = ref<string | null>(null)
 
 // Confirmation dialog state
 const pendingItem = ref<ChecklistItem | null>(null)
 const showConfirm = ref(false)
-
-onMounted(async () => {
-  isLoading.value = true
-  try {
-    const res = await obgynApi.getChecklist(props.patientId, props.pregnancyId)
-    items.value = res.data
-  } catch {
-    // silent
-  } finally {
-    isLoading.value = false
-  }
-})
 
 // Group by ga_window
 const grouped = computed(() => {
@@ -83,11 +72,10 @@ async function confirmToggle() {
   togglingKey.value = item.key
 
   try {
-    const res = await obgynApi.toggleChecklistItem(props.patientId, props.pregnancyId, {
+    await pdStore.toggleChecklistItem(props.pregnancyId, {
       key: item.key,
       completed: !wasCompleted,
     })
-    items.value = res.data
     toast.success(wasCompleted ? `${item.name} unmarked` : `${item.name} marked as done`)
   } catch {
     toast.error('Failed to update checklist')
