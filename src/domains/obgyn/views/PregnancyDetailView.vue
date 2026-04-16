@@ -21,11 +21,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { RouteNames } from '@/router/routeNames'
-import { patientApi } from '@/domains/patient/api/patientApi'
-import type { PatientResponse } from '@/domains/patient/types/patient.types'
-import { usePregnancyStore } from '../stores/pregnancyStore'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import { obgynApi } from '../api/obgynApi'
 import type { EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
@@ -39,7 +36,7 @@ import { pregnancyOutcomeLabel } from '../types/obgyn.types'
 
 const route = useRoute()
 const router = useRouter()
-const store = usePregnancyStore()
+const pdStore = usePatientDetailStore()
 const encounterStore = useEncounterStore()
 
 const patientId = computed(() => {
@@ -52,12 +49,10 @@ const pregnancyId = computed(() => {
   return typeof id === 'string' ? id : id[0] ?? ''
 })
 
-const patient = ref<PatientResponse | null>(null)
-
 const isNew = computed(() => route.name === RouteNames.PREGNANCY_CREATE)
 const showSetupForm = ref(false)
 const loadError = ref<string | null>(null)
-const pregnancyReady = computed(() => !isNew.value && store.currentPregnancy !== null)
+const pregnancyReady = computed(() => !isNew.value && pdStore.currentPregnancy !== null)
 
 function formatDate(d: string | null): string {
   if (!d) return '—'
@@ -110,9 +105,8 @@ onMounted(async () => {
   if (!isNew.value) {
     try {
       await Promise.all([
-        store.loadPregnancy(patientId.value, pregnancyId.value),
+        pdStore.loadPregnancyDetail(pregnancyId.value),
         encounterStore.loadForPatient(patientId.value, { pregnancy_id: pregnancyId.value }),
-        patientApi.get(patientId.value).then((res) => { patient.value = res.data }),
       ])
     } catch {
       loadError.value = 'Failed to load pregnancy record.'
@@ -121,7 +115,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  store.$reset()
   encounterStore.clearPatientEncounters()
 })
 
@@ -134,7 +127,7 @@ function handleSetupSaved(pregnancy: Pregnancy): void {
     return
   }
   // Reload dashboard data to reflect changes (EDD, risk level, etc.)
-  store.loadDashboard(patientId.value, pregnancy.id).catch(() => {})
+  pdStore.reloadDashboard(pregnancy.id).catch(() => {})
 }
 
 async function goToNewVisit(): Promise<void> {
@@ -166,7 +159,7 @@ async function handleResolve(payload: {
     const result = await obgynApi.resolvePregnancy(patientId.value, pregnancyId.value, payload)
 
     // Update local pregnancy state
-    store.currentPregnancy = result.data
+    pdStore.currentPregnancy = result.data
 
     showResolveModal.value = false
 
@@ -216,7 +209,7 @@ function goToVisit(encounterId: string): void {
 <template>
   <div class="flex flex-1 flex-col">
     <!-- Loading -->
-    <div v-if="store.isLoading && !store.currentPregnancy && !isNew" class="flex flex-1 items-center justify-center py-16">
+    <div v-if="pdStore.isLoadingObgyn && !pdStore.currentPregnancy && !isNew" class="flex flex-1 items-center justify-center py-16">
       <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
     </div>
 
@@ -246,7 +239,7 @@ function goToVisit(encounterId: string): void {
         <div class="mx-auto max-w-3xl">
           <PregnancySetupForm
             :patient-id="patientId"
-            :pregnancy="store.currentPregnancy ?? undefined"
+            :pregnancy="pdStore.currentPregnancy ?? undefined"
             @saved="handleSetupSaved"
             @cancel="isNew ? router.back() : (showSetupForm = false)"
           />
@@ -270,20 +263,20 @@ function goToVisit(encounterId: string): void {
             <Badge
               variant="outline"
               class="text-xs"
-              :class="statusClass(store.currentPregnancy!.status)"
+              :class="statusClass(pdStore.currentPregnancy!.status)"
             >
-              {{ statusLabel(store.currentPregnancy!.status) }}
+              {{ statusLabel(pdStore.currentPregnancy!.status) }}
             </Badge>
             <RiskClassificationBadge
-              v-if="store.currentPregnancy!.risk_level"
-              :level="store.currentPregnancy!.risk_level"
-              :factors="store.currentPregnancy!.risk_factors"
+              v-if="pdStore.currentPregnancy!.risk_level"
+              :level="pdStore.currentPregnancy!.risk_level"
+              :factors="pdStore.currentPregnancy!.risk_factors"
             />
           </div>
 
           <div class="flex items-center gap-2">
             <!-- GA Summary -->
-            <GACalculator v-if="store.currentPregnancy!.edd && store.currentPregnancy!.status === 'active'" :edd="store.currentPregnancy!.edd" />
+            <GACalculator v-if="pdStore.currentPregnancy!.edd && pdStore.currentPregnancy!.status === 'active'" :edd="pdStore.currentPregnancy!.edd" />
           </div>
         </div>
       </div>
@@ -296,10 +289,10 @@ function goToVisit(encounterId: string): void {
           <div class="flex flex-col gap-4 lg:w-2/3">
             <!-- Action buttons -->
             <div class="flex flex-wrap items-center gap-2">
-              <Button v-if="store.currentPregnancy?.status === 'active'" size="sm" @click="goToNewVisit">
+              <Button v-if="pdStore.currentPregnancy?.status === 'active'" size="sm" @click="goToNewVisit">
                 <Plus class="size-3.5" /> New Visit
               </Button>
-              <Button v-if="store.currentPregnancy?.status === 'delivered'" size="sm" variant="outline" @click="goToPostpartum">
+              <Button v-if="pdStore.currentPregnancy?.status === 'delivered'" size="sm" variant="outline" @click="goToPostpartum">
                 <Plus class="size-3.5" /> Postpartum Visit
               </Button>
 
@@ -307,7 +300,7 @@ function goToVisit(encounterId: string): void {
 
               <!-- Resolve button (visible at ≥24 weeks) -->
               <Button
-                v-if="store.currentPregnancy?.status === 'active' && (store.currentPregnancy?.current_ga?.weeks ?? 0) >= 24"
+                v-if="pdStore.currentPregnancy?.status === 'active' && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) >= 24"
                 size="sm"
                 variant="outline"
                 @click="showResolveModal = true"
@@ -329,7 +322,7 @@ function goToVisit(encounterId: string): void {
                   </DropdownMenuItem>
                   <!-- Resolve in menu only when <24 weeks -->
                   <DropdownMenuItem
-                    v-if="store.currentPregnancy?.status === 'active' && (store.currentPregnancy?.current_ga?.weeks ?? 0) < 24"
+                    v-if="pdStore.currentPregnancy?.status === 'active' && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) < 24"
                     @click="showResolveModal = true"
                   >
                     <CheckCircle2 class="mr-2 size-3.5" />
@@ -341,34 +334,34 @@ function goToVisit(encounterId: string): void {
 
             <!-- Outcome banner for resolved/delivered pregnancies -->
             <div
-              v-if="store.currentPregnancy?.outcome && store.currentPregnancy?.status !== 'active'"
+              v-if="pdStore.currentPregnancy?.outcome && pdStore.currentPregnancy?.status !== 'active'"
               class="rounded-md border p-3 text-sm"
-              :class="store.currentPregnancy.status === 'delivered'
+              :class="pdStore.currentPregnancy.status === 'delivered'
                 ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950'
                 : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'"
             >
-              <p class="font-medium" :class="store.currentPregnancy.status === 'delivered' ? 'text-blue-800 dark:text-blue-300' : 'text-red-800 dark:text-red-300'">
-                {{ pregnancyOutcomeLabel(store.currentPregnancy.outcome) }}
+              <p class="font-medium" :class="pdStore.currentPregnancy.status === 'delivered' ? 'text-blue-800 dark:text-blue-300' : 'text-red-800 dark:text-red-300'">
+                {{ pregnancyOutcomeLabel(pdStore.currentPregnancy.outcome) }}
               </p>
               <p class="mt-0.5 text-xs text-muted-foreground">
-                <span v-if="store.currentPregnancy.outcome_date">
-                  {{ formatDate(store.currentPregnancy.outcome_date) }}
+                <span v-if="pdStore.currentPregnancy.outcome_date">
+                  {{ formatDate(pdStore.currentPregnancy.outcome_date) }}
                 </span>
-                <span v-if="store.currentPregnancy.outcome_ga_weeks != null">
-                  &middot; {{ store.currentPregnancy.outcome_ga_weeks }}w{{ store.currentPregnancy.outcome_ga_days ? ` ${store.currentPregnancy.outcome_ga_days}d` : '' }}
+                <span v-if="pdStore.currentPregnancy.outcome_ga_weeks != null">
+                  &middot; {{ pdStore.currentPregnancy.outcome_ga_weeks }}w{{ pdStore.currentPregnancy.outcome_ga_days ? ` ${pdStore.currentPregnancy.outcome_ga_days}d` : '' }}
                 </span>
-                <span v-if="store.currentPregnancy.birth_weight">
-                  &middot; {{ store.currentPregnancy.birth_weight }}g
+                <span v-if="pdStore.currentPregnancy.birth_weight">
+                  &middot; {{ pdStore.currentPregnancy.birth_weight }}g
                 </span>
-                <span v-if="store.currentPregnancy.birth_gender">
-                  &middot; {{ store.currentPregnancy.birth_gender }}
+                <span v-if="pdStore.currentPregnancy.birth_gender">
+                  &middot; {{ pdStore.currentPregnancy.birth_gender }}
                 </span>
               </p>
               <p
-                v-if="store.currentPregnancy.outcome_details?.notes"
+                v-if="pdStore.currentPregnancy.outcome_details?.notes"
                 class="mt-1 text-xs text-muted-foreground"
               >
-                {{ store.currentPregnancy.outcome_details.notes }}
+                {{ pdStore.currentPregnancy.outcome_details.notes }}
               </p>
             </div>
 
@@ -377,8 +370,8 @@ function goToVisit(encounterId: string): void {
               v-if="encounterStore.patientEncounters.length > 0"
               :patient-id="patientId"
               :pregnancy-id="pregnancyId"
-              :pregnancy="store.currentPregnancy!"
-              :patient="patient"
+              :pregnancy="pdStore.currentPregnancy!"
+              :patient="pdStore.patient"
             />
 
             <!-- Empty dashboard state -->
@@ -430,7 +423,7 @@ function goToVisit(encounterId: string): void {
               <CalendarDays class="size-8 text-muted-foreground/30" />
               <p class="text-sm text-muted-foreground">No visits yet</p>
               <Button
-                v-if="store.currentPregnancy?.status === 'active'"
+                v-if="pdStore.currentPregnancy?.status === 'active'"
                 size="sm"
                 variant="outline"
                 class="mt-1"
@@ -498,10 +491,10 @@ function goToVisit(encounterId: string): void {
 
     <!-- Resolve Pregnancy Modal -->
     <ResolvePregnancyModal
-      v-if="store.currentPregnancy"
+      v-if="pdStore.currentPregnancy"
       ref="resolveModalRef"
       :open="showResolveModal"
-      :pregnancy="store.currentPregnancy"
+      :pregnancy="pdStore.currentPregnancy"
       @update:open="showResolveModal = $event"
       @resolve="handleResolve"
     />

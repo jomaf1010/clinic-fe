@@ -1,60 +1,38 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
-  LoaderCircle,
   Activity,
   Weight,
   CalendarDays,
   AlertTriangle,
   ShieldAlert,
-  HeartPulse,
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import PregnantIcon from '@/components/icons/PregnantIcon.vue'
 import PregnantWeeksIcon from '@/components/icons/PregnantWeeksIcon.vue'
-import FetusIcon from '@/components/icons/FetusIcon.vue'
 import ChartLineIcon from '@/components/icons/ChartLineIcon.vue'
 import GACalculator from './GACalculator.vue'
 import RiskClassificationBadge from './RiskClassificationBadge.vue'
 import PrenatalTrendCharts from './PrenatalTrendCharts.vue'
 import PrenatalCareChecklist from './PrenatalCareChecklist.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { obgynApi } from '../api/obgynApi'
-import type { GynProfile, Pregnancy, PregnancyDashboard as PregnancyDashboardData } from '../types/obgyn.types'
-import type { PatientResponse } from '@/domains/patient/types/patient.types'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
+import type { Pregnancy } from '../types/obgyn.types'
 
 const props = defineProps<{
   patientId: string
   pregnancyId: string
   pregnancy: Pregnancy
-  patient?: PatientResponse | null
 }>()
 
-const dashboardData = ref<PregnancyDashboardData | null>(null)
-const gynProfile = ref<GynProfile | null>(null)
-const isLoading = ref(false)
-const loadError = ref<string | null>(null)
+const pdStore = usePatientDetailStore()
 const timelineAnimated = ref(false)
 
-onMounted(async () => {
-  isLoading.value = true
-  loadError.value = null
-  try {
-    const [dashRes, gynRes] = await Promise.all([
-      obgynApi.getDashboard(props.patientId, props.pregnancyId),
-      obgynApi.getGynProfile(props.patientId).catch(() => null),
-    ])
-    dashboardData.value = dashRes.data
-    if (gynRes) gynProfile.value = gynRes.data
-    // Trigger timeline animation after render
-    setTimeout(() => { timelineAnimated.value = true }, 100)
-  } catch {
-    loadError.value = 'Failed to load dashboard data.'
-  } finally {
-    isLoading.value = false
-  }
+onMounted(() => {
+  // Trigger timeline animation after render — data is already loaded by parent
+  setTimeout(() => { timelineAnimated.value = true }, 100)
 })
 
 function formatDate(d: string | null): string {
@@ -63,18 +41,8 @@ function formatDate(d: string | null): string {
 }
 
 const patientInitials = computed(() => {
-  if (!props.patient) return '?'
-  return `${props.patient.first_name.charAt(0)}${props.patient.last_name.charAt(0)}`.toUpperCase()
-})
-
-const patientAge = computed(() => {
-  if (!props.patient?.date_of_birth) return null
-  const dob = new Date(props.patient.date_of_birth)
-  const today = new Date()
-  let age = today.getFullYear() - dob.getFullYear()
-  const m = today.getMonth() - dob.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
-  return age
+  if (!pdStore.patient) return '?'
+  return `${pdStore.patient.first_name.charAt(0)}${pdStore.patient.last_name.charAt(0)}`.toUpperCase()
 })
 
 // ── GA timeline ────────────────────────────────────────────────────
@@ -120,7 +88,7 @@ const babyPingColor = computed(() => {
 })
 
 const gpal = computed(() => {
-  const gp = gynProfile.value
+  const gp = pdStore.gynProfile
   if (!gp) return '—'
   const g = gp.gravidity ?? '?'
   const t = gp.parity_term ?? '?'
@@ -153,43 +121,34 @@ const statusConfig = computed(() => {
 })
 
 // Timeline visits from dashboard data
-const visitSummary = computed(() => dashboardData.value?.visit_summary ?? [])
+const visitSummary = computed(() => pdStore.pregnancyDashboard?.visit_summary ?? [])
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
     <!-- Loading state -->
-    <div v-if="isLoading" class="flex items-center justify-center py-16">
+    <div v-if="pdStore.isLoadingObgyn" class="flex items-center justify-center py-16">
       <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
     </div>
 
-    <!-- Error state -->
-    <div
-      v-else-if="loadError"
-      role="alert"
-      class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-    >
-      {{ loadError }}
-    </div>
-
-    <template v-else-if="dashboardData">
+    <template v-else-if="pdStore.pregnancyDashboard">
       <!-- A. Patient Card + GA Timeline ────────────────────────────────── -->
-      <div v-if="patient" class="flex flex-col gap-4 rounded-xl border bg-card p-4">
+      <div v-if="pdStore.patient" class="flex flex-col gap-4 rounded-xl border bg-card p-4">
         <!-- Patient info row -->
         <div class="flex items-center gap-4">
           <Avatar class="size-12">
-            <AvatarImage v-if="patient.avatar_url" :src="patient.avatar_url" :alt="patient.full_name" />
+            <AvatarImage v-if="pdStore.patient.avatar_url" :src="pdStore.patient.avatar_url" :alt="pdStore.patient.full_name" />
             <AvatarFallback class="bg-gradient-to-br from-purple-500 to-pink-500 text-lg font-semibold text-white">
               {{ patientInitials }}
             </AvatarFallback>
           </Avatar>
           <div class="min-w-0 flex-1">
-            <h2 class="text-lg font-bold leading-tight">{{ patient.full_name }}</h2>
+            <h2 class="text-lg font-bold leading-tight">{{ pdStore.patient.full_name }}</h2>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-              <span v-if="patientAge !== null">{{ patientAge }} yrs old</span>
-              <span v-if="patient.sex">&middot; {{ patient.sex === 'female' ? 'Female' : patient.sex }}</span>
-              <span v-if="patient.blood_type">&middot; {{ patient.blood_type }}</span>
-              <span v-if="patient.contact_number">&middot; {{ patient.contact_number }}</span>
+              <span v-if="pdStore.patientAge !== null">{{ pdStore.patientAge }} yrs old</span>
+              <span v-if="pdStore.patient.sex">&middot; {{ pdStore.patient.sex === 'female' ? 'Female' : pdStore.patient.sex }}</span>
+              <span v-if="pdStore.patient.blood_type">&middot; {{ pdStore.patient.blood_type }}</span>
+              <span v-if="pdStore.patient.contact_number">&middot; {{ pdStore.patient.contact_number }}</span>
             </div>
           </div>
           <div class="hidden sm:flex items-center gap-2">
@@ -325,7 +284,7 @@ const visitSummary = computed(() => dashboardData.value?.visit_summary ?? [])
           </div>
           <div class="min-w-0">
             <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Visits</p>
-            <p class="text-lg font-bold tabular-nums">{{ dashboardData.visit_summary?.count ?? 0 }}</p>
+            <p class="text-lg font-bold tabular-nums">{{ pdStore.pregnancyDashboard.visit_summary?.count ?? 0 }}</p>
           </div>
         </div>
       </div>

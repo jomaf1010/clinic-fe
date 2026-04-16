@@ -73,8 +73,7 @@ import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import DangerSignsChecklist from '../components/DangerSignsChecklist.vue'
 import PrenatalCareChecklist from '../components/PrenatalCareChecklist.vue'
 import { obgynApi } from '../api/obgynApi'
-import { patientApi } from '@/domains/patient/api/patientApi'
-import type { PatientResponse } from '@/domains/patient/types/patient.types'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { toast } from 'vue-sonner'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import { use } from 'echarts/core'
@@ -84,7 +83,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 
 use([LineChart, GridComponent, TooltipComponent, CanvasRenderer])
-import type { DueReminders, GynProfile, Pregnancy as PregnancyType, BpTrendPoint, FhrTrendPoint } from '../types/obgyn.types'
+import type { DueReminders, Pregnancy as PregnancyType } from '../types/obgyn.types'
 import { useClinicalSummary } from '../composables/useClinicalSummary'
 
 // ── Router / stores ─────────────────────────────────────────────────
@@ -92,6 +91,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const store = useEncounterStore()
+const pdStore = usePatientDetailStore()
 const { isOnline, pendingCount } = useOfflineSync()
 
 const encounterId = computed(() => store.current?.id)
@@ -130,75 +130,28 @@ function setupTabsObserver() {
 }
 
 // ── Pregnancy summary (sidebar) ─────────────────────────────────────
-const pregnancyEdd = ref<string | null>(null)
-const pregnancyRiskLevel = ref<string | null>(null)
-const pregnancyLmp = ref<string | null>(null)
-const patientData = ref<PatientResponse | null>(null)
-const gynProfile = ref<GynProfile | null>(null)
+const pregnancyEdd = computed(() => pdStore.currentPregnancy?.edd ?? null)
+const pregnancyRiskLevel = computed(() => pdStore.currentPregnancy?.risk_level ?? null)
+const pregnancyLmp = computed(() => pdStore.currentPregnancy?.lmp ?? null)
+const patientData = computed(() => pdStore.patient)
+const gynProfile = computed(() => pdStore.gynProfile)
 
-// Previous visit comparison + trend data
-const bpTrend = ref<BpTrendPoint[]>([])
-const fhrTrend = ref<FhrTrendPoint[]>([])
-const previousVisitData = ref<{
-  date: string
-  ga: string
-  bp: string | null
-  weight: string | null
-  fhr: string | null
-  fh: string | null
-} | null>(null)
-
-async function loadPregnancySummary() {
-  const enc = store.current
-  if (!enc?.patient_id) return
-
-  const fetches: Promise<void>[] = []
-
-  if (enc.pregnancy_id) {
-    fetches.push(
-      obgynApi.getPregnancy(enc.patient_id, enc.pregnancy_id).then((res) => {
-        pregnancyEdd.value = res.data.edd
-        pregnancyRiskLevel.value = res.data.risk_level
-        pregnancyLmp.value = res.data.lmp ?? null
-      }).catch(() => {}),
-    )
-    // Load dashboard for previous visit comparison and trend sparklines
-    fetches.push(
-      obgynApi.getDashboard(enc.patient_id, enc.pregnancy_id).then((res) => {
-        const d = res.data
-        bpTrend.value = d.bp_trend ?? []
-        fhrTrend.value = d.fhr_trend ?? []
-        // Extract previous visit from visit_summary (current is last, previous is second-to-last)
-        const visits = d.visit_summary ?? []
-        if (visits.length >= 2) {
-          const prev = visits[visits.length - 2]!
-          previousVisitData.value = {
-            date: new Date(prev.visit_date ?? prev.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            ga: prev.gestational_age_weeks != null ? `${prev.gestational_age_weeks}w${prev.gestational_age_days ?? 0}d` : '—',
-            bp: prev.bp_systolic && prev.bp_diastolic ? `${prev.bp_systolic}/${prev.bp_diastolic}` : null,
-            weight: prev.weight != null ? `${prev.weight} kg` : null,
-            fhr: prev.fetal_heart_rate != null ? `${prev.fetal_heart_rate} bpm` : null,
-            fh: prev.fundal_height != null ? `${prev.fundal_height} cm` : null,
-          }
-        }
-      }).catch(() => {}),
-    )
+// Previous visit comparison + trend data — derived from store dashboard
+const bpTrend = computed(() => pdStore.pregnancyDashboard?.bp_trend ?? [])
+const fhrTrend = computed(() => pdStore.pregnancyDashboard?.fhr_trend ?? [])
+const previousVisitData = computed(() => {
+  const visits = pdStore.pregnancyDashboard?.visit_summary ?? []
+  if (visits.length < 2) return null
+  const prev = visits[visits.length - 2]!
+  return {
+    date: new Date(prev.visit_date ?? prev.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    ga: prev.gestational_age_weeks != null ? `${prev.gestational_age_weeks}w${prev.gestational_age_days ?? 0}d` : '—',
+    bp: prev.bp_systolic && prev.bp_diastolic ? `${prev.bp_systolic}/${prev.bp_diastolic}` : null,
+    weight: prev.weight != null ? `${prev.weight} kg` : null,
+    fhr: prev.fetal_heart_rate != null ? `${prev.fetal_heart_rate} bpm` : null,
+    fh: prev.fundal_height != null ? `${prev.fundal_height} cm` : null,
   }
-
-  fetches.push(
-    patientApi.get(enc.patient_id).then((res) => {
-      patientData.value = res.data
-    }).catch(() => {}),
-  )
-
-  fetches.push(
-    obgynApi.getGynProfile(enc.patient_id).then((res) => {
-      gynProfile.value = res.data
-    }).catch(() => {}),
-  )
-
-  await Promise.all(fetches)
-}
+})
 
 function formatEdd(): string {
   if (!pregnancyEdd.value) return '—'
@@ -227,15 +180,7 @@ const activePregnancyRef = computed<PregnancyType | null>(() => {
 
 const { clinicalSummary } = useClinicalSummary(gynProfile, activePregnancyRef, gpal)
 
-const patientAge = computed(() => {
-  if (!patientData.value?.date_of_birth) return null
-  const dob = new Date(patientData.value.date_of_birth)
-  const today = new Date()
-  let age = today.getFullYear() - dob.getFullYear()
-  const m = today.getMonth() - dob.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--
-  return age
-})
+const patientAge = computed(() => pdStore.patientAge)
 
 // ── Plan tab reminders ──────────────────────────────────────────────
 const dueReminders = ref<DueReminders | null>(null)
@@ -926,14 +871,14 @@ const eddComparison = computed(() => {
 
 async function adoptUltrasoundEdd(): Promise<void> {
   const enc = store.current
-  if (!enc?.pregnancy_id || !enc.patient_id || !eddComparison.value) return
+  if (!enc?.pregnancy_id || !eddComparison.value) return
   isUpdatingEdd.value = true
   try {
-    await obgynApi.updatePregnancy(enc.patient_id, enc.pregnancy_id, {
+    await pdStore.updatePregnancy(enc.pregnancy_id, {
       edd: eddComparison.value.rawNewEdd,
       edd_source: 'ultrasound',
     })
-    pregnancyEdd.value = eddComparison.value.rawNewEdd
+    // pregnancyEdd auto-updates from pdStore.currentPregnancy.edd
     // Reload encounter to get recalculated GA
     await store.loadEncounter(enc.id)
     syncTriageFromStore()
@@ -998,7 +943,13 @@ onMounted(async () => {
     syncAssessmentFromStore()
     syncPlanFromStore()
     loadReminders()
-    await loadPregnancySummary()
+    const enc = store.current
+    if (enc?.patient_id) {
+      // Ensure patient-level OB-GYN data is loaded (gynProfile + pregnancies list)
+      if (!pdStore.gynProfile) await pdStore.loadObgyn()
+      // Load pregnancy detail (currentPregnancy, dashboard, visits, labsDue)
+      if (enc.pregnancy_id) await pdStore.loadPregnancyDetail(enc.pregnancy_id)
+    }
     // Pre-populate normal defaults for new visits (documentation by exception)
     const isNewVisit = !store.current?.prenatal_visit?.triage?.concerns
       && !store.current?.prenatal_visit?.triage?.vitals?.bp_systolic

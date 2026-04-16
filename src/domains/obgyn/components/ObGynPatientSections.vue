@@ -42,8 +42,7 @@ import PregnantWeeksIcon from '@/components/icons/PregnantWeeksIcon.vue'
 import CervicalScreeningIcon from '@/components/icons/CervicalScreeningIcon.vue'
 import FamilyPlanningIcon from '@/components/icons/FamilyPlanningIcon.vue'
 import PatientSectionWidget from '@/domains/patient/components/specialties/PatientSectionWidget.vue'
-import { obgynApi } from '../api/obgynApi'
-import { patientApi } from '@/domains/patient/api/patientApi'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { GynProfile, Pregnancy, ContraceptiveEntry, ScreeningEntry } from '../types/obgyn.types'
 import { CONTRACEPTION_OPTIONS, contraceptionLabel, SCREENING_TYPE_OPTIONS, screeningTypeLabel } from '../types/obgyn.types'
 import type { UpsertGynProfilePayload } from '../api/obgynApi'
@@ -52,6 +51,8 @@ import { useClinicalSummary } from '../composables/useClinicalSummary'
 const route = useRoute()
 const router = useRouter()
 const patientId = computed(() => route.params.id as string)
+
+const pdStore = usePatientDetailStore()
 
 function navigateToPregnancy(pregnancyUuid: string) {
   showPregDialog.value = false
@@ -73,8 +74,8 @@ function formatDate(d: string | null): string {
 }
 
 // ── GYN Profile ───────────────────────────────────────────────────────────
-const gynProfile = ref<GynProfile | null>(null)
-const isLoadingGyn = ref(false)
+const gynProfile = computed(() => pdStore.gynProfile)
+const isLoadingGyn = computed(() => pdStore.isLoadingObgyn)
 const showMenstrualDialog = ref(false)
 const showGpalDialog = ref(false)
 const showScreeningDialog = ref(false)
@@ -96,7 +97,7 @@ const gynForm = reactive<UpsertGynProfilePayload>({
 })
 
 // Patient DOB for year range calculation
-const patientDob = ref<string | null>(null)
+const patientDob = computed(() => pdStore.patient?.date_of_birth ?? null)
 const earliestDeliveryYear = computed(() => {
   if (!patientDob.value) return 1970
   return new Date(patientDob.value).getFullYear() + 12 // earliest realistic pregnancy age
@@ -193,22 +194,10 @@ function openGpalDialog() {
   showGpalDialog.value = true
 }
 
-async function loadGynProfile() {
-  isLoadingGyn.value = true
-  try {
-    const res = await obgynApi.getGynProfile(patientId.value)
-    gynProfile.value = res.data
-  } catch {
-    // silently fail — profile may not exist yet
-  } finally {
-    isLoadingGyn.value = false
-  }
-}
-
 async function saveMenstrualHistory() {
   isSavingGyn.value = true
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, {
+    await pdStore.updateGynProfile({
       menarche_age: gynForm.menarche_age,
       cycle_length: gynForm.cycle_length,
       regularity: gynForm.regularity,
@@ -216,9 +205,7 @@ async function saveMenstrualHistory() {
       flow: gynForm.flow,
       dysmenorrhea: gynForm.dysmenorrhea,
     })
-    gynProfile.value = res.data
     showMenstrualDialog.value = false
-    toast.success('Menstrual history updated')
   } catch {
     toast.error('Failed to save')
   } finally {
@@ -242,7 +229,7 @@ const gpalErrors = computed(() => {
 async function saveGpal() {
   isSavingGyn.value = true
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, {
+    await pdStore.updateGynProfile({
       gravidity: gynForm.gravidity,
       parity_term: gynForm.parity_term,
       parity_preterm: gynForm.parity_preterm,
@@ -258,9 +245,7 @@ async function saveGpal() {
         notes: null,
       })),
     })
-    gynProfile.value = res.data
     showGpalDialog.value = false
-    toast.success('GPAL updated')
   } catch {
     toast.error('Failed to save')
   } finally {
@@ -269,14 +254,12 @@ async function saveGpal() {
 }
 
 // ── Pregnancies ───────────────────────────────────────────────────────────
-const pregnancies = ref<Pregnancy[]>([])
-const isLoadingPreg = ref(false)
+const pregnancies = computed(() => pdStore.pregnancies)
+const isLoadingPreg = computed(() => pdStore.isLoadingObgyn)
 const showPregDialog = ref(false)
 const deletingPregId = ref<string | null>(null)
 
-const activePregnancy = computed(() =>
-  pregnancies.value.find((p) => p.status === 'active') ?? null,
-)
+const activePregnancy = computed(() => pdStore.activePregnancy)
 
 const pregnancyWidgetDetail = computed(() => {
   if (activePregnancy.value) {
@@ -292,23 +275,10 @@ const pregBadgeText = computed(() =>
   activePregnancy.value ? '1' : undefined,
 )
 
-async function loadPregnancies() {
-  isLoadingPreg.value = true
-  try {
-    const res = await obgynApi.listPregnancies(patientId.value)
-    pregnancies.value = res.data
-  } catch {
-    // silently fail
-  } finally {
-    isLoadingPreg.value = false
-  }
-}
-
 async function deletePregnancy(uuid: string) {
   deletingPregId.value = uuid
   try {
-    await obgynApi.deletePregnancy(patientId.value, uuid)
-    pregnancies.value = pregnancies.value.filter((p) => p.id !== uuid)
+    await pdStore.deletePregnancy(uuid)
   } catch {
     toast.error('Failed to delete pregnancy record')
   } finally {
@@ -369,10 +339,8 @@ async function addScreening() {
   // Sort by date descending
   updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { screenings: updated })
-    gynProfile.value = res.data
+    await pdStore.updateGynProfile({ screenings: updated })
     resetNewScreening()
-    toast.success('Screening record added')
   } catch {
     toast.error('Failed to add screening')
   }
@@ -401,10 +369,8 @@ async function saveEditScreening() {
     i === idx ? { ...e, result: editScreening.result || null, notes: editScreening.notes || null } : e,
   )
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { screenings: updated })
-    gynProfile.value = res.data
+    await pdStore.updateGynProfile({ screenings: updated })
     editingScreeningIndex.value = null
-    toast.success('Screening updated')
   } catch {
     toast.error('Failed to update')
   }
@@ -414,9 +380,7 @@ async function removeScreening(index: number) {
   const current = gynProfile.value?.screenings ?? []
   const updated = current.filter((_: ScreeningEntry, i: number) => i !== index)
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { screenings: updated })
-    gynProfile.value = res.data
-    toast.success('Screening removed')
+    await pdStore.updateGynProfile({ screenings: updated })
   } catch {
     toast.error('Failed to remove screening')
   }
@@ -461,10 +425,8 @@ async function addContraception() {
   }]
   updated.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { contraception: updated })
-    gynProfile.value = res.data
+    await pdStore.updateGynProfile({ contraception: updated })
     resetNewContraception()
-    toast.success('Contraception record added')
   } catch {
     toast.error('Failed to add record')
   }
@@ -493,10 +455,8 @@ async function saveEditContraception() {
     i === idx ? { ...e, end_date: editContraception.end_date || null, notes: editContraception.notes || null } : e,
   )
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { contraception: updated })
-    gynProfile.value = res.data
+    await pdStore.updateGynProfile({ contraception: updated })
     editingContraceptionIndex.value = null
-    toast.success('Record updated')
   } catch {
     toast.error('Failed to update')
   }
@@ -506,9 +466,7 @@ async function removeContraception(index: number) {
   const current = gynProfile.value?.contraception ?? []
   const updated = current.filter((_: ContraceptiveEntry, i: number) => i !== index)
   try {
-    const res = await obgynApi.upsertGynProfile(patientId.value, { contraception: updated })
-    gynProfile.value = res.data
-    toast.success('Record removed')
+    await pdStore.updateGynProfile({ contraception: updated })
   } catch {
     toast.error('Failed to remove record')
   }
@@ -520,13 +478,7 @@ const { clinicalSummary: gynNarrativeSummary } = useClinicalSummary(gynProfile, 
 // ── Load ──────────────────────────────────────────────────────────────────
 onMounted(async () => {
   if (!patientId.value) return
-  loadGynProfile()
-  loadPregnancies()
-  // Fetch patient DOB for delivery year range
-  try {
-    const res = await patientApi.get(patientId.value)
-    patientDob.value = res.data.date_of_birth ?? null
-  } catch { /* non-critical */ }
+  if (!pdStore.gynProfile) await pdStore.loadObgyn()
 })
 </script>
 

@@ -24,11 +24,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import MFDatePicker from '@/components/shared/MFDatePicker.vue'
-import { usePregnancyStore } from '../stores/pregnancyStore'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { Pregnancy } from '../types/obgyn.types'
-import { obgynApi } from '../api/obgynApi'
 import type { CreatePregnancyPayload } from '../api/obgynApi'
-import { patientApi } from '@/domains/patient/api/patientApi'
 import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
@@ -41,7 +39,7 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const store = usePregnancyStore()
+const store = usePatientDetailStore()
 const showRiskOverride = ref(false)
 const isEvaluatingRisk = ref(false)
 const evaluatedRisk = ref<{ level: string; factors: string[] } | null>(null)
@@ -49,7 +47,7 @@ const evaluatedRisk = ref<{ level: string; factors: string[] } | null>(null)
 async function evaluateRisk(): Promise<void> {
   isEvaluatingRisk.value = true
   try {
-    const res = await obgynApi.evaluateRisk(props.patientId, {
+    const res = await store.evaluateRisk({
       pre_pregnancy_weight: form.pre_pregnancy_weight,
       height: form.height,
       medical_conditions: form.medical_conditions || null,
@@ -57,10 +55,10 @@ async function evaluateRisk(): Promise<void> {
       smoking: form.smoking || null,
       pregnancy_id: props.pregnancy?.id ?? null,
     })
-    evaluatedRisk.value = res.data
+    evaluatedRisk.value = res
     // Auto-set form values from evaluation
-    form.risk_level = res.data.level as typeof form.risk_level
-    form.risk_factors = res.data.factors.join('\n')
+    form.risk_level = res.level as typeof form.risk_level
+    form.risk_factors = res.factors.join('\n')
   } catch {
     toast.error('Failed to evaluate risk')
   } finally {
@@ -73,12 +71,8 @@ const pastDiagnoses = ref<{ description: string; code: string | null }[]>([])
 
 onMounted(async () => {
   const fetches: Promise<void>[] = []
-  fetches.push(
-    patientApi.getPastDiagnoses(props.patientId).then((res) => {
-      pastDiagnoses.value = res.data
-    }).catch(() => {}),
-  )
-  await Promise.all(fetches)
+  // Past diagnoses already loaded in store by parent
+  pastDiagnoses.value = store.pastDiagnoses
 })
 
 interface FormState {
@@ -289,9 +283,9 @@ async function handleSubmit(): Promise<void> {
 
   let result: Pregnancy
   if (props.pregnancy) {
-    result = await store.updatePregnancy(props.patientId, props.pregnancy.id, payload)
+    result = await store.updatePregnancy(props.pregnancy.id, payload)
   } else {
-    result = await store.createPregnancy(props.patientId, payload)
+    result = await store.createPregnancy(payload)
   }
   emit('saved', result)
 }
@@ -734,11 +728,11 @@ async function handleSubmit(): Promise<void> {
 
     <!-- Footer -->
     <div class="flex items-center justify-end gap-2 border-t pt-4">
-      <Button variant="outline" :disabled="store.isSaving" @click="emit('cancel')">
+      <Button variant="outline" :disabled="store.isSavingObgyn" @click="emit('cancel')">
         Cancel
       </Button>
-      <Button :disabled="store.isSaving" @click="handleSubmit">
-        <LoaderCircle v-if="store.isSaving" class="size-4 animate-spin" />
+      <Button :disabled="store.isSavingObgyn" @click="handleSubmit">
+        <LoaderCircle v-if="store.isSavingObgyn" class="size-4 animate-spin" />
         {{ pregnancy ? 'Save Changes' : 'Create Pregnancy Record' }}
       </Button>
     </div>
