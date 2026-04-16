@@ -387,16 +387,18 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   async function loadPregnancyDetail(pregnancyId: string): Promise<void> {
     if (!patientId.value) return
     const id = patientId.value
-    const [pregRes, dashRes, visitsRes, labsRes] = await Promise.all([
-      obgynApi.getPregnancy(id, pregnancyId),
+    // Use pregnancy from list if already loaded (avoid extra API call)
+    const existing = pregnancies.value.find((p) => p.id === pregnancyId)
+    const [pregRes, dashRes, visitsRes, checklistRes] = await Promise.all([
+      existing ? null : obgynApi.getPregnancy(id, pregnancyId),
       obgynApi.getDashboard(id, pregnancyId).catch(() => ({ data: null })),
       obgynApi.listVisits(id, pregnancyId).catch(() => ({ data: [] })),
       obgynApi.getChecklist(id, pregnancyId).catch(() => ({ data: [] })),
     ])
-    currentPregnancy.value = pregRes.data
+    currentPregnancy.value = pregRes ? pregRes.data : existing!
     pregnancyDashboard.value = dashRes.data as PregnancyDashboard | null
     pregnancyVisits.value = visitsRes.data as PrenatalVisit[]
-    prenatalChecklist.value = labsRes.data as ChecklistItem[]
+    prenatalChecklist.value = checklistRes.data as ChecklistItem[]
   }
 
   async function reloadChecklist(pregnancyId: string): Promise<void> {
