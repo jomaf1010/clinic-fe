@@ -112,7 +112,7 @@ function buildInitialState(): FormState {
     first_ultrasound_ga_days: parseGADays(p?.first_ultrasound_ga),
     fetus_count: p?.fetus_count ?? 1,
     fetuses: p?.fetuses?.length ? [...p.fetuses] : [{ label: 'Baby', sex: 'unknown' as const }],
-    medical_conditions: p?.medical_conditions ?? '',
+    medical_conditions: Array.isArray(p?.medical_conditions) ? p.medical_conditions.join('\n') : (p?.medical_conditions ?? ''),
     surgical_history: p?.surgical_history ?? '',
     smoking: p?.smoking ?? '',
     alcohol: p?.alcohol ?? '',
