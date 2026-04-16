@@ -211,6 +211,34 @@ function goToVisit(encounterId: string): void {
     params: { patientId: patientId.value, id: encounterId },
   })
 }
+
+// ── Close postpartum ────────────────────────────────────────────────
+const daysPostpartum = computed(() => {
+  const delivered = pdStore.currentPregnancy?.delivered_at
+  if (!delivered) return 0
+  return Math.floor((Date.now() - new Date(delivered).getTime()) / (1000 * 60 * 60 * 24))
+})
+
+const canClosePostpartum = computed(() => {
+  const status = pdStore.currentPregnancy?.status
+  return (status === 'delivered' || status === 'postpartum') && daysPostpartum.value >= 42
+})
+
+const isClosingPostpartum = ref(false)
+
+async function closePostpartum(): Promise<void> {
+  if (!pdStore.currentPregnancy) return
+  isClosingPostpartum.value = true
+  try {
+    await pdStore.updatePregnancy(pregnancyId.value, { status: 'inactive' } as any)
+    await pdStore.loadObgyn()
+    toast.success('Postpartum period closed')
+  } catch {
+    // store already shows error toast
+  } finally {
+    isClosingPostpartum.value = false
+  }
+}
 </script>
 
 <template>
@@ -299,8 +327,19 @@ function goToVisit(encounterId: string): void {
               <Button v-if="pdStore.currentPregnancy?.status === 'active'" size="sm" @click="goToNewVisit">
                 <Plus class="size-3.5" /> New Visit
               </Button>
-              <Button v-if="pdStore.currentPregnancy?.status === 'delivered'" size="sm" variant="outline" @click="goToPostpartum">
+              <Button v-if="pdStore.currentPregnancy?.status === 'delivered'" size="sm" @click="goToPostpartum">
                 <Plus class="size-3.5" /> Postpartum Visit
+              </Button>
+              <Button
+                v-if="canClosePostpartum"
+                size="sm"
+                variant="outline"
+                :disabled="isClosingPostpartum"
+                @click="closePostpartum"
+              >
+                <LoaderCircle v-if="isClosingPostpartum" class="size-3.5 animate-spin" />
+                <CheckCircle2 v-else class="size-3.5" />
+                Close Postpartum
               </Button>
 
               <div class="flex-1" />

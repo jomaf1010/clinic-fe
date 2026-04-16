@@ -261,18 +261,32 @@ const deletingPregId = ref<string | null>(null)
 
 const activePregnancy = computed(() => pdStore.activePregnancy)
 
+const postpartumPregnancy = computed(() => {
+  if (activePregnancy.value) return null
+  const sixWeeksMs = 42 * 24 * 60 * 60 * 1000
+  return pregnancies.value.find((p) => {
+    if (p.status !== 'delivered' && p.status !== 'postpartum') return false
+    if (!p.delivered_at) return false
+    return Date.now() - new Date(p.delivered_at).getTime() < sixWeeksMs
+  }) ?? null
+})
+
 const pregnancyWidgetDetail = computed(() => {
   if (activePregnancy.value) {
     const ga = activePregnancy.value.current_ga
     if (ga) return `Active (${ga.weeks}w${ga.days}d)`
     return 'Active pregnancy'
   }
+  if (postpartumPregnancy.value) {
+    const days = Math.floor((Date.now() - new Date(postpartumPregnancy.value.delivered_at!).getTime()) / (24 * 60 * 60 * 1000))
+    return `Postpartum (day ${days})`
+  }
   const count = pregnancies.value.length
   return count > 0 ? `${count} previous` : 'None recorded'
 })
 
 const pregBadgeText = computed(() =>
-  activePregnancy.value ? '1' : undefined,
+  activePregnancy.value || postpartumPregnancy.value ? '1' : undefined,
 )
 
 async function deletePregnancy(uuid: string) {
@@ -580,6 +594,24 @@ onMounted(async () => {
       <ExternalLink class="size-4 shrink-0 text-purple-400" />
     </Button>
 
+    <!-- Manage Postpartum — shown for recently delivered pregnancies (within 6 weeks) -->
+    <Button
+      v-else-if="postpartumPregnancy"
+      variant="outline"
+      class="col-span-full h-auto justify-start gap-3 rounded-lg border-teal-200 bg-teal-50/50 px-4 py-3 text-teal-700 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/50 dark:text-teal-400 dark:hover:bg-teal-900"
+      @click="navigateToPregnancy(postpartumPregnancy!.id)"
+    >
+      <Baby class="size-5 shrink-0" />
+      <div class="flex flex-col items-start gap-0.5">
+        <span class="text-sm font-semibold">Manage Postpartum</span>
+        <span class="text-xs font-normal text-teal-600/70 dark:text-teal-400/70">
+          Day {{ Math.floor((Date.now() - new Date(postpartumPregnancy.delivered_at!).getTime()) / (24 * 60 * 60 * 1000)) }} postpartum
+          <template v-if="postpartumPregnancy.outcome"> · {{ postpartumPregnancy.outcome.replace(/_/g, ' ') }}</template>
+        </span>
+      </div>
+      <ExternalLink class="size-4 shrink-0 text-teal-400" />
+    </Button>
+
     <!-- Menstrual Cycle Dialog -->
     <Dialog v-model:open="showMenstrualDialog">
       <DialogContent class="sm:max-w-md">
@@ -885,12 +917,42 @@ onMounted(async () => {
             </div>
           </button>
 
+          <!-- Postpartum pregnancy highlight -->
+          <button
+            v-else-if="postpartumPregnancy"
+            type="button"
+            class="w-full rounded-lg border-2 border-teal-200 bg-teal-50/50 p-3 mb-1 text-left transition-colors hover:bg-teal-50 cursor-pointer dark:border-teal-800 dark:bg-teal-950/50 dark:hover:bg-teal-900"
+            @click.stop="navigateToPregnancy(postpartumPregnancy!.id)"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" class="bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-100 text-[10px] px-1.5 py-0 dark:bg-teal-950 dark:text-teal-400 dark:border-teal-800">Postpartum</Badge>
+                  <span class="text-sm font-semibold">Postpartum Care</span>
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Day <strong class="text-foreground">{{ Math.floor((Date.now() - new Date(postpartumPregnancy.delivered_at!).getTime()) / (24 * 60 * 60 * 1000)) }}</strong> postpartum
+                  </span>
+                  <span v-if="postpartumPregnancy.outcome">
+                    Outcome: <strong class="text-foreground capitalize">{{ postpartumPregnancy.outcome.replace(/_/g, ' ') }}</strong>
+                  </span>
+                  <span v-if="postpartumPregnancy.delivery_type">
+                    {{ postpartumPregnancy.delivery_type === 'cesarean' ? 'Cesarean' : 'Vaginal' }}
+                  </span>
+                </div>
+              </div>
+              <ExternalLink class="size-4 text-muted-foreground shrink-0" />
+            </div>
+          </button>
+
           <!-- Pregnancy list (non-active) -->
           <template v-if="pregnancies.length > 0">
             <template v-for="preg in pregnancies" :key="preg.id">
             <div
               v-if="preg.status !== 'active'"
-              class="flex items-start gap-2 rounded-lg border bg-card p-2.5"
+              class="flex cursor-pointer items-start gap-2 rounded-lg border bg-card p-2.5 transition-colors hover:bg-muted/50"
+              @click="navigateToPregnancy(preg.id)"
             >
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
@@ -911,12 +973,13 @@ onMounted(async () => {
                 </div>
               </div>
               <Button
+                v-if="preg.status !== 'delivered' && !preg.delivery_encounter_id"
                 variant="ghost"
                 size="icon"
                 class="size-6 shrink-0"
                 title="Delete"
                 :disabled="deletingPregId === preg.id"
-                @click="deletePregnancy(preg.id)"
+                @click.stop="deletePregnancy(preg.id)"
               >
                 <LoaderCircle v-if="deletingPregId === preg.id" class="size-3.5 animate-spin" />
                 <Trash2 v-else class="size-3.5 text-muted-foreground" />

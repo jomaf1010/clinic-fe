@@ -264,6 +264,42 @@ export interface FhrTrendPoint {
   fetal_heart_rate: number
 }
 
+export interface DeliverySummary {
+  delivered_at: string | null
+  delivery_mode: string | null
+  laceration: string | null
+  blood_loss_ml: number | null
+  complications: string[]
+  transfusion: boolean
+  maternal_outcome: string | null
+  birth_weight_grams: number | null
+  birth_gender: string | null
+  apgar_1min: number | null
+  apgar_5min: number | null
+  neonatal_outcome: string | null
+  ga_weeks: number | null
+  ga_days: number | null
+}
+
+export interface PostpartumVisitSummary {
+  id: string
+  days_postpartum: number | null
+  created_at: string
+  bp_systolic: number | null
+  bp_diastolic: number | null
+  weight: number | null
+  lochia: string | null
+  wound_healing: string | null
+  phq2_total: number | null
+  phq2_risk: string | null
+  contraception_discussed: boolean
+  contraception_method: string | string[] | null
+  infant_feeding: string | null
+  return_to_activity_cleared: boolean
+  sexual_activity_cleared: boolean
+  next_visit_date: string | null
+}
+
 export interface PregnancyDashboard {
   pregnancy: Pregnancy
   visit_count: number
@@ -275,5 +311,10 @@ export interface PregnancyDashboard {
   weight_trend: WeightTrendPoint[]
   fundal_height_trend: FundalHeightTrendPoint[]
   fhr_trend: FhrTrendPoint[]
-  visit_summary: PrenatalVisit[]
+  visit_summary: { count: number; first_date: string | null; last_date: string | null }
+  // Postpartum (present when status is delivered/postpartum)
+  delivery_summary?: DeliverySummary | null
+  postpartum_visits?: PostpartumVisitSummary[]
+  postpartum_bp_trend?: BpTrendPoint[]
+  postpartum_weight_trend?: { date: string; weight: number; gestational_age_weeks: null; days_postpartum: number | null }[]
 }

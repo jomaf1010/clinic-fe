@@ -57,10 +57,14 @@ const props = withDefaults(defineProps<{
   openMedCertOnMount?: boolean
   canFinalize?: boolean
   isSaving?: boolean
+  encounterType?: string
+  deliveryMode?: string | null
 }>(), {
   openMedCertOnMount: false,
   canFinalize: false,
   isSaving: false,
+  encounterType: 'consultation',
+  deliveryMode: null,
 })
 
 const emit = defineEmits<{
@@ -239,14 +243,45 @@ const {
   },
 )
 
+// Map encounter delivery_mode values to specialty_fees keys
+const deliveryModeFeeMap: Record<string, string> = {
+  vaginal_spontaneous: 'nsd',
+  cesarean: 'cesarean_section',
+  vacuum: 'vacuum_assisted',
+  forceps: 'forceps_assisted',
+}
+
 // Estimated charges (draft mode)
+const isDeliveryEncounter = computed(() => props.encounterType === 'delivery')
+
 const consultationFee = computed(() => {
+  // For delivery encounters, use specialty delivery fee
+  if (isDeliveryEncounter.value && props.deliveryMode) {
+    const feeKey = deliveryModeFeeMap[props.deliveryMode]
+    if (feeKey) {
+      return authStore.user?.specialty_fees?.[feeKey] ?? 0
+    }
+  }
+
   const isFollowUp = props.consultationType === 'follow_up'
   const doctorFee = isFollowUp ? authStore.user?.follow_up_fee : authStore.user?.consultation_fee
   const clinicFee = isFollowUp
     ? authStore.currentClinic?.settings?.default_follow_up_fee
     : authStore.currentClinic?.settings?.default_consultation_fee
   return doctorFee ?? clinicFee ?? 0
+})
+
+const feeLabel = computed(() => {
+  if (isDeliveryEncounter.value && props.deliveryMode) {
+    const labels: Record<string, string> = {
+      vaginal_spontaneous: 'NSD Fee',
+      cesarean: 'Cesarean Section Fee',
+      vacuum: 'Vacuum-Assisted Fee',
+      forceps: 'Forceps-Assisted Fee',
+    }
+    return labels[props.deliveryMode] ?? 'Delivery Fee'
+  }
+  return props.consultationType === 'follow_up' ? 'Follow-up Fee' : 'Consultation Fee'
 })
 
 const medicinesTotalEstimate = computed(() => {
@@ -564,11 +599,12 @@ watch(() => props.status, (newStatus, oldStatus) => {
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Estimated Charges</h3>
       <div class="flex flex-col gap-1.5 rounded-lg border p-4">
         <div class="flex justify-between text-sm">
-          <span class="text-muted-foreground">
-            {{ consultationType === 'follow_up' ? 'Follow-up Fee' : 'Consultation Fee' }}
-          </span>
+          <span class="text-muted-foreground">{{ feeLabel }}</span>
           <span class="tabular-nums">{{ formatCurrency(consultationFee) }}</span>
         </div>
+        <p v-if="isDeliveryEncounter && !deliveryMode" class="text-xs text-muted-foreground italic">
+          Select a delivery mode to see the delivery fee
+        </p>
         <div v-if="discountAmount > 0" class="flex justify-between text-sm">
           <span class="text-muted-foreground">
             Discount

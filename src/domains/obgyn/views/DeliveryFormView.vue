@@ -1071,6 +1071,8 @@ async function handleFinalizeAndBilling(): Promise<void> {
               :payment="store.current.payment"
               :can-finalize="store.isDraft && canFinalize"
               :is-saving="store.isSaving"
+              encounter-type="delivery"
+              :delivery-mode="localDelivery.delivery_mode"
               @update:payment="(p) => { if (store.current) store.current.payment = p }"
               @finalize="handleFinalizeAndBilling"
             />

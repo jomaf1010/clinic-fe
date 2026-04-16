@@ -7,6 +7,9 @@ import {
   AlertTriangle,
   LoaderCircle,
   ShieldAlert,
+  Baby,
+  CheckCircle2,
+  Circle,
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -123,7 +126,113 @@ const statusConfig = computed(() => {
 })
 
 // Timeline visits from dashboard data
-const visitSummary = computed(() => pdStore.pregnancyDashboard?.visit_summary ?? [])
+const visitSummary = computed(() => pdStore.pregnancyDashboard?.visit_summary ?? { count: 0, first_date: null, last_date: null })
+
+// ── Postpartum ────────────────────────────────────────────────────
+const isPostpartum = computed(() =>
+  props.pregnancy.status === 'delivered' || props.pregnancy.status === 'postpartum',
+)
+
+const daysPostpartum = computed(() => {
+  if (!props.pregnancy.delivered_at) return 0
+  return Math.floor((Date.now() - new Date(props.pregnancy.delivered_at).getTime()) / (1000 * 60 * 60 * 24))
+})
+
+const PP_TOTAL_DAYS = 56
+const ppProgressTarget = computed(() => Math.min(100, (daysPostpartum.value / PP_TOTAL_DAYS) * 100))
+const ppProgress = computed(() => timelineAnimated.value ? ppProgressTarget.value : 0)
+
+const ppMilestones = [
+  { day: 0, label: 'Delivery' },
+  { day: 7, label: 'Wound Check' },
+  { day: 14, label: 'Lactation' },
+  { day: 42, label: 'Clearance' },
+]
+const ppDayMarkers = [0, 7, 14, 21, 28, 35, 42, 49, 56]
+
+function deliveryModeLabel(mode: string | null | undefined): string {
+  switch (mode) {
+    case 'vaginal_spontaneous': return 'NSD'
+    case 'cesarean': return 'Cesarean Section'
+    case 'vacuum': return 'Vacuum-Assisted'
+    case 'forceps': return 'Forceps-Assisted'
+    default: return mode?.replace(/_/g, ' ') ?? '—'
+  }
+}
+
+function deliveryModeShort(mode: string | null | undefined): string {
+  switch (mode) {
+    case 'vaginal_spontaneous': return 'NSD'
+    case 'cesarean': return 'CS'
+    case 'vacuum': return 'Vacuum'
+    case 'forceps': return 'Forceps'
+    default: return '—'
+  }
+}
+
+const ppNextVisit = computed(() => {
+  const visits = dashboardData.value?.postpartum_visits ?? []
+  for (let i = visits.length - 1; i >= 0; i--) {
+    if (visits[i].next_visit_date) return visits[i].next_visit_date
+  }
+  return null
+})
+
+const ppNextVisitDays = computed(() => {
+  if (!ppNextVisit.value) return null
+  const diff = Math.ceil((new Date(ppNextVisit.value).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  return diff
+})
+
+const ppTotalVisits = computed(() => {
+  const prenatal = visitSummary.value?.count ?? 0
+  const pp = dashboardData.value?.postpartum_visits?.length ?? 0
+  return prenatal + pp
+})
+
+// Merge postpartum trends into prenatal for continuous charts
+const mergedDashboardData = computed(() => {
+  const base = dashboardData.value
+  if (!base) return base
+  if (!isPostpartum.value) return base
+  return {
+    ...base,
+    bp_trend: [
+      ...base.bp_trend,
+      ...(base.postpartum_bp_trend ?? []),
+    ],
+    weight_trend: [
+      ...base.weight_trend,
+      ...(base.postpartum_weight_trend ?? []).map((p) => ({
+        date: p.date,
+        cumulative_gain: p.weight - (base.pregnancy?.pre_pregnancy_weight ?? p.weight),
+        status: null as string | null,
+        gestational_age_weeks: null as number | null,
+      })),
+    ],
+  }
+})
+
+// Postpartum checklist derived from visit data
+const postpartumChecklist = computed(() => {
+  const visits = dashboardData.value?.postpartum_visits ?? []
+  const isCS = dashboardData.value?.delivery_summary?.delivery_mode === 'cesarean'
+
+  const items = [
+    { key: 'fp_counseling', label: 'Family planning counseling', done: visits.some((v) => v.contraception_discussed) },
+    { key: 'contraceptive', label: 'Contraceptive method chosen', done: visits.some((v) => v.contraception_method && v.contraception_method !== 'none') },
+    { key: 'breastfeeding', label: 'Breastfeeding assessment', done: visits.some((v) => !!v.infant_feeding) },
+    { key: 'phq2', label: 'PHQ-2 depression screening', done: visits.some((v) => v.phq2_total != null) },
+    ...(isCS ? [
+      { key: 'wound_check', label: 'Wound check (CS)', done: visits.some((v) => !!v.wound_healing) },
+    ] : []),
+    { key: 'activity_clearance', label: 'Return-to-activity clearance', done: visits.some((v) => v.return_to_activity_cleared) },
+    { key: 'sexual_clearance', label: 'Sexual activity clearance', done: visits.some((v) => v.sexual_activity_cleared) },
+  ]
+  return items
+})
+
+const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i.done).length)
 </script>
 
 <template>
@@ -214,10 +323,72 @@ const visitSummary = computed(() => pdStore.pregnancyDashboard?.visit_summary ??
             </div>
           </div>
         </div>
+
+        <!-- Postpartum Timeline -->
+        <div v-else-if="isPostpartum" class="flex flex-col gap-1.5">
+          <div class="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Postpartum Recovery</span>
+            <span class="font-medium text-foreground">Day {{ daysPostpartum }}</span>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="relative mt-2 mb-3">
+            <div class="h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                class="absolute inset-y-0 left-0 h-3 rounded-full transition-all duration-1000 ease-out"
+                :style="{ width: `${ppProgress}%`, background: 'linear-gradient(90deg, #14b8a6, #06b6d4, #3b82f6)' }"
+              />
+            </div>
+
+            <!-- Today marker -->
+            <div
+              class="absolute top-1/2 -translate-y-1/2 z-20 transition-all duration-1000 ease-out"
+              :style="{ left: `${ppProgress}%` }"
+            >
+              <div class="group relative -ml-2 flex items-center justify-center size-4">
+                <span class="absolute inset-0 animate-ping rounded-full bg-teal-400/30" />
+                <span class="relative flex size-4 items-center justify-center rounded-full bg-white shadow-md ring-2 ring-teal-400">
+                  <span class="size-2 rounded-full bg-teal-500" />
+                </span>
+              </div>
+            </div>
+
+            <!-- Milestone markers -->
+            <div
+              v-for="m in ppMilestones"
+              :key="m.day"
+              class="absolute top-1/2 -translate-y-1/2 z-10"
+              :style="{ left: `${(m.day / PP_TOTAL_DAYS) * 100}%` }"
+            >
+              <div class="group relative -ml-1.5 flex items-center justify-center">
+                <span
+                  class="flex size-3 items-center justify-center rounded-full border-2 bg-background"
+                  :class="daysPostpartum >= m.day ? 'border-teal-500 bg-teal-500' : 'border-muted-foreground/30'"
+                />
+                <div class="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[9px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                  {{ m.label }} (Day {{ m.day }})
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Day markers -->
+          <div class="relative h-3 w-full">
+            <div
+              v-for="d in ppDayMarkers"
+              :key="d"
+              class="absolute flex flex-col items-center"
+              :style="{ left: `${(d / PP_TOTAL_DAYS) * 100}%` }"
+            >
+              <div class="h-1.5 w-px bg-muted-foreground/30" />
+              <span class="mt-0.5 text-[8px] tabular-nums text-muted-foreground/60 -translate-x-1/2">{{ d }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- B. Summary Cards ─────────────────────────────────────────────── -->
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- B. Summary Cards — Prenatal ────────────────────────────────── -->
+      <div v-if="!isPostpartum" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <!-- Obstetric Hx -->
         <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
           <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
@@ -286,20 +457,155 @@ const visitSummary = computed(() => pdStore.pregnancyDashboard?.visit_summary ??
           </div>
           <div class="min-w-0">
             <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Visits</p>
-            <p class="text-lg font-bold tabular-nums">{{ pdStore.pregnancyDashboard.visit_summary?.count ?? 0 }}</p>
+            <p class="text-lg font-bold tabular-nums">{{ visitSummary?.count ?? 0 }}</p>
           </div>
         </div>
       </div>
 
-      <!-- B. Trend Charts ──────────────────────────────────────────────── -->
-      <PrenatalTrendCharts :dashboard-data="dashboardData" />
+      <!-- B. Summary Cards — Postpartum ────────────────────────────── -->
+      <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <!-- Days Postpartum -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-sm">
+            <CalendarDays class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Postpartum</p>
+            <p class="text-lg font-bold tabular-nums">Day {{ daysPostpartum }}</p>
+            <p class="text-[10px] text-muted-foreground">
+              {{ daysPostpartum <= 7 ? 'Early postpartum' : daysPostpartum <= 42 ? 'Late postpartum' : 'Extended' }}
+            </p>
+          </div>
+        </div>
 
-      <!-- C. Lab Tracker ──────────────────────────────────────────────── -->
+        <!-- Delivery Mode -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm">
+            <Baby class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Delivery</p>
+            <p class="text-lg font-bold">{{ deliveryModeShort(dashboardData?.delivery_summary?.delivery_mode) }}</p>
+            <p v-if="dashboardData?.delivery_summary?.ga_weeks != null" class="text-[10px] text-muted-foreground">
+              {{ dashboardData.delivery_summary.ga_weeks }}w{{ dashboardData.delivery_summary.ga_days ?? 0 }}d
+            </p>
+          </div>
+        </div>
+
+        <!-- Next Visit -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
+            <CalendarDays class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Next Visit</p>
+            <p class="text-sm font-bold">{{ ppNextVisit ? formatDate(ppNextVisit) : '—' }}</p>
+            <p v-if="ppNextVisitDays !== null" class="text-[10px] text-muted-foreground">
+              {{ ppNextVisitDays > 0 ? `In ${ppNextVisitDays} days` : ppNextVisitDays === 0 ? 'Today' : `${Math.abs(ppNextVisitDays)} days ago` }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Total Visits -->
+        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
+            <ChartLineIcon class="size-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total Visits</p>
+            <p class="text-lg font-bold tabular-nums">{{ ppTotalVisits }}</p>
+            <p class="text-[10px] text-muted-foreground">
+              {{ visitSummary?.count ?? 0 }} prenatal + {{ dashboardData?.postpartum_visits?.length ?? 0 }} PP
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delivery Summary Card (postpartum only) ────────────────── -->
+      <Card v-if="isPostpartum && dashboardData?.delivery_summary" class="border-teal-200 bg-teal-50/30 dark:border-teal-800 dark:bg-teal-950/30">
+        <CardHeader class="pb-2 pt-3">
+          <CardTitle class="text-sm font-semibold">Delivery Summary</CardTitle>
+        </CardHeader>
+        <CardContent class="pb-4">
+          <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+            <div>
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Date</p>
+              <p class="font-medium">{{ formatDate(dashboardData.delivery_summary.delivered_at) }}</p>
+            </div>
+            <div>
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Mode</p>
+              <p class="font-medium">{{ deliveryModeLabel(dashboardData.delivery_summary.delivery_mode) }}</p>
+            </div>
+            <div v-if="dashboardData.delivery_summary.blood_loss_ml">
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Blood Loss</p>
+              <p class="font-medium" :class="dashboardData.delivery_summary.blood_loss_ml > 500 ? 'text-red-600' : ''">
+                {{ dashboardData.delivery_summary.blood_loss_ml }} mL
+              </p>
+            </div>
+            <div v-if="dashboardData.delivery_summary.complications.length > 0">
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Complications</p>
+              <p class="font-medium text-red-600">{{ dashboardData.delivery_summary.complications.map((c: string) => c.replace(/_/g, ' ')).join(', ') }}</p>
+            </div>
+            <div>
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Baby</p>
+              <p class="font-medium">
+                {{ dashboardData.delivery_summary.birth_gender === 'male' ? 'Boy' : dashboardData.delivery_summary.birth_gender === 'female' ? 'Girl' : '—' }}
+                <span v-if="dashboardData.delivery_summary.birth_weight_grams" class="text-muted-foreground">
+                  &middot; {{ dashboardData.delivery_summary.birth_weight_grams }}g
+                  ({{ (dashboardData.delivery_summary.birth_weight_grams / 1000).toFixed(2) }}kg)
+                </span>
+              </p>
+            </div>
+            <div v-if="dashboardData.delivery_summary.apgar_1min != null">
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">APGAR 1'/5'</p>
+              <p class="font-medium tabular-nums">
+                {{ dashboardData.delivery_summary.apgar_1min }} / {{ dashboardData.delivery_summary.apgar_5min ?? '—' }}
+              </p>
+            </div>
+            <div v-if="dashboardData.delivery_summary.laceration">
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Laceration</p>
+              <p class="font-medium">{{ dashboardData.delivery_summary.laceration.replace(/_/g, ' ') }}</p>
+            </div>
+            <div v-if="dashboardData.delivery_summary.neonatal_outcome && dashboardData.delivery_summary.neonatal_outcome !== 'alive_well'">
+              <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Neonatal Outcome</p>
+              <p class="font-medium text-red-600">{{ dashboardData.delivery_summary.neonatal_outcome.replace(/_/g, ' ') }}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Trend Charts ─────────────────────────────────────────────────── -->
+      <PrenatalTrendCharts :dashboard-data="mergedDashboardData" :show-fetal-charts="pregnancy.status === 'active'" />
+
+      <!-- Prenatal Care Checklist (active only) ──────────────────────── -->
       <PrenatalCareChecklist
+        v-if="pregnancy.status === 'active'"
         :patient-id="patientId"
         :pregnancy-id="pregnancyId"
-        :disabled="pregnancy.status !== 'active'"
       />
+
+      <!-- Postpartum Checklist ────────────────────────────────────────── -->
+      <Card v-if="isPostpartum">
+        <CardHeader class="pb-2 pt-3">
+          <div class="flex items-center justify-between">
+            <CardTitle class="text-sm font-semibold">Postpartum Checklist</CardTitle>
+            <span class="text-xs text-muted-foreground tabular-nums">{{ ppChecklistDone }}/{{ postpartumChecklist.length }}</span>
+          </div>
+        </CardHeader>
+        <CardContent class="pb-4">
+          <div class="flex flex-col gap-0.5">
+            <div
+              v-for="item in postpartumChecklist"
+              :key="item.key"
+              class="flex items-center gap-2.5 rounded-md px-2 py-1.5"
+            >
+              <CheckCircle2 v-if="item.done" class="size-4 shrink-0 text-teal-500" />
+              <Circle v-else class="size-4 shrink-0 text-muted-foreground/30" />
+              <span class="text-sm" :class="item.done ? 'text-muted-foreground line-through' : ''">{{ item.label }}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <!-- D. Visit Timeline ───────────────────────────────────────────── -->
       <Card v-if="visitSummary.length > 0">

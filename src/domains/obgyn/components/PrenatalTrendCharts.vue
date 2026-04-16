@@ -15,9 +15,12 @@ import type { PregnancyDashboard } from '../types/obgyn.types'
 
 use([LineChart, GridComponent, TooltipComponent, LegendComponent, MarkLineComponent, CanvasRenderer])
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   dashboardData: PregnancyDashboard
-}>()
+  showFetalCharts?: boolean
+}>(), {
+  showFetalCharts: true,
+})
 
 function shortDate(d: string): string {
   const dt = new Date(d)
@@ -416,8 +419,8 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
       </CardContent>
     </Card>
 
-    <!-- Fundal Height -->
-    <Card>
+    <!-- Fundal Height (prenatal only) -->
+    <Card v-if="showFetalCharts">
       <CardHeader class="px-3 pb-0 pt-2.5">
         <CardTitle class="text-[11px] font-semibold">Fundal Height Trend</CardTitle>
       </CardHeader>
@@ -434,8 +437,8 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
       </CardContent>
     </Card>
 
-    <!-- Fetal Heart Rate -->
-    <Card>
+    <!-- Fetal Heart Rate (prenatal only) -->
+    <Card v-if="showFetalCharts">
       <CardHeader class="px-3 pb-0 pt-2.5">
         <CardTitle class="text-[11px] font-semibold">Fetal Heart Rate Trend</CardTitle>
       </CardHeader>
