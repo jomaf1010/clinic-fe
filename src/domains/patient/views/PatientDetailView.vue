@@ -38,7 +38,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import EditPatientDialog from '../components/EditPatientDialog.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
 import { patientApi } from '../api/patientApi'
-import type { PatientResponse, Problem } from '../types/patient.types'
+import type { PatientResponse } from '../types/patient.types'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
 import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
@@ -55,14 +56,15 @@ const router = useRouter()
 const authStore = useAuthStore()
 const encounterStore = useEncounterStore()
 const notificationStore = useNotificationStore()
-const patient = ref<PatientResponse | null>(null)
+const pdStore = usePatientDetailStore()
+const patient = computed(() => pdStore.patient)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
 const patientIdRef = computed(() => route.params.id as string)
 const clinicIdRef = computed(() => authStore.currentClinic?.id)
 usePatientSync(patientIdRef, clinicIdRef, (updated) => {
-  patient.value = updated
+  pdStore.updatePatientFromSync(updated)
 })
 
 const avatarCropOpen = ref(false)
@@ -119,17 +121,7 @@ const previousTriage = computed(() => {
   return visibleConsultations.value[idx]?.triage ?? null
 })
 
-const age = computed(() => {
-  if (!patient.value) return null
-  const dob = new Date(patient.value.date_of_birth)
-  const today = new Date()
-  let years = today.getFullYear() - dob.getFullYear()
-  const monthDiff = today.getMonth() - dob.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-    years--
-  }
-  return years
-})
+const age = computed(() => pdStore.patientAge)
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
@@ -146,12 +138,11 @@ async function fetchPatient() {
   avatarUrl.value = null
 
   try {
-    const response = await patientApi.get(route.params.id as string)
-    patient.value = response.data
-
+    const id = route.params.id as string
+    await pdStore.loadPatient(id)
     await Promise.all([
-      encounterStore.loadForPatient(response.data.id),
-      fetchProblems(response.data.id),
+      encounterStore.loadForPatient(id),
+      pdStore.loadCore(),
     ])
   } catch {
     error.value = 'Failed to load patient details. Please try again.'
@@ -172,20 +163,10 @@ watch(() => notificationStore.notifications[0], (newest) => {
 const editDialogOpen = ref(false)
 const mobileCardExpanded = ref(false)
 
-// Problems count for stats row
-const patientProblems = ref<Problem[]>([])
+// Problems count from store
 const activeProblemsCount = computed(() =>
-  patientProblems.value.filter(p => p.status !== 'resolved').length,
+  pdStore.problems.filter(p => p.status !== 'resolved').length,
 )
-
-async function fetchProblems(patientId: string) {
-  try {
-    const res = await patientApi.getProblems(patientId)
-    patientProblems.value = res.data
-  } catch {
-    patientProblems.value = []
-  }
-}
 
 // Profile completeness (0 to 1)
 const profileCompleteness = computed(() => {
@@ -296,6 +277,7 @@ watch(sentinel, (el) => {
 onUnmounted(() => {
   observer?.disconnect()
   encounterStore.clearPatientEncounters()
+  pdStore.$reset()
 })
 </script>
 

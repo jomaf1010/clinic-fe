@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
@@ -35,22 +35,23 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
-import { patientApi } from '@/domains/patient/api/patientApi'
 import { consultationApi } from '@/domains/consultation/api/consultationApi'
 import type { Problem, ProblemStatus, CreateProblemPayload } from '@/domains/patient/types/patient.types'
 import type { DiagnosisSearchResult } from '@/domains/consultation/api/consultationApi'
 import type { StructuredAllergy, StoreAllergyPayload } from '@/domains/patient/api/patientApi'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 
 const route = useRoute()
 const patientId = computed(() => route.params.id as string)
+const pdStore = usePatientDetailStore()
 
 // ── Modal state ───────────────────────────────────────────────────────────
 const showProblemsModal = ref<boolean>(false)
 const showAllergiesModal = ref<boolean>(false)
 
-// ── Problem List ──────────────────────────────────────────────────────────
-const problems = ref<Problem[]>([])
-const isLoading = ref(false)
+// ── Problem List (from store) ─────────────────────────────────────────────
+const problems = computed(() => pdStore.problems)
+const isLoading = computed(() => pdStore.isLoadingCore)
 
 const activeProblems = computed(() =>
   problems.value.filter((p) => p.status !== 'resolved'),
@@ -113,13 +114,12 @@ async function submitAdd() {
   if (!desc) return
   isSaving.value = true
   try {
-    const res = await patientApi.addProblem(patientId.value, {
+    await pdStore.addProblem({
       description: desc,
       icd_code: newProblem.value.icd_code,
       status: newProblem.value.status,
       onset_date: newProblem.value.onset_date || null,
     })
-    problems.value.unshift(res.data)
     resetAddForm()
     showAddForm.value = false
   } catch {
@@ -197,14 +197,12 @@ function cancelEdit() {
 async function submitEdit(p: Problem) {
   isUpdating.value = true
   try {
-    const res = await patientApi.updateProblem(p.uuid, {
+    await pdStore.updateProblem(p.uuid, {
       description: editForm.value.description,
       icd_code: editForm.value.icd_code,
       status: editForm.value.status,
       onset_date: editForm.value.onset_date || null,
     })
-    const idx = problems.value.findIndex((x) => x.uuid === p.uuid)
-    if (idx >= 0) problems.value[idx] = res.data
     editingId.value = null
   } catch {
     toast.error('Failed to update problem')
@@ -215,9 +213,7 @@ async function submitEdit(p: Problem) {
 
 async function resolveProblem(p: Problem) {
   try {
-    const res = await patientApi.updateProblem(p.uuid, { status: 'resolved' })
-    const idx = problems.value.findIndex((x) => x.uuid === p.uuid)
-    if (idx >= 0) problems.value[idx] = res.data
+    await pdStore.updateProblem(p.uuid, { status: 'resolved' })
   } catch {
     toast.error('Failed to resolve problem')
   }
@@ -225,8 +221,7 @@ async function resolveProblem(p: Problem) {
 
 async function deleteProblem(p: Problem) {
   try {
-    await patientApi.deleteProblem(p.uuid)
-    problems.value = problems.value.filter((x) => x.uuid !== p.uuid)
+    await pdStore.deleteProblem(p.uuid)
   } catch {
     toast.error('Failed to delete problem')
   }
@@ -234,9 +229,7 @@ async function deleteProblem(p: Problem) {
 
 async function reactivateProblem(p: Problem) {
   try {
-    const res = await patientApi.updateProblem(p.uuid, { status: 'active' })
-    const idx = problems.value.findIndex((x) => x.uuid === p.uuid)
-    if (idx >= 0) problems.value[idx] = res.data
+    await pdStore.updateProblem(p.uuid, { status: 'active' })
   } catch {
     toast.error('Failed to reactivate problem')
   }
@@ -261,9 +254,9 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-// ── Structured Allergies ──────────────────────────────────────────────────
-const allergies = ref<StructuredAllergy[]>([])
-const isLoadingAllergies = ref(false)
+// ── Structured Allergies (from store) ────────────────────────────────────
+const allergies = computed(() => pdStore.allergies)
+const isLoadingAllergies = computed(() => pdStore.isLoadingCore)
 const showAllergyDialog = ref(false)
 const editingAllergy = ref<StructuredAllergy | null>(null)
 const isSavingAllergy = ref(false)
@@ -310,18 +303,6 @@ function openEditAllergy(a: StructuredAllergy) {
   showAllergyDialog.value = true
 }
 
-async function loadAllergies() {
-  isLoadingAllergies.value = true
-  try {
-    const res = await patientApi.getAllergies(patientId.value)
-    allergies.value = res.data
-  } catch {
-    // silently fail
-  } finally {
-    isLoadingAllergies.value = false
-  }
-}
-
 async function saveAllergy() {
   if (!allergyForm.allergen.trim()) return
   isSavingAllergy.value = true
@@ -335,12 +316,9 @@ async function saveAllergy() {
       notes: allergyForm.notes.trim() || null,
     }
     if (editingAllergy.value) {
-      const res = await patientApi.updateAllergy(patientId.value, editingAllergy.value.uuid, payload)
-      const idx = allergies.value.findIndex((a) => a.uuid === editingAllergy.value!.uuid)
-      if (idx >= 0) allergies.value[idx] = res.data
+      await pdStore.updateAllergy(editingAllergy.value.uuid, payload)
     } else {
-      const res = await patientApi.addAllergy(patientId.value, payload)
-      allergies.value.unshift(res.data)
+      await pdStore.addAllergy(payload)
     }
     showAllergyDialog.value = false
     resetAllergyForm()
@@ -353,8 +331,7 @@ async function saveAllergy() {
 
 async function deleteAllergy(a: StructuredAllergy) {
   try {
-    await patientApi.deleteAllergy(patientId.value, a.uuid)
-    allergies.value = allergies.value.filter((x) => x.uuid !== a.uuid)
+    await pdStore.deleteAllergy(a.uuid)
   } catch {
     toast.error('Failed to delete allergy')
   }
@@ -405,20 +382,7 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
   return hasSevere ? 'destructive' : 'secondary'
 })
 
-// ── Load ──────────────────────────────────────────────────────────────────
-onMounted(async () => {
-  if (!patientId.value) return
-  isLoading.value = true
-  try {
-    const res = await patientApi.getProblems(patientId.value)
-    problems.value = res.data
-  } catch {
-    // silently fail
-  } finally {
-    isLoading.value = false
-  }
-  loadAllergies()
-})
+// Data loaded by parent via pdStore.loadCore() — no onMounted fetch needed
 </script>
 
 <template>
