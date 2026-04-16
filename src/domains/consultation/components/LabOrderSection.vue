@@ -3,7 +3,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { http, getAuthToken } from '@/lib/http'
 import {
-  FlaskConical,
   Plus,
   Pencil,
   X,
@@ -23,7 +22,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Dialog, DialogScrollContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -562,24 +560,19 @@ function cancelAddForm() {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header row -->
+    <!-- Actions -->
     <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2">
-        <Label class="flex items-center gap-1.5">
-          <FlaskConical class="size-3.5 text-muted-foreground" />
-          Lab Orders
-        </Label>
-        <Badge
-          v-if="labOrder"
-          variant="outline"
-          class="capitalize"
-          :class="labOrderStatusClass"
-        >
-          <CheckCircle2 v-if="labOrder.status === 'completed'" class="size-3" />
-          <Clock v-else class="size-3" />
-          {{ labOrder.status }}
-        </Badge>
-      </div>
+      <Badge
+        v-if="labOrder"
+        variant="outline"
+        class="capitalize"
+        :class="labOrderStatusClass"
+      >
+        <CheckCircle2 v-if="labOrder.status === 'completed'" class="size-3" />
+        <Clock v-else class="size-3" />
+        {{ labOrder.status }}
+      </Badge>
+      <div v-else />
 
       <div class="flex items-center gap-1.5">
         <template v-if="labOrder && labOrder.items.some(i => i.status === 'pending')">

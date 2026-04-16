@@ -53,6 +53,7 @@ async function evaluateRisk(): Promise<void> {
       medical_conditions: form.medical_conditions ? form.medical_conditions.split('\n').map((s: string) => s.trim()).filter(Boolean) : null,
       fetus_count: form.fetus_count,
       smoking: form.smoking || null,
+      alcohol: form.alcohol || null,
       pregnancy_id: props.pregnancy?.id ?? null,
     })
     evaluatedRisk.value = res

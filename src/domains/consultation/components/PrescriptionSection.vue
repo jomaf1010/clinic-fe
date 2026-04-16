@@ -5,7 +5,6 @@ import { HttpError } from '@/lib/http'
 import {
   AlertTriangle,
   Calculator,
-  Pill,
   Plus,
   Pencil,
   X,
@@ -19,7 +18,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -589,21 +587,16 @@ const canSave = () => {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header -->
+    <!-- Actions -->
     <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2">
-        <Label class="flex items-center gap-1.5">
-          <Pill class="size-3.5 text-muted-foreground" />
-          Prescription
-        </Label>
-        <Badge
-          v-if="prescription"
-          variant="outline"
-          class="border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-400"
-        >
-          {{ prescription.items.length }} {{ prescription.items.length === 1 ? 'medicine' : 'medicines' }}
-        </Badge>
-      </div>
+      <Badge
+        v-if="prescription"
+        variant="outline"
+        class="border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-400"
+      >
+        {{ prescription.items.length }} {{ prescription.items.length === 1 ? 'medicine' : 'medicines' }}
+      </Badge>
+      <div v-else />
 
       <!-- PDF actions -->
       <div v-if="prescription && prescription.items.length > 0" class="flex items-center gap-1.5">

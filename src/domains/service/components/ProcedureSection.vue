@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import {
-  Stethoscope,
   Plus,
   Minus,
   X,
@@ -13,7 +12,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -147,20 +145,14 @@ function formatPrice(price: number | null): string {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header -->
-    <div class="flex items-center gap-2">
-      <Label class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Procedures
-      </Label>
-      <Badge
-        v-if="procedures.length"
-        variant="outline"
-        class="border-purple-300 bg-purple-100 text-purple-700 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-400"
-      >
-        {{ procedures.length }} {{ procedures.length === 1 ? 'item' : 'items' }}
-      </Badge>
-    </div>
+    <!-- Badge -->
+    <Badge
+      v-if="procedures.length"
+      variant="outline"
+      class="w-fit border-purple-300 bg-purple-100 text-purple-700 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-400"
+    >
+      {{ procedures.length }} {{ procedures.length === 1 ? 'item' : 'items' }}
+    </Badge>
 
     <!-- Procedures list -->
     <div v-if="procedures.length" class="flex flex-wrap gap-2">

@@ -165,6 +165,9 @@ async function handleResolve(payload: {
 
     showResolveModal.value = false
 
+    // Reload pregnancy list so cached data reflects resolved status
+    await pdStore.loadObgyn()
+
     if (result.encounter_id) {
       // Delivery outcome — navigate to delivery form
       toast.success('Delivery encounter created')
@@ -173,10 +176,12 @@ async function handleResolve(payload: {
         params: { patientId: patientId.value, id: result.encounter_id },
       })
     } else {
-      // Loss outcome — pregnancy closed
+      // Loss outcome — pregnancy closed, reload detail + encounters
       toast.success('Pregnancy resolved')
-      // Reload encounters to reflect updated timeline
-      await encounterStore.loadForPatient(patientId.value, { pregnancy_id: pregnancyId.value })
+      await Promise.all([
+        pdStore.loadPregnancyDetail(pregnancyId.value),
+        encounterStore.loadForPatient(patientId.value, { pregnancy_id: pregnancyId.value }),
+      ])
     }
   } catch {
     toast.error('Failed to resolve pregnancy')
@@ -300,9 +305,19 @@ function goToVisit(encounterId: string): void {
 
               <div class="flex-1" />
 
-              <!-- Resolve button (visible at ≥24 weeks) -->
+              <!-- Go to Delivery (pregnancy resolved with delivery encounter) -->
               <Button
-                v-if="pdStore.currentPregnancy?.status === 'active' && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) >= 24"
+                v-if="pdStore.currentPregnancy?.delivery_encounter_id"
+                size="sm"
+                variant="outline"
+                @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patientId, id: pdStore.currentPregnancy.delivery_encounter_id } })"
+              >
+                <Baby class="size-3.5" /> Go to Delivery
+              </Button>
+
+              <!-- Resolve button (visible at ≥24 weeks, no delivery yet) -->
+              <Button
+                v-else-if="pdStore.currentPregnancy?.status === 'active' && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) >= 24"
                 size="sm"
                 variant="outline"
                 @click="showResolveModal = true"
@@ -322,9 +337,9 @@ function goToVisit(encounterId: string): void {
                     <Pencil class="mr-2 size-3.5" />
                     Edit Setup
                   </DropdownMenuItem>
-                  <!-- Resolve in menu only when <24 weeks -->
+                  <!-- Resolve in menu only when <24 weeks and no delivery encounter -->
                   <DropdownMenuItem
-                    v-if="pdStore.currentPregnancy?.status === 'active' && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) < 24"
+                    v-if="pdStore.currentPregnancy?.status === 'active' && !pdStore.currentPregnancy?.delivery_encounter_id && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) < 24"
                     @click="showResolveModal = true"
                   >
                     <CheckCircle2 class="mr-2 size-3.5" />

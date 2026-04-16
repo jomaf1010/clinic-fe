@@ -551,6 +551,7 @@ function proceedAfterFeeWarning() {
               :diagnoses="store.current.consultation?.assessment?.diagnoses ?? []"
               :document-update="documentUpdate"
               :consumables="store.current.consumables ?? []"
+              :procedures="store.current.procedures ?? []"
               :prescription-summary="store.current.prescription_summary"
               :lab-order-summary="store.current.lab_order_summary"
               :payment="store.current.payment"

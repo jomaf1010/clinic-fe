@@ -50,6 +50,7 @@ const props = withDefaults(defineProps<{
   diagnoses: AssessmentDiagnosis[]
   documentUpdate?: GeneratedDocumentResponse | null
   consumables: ConsultationConsumable[]
+  procedures?: Array<{ service_id: string; name: string; quantity: number; unit_price: number | null; notes: string | null }>
   prescriptionSummary: PrescriptionSummary | null
   labOrderSummary: LabOrderSummary | null
   payment: ConsultationPayment
@@ -261,6 +262,11 @@ const consumablesTotalEstimate = computed(() => {
   return props.consumables.reduce((sum, c) => sum + c.quantity * (c.unit_price ?? 0), 0)
 })
 
+const proceduresTotalEstimate = computed(() => {
+  if (!props.procedures?.length) return 0
+  return props.procedures.reduce((sum, p) => sum + p.quantity * (p.unit_price ?? 0), 0)
+})
+
 const discountAmount = computed(() => {
   const fee = consultationFee.value
   const type = props.payment?.fee_discount_type
@@ -272,7 +278,7 @@ const discountAmount = computed(() => {
 
 const estimatedTotal = computed(() => {
   const fee = consultationFee.value - discountAmount.value
-  return Math.max(0, fee) + medicinesTotalEstimate.value + consumablesTotalEstimate.value
+  return Math.max(0, fee) + medicinesTotalEstimate.value + consumablesTotalEstimate.value + proceduresTotalEstimate.value
 })
 
 // Edit mode (finalized)
@@ -430,17 +436,24 @@ onMounted(() => {
     fetchInvoice()
   }
 })
+
+// When status changes from draft → finalized, fetch the newly created invoice
+watch(() => props.status, (newStatus, oldStatus) => {
+  if (newStatus === 'finalized' && oldStatus === 'draft') {
+    fetchInvoice()
+  }
+})
 </script>
 
 <template>
   <!-- Documents section (always visible) -->
-  <div class="flex flex-col gap-3">
-    <h3 class="text-sm font-medium text-muted-foreground">Documents</h3>
+  <div class="flex flex-col gap-4">
+    <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Documents</h3>
     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
       <!-- Prescription PDF -->
       <div
         v-if="hasPrescription"
-        class="flex items-center justify-between rounded-lg border p-3"
+        class="flex flex-col gap-2 rounded-lg border p-3"
       >
         <div class="flex items-center gap-2">
           <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
@@ -451,7 +464,7 @@ onMounted(() => {
             <p class="text-xs text-muted-foreground">{{ prescriptionSummary?.total ?? 0 }} item(s)</p>
           </div>
         </div>
-        <div class="flex items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-1.5">
           <Button
             v-if="prescriptionReady"
             variant="outline"
@@ -487,7 +500,7 @@ onMounted(() => {
       </div>
 
       <!-- Medical Certificate -->
-      <div class="flex items-center justify-between rounded-lg border p-3">
+      <div class="flex flex-col gap-2 rounded-lg border p-3">
         <div class="flex items-center gap-2">
           <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-950">
             <FileCheck class="size-4 text-green-600 dark:text-green-400" />
@@ -499,7 +512,7 @@ onMounted(() => {
             </p>
           </div>
         </div>
-        <div class="flex items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-1.5">
           <Button
             v-if="medCertReady"
             variant="outline"
@@ -544,13 +557,11 @@ onMounted(() => {
     </div>
   </div>
 
-  <Separator class="my-4" />
-
   <!-- Draft state — Estimated Charges + Fee Discount -->
-  <div v-if="isDraft" class="flex flex-col gap-6">
+  <div v-if="isDraft" class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Estimated Charges -->
-    <div class="flex flex-col gap-3">
-      <h3 class="text-sm font-medium text-muted-foreground">Estimated Charges</h3>
+    <div class="flex flex-col gap-4">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Estimated Charges</h3>
       <div class="flex flex-col gap-1.5 rounded-lg border p-4">
         <div class="flex justify-between text-sm">
           <span class="text-muted-foreground">
@@ -569,6 +580,10 @@ onMounted(() => {
           <span class="text-muted-foreground">Medicines</span>
           <span class="tabular-nums">{{ formatCurrency(medicinesTotalEstimate) }}</span>
         </div>
+        <div v-if="proceduresTotalEstimate > 0" class="flex justify-between text-sm">
+          <span class="text-muted-foreground">Procedures ({{ procedures?.length }})</span>
+          <span class="tabular-nums">{{ formatCurrency(proceduresTotalEstimate) }}</span>
+        </div>
         <div v-if="consumablesTotalEstimate > 0" class="flex justify-between text-sm">
           <span class="text-muted-foreground">Consumables</span>
           <span class="tabular-nums">{{ formatCurrency(consumablesTotalEstimate) }}</span>
@@ -586,9 +601,9 @@ onMounted(() => {
     </div>
 
     <!-- Fee Discount -->
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-medium text-muted-foreground">Fee Discount</h3>
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Fee Discount</h3>
         <Button
           v-if="payment?.fee_discount_value"
           variant="ghost"
@@ -651,18 +666,19 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Finalize button -->
-    <Button
-      v-if="canFinalize"
-      class="w-full"
-      :disabled="isSaving"
-      @click="emit('finalize')"
-    >
-      <LoaderCircle v-if="isSaving" class="size-4 animate-spin" />
-      <CheckCircle2 v-else class="size-4" />
-      Finalize Consultation
-    </Button>
   </div>
+
+  <!-- Finalize button -->
+  <Button
+    v-if="isDraft && canFinalize"
+    class="mt-5 w-full"
+    :disabled="isSaving"
+    @click="emit('finalize')"
+  >
+    <LoaderCircle v-if="isSaving" class="size-4 animate-spin" />
+    <CheckCircle2 v-else class="size-4" />
+    Finalize Consultation
+  </Button>
 
   <!-- Loading -->
   <div v-else-if="isLoading" class="flex flex-col gap-4 py-4">
@@ -700,11 +716,11 @@ onMounted(() => {
   </div>
 
   <!-- Finalized with invoice -->
-  <div v-else-if="invoice" class="flex flex-col gap-6">
+  <div v-else-if="invoice" class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Header -->
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
-        <h3 class="text-base font-semibold">{{ invoice.invoice_number }}</h3>
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{{ invoice.invoice_number }}</h3>
         <InvoiceStatusBadge :status="invoice.status" />
       </div>
       <Button variant="outline" size="sm" @click="goToBilling">
@@ -713,12 +729,10 @@ onMounted(() => {
       </Button>
     </div>
 
-    <Separator />
-
     <!-- Line items -->
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between">
-        <h4 class="text-sm font-medium text-muted-foreground">Line Items</h4>
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Line Items</h3>
         <template v-if="canEdit">
           <Button v-if="isEditing" variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs" @click="cancelEditing">
             Done
@@ -794,8 +808,8 @@ onMounted(() => {
     </div>
 
     <!-- Payments -->
-    <div v-if="invoice.payments.length > 0" class="flex flex-col gap-2">
-      <h4 class="text-sm font-medium text-muted-foreground">Payments</h4>
+    <div v-if="invoice.payments.length > 0" class="flex flex-col gap-4">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Payments</h3>
       <div class="flex flex-col gap-2">
         <div
           v-for="payment in invoice.payments"
@@ -823,24 +837,26 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Record payment button -->
-    <Button
-      v-if="canManage && invoice.status !== 'paid' && invoice.status !== 'void'"
-      class="w-full sm:w-auto"
-      @click="showPaymentDialog = true"
-    >
-      <DollarSign class="size-4" />
-      Record Payment
-    </Button>
-
-    <!-- Payment dialog -->
-    <RecordPaymentDialog
-      :open="showPaymentDialog"
-      :invoice="invoice"
-      @update:open="showPaymentDialog = $event"
-      @recorded="onPaymentRecorded"
-    />
   </div>
+
+  <!-- Record payment button -->
+  <Button
+    v-if="invoice && canManage && invoice.status !== 'paid' && invoice.status !== 'void'"
+    class="mt-5 w-full sm:w-auto"
+    @click="showPaymentDialog = true"
+  >
+    <DollarSign class="size-4" />
+    Record Payment
+  </Button>
+
+  <!-- Payment dialog -->
+  <RecordPaymentDialog
+    v-if="invoice"
+    :open="showPaymentDialog"
+    :invoice="invoice"
+    @update:open="showPaymentDialog = $event"
+    @recorded="onPaymentRecorded"
+  />
 
   <!-- Medical Certificate Dialog -->
   <MedCertDialog

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { CheckCircle2, Circle, AlertCircle, LoaderCircle, ClipboardList, Clock } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -123,11 +123,7 @@ function typeBadgeClass(type: ChecklistItem['type']): string {
 <template>
   <Card>
     <CardHeader class="pb-2 pt-3">
-      <div class="flex items-center justify-between">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <ClipboardList class="size-3.5 text-muted-foreground" />
-          Prenatal Care Checklist
-        </CardTitle>
+      <div class="flex items-center justify-end">
         <span v-if="!isLoading && totalCount > 0" class="text-xs text-muted-foreground">
           {{ completedCount }}/{{ totalCount }}
         </span>

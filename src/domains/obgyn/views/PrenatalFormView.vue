@@ -9,6 +9,7 @@ import {
   Baby,
   CalendarDays,
   CheckCircle2,
+  Clock,
   FileText,
   ChevronLeft,
   ChevronRight,
@@ -19,7 +20,6 @@ import {
   LoaderCircle,
   Lock,
   Search,
-  Send,
   Stethoscope,
   WifiOff,
   X,
@@ -74,7 +74,12 @@ import DangerSignsChecklist from '../components/DangerSignsChecklist.vue'
 import PrenatalCareChecklist from '../components/PrenatalCareChecklist.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { toast } from 'vue-sonner'
+import { CalendarDate, today, getLocalTimeZone, getDayOfWeek } from '@internationalized/date'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
+import { scheduleApi } from '@/domains/schedule/api/scheduleApi'
+import type { DaySchedule, Slot } from '@/domains/schedule/types/schedule.types'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
@@ -323,8 +328,10 @@ function buildTriagePayload(): PrenatalTriage {
   }
 }
 
+let triageSaving = false
 function saveTriage(): void {
-  handleSave({ triage: buildTriagePayload() })
+  triageSaving = true
+  handleSave({ triage: buildTriagePayload() }).finally(() => { triageSaving = false })
 }
 
 // ── Local assessment state ───────────────────────────────────────────
@@ -667,7 +674,7 @@ interface LocalPlan {
   next_visit_date: string
   counseling_provided: string[]
   birth_plan_discussed: boolean
-  referrals: string
+
   notes: string
 }
 
@@ -676,7 +683,6 @@ function emptyPlan(): LocalPlan {
     next_visit_date: '',
     counseling_provided: [],
     birth_plan_discussed: false,
-    referrals: '',
     notes: '',
   }
 }
@@ -689,7 +695,6 @@ function syncPlanFromStore(): void {
   localPlan.next_visit_date = p.next_visit_date ?? ''
   localPlan.counseling_provided = [...(p.counseling_provided ?? [])]
   localPlan.birth_plan_discussed = p.birth_plan_discussed ?? false
-  localPlan.referrals = (p.referrals ?? []).join(', ')
   localPlan.notes = p.notes ?? ''
 }
 
@@ -720,18 +725,6 @@ const weightGainBadge = computed(() => {
   }
 })
 
-// Next visit auto-suggest date
-function autoSuggestNextVisit(): void {
-  if (localPlan.next_visit_date) return // don't overwrite existing
-  const w = gaWeeks.value ?? 0
-  const today = new Date()
-  let daysToAdd = 28 // monthly
-  if (w >= 36) daysToAdd = 7
-  else if (w >= 28) daysToAdd = 14
-  const nextDate = new Date(today.getTime() + daysToAdd * 24 * 60 * 60 * 1000)
-  localPlan.next_visit_date = nextDate.toISOString().slice(0, 10)
-  savePlan()
-}
 
 // Sparkline chart options for BP and FHR trends
 const bpSparkline = computed(() => {
@@ -763,26 +756,223 @@ const fhrSparkline = computed(() => {
   }
 })
 
-// Create appointment from next visit date
-const isCreatingAppointment = ref(false)
+// ── Follow-up scheduling (schedule-aware) ────────────────────────────
+const workingDays = ref<DaySchedule[]>([])
+const scheduleLoading = ref(false)
+const followUpSlots = ref<Slot[]>([])
+const followUpSlotsLoading = ref(false)
+const followUpSelectedDate = ref<string | null>(null)
+const followUpSelectedSlot = ref<string | null>(null)
+const isBookingFollowUp = ref(false)
+const followUpBooked = ref(false)
 
-async function createAppointmentFromNextVisit(): Promise<void> {
-  if (!localPlan.next_visit_date || !store.current) return
-  isCreatingAppointment.value = true
+const minFollowUpDate = today(getLocalTimeZone()).add({ days: 1 })
+
+const enabledWeekdays = computed(() => {
+  const days = workingDays.value
+  if (!days.length) return new Set<number>()
+  return new Set(days.filter((d) => d.enabled).map((d) => d.day))
+})
+
+function isDateUnavailable(date: { year: number; month: number; day: number }): boolean {
+  if (enabledWeekdays.value.size === 0) return false
+  const calDate = new CalendarDate(date.year, date.month, date.day)
+  const dow = getDayOfWeek(calDate, 'en-US')
+  return !enabledWeekdays.value.has(dow)
+}
+
+const availableFollowUpSlots = computed(() => followUpSlots.value.filter((s) => s.available))
+
+const followUpCalendarValue = computed(() => {
+  const d = followUpSelectedDate.value
+  if (!d) return undefined
+  const dt = new Date(d)
+  return new CalendarDate(dt.getFullYear(), dt.getMonth() + 1, dt.getDate())
+})
+
+const followUpDisplay = computed(() => {
+  if (!followUpSelectedDate.value) return null
+  return new Date(followUpSelectedDate.value).toLocaleDateString('en-US', {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+  })
+})
+
+function formatSlotTime(isoDatetime: string): string {
+  return new Date(isoDatetime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+async function loadDoctorSchedule(): Promise<void> {
+  const doctorId = store.current?.doctor_id ?? authStore.user?.id
+  if (!doctorId) return
+  scheduleLoading.value = true
+  try {
+    const res = await scheduleApi.getSchedule(doctorId)
+    workingDays.value = res.data.days
+  } catch {
+    // No schedule configured — allow all days
+  } finally {
+    scheduleLoading.value = false
+  }
+}
+
+async function onFollowUpDateSelect(date: CalendarDate): Promise<void> {
+  const iso = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
+  followUpSelectedDate.value = iso
+  followUpSelectedSlot.value = null
+  followUpBooked.value = false
+
+  // Fetch available slots (don't save yet — save only when slot is booked)
+  const doctorId = store.current?.doctor_id ?? authStore.user?.id
+  if (!doctorId) return
+  followUpSlotsLoading.value = true
+  try {
+    const res = await scheduleApi.getAvailability(doctorId, iso)
+    followUpSlots.value = res.data.slots
+  } catch {
+    followUpSlots.value = []
+  } finally {
+    followUpSlotsLoading.value = false
+  }
+}
+
+async function bookFollowUpSlot(slot: Slot): Promise<void> {
+  if (!store.current) return
+  followUpSelectedSlot.value = slot.start
+  isBookingFollowUp.value = true
   try {
     await appointmentApi.create({
       patient_id: store.current.patient_id,
       doctor_id: store.current.doctor_id ?? authStore.user!.id,
-      scheduled_at: `${localPlan.next_visit_date}T09:00:00`,
+      scheduled_at: slot.start,
       reason: 'Prenatal visit',
       consultation_type: 'follow_up',
     })
-    toast.success('Follow-up appointment scheduled')
+    followUpBooked.value = true
+    localPlan.next_visit_date = followUpSelectedDate.value ?? ''
+    savePlan()
+    toast.success('Follow-up appointment booked')
   } catch {
-    toast.error('Failed to create appointment')
+    toast.error('Failed to book appointment')
+    followUpSelectedSlot.value = null
   } finally {
-    isCreatingAppointment.value = false
+    isBookingFollowUp.value = false
   }
+}
+
+function clearFollowUp(): void {
+  localPlan.next_visit_date = ''
+  followUpSelectedDate.value = null
+  followUpSelectedSlot.value = null
+  followUpSlots.value = []
+  followUpBooked.value = false
+  savePlan()
+}
+
+// ── Smart follow-up recommendation ──────────────────────────────────
+const recommendedDate = computed(() => {
+  const w = gaWeeks.value ?? 0
+  const visitDate = store.current?.visit_date ? new Date(store.current.visit_date) : new Date()
+  let daysToAdd = 28
+  if (w >= 36) daysToAdd = 7
+  else if (w >= 28) daysToAdd = 14
+  const target = new Date(visitDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000)
+  return target.toISOString().slice(0, 10)
+})
+
+const recommendedDateDisplay = computed(() => {
+  if (!recommendedDate.value) return ''
+  return new Date(recommendedDate.value + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+})
+
+const isCheckingRecommended = ref(false)
+const recommendedUnavailable = ref(false)
+const earlierAlternative = ref<{ date: string; display: string } | null>(null)
+const laterAlternative = ref<{ date: string; display: string } | null>(null)
+
+function dateToIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function formatDateDisplay(iso: string): string {
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+async function checkDateHasSlots(iso: string): Promise<boolean> {
+  const doctorId = store.current?.doctor_id ?? authStore.user?.id
+  if (!doctorId) return false
+  try {
+    const res = await scheduleApi.getAvailability(doctorId, iso)
+    return res.data.slots.some((s) => s.available)
+  } catch {
+    return false
+  }
+}
+
+function isWorkingDay(iso: string): boolean {
+  const d = new Date(iso + 'T00:00')
+  const calDate = new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate())
+  return !isDateUnavailable({ year: calDate.year, month: calDate.month, day: calDate.day })
+}
+
+async function checkRecommendedAvailability(): Promise<void> {
+  isCheckingRecommended.value = true
+  recommendedUnavailable.value = false
+  earlierAlternative.value = null
+  laterAlternative.value = null
+
+  const targetIso = recommendedDate.value
+  const targetDate = new Date(targetIso + 'T00:00')
+
+  // Check if recommended date is a working day with available slots
+  if (isWorkingDay(targetIso) && await checkDateHasSlots(targetIso)) {
+    isCheckingRecommended.value = false
+    return // recommended date is available — button will show it directly
+  }
+
+  // Recommended date unavailable — find alternatives
+  recommendedUnavailable.value = true
+
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const findEarlier = (async () => {
+    for (let i = 1; i <= 14; i++) {
+      const candidate = new Date(targetDate.getTime() - i * 86400000)
+      if (candidate < tomorrow) break
+      const iso = dateToIso(candidate)
+      if (isWorkingDay(iso) && await checkDateHasSlots(iso)) {
+        earlierAlternative.value = { date: iso, display: formatDateDisplay(iso) }
+        return
+      }
+    }
+  })()
+
+  const findLater = (async () => {
+    for (let i = 1; i <= 14; i++) {
+      const candidate = new Date(targetDate.getTime() + i * 86400000)
+      const iso = dateToIso(candidate)
+      if (isWorkingDay(iso) && await checkDateHasSlots(iso)) {
+        laterAlternative.value = { date: iso, display: formatDateDisplay(iso) }
+        return
+      }
+    }
+  })()
+
+  await Promise.all([findEarlier, findLater])
+  isCheckingRecommended.value = false
+}
+
+function selectRecommendedDate(): void {
+  const d = new Date(recommendedDate.value + 'T00:00')
+  onFollowUpDateSelect(new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate()))
+}
+
+function selectAlternativeDate(iso: string): void {
+  recommendedUnavailable.value = false
+  earlierAlternative.value = null
+  laterAlternative.value = null
+  const d = new Date(iso + 'T00:00')
+  onFollowUpDateSelect(new CalendarDate(d.getFullYear(), d.getMonth() + 1, d.getDate()))
 }
 
 // ── Ultrasound GA ↔ EDD auto-computation ────────────────────────────
@@ -923,13 +1113,15 @@ function buildPlanPayload(): PrenatalPlan {
     counseling_provided: [...localPlan.counseling_provided],
     birth_plan_discussed: localPlan.birth_plan_discussed,
     education_provided: [],
-    referrals: localPlan.referrals ? localPlan.referrals.split(',').map((s) => s.trim()).filter(Boolean) : [],
+    referrals: [],
     notes: localPlan.notes || null,
   }
 }
 
+let planSaving = false
 function savePlan(): void {
-  handleSave({ plan: buildPlanPayload() })
+  planSaving = true
+  handleSave({ plan: buildPlanPayload() }).finally(() => { planSaving = false })
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────
@@ -963,6 +1155,15 @@ onMounted(async () => {
       && !store.current?.prenatal_visit?.assessment?.notes
     if (isNewVisit) applyNormalDefaults()
     setupTabsObserver()
+    // If follow-up date already set, restore selection state
+    if (localPlan.next_visit_date) {
+      followUpSelectedDate.value = localPlan.next_visit_date
+      followUpBooked.value = true
+    }
+    // Load schedule then pre-check recommended date availability
+    loadDoctorSchedule().then(() => {
+      if (!localPlan.next_visit_date) checkRecommendedAvailability()
+    })
   } catch (err) {
     if (err instanceof HttpError && err.status === 403) {
       loadError.value = 'You don\'t have permission to access this encounter.'
@@ -981,7 +1182,7 @@ onUnmounted(() => {
 // Re-sync local state if the store updates from realtime events
 watch(
   () => store.current?.prenatal_visit?.triage,
-  () => { syncTriageFromStore() },
+  () => { if (!triageSaving) syncTriageFromStore() },
   { deep: true },
 )
 watch(
@@ -991,7 +1192,7 @@ watch(
 )
 watch(
   () => store.current?.prenatal_visit?.plan,
-  () => { syncPlanFromStore() },
+  () => { if (!planSaving) syncPlanFromStore() },
   { deep: true },
 )
 
@@ -1547,22 +1748,21 @@ function goToTab(direction: 'prev' | 'next'): void {
               :disabled="store.isFinalized || !canEditTriage"
               @update:model-value="(v) => { localTriage.danger_signs = v; saveTriage() }"
             />
-            <div class="flex items-center gap-2 border-t pt-3">
-              <Checkbox
-                id="danger-signs-reviewed"
+            <label class="flex items-center gap-2 border-t pt-3 cursor-pointer">
+              <input
+                type="checkbox"
                 :checked="localTriage.danger_signs_reviewed"
                 :disabled="store.isFinalized || !canEditTriage"
-                @update:checked="(v) => { localTriage.danger_signs_reviewed = !!v; saveTriage() }"
+                class="size-4 shrink-0 rounded-[4px] border border-input shadow-xs accent-primary"
+                @change="localTriage.danger_signs_reviewed = !localTriage.danger_signs_reviewed; saveTriage()"
               />
-              <Label for="danger-signs-reviewed" class="cursor-pointer text-sm font-normal">
-                Danger signs reviewed with patient
-              </Label>
-            </div>
+              <span class="text-sm font-normal">Danger signs reviewed with patient</span>
+            </label>
           </div>
           </div>
 
           <!-- Bottom nav -->
-          <div class="mt-4 flex justify-end border-t pt-4">
+          <div class="flex justify-end">
             <Button variant="outline" @click="goToTab('next')">
               {{ nextTabLabel }}
               <ChevronRight class="ml-1 size-4" />
@@ -2091,7 +2291,7 @@ function goToTab(direction: 'prev' | 'next'): void {
           </div>
 
           <!-- Bottom nav -->
-          <div class="mt-4 flex justify-between border-t pt-4">
+          <div class="flex justify-between">
             <Button variant="outline" @click="goToTab('prev')">
               <ChevronLeft class="mr-1 size-4" />
               {{ prevTabLabel }}
@@ -2104,180 +2304,276 @@ function goToTab(direction: 'prev' | 'next'): void {
         </TabsContent>
 
         <!-- ── PLAN TAB ───────────────────────────────────────────── -->
-        <TabsContent value="plan" class="mt-0 flex flex-col gap-6 px-0 md:px-8">
+        <TabsContent value="plan" class="mt-0 flex flex-col divide-y divide-dashed divide-border px-0 md:px-8 [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
 
-          <!-- Prescriptions -->
-          <PrescriptionSection
-            :consultation-id="store.current.id"
-            :disabled="store.isFinalized || !canEditPlan || !authStore.hasPermission('prescriptions.create')"
-            :realtime-update="prescriptionUpdate"
-            :document-update="documentUpdate"
-          />
-
-          <!-- Due Procedures Reminder -->
-          <div
-            v-if="dueReminders?.procedures?.length"
-            class="flex items-start gap-2 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 dark:border-purple-800 dark:bg-purple-950"
-          >
-            <ClipboardList class="mt-0.5 size-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
-            <div class="text-xs">
-              <span class="font-medium text-purple-800 dark:text-purple-300">Due procedures:</span>
-              <span class="ml-1 text-purple-700 dark:text-purple-400">
-                {{ dueReminders.procedures.map(r => r.name).join(', ') }}
-              </span>
-            </div>
+          <!-- ── PRESCRIPTIONS ─────────────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prescriptions</h3>
+            <PrescriptionSection
+              :consultation-id="store.current.id"
+              :disabled="store.isFinalized || !canEditPlan || !authStore.hasPermission('prescriptions.create')"
+              :realtime-update="prescriptionUpdate"
+              :document-update="documentUpdate"
+            />
           </div>
 
-          <!-- Procedures -->
-          <ProcedureSection
-            :encounter-id="store.current.id"
-            :procedures="store.current.procedures ?? []"
-            :disabled="store.isFinalized || !canEditPlan"
-            @update="(p) => { if (store.current) store.current.procedures = p }"
-          />
-
-          <!-- Due Labs Reminder -->
-          <div
-            v-if="dueReminders?.labs?.length"
-            class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950"
-          >
-            <FlaskConical class="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div class="text-xs">
-              <span class="font-medium text-amber-800 dark:text-amber-300">Due lab orders:</span>
-              <span class="ml-1 text-amber-700 dark:text-amber-400">
-                {{ dueReminders.labs.map(r => r.name).join(', ') }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Lab Orders -->
-          <LabOrderSection
-            :consultation-id="store.current.id"
-            :disabled="store.isFinalized || !canEditPlan || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
-            :realtime-update="labOrderUpdate"
-            :document-update="documentUpdate"
-            @lab-updated="store.loadEncounter(store.current!.id)"
-          />
-
-          <!-- Consumables -->
-          <ConsumableSection
-            :consultation-id="store.current.id"
-            :consumables="store.current.consumables ?? []"
-            :disabled="store.isFinalized || !canEditPlan"
-            @update="(c) => { if (store.current) store.current.consumables = c }"
-          />
-
-          <!-- Prenatal Care Checklist -->
-          <PrenatalCareChecklist
-            v-if="store.current.pregnancy_id"
-            :patient-id="store.current.patient_id"
-            :pregnancy-id="store.current.pregnancy_id"
-            :disabled="store.isFinalized || !canEditPlan"
-          />
-
-          <!-- Next visit -->
-          <div class="flex flex-col gap-3 rounded-md border p-4">
-            <h3 class="text-sm font-semibold">Next Visit</h3>
-            <p class="text-xs text-muted-foreground">
-              {{ suggestedVisitInterval }}
-            </p>
-            <div class="flex flex-col gap-2">
-              <Label for="plan-next-visit" class="text-xs text-muted-foreground">Scheduled Date</Label>
-              <div class="flex items-center gap-2">
-                <MFDatePicker
-                  :model-value="localPlan.next_visit_date"
-                  :disabled="store.isFinalized || !canEditPlan"
-                  disable-past
-                  placeholder="Select date"
-                  class="max-w-xs"
-                  @update:model-value="(v) => { localPlan.next_visit_date = v ?? ''; savePlan() }"
-                />
-                <Button
-                  v-if="!localPlan.next_visit_date && !store.isFinalized && canEditPlan"
-                  variant="outline"
-                  size="sm"
-                  class="shrink-0 text-xs"
-                  @click="autoSuggestNextVisit"
-                >
-                  <CalendarDays class="size-3.5" />
-                  Set recommended
-                </Button>
-                <Button
-                  v-if="localPlan.next_visit_date && !store.isFinalized && canEditPlan"
-                  variant="outline"
-                  size="sm"
-                  class="shrink-0 text-xs"
-                  :disabled="isCreatingAppointment"
-                  @click="createAppointmentFromNextVisit"
-                >
-                  <LoaderCircle v-if="isCreatingAppointment" class="size-3.5 animate-spin" />
-                  <CalendarDays v-else class="size-3.5" />
-                  Schedule appointment
-                </Button>
+          <!-- ── PROCEDURES ────────────────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Procedures</h3>
+            <div
+              v-if="dueReminders?.procedures?.length"
+              class="flex items-start gap-2 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 dark:border-purple-800 dark:bg-purple-950"
+            >
+              <ClipboardList class="mt-0.5 size-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
+              <div class="text-xs">
+                <span class="font-medium text-purple-800 dark:text-purple-300">Due procedures:</span>
+                <span class="ml-1 text-purple-700 dark:text-purple-400">
+                  {{ dueReminders.procedures.map(r => r.name).join(', ') }}
+                </span>
               </div>
             </div>
+            <ProcedureSection
+              :encounter-id="store.current.id"
+              :procedures="store.current.procedures ?? []"
+              :disabled="store.isFinalized || !canEditPlan"
+              @update="(p) => { if (store.current) store.current.procedures = p }"
+            />
           </div>
 
-          <!-- Counseling provided -->
-          <div class="flex flex-col gap-3">
-            <Label class="flex items-center gap-1.5 text-sm font-semibold">
-              Counseling Provided
-            </Label>
+          <!-- ── LAB ORDERS ────────────────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
+            <div
+              v-if="dueReminders?.labs?.length"
+              class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950"
+            >
+              <FlaskConical class="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div class="text-xs">
+                <span class="font-medium text-amber-800 dark:text-amber-300">Due lab orders:</span>
+                <span class="ml-1 text-amber-700 dark:text-amber-400">
+                  {{ dueReminders.labs.map(r => r.name).join(', ') }}
+                </span>
+              </div>
+            </div>
+            <LabOrderSection
+              :consultation-id="store.current.id"
+              :disabled="store.isFinalized || !canEditPlan || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
+              :realtime-update="labOrderUpdate"
+              :document-update="documentUpdate"
+              @lab-updated="store.loadEncounter(store.current!.id)"
+            />
+          </div>
+
+          <!-- ── CONSUMABLES ───────────────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Consumables</h3>
+            <ConsumableSection
+              :consultation-id="store.current.id"
+              :consumables="store.current.consumables ?? []"
+              :disabled="store.isFinalized || !canEditPlan"
+              @update="(c) => { if (store.current) store.current.consumables = c }"
+            />
+          </div>
+
+          <!-- ── FOLLOW-UP ─────────────────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Follow-Up</h3>
+            <p class="text-xs text-muted-foreground">{{ suggestedVisitInterval }}</p>
+
+            <!-- Booked state -->
+            <div
+              v-if="followUpBooked && followUpSelectedDate"
+              class="flex items-center gap-3 rounded-md border border-green-300 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950"
+            >
+              <CheckCircle2 class="size-5 shrink-0 text-green-600 dark:text-green-400" />
+              <div class="flex-1">
+                <p class="text-sm font-medium text-green-800 dark:text-green-300">Follow-up booked</p>
+                <p class="text-xs text-green-700 dark:text-green-400">
+                  {{ followUpDisplay }}
+                  <span v-if="followUpSelectedSlot"> at {{ formatSlotTime(followUpSelectedSlot) }}</span>
+                </p>
+              </div>
+              <Button
+                v-if="!store.isFinalized && canEditPlan"
+                variant="ghost"
+                size="icon"
+                class="size-7 text-green-700 hover:text-destructive dark:text-green-400"
+                @click="clearFollowUp"
+              >
+                <X class="size-4" />
+              </Button>
+            </div>
+
+            <!-- Date + slot picker -->
+            <template v-else-if="!store.isFinalized && canEditPlan">
+              <div class="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger as-child>
+                    <Button
+                      variant="outline"
+                      class="w-[240px] justify-start text-left font-normal"
+                      :class="{ 'text-muted-foreground': !followUpSelectedDate }"
+                    >
+                      <CalendarDays class="mr-2 size-4" />
+                      {{ followUpSelectedDate ? new Date(followUpSelectedDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select a date' }}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent class="w-auto p-0" align="start">
+                    <Calendar
+                      :model-value="followUpCalendarValue"
+                      :min-value="minFollowUpDate"
+                      :is-date-unavailable="isDateUnavailable"
+                      @update:model-value="onFollowUpDateSelect"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  v-if="followUpSelectedDate"
+                  variant="ghost"
+                  size="icon"
+                  class="size-8"
+                  @click="clearFollowUp"
+                >
+                  <X class="size-4" />
+                </Button>
+              </div>
+
+              <!-- Recommendation: loading -->
+              <div v-if="!followUpSelectedDate && isCheckingRecommended" class="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle class="size-3.5 animate-spin" />
+                Checking recommended date...
+              </div>
+
+              <!-- Recommendation: available — one-click button -->
+              <Button
+                v-if="!followUpSelectedDate && !isCheckingRecommended && !recommendedUnavailable"
+                variant="outline"
+                size="sm"
+                class="w-fit text-xs"
+                @click="selectRecommendedDate"
+              >
+                <CalendarDays class="size-3.5" />
+                Set recommended — {{ recommendedDateDisplay }}
+              </Button>
+
+              <!-- Recommendation: unavailable — show alternatives -->
+              <div v-if="!followUpSelectedDate && !isCheckingRecommended && recommendedUnavailable" class="flex flex-col gap-3">
+                <div class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950">
+                  <AlertTriangle class="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div class="flex flex-col gap-2">
+                    <p class="text-xs font-medium text-amber-800 dark:text-amber-300">
+                      {{ recommendedDateDisplay }} is unavailable
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Button
+                        v-if="earlierAlternative"
+                        variant="outline"
+                        size="sm"
+                        class="h-7 text-xs"
+                        @click="selectAlternativeDate(earlierAlternative.date)"
+                      >
+                        <ChevronLeft class="size-3" />
+                        {{ earlierAlternative.display }}
+                      </Button>
+                      <Button
+                        v-if="laterAlternative"
+                        variant="outline"
+                        size="sm"
+                        class="h-7 text-xs"
+                        @click="selectAlternativeDate(laterAlternative.date)"
+                      >
+                        {{ laterAlternative.display }}
+                        <ChevronRight class="size-3" />
+                      </Button>
+                      <span v-if="!earlierAlternative && !laterAlternative" class="text-xs text-amber-700 dark:text-amber-400">
+                        No alternatives found within 2 weeks. Use the calendar to pick a date.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Slot picker -->
+              <div v-if="followUpSelectedDate" class="mt-1">
+                <div v-if="followUpSlotsLoading" class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <LoaderCircle class="size-4 animate-spin" />
+                  Loading available slots...
+                </div>
+
+                <div v-else-if="availableFollowUpSlots.length === 0" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                  No available slots on this date. Please select another day.
+                </div>
+
+                <div v-else class="flex flex-col gap-2">
+                  <p class="text-xs text-muted-foreground">
+                    {{ availableFollowUpSlots.length }} available slot{{ availableFollowUpSlots.length > 1 ? 's' : '' }} — select a time:
+                  </p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <Button
+                      v-for="slot in availableFollowUpSlots"
+                      :key="slot.start"
+                      variant="outline"
+                      size="sm"
+                      class="h-8"
+                      :class="{ 'border-primary bg-primary/10 text-primary': followUpSelectedSlot === slot.start }"
+                      :disabled="isBookingFollowUp"
+                      @click="bookFollowUpSlot(slot)"
+                    >
+                      <Clock class="mr-1 size-3" />
+                      {{ formatSlotTime(slot.start) }}
+                    </Button>
+                  </div>
+                  <div v-if="isBookingFollowUp" class="flex items-center gap-2 text-xs text-muted-foreground">
+                    <LoaderCircle class="size-3 animate-spin" />
+                    Booking appointment...
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Read-only display -->
+            <p v-else-if="localPlan.next_visit_date" class="text-sm">
+              {{ new Date(localPlan.next_visit_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) }}
+            </p>
+            <p v-else class="text-sm text-muted-foreground">No follow-up scheduled</p>
+          </div>
+
+          <!-- ── COUNSELING & EDUCATION ─────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Counseling & Education</h3>
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              <div
+              <label
                 v-for="opt in COUNSELING_OPTIONS"
                 :key="opt.key"
-                class="flex items-center gap-2"
+                class="flex items-center gap-2 cursor-pointer"
               >
-                <Checkbox
-                  :id="`counsel-${opt.key}`"
+                <input
+                  type="checkbox"
                   :checked="localPlan.counseling_provided.includes(opt.key)"
                   :disabled="store.isFinalized || !canEditPlan"
-                  @update:checked="() => { toggleCounseling(opt.key); savePlan() }"
+                  class="peer size-4 shrink-0 rounded-[4px] border border-input shadow-xs accent-primary"
+                  @change="toggleCounseling(opt.key); savePlan()"
                 />
-                <Label :for="`counsel-${opt.key}`" class="cursor-pointer text-sm font-normal">
-                  {{ opt.label }}
-                </Label>
-              </div>
+                <span class="text-sm font-normal">{{ opt.label }}</span>
+              </label>
             </div>
+
+            <!-- Birth plan (trimester 3 only) -->
+            <label v-if="isTrimester3" class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                :checked="localPlan.birth_plan_discussed"
+                :disabled="store.isFinalized || !canEditPlan"
+                class="peer size-4 shrink-0 rounded-[4px] border border-input shadow-xs accent-primary"
+                @change="localPlan.birth_plan_discussed = !localPlan.birth_plan_discussed; savePlan()"
+              />
+              <span class="text-sm font-normal">Birth plan discussed with patient</span>
+            </label>
           </div>
 
-          <!-- Birth plan (trimester 3 only) -->
-          <div v-if="isTrimester3" class="flex items-center gap-2">
-            <Checkbox
-              id="plan-birth-plan"
-              :checked="localPlan.birth_plan_discussed"
-              :disabled="store.isFinalized || !canEditPlan"
-              @update:checked="(v) => { localPlan.birth_plan_discussed = !!v; savePlan() }"
-            />
-            <Label for="plan-birth-plan" class="cursor-pointer text-sm font-normal">
-              Birth plan discussed with patient
-            </Label>
-          </div>
-
-          <!-- Referrals -->
-          <div class="flex flex-col gap-2">
-            <Label for="plan-referrals" class="flex items-center gap-1.5">
-              <Send class="size-3.5 text-muted-foreground" />
-              Referrals
-            </Label>
-            <Textarea
-              id="plan-referrals"
-              :model-value="localPlan.referrals"
-              placeholder="e.g. MFM consult, cardiology, etc."
-              :disabled="store.isFinalized || !canEditPlan"
-              :rows="2"
-              @update:model-value="(v) => localPlan.referrals = String(v)"
-              @blur="savePlan"
-            />
-          </div>
-
-          <!-- Notes -->
-          <div class="flex flex-col gap-2">
-            <Label for="plan-notes" class="flex items-center gap-1.5">
-              <ClipboardList class="size-3.5 text-muted-foreground" />
-              Plan Notes
-            </Label>
+          <!-- ── PLAN NOTES ────────────────────────────────────────── -->
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Plan Notes</h3>
             <Textarea
               id="plan-notes"
               :model-value="localPlan.notes"
@@ -2289,8 +2585,18 @@ function goToTab(direction: 'prev' | 'next'): void {
             />
           </div>
 
+          <!-- ── PRENATAL CARE CHECKLIST ────────────────────────────── -->
+          <div v-if="store.current.pregnancy_id" class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prenatal Care Checklist</h3>
+            <PrenatalCareChecklist
+              :patient-id="store.current.patient_id"
+              :pregnancy-id="store.current.pregnancy_id"
+              :disabled="store.isFinalized || !canEditPlan"
+            />
+          </div>
+
           <!-- Bottom nav -->
-          <div class="mt-4 flex items-center justify-between border-t pt-4">
+          <div class="flex items-center justify-between">
             <Button variant="outline" @click="goToTab('prev')">
               <ChevronLeft class="mr-1 size-4" />
               {{ prevTabLabel }}
@@ -2315,7 +2621,7 @@ function goToTab(direction: 'prev' | 'next'): void {
         </TabsContent>
 
         <!-- ── BILLING TAB ────────────────────────────────────────── -->
-        <TabsContent value="billing" class="mt-0 px-0 md:px-8">
+        <TabsContent value="billing" class="mt-0 flex flex-col gap-5 px-0 md:px-8">
           <PaymentTab
             :disabled="store.isFinalized"
             :consultation-id="store.current.id"
@@ -2325,6 +2631,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             :diagnoses="store.current.prenatal_visit?.assessment?.diagnoses ?? []"
             :document-update="documentUpdate"
             :consumables="store.current.consumables ?? []"
+            :procedures="store.current.procedures ?? []"
             :prescription-summary="store.current.prescription_summary"
             :lab-order-summary="store.current.lab_order_summary"
             :payment="store.current.payment"
@@ -2333,7 +2640,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             @update:payment="(p) => { if (store.current) store.current.payment = p }"
             @finalize="showFinalizeModal = true"
           />
-          <div class="mt-8 flex justify-start border-t pt-4">
+          <div class="mt-5 flex justify-start">
             <Button variant="outline" @click="goToTab('prev')">
               <ChevronLeft class="mr-1 size-4" />
               {{ prevTabLabel }}
