@@ -5,6 +5,7 @@ import {
   Weight,
   CalendarDays,
   AlertTriangle,
+  LoaderCircle,
   ShieldAlert,
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +29,7 @@ const props = defineProps<{
 }>()
 
 const pdStore = usePatientDetailStore()
+const dashboardData = computed(() => pdStore.pregnancyDashboard)
 const timelineAnimated = ref(false)
 
 onMounted(() => {
