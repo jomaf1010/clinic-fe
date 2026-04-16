@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import {
   Plus,
   ChevronRight,
@@ -46,16 +44,13 @@ import {
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { patientApi } from '@/domains/patient/api/patientApi'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { LifestyleData } from '@/domains/consultation/types/consultation.types'
-import type { FamilyHistoryEntry, FamilyHistoryCondition, Medication, StoreMedicationPayload, PreventiveCareItem, StorePreventiveCarePayload } from '@/domains/patient/api/patientApi'
-import type { ChronicTrendsData, Problem } from '@/domains/patient/types/patient.types'
-import type { StructuredAllergy } from '@/domains/patient/api/patientApi'
+import type { FamilyHistoryEntry, FamilyHistoryCondition, StoreMedicationPayload, StorePreventiveCarePayload } from '@/domains/patient/api/patientApi'
 
 use([LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
 
-const route = useRoute()
-const patientId = computed(() => route.params.id as string)
+const pdStore = usePatientDetailStore()
 
 function formatDate(d: string | null): string {
   if (!d) return ''
@@ -63,7 +58,6 @@ function formatDate(d: string | null): string {
 }
 
 // ── Lifestyle ────────────────────────────────────────────────────────────
-const lifestyleLoading = ref(false)
 const lifestyleEditing = ref(false)
 const lifestyleSaving = ref(false)
 const lifestyle = reactive<LifestyleData>({
@@ -74,6 +68,15 @@ const lifestyle = reactive<LifestyleData>({
   diet: null,
   medication_adherence: null,
 })
+
+// Sync form from store whenever lifestyle data arrives or changes
+watch(
+  () => pdStore.lifestyle,
+  (val) => {
+    if (val) Object.assign(lifestyle, val)
+  },
+  { immediate: true },
+)
 
 const showPackYears = computed(() => lifestyle.smoking === 'current' || lifestyle.smoking === 'former')
 
@@ -101,34 +104,18 @@ const lifestyleDisplayItems = computed(() => {
   return items
 })
 
-async function loadLifestyle() {
-  lifestyleLoading.value = true
-  try {
-    const res = await patientApi.getLifestyle(patientId.value)
-    if (res.data) Object.assign(lifestyle, res.data)
-  } catch {
-    // silently fail
-  } finally {
-    lifestyleLoading.value = false
-  }
-}
-
 async function saveLifestyle() {
   lifestyleSaving.value = true
   try {
-    const res = await patientApi.updateLifestyle(patientId.value, { ...lifestyle })
-    Object.assign(lifestyle, res.data)
+    await pdStore.updateLifestyle({ ...lifestyle })
     lifestyleEditing.value = false
-  } catch {
-    toast.error('Failed to save lifestyle data')
   } finally {
     lifestyleSaving.value = false
   }
 }
 
 // ── Family History ────────────────────────────────────────────────────────
-const familyHistory = ref<FamilyHistoryEntry[]>([])
-const isLoadingFamilyHistory = ref(false)
+const familyHistory = computed(() => pdStore.familyHistory)
 const showFamilyHistoryDialog = ref(false)
 const editingFamilyEntry = ref<FamilyHistoryEntry | null>(null)
 const isSavingFamilyHistory = ref(false)
@@ -206,18 +193,6 @@ function removeConditionRow(index: number) {
   familyForm.conditions.splice(index, 1)
 }
 
-async function loadFamilyHistory() {
-  isLoadingFamilyHistory.value = true
-  try {
-    const res = await patientApi.getFamilyHistory(patientId.value)
-    familyHistory.value = res.data
-  } catch {
-    // silently fail
-  } finally {
-    isLoadingFamilyHistory.value = false
-  }
-}
-
 async function saveFamilyHistory() {
   if (!familyForm.relative) return
   isSavingFamilyHistory.value = true
@@ -238,40 +213,29 @@ async function saveFamilyHistory() {
     }
 
     if (editingFamilyEntry.value) {
-      const res = await patientApi.updateFamilyHistory(patientId.value, editingFamilyEntry.value.uuid, payload)
-      const idx = familyHistory.value.findIndex((e) => e.uuid === editingFamilyEntry.value!.uuid)
-      if (idx >= 0) familyHistory.value[idx] = res.data
+      await pdStore.updateFamilyHistory(editingFamilyEntry.value.uuid, payload)
     } else {
-      const res = await patientApi.addFamilyHistory(patientId.value, payload)
-      familyHistory.value.push(res.data)
+      await pdStore.addFamilyHistory(payload)
     }
 
     showFamilyHistoryDialog.value = false
     resetFamilyForm()
-  } catch {
-    toast.error('Failed to save family history')
   } finally {
     isSavingFamilyHistory.value = false
   }
 }
 
 async function deleteFamilyEntry(uuid: string) {
-  try {
-    await patientApi.deleteFamilyHistory(patientId.value, uuid)
-    familyHistory.value = familyHistory.value.filter((e) => e.uuid !== uuid)
-  } catch {
-    toast.error('Failed to delete family history entry')
-  }
+  await pdStore.deleteFamilyHistory(uuid)
 }
 
 // ── Medications ───────────────────────────────────────────────────────────
-const medications = ref<Medication[]>([])
-const isLoadingMeds = ref(false)
+const medications = computed(() => pdStore.medications)
 const showMedDialog = ref(false)
-const editingMed = ref<Medication | null>(null)
+const editingMed = ref<{ uuid: string; drug_name: string; dose: string | null; frequency: string | null; route: string | null; indication: string | null; started_date: string | null; status: 'active' | 'on_hold' | 'discontinued'; notes: string | null; discontinue_reason: string | null } | null>(null)
 const isSavingMed = ref(false)
 const showDiscontinueDialog = ref(false)
-const discontinuingMed = ref<Medication | null>(null)
+const discontinuingMed = ref<{ uuid: string; drug_name: string } | null>(null)
 const discontinuing = ref(false)
 const discontinueReason = ref('')
 const discontinuedMedsOpen = ref(false)
@@ -307,7 +271,7 @@ function openAddMed() {
   showMedDialog.value = true
 }
 
-function openEditMed(med: Medication) {
+function openEditMed(med: typeof editingMed.value & object) {
   editingMed.value = med
   medForm.drug_name = med.drug_name
   medForm.dose = med.dose ?? ''
@@ -318,18 +282,6 @@ function openEditMed(med: Medication) {
   medForm.status = med.status === 'discontinued' ? 'active' : med.status
   medForm.notes = med.notes ?? ''
   showMedDialog.value = true
-}
-
-async function loadMedications() {
-  isLoadingMeds.value = true
-  try {
-    const res = await patientApi.getMedications(patientId.value)
-    medications.value = res.data
-  } catch {
-    // silently fail
-  } finally {
-    isLoadingMeds.value = false
-  }
 }
 
 async function saveMedication() {
@@ -347,23 +299,18 @@ async function saveMedication() {
       notes: medForm.notes.trim() || null,
     }
     if (editingMed.value) {
-      const res = await patientApi.updateMedication(patientId.value, editingMed.value.uuid, payload)
-      const idx = medications.value.findIndex((m) => m.uuid === editingMed.value!.uuid)
-      if (idx >= 0) medications.value[idx] = res.data
+      await pdStore.updateMedication(editingMed.value.uuid, payload)
     } else {
-      const res = await patientApi.addMedication(patientId.value, payload)
-      medications.value.unshift(res.data)
+      await pdStore.addMedication(payload)
     }
     showMedDialog.value = false
     resetMedForm()
-  } catch {
-    toast.error('Failed to save medication')
   } finally {
     isSavingMed.value = false
   }
 }
 
-function openDiscontinue(med: Medication) {
+function openDiscontinue(med: { uuid: string; drug_name: string }) {
   discontinuingMed.value = med
   discontinueReason.value = ''
   showDiscontinueDialog.value = true
@@ -373,35 +320,25 @@ async function confirmDiscontinue() {
   if (!discontinuingMed.value) return
   discontinuing.value = true
   try {
-    const res = await patientApi.updateMedication(patientId.value, discontinuingMed.value.uuid, {
+    await pdStore.updateMedication(discontinuingMed.value.uuid, {
       drug_name: discontinuingMed.value.drug_name,
       status: 'discontinued',
       discontinue_reason: discontinueReason.value.trim() || null,
     })
-    const idx = medications.value.findIndex((m) => m.uuid === discontinuingMed.value!.uuid)
-    if (idx >= 0) medications.value[idx] = res.data
     showDiscontinueDialog.value = false
-  } catch {
-    toast.error('Failed to discontinue medication')
   } finally {
     discontinuing.value = false
   }
 }
 
 async function deleteMedication(uuid: string) {
-  try {
-    await patientApi.deleteMedication(patientId.value, uuid)
-    medications.value = medications.value.filter((m) => m.uuid !== uuid)
-  } catch {
-    toast.error('Failed to delete medication')
-  }
+  await pdStore.deleteMedication(uuid)
 }
 
 // ── Preventive Care ───────────────────────────────────────────────────────
-const preventiveCare = ref<PreventiveCareItem[]>([])
-const isLoadingPreventive = ref(false)
+const preventiveCare = computed(() => pdStore.preventiveCare)
 const showPreventiveDialog = ref(false)
-const editingScreening = ref<PreventiveCareItem | null>(null)
+const editingScreening = ref<{ key: string; name: string; status: 'completed' | 'due' | 'overdue' | 'declined' | 'not_applicable'; last_done_date: string | null; next_due_date: string | null; result: string | null; notes: string | null; recorded_uuid: string | null; category: string } | null>(null)
 const isSavingPreventive = ref(false)
 
 const categoryLabels: Record<string, string> = {
@@ -417,13 +354,13 @@ const overdueScreenings = computed(() =>
 
 const groupedByCategory = computed(() => {
   const catOrder = Object.keys(categoryLabels)
-  const groups = new Map<string, PreventiveCareItem[]>()
+  const groups = new Map<string, typeof preventiveCare.value>()
   for (const item of preventiveCare.value) {
     const list = groups.get(item.category) ?? []
     list.push(item)
     groups.set(item.category, list)
   }
-  const result: { category: string; items: PreventiveCareItem[] }[] = []
+  const result: { category: string; items: typeof preventiveCare.value }[] = []
   for (const cat of catOrder) {
     if (groups.has(cat)) result.push({ category: cat, items: groups.get(cat)! })
   }
@@ -445,7 +382,7 @@ const screeningForm = reactive<{
   notes: '',
 })
 
-function openRecordScreening(item: PreventiveCareItem) {
+function openRecordScreening(item: typeof editingScreening.value & object) {
   editingScreening.value = item
   screeningForm.status = item.status === 'declined' || item.status === 'not_applicable'
     ? item.status
@@ -454,18 +391,6 @@ function openRecordScreening(item: PreventiveCareItem) {
   screeningForm.result = item.result ?? ''
   screeningForm.notes = item.notes ?? ''
   showPreventiveDialog.value = true
-}
-
-async function loadPreventiveCare() {
-  isLoadingPreventive.value = true
-  try {
-    const res = await patientApi.getPreventiveCare(patientId.value)
-    preventiveCare.value = res.data
-  } catch {
-    // silently fail
-  } finally {
-    isLoadingPreventive.value = false
-  }
 }
 
 async function saveScreening() {
@@ -480,43 +405,21 @@ async function saveScreening() {
       notes: screeningForm.notes.trim() || null,
     }
     if (editingScreening.value.recorded_uuid) {
-      const res = await patientApi.updatePreventiveCare(patientId.value, editingScreening.value.recorded_uuid, payload)
-      const idx = preventiveCare.value.findIndex((x) => x.key === editingScreening.value!.key)
-      if (idx >= 0) preventiveCare.value[idx] = res.data
+      await pdStore.updatePreventiveCare(editingScreening.value.recorded_uuid, payload)
     } else {
-      const res = await patientApi.storePreventiveCare(patientId.value, payload)
-      const idx = preventiveCare.value.findIndex((x) => x.key === editingScreening.value!.key)
-      if (idx >= 0) preventiveCare.value[idx] = res.data
+      await pdStore.addPreventiveCare(payload)
     }
     showPreventiveDialog.value = false
-  } catch {
-    toast.error('Failed to save screening record')
   } finally {
     isSavingPreventive.value = false
   }
 }
 
-async function deleteScreening(entryUuid: string, key: string) {
-  try {
-    await patientApi.deletePreventiveCare(patientId.value, entryUuid)
-    const idx = preventiveCare.value.findIndex((x) => x.key === key)
-    if (idx >= 0) {
-      preventiveCare.value[idx] = {
-        ...preventiveCare.value[idx]!,
-        status: 'due',
-        last_done_date: null,
-        next_due_date: null,
-        result: null,
-        notes: null,
-        recorded_uuid: null,
-      }
-    }
-  } catch {
-    toast.error('Failed to remove screening record')
-  }
+async function deleteScreening(entryUuid: string) {
+  await pdStore.deletePreventiveCare(entryUuid)
 }
 
-function preventiveStatusLabel(status: PreventiveCareItem['status']): string {
+function preventiveStatusLabel(status: 'completed' | 'due' | 'overdue' | 'declined' | 'not_applicable'): string {
   switch (status) {
     case 'completed': return 'Completed'
     case 'due': return 'Due'
@@ -526,7 +429,7 @@ function preventiveStatusLabel(status: PreventiveCareItem['status']): string {
   }
 }
 
-function preventiveStatusClass(status: PreventiveCareItem['status']): string {
+function preventiveStatusClass(status: 'completed' | 'due' | 'overdue' | 'declined' | 'not_applicable'): string {
   switch (status) {
     case 'completed': return 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100'
     case 'due': return 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100'
@@ -538,8 +441,7 @@ function preventiveStatusClass(status: PreventiveCareItem['status']): string {
 
 // ── Patient Trends ────────────────────────────────────────────────────────
 const showTrendsModal = ref(false)
-const trendsData = ref<ChronicTrendsData | null>(null)
-const trendsLoading = ref(true)
+const trendsData = computed(() => pdStore.chronicTrends)
 const activeTrendTab = ref<'bp' | 'blood_sugar' | 'weight' | 'bmi'>('bp')
 
 const trendTabs = [
@@ -548,18 +450,6 @@ const trendTabs = [
   { key: 'weight' as const, label: 'Weight' },
   { key: 'bmi' as const, label: 'BMI' },
 ]
-
-async function loadTrends() {
-  trendsLoading.value = true
-  try {
-    const res = await patientApi.getChronicTrends(patientId.value)
-    trendsData.value = res.data
-  } catch {
-    // silent
-  } finally {
-    trendsLoading.value = false
-  }
-}
 
 const trendsWidgetDetail = computed(() => {
   if (!trendsData.value) return 'No data'
@@ -698,17 +588,8 @@ const trendsChartOption = computed(() => {
 })
 
 // ── Clinical Narrative Summary ────────────────────────────────────────────
-const narrativeProblems = ref<Problem[]>([])
-const narrativeAllergies = ref<StructuredAllergy[]>([])
-
-async function loadNarrativeData() {
-  const [probRes, allergyRes] = await Promise.allSettled([
-    patientApi.getProblems(patientId.value),
-    patientApi.getAllergies(patientId.value),
-  ])
-  if (probRes.status === 'fulfilled') narrativeProblems.value = probRes.value.data
-  if (allergyRes.status === 'fulfilled') narrativeAllergies.value = allergyRes.value.data
-}
+const narrativeProblems = computed(() => pdStore.problems)
+const narrativeAllergies = computed(() => pdStore.allergies)
 
 function b(text: string | number) { return `<b>${text}</b>` }
 
@@ -794,7 +675,7 @@ const narrativeSummary = computed(() => {
   return lines.length > 0 ? lines.join(' ') : null
 })
 
-const hasPreventiveCare = computed(() => !isLoadingPreventive.value && preventiveCare.value.length > 0)
+const hasPreventiveCare = computed(() => !pdStore.isLoadingFM && preventiveCare.value.length > 0)
 
 // ── Section modal visibility ──────────────────────────────────────────────
 const showMedsModal = ref<boolean>(false)
@@ -803,14 +684,11 @@ const showFamilyModal = ref<boolean>(false)
 const showPreventiveModal = ref<boolean>(false)
 
 // ── Load ──────────────────────────────────────────────────────────────────
-onMounted(() => {
-  if (!patientId.value) return
-  loadLifestyle()
-  loadFamilyHistory()
-  loadMedications()
-  loadPreventiveCare()
-  loadTrends()
-  loadNarrativeData()
+onMounted(async () => {
+  if (!pdStore.patientId) return
+  if (!pdStore.lifestyle && !pdStore.isLoadingFM) {
+    await pdStore.loadFM()
+  }
 })
 </script>
 
@@ -824,7 +702,7 @@ onMounted(() => {
         :sub-detail="discontinuedMeds.length > 0 ? `${discontinuedMeds.length} discontinued` : undefined"
         :badge-text="activeMeds.length > 0 ? String(activeMeds.length) : undefined"
         badge-variant="secondary"
-        :loading="isLoadingMeds"
+        :loading="pdStore.isLoadingFM"
         @click="showMedsModal = true"
       />
       <PatientSectionWidget
@@ -832,7 +710,7 @@ onMounted(() => {
         icon-color="bg-gradient-to-br from-orange-500 to-orange-600"
         title="Patient Trends"
         :detail="trendsWidgetDetail"
-        :loading="trendsLoading"
+        :loading="pdStore.isLoadingFM"
         @click="showTrendsModal = true"
       />
       <PatientSectionWidget
@@ -840,7 +718,7 @@ onMounted(() => {
         icon-color="bg-gradient-to-br from-green-500 to-green-600"
         title="Lifestyle"
         :detail="hasLifestyleData ? 'Recorded' : 'Not recorded'"
-        :loading="lifestyleLoading"
+        :loading="pdStore.isLoadingFM"
         @click="showLifestyleModal = true"
       />
       <PatientSectionWidget
@@ -850,7 +728,7 @@ onMounted(() => {
         :detail="familyHistory.length > 0 ? `${familyHistory.length} relatives` : 'None recorded'"
         :badge-text="familyHistory.length > 0 ? String(familyHistory.length) : undefined"
         badge-variant="secondary"
-        :loading="isLoadingFamilyHistory"
+        :loading="pdStore.isLoadingFM"
         @click="showFamilyModal = true"
       />
       <PatientSectionWidget
@@ -861,7 +739,7 @@ onMounted(() => {
         :detail="overdueScreenings.length > 0 ? `${overdueScreenings.length} overdue` : `${preventiveCare.length} screenings`"
         :badge-text="overdueScreenings.length > 0 ? String(overdueScreenings.length) : undefined"
         badge-variant="destructive"
-        :loading="isLoadingPreventive"
+        :loading="pdStore.isLoadingFM"
         @click="showPreventiveModal = true"
       />
 
@@ -896,7 +774,7 @@ onMounted(() => {
 
         <div class="flex flex-1 flex-col gap-2">
           <!-- Loading -->
-          <div v-if="isLoadingMeds" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div v-if="pdStore.isLoadingFM" class="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle class="size-3.5 animate-spin" />
             Loading...
           </div>
@@ -1001,7 +879,7 @@ onMounted(() => {
 
         <div class="flex flex-1 flex-col gap-3">
           <!-- Loading -->
-          <div v-if="lifestyleLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div v-if="pdStore.isLoadingFM" class="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle class="size-3.5 animate-spin" />
             Loading...
           </div>
@@ -1163,7 +1041,7 @@ onMounted(() => {
               Save
             </Button>
           </template>
-          <Button v-else-if="!lifestyleLoading" variant="secondary" @click="lifestyleEditing = true">
+          <Button v-else-if="!pdStore.isLoadingFM" variant="secondary" @click="lifestyleEditing = true">
             <Pencil class="size-4 mr-1" />
             Edit Lifestyle
           </Button>
@@ -1183,7 +1061,7 @@ onMounted(() => {
 
         <div class="flex flex-1 flex-col gap-2">
           <!-- Loading -->
-          <div v-if="isLoadingFamilyHistory" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div v-if="pdStore.isLoadingFM" class="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle class="size-3.5 animate-spin" />
             Loading...
           </div>
@@ -1273,7 +1151,7 @@ onMounted(() => {
 
         <div class="flex flex-col gap-3">
           <!-- Loading -->
-          <div v-if="isLoadingPreventive" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div v-if="pdStore.isLoadingFM" class="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle class="size-3.5 animate-spin" />
             Loading...
           </div>
@@ -1337,7 +1215,7 @@ onMounted(() => {
                       v-if="item.recorded_uuid"
                       size="sm" variant="ghost" class="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                       title="Remove record"
-                      @click="deleteScreening(item.recorded_uuid, item.key)"
+                      @click="deleteScreening(item.recorded_uuid)"
                     >
                       <Trash2 class="size-3.5" />
                     </Button>
@@ -1362,7 +1240,7 @@ onMounted(() => {
 
         <div class="flex flex-1 flex-col gap-4">
           <!-- Loading -->
-          <div v-if="trendsLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div v-if="pdStore.isLoadingFM" class="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle class="size-3.5 animate-spin" />
             Loading...
           </div>

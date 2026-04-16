@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, watch, onMounted } from 'vue'
 import GrowthChart from './GrowthChart.vue'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
 import type { PatientSex } from '@/domains/patient/lib/whoGrowthStandards'
-import { useRoute } from 'vue-router'
-import { toast } from 'vue-sonner'
 import {
   Baby,
   Brain,
   Syringe,
   TrendingUp,
   Pencil,
-  X,
   ChevronDown,
   ChevronRight,
   Plus,
@@ -53,27 +50,19 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import {
-  pediatricsApi,
-  type BirthHistoryFields,
-  type FeedingHistoryFields,
-  type ImmunizationVaccineGroup,
-  type ImmunizationTieredResponse,
-  type AdhocVaccineRecord,
-  type GrowthMeasurement,
-  type MilestoneScheduleResponse,
-  type MilestoneCheckpoint,
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
+import type {
+  BirthHistoryFields,
+  FeedingHistoryFields,
+  ImmunizationVaccineGroup,
+  AdhocVaccineRecord,
+  MilestoneCheckpoint,
 } from '../.././../api/pediatricsApi'
 
-const props = defineProps<{
-  patientSex?: string
-}>()
-
-const route = useRoute()
 const authStore = useAuthStore()
-const patientId = computed(() => route.params.id as string)
+const pdStore = usePatientDetailStore()
 const canEdit = computed(() => authStore.hasFeature('specialty_features'))
-const sex = computed<PatientSex>(() => (props.patientSex === 'female' ? 'female' : 'male'))
+const sex = computed<PatientSex>(() => (pdStore.patient?.sex === 'female' ? 'female' : 'male'))
 
 // ── Section modal visibility ──────────────────────────────────────────────────
 const showBirthModal = ref(false)
@@ -85,27 +74,15 @@ const showMilestoneModal = ref(false)
 // BIRTH HISTORY (Task 4)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const birthLoading = ref(true)
 const birthSaving = ref(false)
 const birthEditing = ref(false)
-const birthHistory = ref<Partial<BirthHistoryFields>>({})
-const feedingHistory = ref<Partial<FeedingHistoryFields>>({})
+
+// Local aliases into store state — read-only references for display
+const birthHistory = computed(() => pdStore.birthHistory?.birth_history ?? {})
+const feedingHistory = computed(() => pdStore.birthHistory?.feeding_history ?? {})
 
 const birthForm = reactive<Partial<BirthHistoryFields>>({})
 const feedingForm = reactive<Partial<FeedingHistoryFields>>({})
-
-async function loadBirthHistory() {
-  birthLoading.value = true
-  try {
-    const res = await pediatricsApi.getBirthHistory(patientId.value)
-    birthHistory.value = res.data.birth_history ?? {}
-    feedingHistory.value = res.data.feeding_history ?? {}
-  } catch {
-    // silent — will show "not recorded" state
-  } finally {
-    birthLoading.value = false
-  }
-}
 
 function startBirthEdit() {
   Object.assign(birthForm, {
@@ -139,16 +116,11 @@ function cancelBirthEdit() {
 async function saveBirthHistory() {
   birthSaving.value = true
   try {
-    const res = await pediatricsApi.updateBirthHistory(patientId.value, {
+    await pdStore.updateBirthHistory({
       birth_history: { ...birthForm },
       feeding_history: { ...feedingForm },
     })
-    birthHistory.value = res.data.birth_history ?? {}
-    feedingHistory.value = res.data.feeding_history ?? {}
     birthEditing.value = false
-    toast.success('Birth history saved')
-  } catch {
-    toast.error('Failed to save birth history')
   } finally {
     birthSaving.value = false
   }
@@ -191,11 +163,20 @@ const birthWidgetDetail = computed(() => {
 // IMMUNIZATIONS (Task 6)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const immuneLoading = ref(true)
-const immuneData = ref<ImmunizationTieredResponse | null>(null)
+const immuneData = computed(() => pdStore.immunizations)
 const openGroups = ref<Set<string>>(new Set())
 const activeImmunizationTab = ref<'epi' | 'recommended' | 'other'>('epi')
 const openRecurring = ref<Set<string>>(new Set())
+
+// Auto-open groups with overdue doses whenever the store's immunization data changes
+watch(immuneData, (data) => {
+  if (!data) return
+  const toOpen = new Set<string>()
+  for (const g of data.epi) {
+    if (g.schedule.some((d) => d.status === 'overdue')) toOpen.add(g.key)
+  }
+  openGroups.value = toOpen
+}, { immediate: true })
 
 const epiOverdueCount = computed(() => {
   if (!immuneData.value) return 0
@@ -217,24 +198,6 @@ const recurringOverdueCount = computed(() => {
 })
 
 const overdueCount = computed(() => epiOverdueCount.value + recommendedOverdueCount.value + recurringOverdueCount.value)
-
-async function loadImmunizations() {
-  immuneLoading.value = true
-  try {
-    const res = await pediatricsApi.getImmunizations(patientId.value)
-    immuneData.value = res.data
-    // Auto-open groups with overdue doses
-    const toOpen = new Set<string>()
-    for (const g of res.data.epi) {
-      if (g.schedule.some((d) => d.status === 'overdue')) toOpen.add(g.key)
-    }
-    openGroups.value = toOpen
-  } catch {
-    // silent
-  } finally {
-    immuneLoading.value = false
-  }
-}
 
 function toggleGroup(key: string) {
   if (openGroups.value.has(key)) openGroups.value.delete(key)
@@ -264,7 +227,7 @@ async function saveRecordDose() {
   if (!recordTarget.value || !recordForm.date_given) return
   recordSaving.value = true
   try {
-    await pediatricsApi.recordDose(patientId.value, {
+    await pdStore.recordDose({
       tier: recordTarget.value.tier,
       vaccine_key: recordTarget.value.vaccineKey,
       dose_number: recordTarget.value.tier === 'recurring' ? undefined : recordTarget.value.doseNumber,
@@ -273,23 +236,13 @@ async function saveRecordDose() {
       site: recordForm.site || null,
     })
     recordDialog.value = false
-    toast.success('Dose recorded')
-    await loadImmunizations()
-  } catch {
-    toast.error('Failed to record dose')
   } finally {
     recordSaving.value = false
   }
 }
 
 async function deleteDose(doseUuid: string) {
-  try {
-    await pediatricsApi.deleteDose(patientId.value, doseUuid)
-    toast.success('Dose removed')
-    await loadImmunizations()
-  } catch {
-    toast.error('Failed to remove dose')
-  }
+  await pdStore.deleteDose(doseUuid)
 }
 
 // Ad-hoc vaccine dialog
@@ -311,7 +264,7 @@ async function saveAdhocDose() {
   if (!adhocForm.vaccine_name.trim() || !adhocForm.date_given) return
   adhocSaving.value = true
   try {
-    await pediatricsApi.recordDose(patientId.value, {
+    await pdStore.recordDose({
       tier: 'adhoc',
       vaccine_key: adhocForm.vaccine_name.toLowerCase().replace(/\s+/g, '_'),
       vaccine_name: adhocForm.vaccine_name.trim(),
@@ -322,10 +275,6 @@ async function saveAdhocDose() {
       notes: adhocForm.notes || null,
     })
     showAdhocDialog.value = false
-    toast.success('Vaccine recorded')
-    await loadImmunizations()
-  } catch {
-    toast.error('Failed to record vaccine')
   } finally {
     adhocSaving.value = false
   }
@@ -362,24 +311,11 @@ function formatDate(dateStr: string | null | undefined): string {
 // GROWTH HISTORY + DOSING CALCULATOR (Task 7)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const growthLoading = ref(true)
-const growthMeasurements = ref<GrowthMeasurement[]>([])
+const growthMeasurements = computed(() => pdStore.growthHistory)
 
 const latestMeasurement = computed(() =>
   growthMeasurements.value[growthMeasurements.value.length - 1] ?? null,
 )
-
-async function loadGrowthHistory() {
-  growthLoading.value = true
-  try {
-    const res = await pediatricsApi.getGrowthHistory(patientId.value)
-    growthMeasurements.value = res.data
-  } catch {
-    // silent
-  } finally {
-    growthLoading.value = false
-  }
-}
 
 function percentileLabel(p: number | null | undefined): string {
   if (p == null) return ''
@@ -455,9 +391,19 @@ const DOMAIN_LABELS: Record<MilestoneDomain, string> = {
   social: 'Social',
 }
 
-const milestoneLoading = ref(true)
-const milestoneData = ref<MilestoneScheduleResponse | null>(null)
+const milestoneData = computed(() => pdStore.milestones)
 const openMilestoneCheckpoints = ref<Set<string>>(new Set())
+
+// Auto-open checkpoints that are due or have concerns when store data changes
+watch(milestoneData, (data) => {
+  if (!data) return
+  const toOpen = new Set<string>()
+  for (const cp of data.schedule) {
+    if (cp.status === 'due' || cp.status === 'concern') toOpen.add(cp.checkpoint)
+  }
+  openMilestoneCheckpoints.value = toOpen
+}, { immediate: true })
+
 const showMilestoneDialog = ref(false)
 const milestoneAssessTarget = ref<MilestoneCheckpoint | null>(null)
 const milestoneSaving = ref(false)
@@ -523,23 +469,6 @@ const milestoneDialogRedFlagWarnings = computed(() => {
     .map((flag) => flag.prompt)
 })
 
-async function loadMilestones() {
-  milestoneLoading.value = true
-  try {
-    const res = await pediatricsApi.getMilestones(patientId.value)
-    milestoneData.value = res.data
-    const toOpen = new Set<string>()
-    for (const cp of res.data.schedule) {
-      if (cp.status === 'due' || cp.status === 'concern') toOpen.add(cp.checkpoint)
-    }
-    openMilestoneCheckpoints.value = toOpen
-  } catch {
-    // silent
-  } finally {
-    milestoneLoading.value = false
-  }
-}
-
 function toggleMilestoneCheckpoint(key: string) {
   if (openMilestoneCheckpoints.value.has(key)) openMilestoneCheckpoints.value.delete(key)
   else openMilestoneCheckpoints.value.add(key)
@@ -565,41 +494,30 @@ async function saveMilestoneAssessment() {
       domain: item.domain,
       result: milestoneForm.items[item.key] ?? 'not_assessed',
     }))
-    await pediatricsApi.storeMilestone(patientId.value, {
+    await pdStore.storeMilestone({
       age_checkpoint: milestoneAssessTarget.value.checkpoint,
       assessed_at: milestoneForm.assessed_at,
       items,
       notes: milestoneForm.notes || null,
     })
     showMilestoneDialog.value = false
-    toast.success('Assessment saved')
-    await loadMilestones()
-  } catch {
-    toast.error('Failed to save assessment')
   } finally {
     milestoneSaving.value = false
   }
 }
 
 async function deleteMilestoneAssessment(assessmentUuid: string) {
-  try {
-    await pediatricsApi.deleteMilestone(patientId.value, assessmentUuid)
-    toast.success('Assessment removed')
-    await loadMilestones()
-  } catch {
-    toast.error('Failed to remove assessment')
-  }
+  await pdStore.deleteMilestone(assessmentUuid)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Init
 // ─────────────────────────────────────────────────────────────────────────────
 
-onMounted(() => {
-  loadBirthHistory()
-  loadImmunizations()
-  loadGrowthHistory()
-  loadMilestones()
+onMounted(async () => {
+  if (!pdStore.birthHistory && !pdStore.isLoadingPeds) {
+    await pdStore.loadPediatrics()
+  }
 })
 </script>
 
@@ -610,7 +528,7 @@ onMounted(() => {
         icon-color="bg-gradient-to-br from-pink-500 to-pink-600"
         title="Birth History"
         :detail="birthWidgetDetail"
-        :loading="birthLoading"
+        :loading="pdStore.isLoadingPeds"
         @click="showBirthModal = true"
       />
       <PatientSectionWidget
@@ -620,7 +538,7 @@ onMounted(() => {
         :detail="overdueCount > 0 ? `${overdueCount} overdue` : 'Up to date'"
         :badge-text="overdueCount > 0 ? String(overdueCount) : undefined"
         badge-variant="destructive"
-        :loading="immuneLoading"
+        :loading="pdStore.isLoadingPeds"
         @click="showImmuneModal = true"
       />
       <PatientSectionWidget
@@ -629,7 +547,7 @@ onMounted(() => {
         title="Growth Charts"
         :detail="growthWidgetDetail"
         :sub-detail="growthWidgetSubDetail"
-        :loading="growthLoading"
+        :loading="pdStore.isLoadingPeds"
         @click="showGrowthModal = true"
       />
       <PatientSectionWidget
@@ -639,7 +557,7 @@ onMounted(() => {
         :detail="milestoneWidgetDetail"
         :badge-text="milestoneBadgeCount > 0 ? String(milestoneBadgeCount) : undefined"
         :badge-variant="milestoneConcernCount > 0 ? 'destructive' : 'default'"
-        :loading="milestoneLoading"
+        :loading="pdStore.isLoadingPeds"
         @click="showMilestoneModal = true"
       />
 
@@ -655,7 +573,7 @@ onMounted(() => {
 
         <div class="flex-1">
         <!-- Loading -->
-        <div v-if="birthLoading" class="flex flex-col gap-2">
+        <div v-if="pdStore.isLoadingPeds" class="flex flex-col gap-2">
           <Skeleton class="h-4 w-3/4" />
           <Skeleton class="h-4 w-1/2" />
         </div>
@@ -936,7 +854,7 @@ onMounted(() => {
               Save
             </Button>
           </template>
-          <Button v-else-if="canEdit && !birthLoading" variant="secondary" @click="startBirthEdit">
+          <Button v-else-if="canEdit && !pdStore.isLoadingPeds" variant="secondary" @click="startBirthEdit">
             <Pencil class="size-4 mr-1" />
             Edit Birth History
           </Button>
@@ -961,7 +879,7 @@ onMounted(() => {
         </DialogHeader>
 
         <!-- Loading -->
-        <div v-if="immuneLoading" class="flex flex-col gap-2">
+        <div v-if="pdStore.isLoadingPeds" class="flex flex-col gap-2">
           <Skeleton class="h-8 w-full" />
           <Skeleton class="h-8 w-full" />
           <Skeleton class="h-8 w-5/6" />
@@ -1384,7 +1302,7 @@ onMounted(() => {
         </DialogHeader>
 
         <!-- Loading -->
-        <div v-if="growthLoading" class="flex flex-col gap-2">
+        <div v-if="pdStore.isLoadingPeds" class="flex flex-col gap-2">
           <Skeleton class="h-4 w-3/4" />
           <Skeleton class="h-4 w-1/2" />
         </div>
@@ -1520,7 +1438,7 @@ onMounted(() => {
         </DialogHeader>
 
         <!-- Loading -->
-        <div v-if="milestoneLoading" class="flex flex-col gap-2">
+        <div v-if="pdStore.isLoadingPeds" class="flex flex-col gap-2">
           <Skeleton class="h-8 w-full" />
           <Skeleton class="h-8 w-full" />
           <Skeleton class="h-8 w-5/6" />

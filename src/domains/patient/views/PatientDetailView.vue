@@ -40,6 +40,7 @@ import ImageCropDialog from '@/components/ImageCropDialog.vue'
 import { patientApi } from '../api/patientApi'
 import type { PatientResponse } from '../types/patient.types'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
+import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
 import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
@@ -57,6 +58,7 @@ const authStore = useAuthStore()
 const encounterStore = useEncounterStore()
 const notificationStore = useNotificationStore()
 const pdStore = usePatientDetailStore()
+const specialtyStore = useSpecialtyConfigStore()
 const patient = computed(() => pdStore.patient)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
@@ -144,6 +146,10 @@ async function fetchPatient() {
       encounterStore.loadForPatient(id),
       pdStore.loadCore(),
     ])
+    // Load specialty-specific data
+    if (specialtyStore.config?.key) {
+      pdStore.loadSpecialty(specialtyStore.config.key)
+    }
   } catch {
     error.value = 'Failed to load patient details. Please try again.'
   } finally {
@@ -514,7 +520,7 @@ onUnmounted(() => {
     <!-- Right panel -->
     <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
       <!-- Specialty-specific patient sections (between patient info and consultation timeline) -->
-      <PatientSpecialtyFactory :patient-sex="patient.sex" class="mb-6" />
+      <PatientSpecialtyFactory class="mb-6" />
 
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">

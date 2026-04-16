@@ -20,6 +20,17 @@ import type {
 } from '@/domains/patient/api/patientApi'
 import type { LifestyleData } from '@/domains/consultation/types/consultation.types'
 import type { ChronicTrendsData } from '@/domains/patient/types/patient.types'
+import { pediatricsApi } from '@/domains/patient/api/pediatricsApi'
+import type {
+  BirthHistoryResponse,
+  BirthHistoryFields,
+  FeedingHistoryFields,
+  ImmunizationTieredResponse,
+  GrowthMeasurement,
+  MilestoneScheduleResponse,
+  RecordDosePayload,
+  StoreMilestonePayload,
+} from '@/domains/patient/api/pediatricsApi'
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
@@ -38,10 +49,17 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   const preventiveCare = ref<PreventiveCareItem[]>([])
   const chronicTrends = ref<ChronicTrendsData | null>(null)
 
+  // ── Pediatrics state ───────────────────────────────────────────────────────
+  const birthHistory = ref<BirthHistoryResponse['data'] | null>(null)
+  const immunizations = ref<ImmunizationTieredResponse | null>(null)
+  const growthHistory = ref<GrowthMeasurement[]>([])
+  const milestones = ref<MilestoneScheduleResponse | null>(null)
+
   // ── Loading flags ─────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const isLoadingCore = ref(false)
   const isLoadingFM = ref(false)
+  const isLoadingPeds = ref(false)
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const patientAge = computed(() => {
@@ -87,6 +105,19 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       pastDiagnoses.value = diagnosesRes.data
     } finally {
       isLoadingCore.value = false
+    }
+  }
+
+  async function loadSpecialty(key: string): Promise<void> {
+    switch (key) {
+      case 'family_medicine':
+      case 'internal_medicine':
+        await loadFM()
+        break
+      case 'pediatrics':
+        await loadPediatrics()
+        break
+      // OB-GYN will be added in Phase 4
     }
   }
 
@@ -256,6 +287,67 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     chronicTrends.value = res.data
   }
 
+  // ── Pediatrics actions ─────────────────────────────────────────────────────
+
+  async function loadPediatrics(): Promise<void> {
+    if (!patientId.value) return
+    isLoadingPeds.value = true
+    const id = patientId.value
+    try {
+      const [birthRes, immuneRes, growthRes, milestoneRes] = await Promise.all([
+        pediatricsApi.getBirthHistory(id).catch(() => ({ data: null })),
+        pediatricsApi.getImmunizations(id).catch(() => ({ data: null })),
+        pediatricsApi.getGrowthHistory(id).catch(() => ({ data: [] })),
+        pediatricsApi.getMilestones(id).catch(() => ({ data: null })),
+      ])
+      birthHistory.value = birthRes.data as BirthHistoryResponse['data'] | null
+      immunizations.value = immuneRes.data as ImmunizationTieredResponse | null
+      growthHistory.value = (growthRes.data ?? []) as GrowthMeasurement[]
+      milestones.value = milestoneRes.data as MilestoneScheduleResponse | null
+    } finally {
+      isLoadingPeds.value = false
+    }
+  }
+
+  async function updateBirthHistory(payload: { birth_history?: Partial<BirthHistoryFields>; feeding_history?: Partial<FeedingHistoryFields> }): Promise<void> {
+    if (!patientId.value) return
+    const res = await pediatricsApi.updateBirthHistory(patientId.value, payload)
+    birthHistory.value = res.data
+    toast.success('Birth history updated')
+  }
+
+  async function recordDose(payload: RecordDosePayload): Promise<void> {
+    if (!patientId.value) return
+    await pediatricsApi.recordDose(patientId.value, payload)
+    const res = await pediatricsApi.getImmunizations(patientId.value)
+    immunizations.value = res.data
+    toast.success('Dose recorded')
+  }
+
+  async function deleteDose(doseUuid: string): Promise<void> {
+    if (!patientId.value) return
+    await pediatricsApi.deleteDose(patientId.value, doseUuid)
+    const res = await pediatricsApi.getImmunizations(patientId.value)
+    immunizations.value = res.data
+    toast.success('Dose removed')
+  }
+
+  async function storeMilestone(payload: StoreMilestonePayload): Promise<void> {
+    if (!patientId.value) return
+    await pediatricsApi.storeMilestone(patientId.value, payload)
+    const res = await pediatricsApi.getMilestones(patientId.value)
+    milestones.value = res.data
+    toast.success('Milestone recorded')
+  }
+
+  async function deleteMilestone(assessmentUuid: string): Promise<void> {
+    if (!patientId.value) return
+    await pediatricsApi.deleteMilestone(patientId.value, assessmentUuid)
+    const res = await pediatricsApi.getMilestones(patientId.value)
+    milestones.value = res.data
+    toast.success('Milestone removed')
+  }
+
   // ── Reset ─────────────────────────────────────────────────────────────────
 
   function $reset(): void {
@@ -270,10 +362,16 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     medications.value = []
     preventiveCare.value = []
     chronicTrends.value = null
+    // Pediatrics
+    birthHistory.value = null
+    immunizations.value = null
+    growthHistory.value = []
+    milestones.value = null
     // Flags
     isLoading.value = false
     isLoadingCore.value = false
     isLoadingFM.value = false
+    isLoadingPeds.value = false
   }
 
   return {
@@ -293,6 +391,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     // Actions — core
     loadPatient,
     loadCore,
+    loadSpecialty,
     updatePatientFromSync,
     $reset,
 
@@ -313,6 +412,21 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     preventiveCare,
     chronicTrends,
     isLoadingFM,
+
+    // State — Pediatrics
+    birthHistory,
+    immunizations,
+    growthHistory,
+    milestones,
+    isLoadingPeds,
+
+    // Actions — Pediatrics
+    loadPediatrics,
+    updateBirthHistory,
+    recordDose,
+    deleteDose,
+    storeMilestone,
+    deleteMilestone,
 
     // Actions — FM / IM
     loadFM,

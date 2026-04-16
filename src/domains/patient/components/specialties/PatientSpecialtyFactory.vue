@@ -6,10 +6,6 @@ import PediatricsPatientSections from './pediatrics/PediatricsPatientSections.vu
 import FMPatientSections from './family-medicine/FMPatientSections.vue'
 import ObGynPatientSections from '@/domains/obgyn/components/ObGynPatientSections.vue'
 
-const props = defineProps<{
-  patientSex?: string
-}>()
-
 const specialtyStore = useSpecialtyConfigStore()
 const specialtyKey = computed(() => specialtyStore.config?.key)
 </script>
@@ -20,10 +16,7 @@ const specialtyKey = computed(() => specialtyStore.config?.key)
     <GeneralPatientSections />
     <!-- Specialty-specific sections -->
     <FMPatientSections v-if="specialtyKey === 'family_medicine' || specialtyKey === 'internal_medicine'" />
-    <PediatricsPatientSections
-      v-else-if="specialtyKey === 'pediatrics'"
-      :patient-sex="props.patientSex"
-    />
+    <PediatricsPatientSections v-else-if="specialtyKey === 'pediatrics'" />
     <ObGynPatientSections v-else-if="specialtyKey === 'obgyn'" />
   </div>
 </template>
