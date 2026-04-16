@@ -140,9 +140,10 @@ const gynProfile = computed(() => pdStore.gynProfile)
 const bpTrend = computed(() => pdStore.pregnancyDashboard?.bp_trend ?? [])
 const fhrTrend = computed(() => pdStore.pregnancyDashboard?.fhr_trend ?? [])
 const previousVisitData = computed(() => {
-  const visits = pdStore.pregnancyDashboard?.visit_summary ?? []
-  if (visits.length < 2) return null
-  const prev = visits[visits.length - 2]!
+  const visits = pdStore.pregnancyDashboard?.visit_summary
+  if (!visits || visits.length < 2) return null
+  const prev = visits[visits.length - 2]
+  if (!prev) return null
   return {
     date: new Date(prev.visit_date ?? prev.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     ga: prev.gestational_age_weeks != null ? `${prev.gestational_age_weeks}w${prev.gestational_age_days ?? 0}d` : '—',
