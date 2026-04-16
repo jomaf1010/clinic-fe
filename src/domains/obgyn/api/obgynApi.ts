@@ -13,6 +13,7 @@ export interface UpsertGynProfilePayload {
   parity_preterm?: number | null
   abortions?: number | null
   living_children?: number | null
+  previous_pregnancies?: Array<{ year: number | null; outcome: string | null; delivery_type: string | null; complications: string | null; sex: string | null; birth_weight: number | null; notes: string | null }> | null
   screenings?: Array<{ date: string; type: string; result?: string | null; notes?: string | null }> | null
   contraception?: Array<{ method: string[]; start_date: string; end_date?: string | null; notes?: string | null }> | null
 }
@@ -85,6 +86,10 @@ export const obgynApi = {
 
   deletePregnancy(patientId: string, pregnancyId: string): Promise<void> {
     return http.delete<void>(`/patients/${patientId}/pregnancies/${pregnancyId}`)
+  },
+
+  evaluateRisk(patientId: string, payload: Record<string, unknown>): Promise<{ data: { level: string; factors: string[] } }> {
+    return http.post<{ data: { level: string; factors: string[] } }>(`/patients/${patientId}/pregnancy-risk-evaluate`, payload)
   },
 
   getDashboard(patientId: string, pregnancyId: string): Promise<{ data: PregnancyDashboard }> {

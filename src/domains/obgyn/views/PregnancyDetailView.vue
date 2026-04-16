@@ -131,8 +131,10 @@ function handleSetupSaved(pregnancy: Pregnancy): void {
       name: RouteNames.PREGNANCY_DETAIL,
       params: { patientId: patientId.value, pregnancyId: pregnancy.id },
     })
+    return
   }
-  showSetupForm.value = false
+  // Reload dashboard data to reflect changes (EDD, risk level, etc.)
+  store.loadDashboard(patientId.value, pregnancy.id).catch(() => {})
 }
 
 async function goToNewVisit(): Promise<void> {

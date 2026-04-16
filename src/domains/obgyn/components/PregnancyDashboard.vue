@@ -127,7 +127,7 @@ const gpal = computed(() => {
   const pt = gp.parity_preterm ?? '?'
   const a = gp.abortions ?? '?'
   const l = gp.living_children ?? '?'
-  return `G${g}P${t}${pt}A${a}L${l}`
+  return `G${g}P(${t}-${pt}-${a}-${l})`
 })
 
 const weeksRemaining = computed(() => {

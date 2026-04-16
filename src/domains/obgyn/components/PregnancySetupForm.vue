@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
 import {
   CalendarDays,
   Weight,
@@ -27,6 +28,8 @@ import { usePregnancyStore } from '../stores/pregnancyStore'
 import type { Pregnancy } from '../types/obgyn.types'
 import { obgynApi } from '../api/obgynApi'
 import type { CreatePregnancyPayload } from '../api/obgynApi'
+import { patientApi } from '@/domains/patient/api/patientApi'
+import { Badge } from '@/components/ui/badge'
 
 const props = defineProps<{
   patientId: string
@@ -39,6 +42,44 @@ const emit = defineEmits<{
 }>()
 
 const store = usePregnancyStore()
+const showRiskOverride = ref(false)
+const isEvaluatingRisk = ref(false)
+const evaluatedRisk = ref<{ level: string; factors: string[] } | null>(null)
+
+async function evaluateRisk(): Promise<void> {
+  isEvaluatingRisk.value = true
+  try {
+    const res = await obgynApi.evaluateRisk(props.patientId, {
+      pre_pregnancy_weight: form.pre_pregnancy_weight,
+      height: form.height,
+      medical_conditions: form.medical_conditions || null,
+      fetus_count: form.fetus_count,
+      smoking: form.smoking || null,
+      pregnancy_id: props.pregnancy?.id ?? null,
+    })
+    evaluatedRisk.value = res.data
+    // Auto-set form values from evaluation
+    form.risk_level = res.data.level as typeof form.risk_level
+    form.risk_factors = res.data.factors.join('\n')
+  } catch {
+    toast.error('Failed to evaluate risk')
+  } finally {
+    isEvaluatingRisk.value = false
+  }
+}
+
+// Past diagnoses suggestions + auto-populate blood type from patient
+const pastDiagnoses = ref<{ description: string; code: string | null }[]>([])
+
+onMounted(async () => {
+  const fetches: Promise<void>[] = []
+  fetches.push(
+    patientApi.getPastDiagnoses(props.patientId).then((res) => {
+      pastDiagnoses.value = res.data
+    }).catch(() => {}),
+  )
+  await Promise.all(fetches)
+})
 
 interface FormState {
   // Dating
@@ -46,14 +87,14 @@ interface FormState {
   edd: string
   edd_source: 'lmp' | 'ultrasound' | 'adjusted' | ''
   first_ultrasound_date: string
-  first_ultrasound_ga: string
+  first_ultrasound_ga_weeks: number | null
+  first_ultrasound_ga_days: number | null
   // Fetus
   fetus_count: number
   fetuses: { label: string; sex: 'male' | 'female' | 'unknown' }[]
   // Medical history
   medical_conditions: string
   surgical_history: string
-  blood_type: string
   // Social
   smoking: 'never' | 'former' | 'current' | ''
   alcohol: 'never' | 'occasional' | 'regular' | ''
@@ -73,12 +114,12 @@ function buildInitialState(): FormState {
     edd: p?.edd ?? '',
     edd_source: p?.edd_source ?? '',
     first_ultrasound_date: p?.first_ultrasound_date ?? '',
-    first_ultrasound_ga: p?.first_ultrasound_ga ?? '',
+    first_ultrasound_ga_weeks: parseGAWeeks(p?.first_ultrasound_ga),
+    first_ultrasound_ga_days: parseGADays(p?.first_ultrasound_ga),
     fetus_count: p?.fetus_count ?? 1,
     fetuses: p?.fetuses?.length ? [...p.fetuses] : [{ label: 'Baby', sex: 'unknown' as const }],
     medical_conditions: p?.medical_conditions ?? '',
     surgical_history: p?.surgical_history ?? '',
-    blood_type: p?.blood_type_rh ?? '',
     smoking: p?.smoking ?? '',
     alcohol: p?.alcohol ?? '',
     ipv_screened: p?.ipv_screened ?? false,
@@ -120,42 +161,55 @@ watch(
   },
 )
 
-// Parse GA string like "15w3d" or "15w" into total days
-function parseGAToDays(ga: string): number | null {
-  const match = ga.match(/^(\d+)w(?:(\d+)d)?$/)
-  if (!match) return null
-  return parseInt(match[1]!) * 7 + parseInt(match[2] ?? '0')
+// Parse GA string like "15w3d" into weeks/days
+function parseGAWeeks(ga: string | null | undefined): number | null {
+  if (!ga) return null
+  const match = ga.match(/^(\d+)w/)
+  return match ? parseInt(match[1]!) : null
+}
+function parseGADays(ga: string | null | undefined): number | null {
+  if (!ga) return null
+  const match = ga.match(/(\d+)d$/)
+  return match ? parseInt(match[1]!) : null
 }
 
-// Auto-calculate EDD from LMP (when source is lmp)
-watch(
-  () => form.lmp,
-  (lmp) => {
-    if (!lmp || form.edd_source === 'ultrasound' || form.edd_source === 'adjusted') return
-    const lmpDate = new Date(lmp)
-    if (isNaN(lmpDate.getTime())) return
-    const eddDate = new Date(lmpDate.getTime() + 280 * 24 * 60 * 60 * 1000)
-    form.edd = eddDate.toISOString().split('T')[0]!
-    if (!form.edd_source) form.edd_source = 'lmp'
-  },
-)
+// Computed EDD from LMP (Naegele's rule: LMP + 280 days)
+const lmpEdd = computed(() => {
+  if (!form.lmp) return null
+  const lmpDate = new Date(form.lmp)
+  if (isNaN(lmpDate.getTime())) return null
+  return new Date(lmpDate.getTime() + 280 * 86400000).toISOString().slice(0, 10)
+})
 
-// Auto-calculate EDD from ultrasound (when source is ultrasound)
-// EDD = ultrasound_date + (280 - GA_in_days)
-watch(
-  () => [form.edd_source, form.first_ultrasound_date, form.first_ultrasound_ga],
-  () => {
-    if (form.edd_source !== 'ultrasound') return
-    if (!form.first_ultrasound_date || !form.first_ultrasound_ga) return
-    const usDate = new Date(form.first_ultrasound_date)
-    if (isNaN(usDate.getTime())) return
-    const gaDays = parseGAToDays(form.first_ultrasound_ga)
-    if (gaDays === null) return
-    const remainingDays = 280 - gaDays
-    const eddDate = new Date(usDate.getTime() + remainingDays * 24 * 60 * 60 * 1000)
-    form.edd = eddDate.toISOString().split('T')[0]!
-  },
-)
+// Computed EDD from Ultrasound (US date + (280 - GA_days))
+const ultrasoundEdd = computed(() => {
+  if (!form.first_ultrasound_date || form.first_ultrasound_ga_weeks === null) return null
+  const usDate = new Date(form.first_ultrasound_date)
+  if (isNaN(usDate.getTime())) return null
+  const gaDays = form.first_ultrasound_ga_weeks * 7 + (form.first_ultrasound_ga_days ?? 0)
+  if (gaDays <= 0) return null
+  return new Date(usDate.getTime() + (280 - gaDays) * 86400000).toISOString().slice(0, 10)
+})
+
+// Sync form.edd when source or computed values change
+function selectEddSource(source: 'lmp' | 'ultrasound'): void {
+  form.edd_source = source
+  const edd = source === 'lmp' ? lmpEdd.value : ultrasoundEdd.value
+  if (edd) form.edd = edd
+}
+
+// Auto-update EDD when inputs change for the selected source
+watch(lmpEdd, (edd) => {
+  if (form.edd_source === 'lmp' && edd) form.edd = edd
+})
+watch(ultrasoundEdd, (edd) => {
+  if (form.edd_source === 'ultrasound' && edd) form.edd = edd
+})
+
+// Auto-select source when first data is entered
+watch(() => form.lmp, (lmp) => {
+  if (lmp && !form.edd_source) selectEddSource('lmp')
+})
 
 const bmi = computed(() => {
   if (!form.pre_pregnancy_weight || !form.height || form.height <= 0) return null
@@ -178,6 +232,32 @@ const bmiCategory = computed(() => {
   return 'Obese'
 })
 
+function addDiagnosisToMedical(description: string): void {
+  const current = form.medical_conditions.trim()
+  if (current.toLowerCase().includes(description.toLowerCase())) return // already added
+  form.medical_conditions = current ? `${current}\n${description}` : description
+}
+
+// Filter out diagnoses already in medical conditions
+const availableSuggestions = computed(() =>
+  pastDiagnoses.value.filter(
+    (d) => !form.medical_conditions.toLowerCase().includes(d.description.toLowerCase()),
+  ),
+)
+
+function formatDateStr(dateStr: string | null): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr + 'T00:00:00')
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+// Difference in days between LMP and Ultrasound EDD
+const eddDiffDays = computed(() => {
+  if (!lmpEdd.value || !ultrasoundEdd.value) return null
+  return Math.abs(Math.round((new Date(ultrasoundEdd.value).getTime() - new Date(lmpEdd.value).getTime()) / 86400000))
+})
+
 const eddDisplay = computed(() => {
   if (!form.edd) return null
   const d = new Date(form.edd)
@@ -191,14 +271,13 @@ async function handleSubmit(): Promise<void> {
     edd: form.edd || null,
     edd_source: (form.edd_source as 'lmp' | 'ultrasound' | 'adjusted') || null,
     first_ultrasound_date: form.first_ultrasound_date || null,
-    first_ultrasound_ga: form.first_ultrasound_ga || null,
+    first_ultrasound_ga: form.first_ultrasound_ga_weeks !== null ? `${form.first_ultrasound_ga_weeks}w${form.first_ultrasound_ga_days ?? 0}d` : null,
     fetus_count: form.fetus_count,
     fetuses: form.fetuses,
     pre_pregnancy_weight: form.pre_pregnancy_weight,
     height: form.height,
     medical_conditions: form.medical_conditions || null,
     surgical_history: form.surgical_history || null,
-    blood_type_rh: form.blood_type || null,
     ...(form.smoking ? { smoking: form.smoking } : {}),
     ...(form.alcohol ? { alcohol: form.alcohol } : {}),
     ipv_screened: form.ipv_screened,
@@ -229,50 +308,114 @@ async function handleSubmit(): Promise<void> {
         </h3>
       </div>
 
+      <p class="text-xs text-muted-foreground">Select a dating method to determine the estimated due date.</p>
+
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div class="flex flex-col gap-1.5">
-          <Label class="text-xs">LMP Date <span class="text-destructive">*</span></Label>
-          <MFDatePicker v-model="form.lmp" disable-future />
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <Label class="text-xs">Estimated Due Date</Label>
-          <div class="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm text-muted-foreground">
-            {{ eddDisplay ?? 'Auto-calculated from LMP' }}
+        <!-- LMP Card -->
+        <button
+          type="button"
+          class="flex flex-col gap-3 rounded-lg border-2 p-4 text-left transition-all"
+          :class="form.edd_source === 'lmp'
+            ? 'border-primary bg-primary/5 shadow-sm'
+            : 'border-border hover:border-primary/40'"
+          @click="selectEddSource('lmp')"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold">Last Menstrual Period</span>
+            <div
+              class="flex size-5 items-center justify-center rounded-full border-2 transition-colors"
+              :class="form.edd_source === 'lmp' ? 'border-primary bg-primary' : 'border-muted-foreground/30'"
+            >
+              <div v-if="form.edd_source === 'lmp'" class="size-2 rounded-full bg-white" />
+            </div>
           </div>
-        </div>
+          <div class="flex flex-col gap-2" @click.stop>
+            <Label class="text-xs text-muted-foreground">LMP Date</Label>
+            <MFDatePicker
+              v-model="form.lmp"
+              disable-future
+              :min-date="new Date(Date.now() - 308 * 86400000).toISOString().slice(0, 10)"
+              class="h-8 text-sm"
+            />
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-muted-foreground">EDD</span>
+            <span class="font-semibold" :class="form.edd_source === 'lmp' ? 'text-primary' : 'text-foreground'">
+              {{ lmpEdd ? formatDateStr(lmpEdd) : '—' }}
+            </span>
+          </div>
+        </button>
 
-        <div class="flex flex-col gap-1.5">
-          <Label for="edd_source" class="text-xs">EDD Source</Label>
-          <Select
-            :model-value="form.edd_source"
-            @update:model-value="(v) => { form.edd_source = v as typeof form.edd_source }"
-          >
-            <SelectTrigger id="edd_source" class="h-8 text-sm">
-              <SelectValue placeholder="Select..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="lmp">LMP</SelectItem>
-              <SelectItem value="ultrasound">Ultrasound</SelectItem>
-              <SelectItem value="adjusted">Adjusted</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <!-- Ultrasound Card -->
+        <button
+          type="button"
+          class="flex flex-col gap-3 rounded-lg border-2 p-4 text-left transition-all"
+          :class="form.edd_source === 'ultrasound'
+            ? 'border-primary bg-primary/5 shadow-sm'
+            : 'border-border hover:border-primary/40'"
+          @click="selectEddSource('ultrasound')"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-semibold">Ultrasound Dating</span>
+            <div
+              class="flex size-5 items-center justify-center rounded-full border-2 transition-colors"
+              :class="form.edd_source === 'ultrasound' ? 'border-primary bg-primary' : 'border-muted-foreground/30'"
+            >
+              <div v-if="form.edd_source === 'ultrasound'" class="size-2 rounded-full bg-white" />
+            </div>
+          </div>
+          <div class="flex flex-col gap-2" @click.stop>
+            <Label class="text-xs text-muted-foreground">Ultrasound Date</Label>
+            <MFDatePicker v-model="form.first_ultrasound_date" disable-future class="h-8 text-sm" />
+          </div>
+          <div class="flex flex-col gap-2" @click.stop>
+            <Label class="text-xs text-muted-foreground">GA at Ultrasound</Label>
+            <div class="flex items-center gap-2">
+              <Input
+                type="number"
+                min="0"
+                max="44"
+                placeholder="Wk"
+                :model-value="form.first_ultrasound_ga_weeks ?? ''"
+                class="h-8 w-20 text-sm"
+                @update:model-value="(v) => form.first_ultrasound_ga_weeks = v ? Number(v) : null"
+                @blur="() => { if (form.first_ultrasound_ga_weeks !== null && form.first_ultrasound_ga_weeks > 44) form.first_ultrasound_ga_weeks = 44 }"
+              />
+              <span class="text-xs text-muted-foreground">w</span>
+              <Input
+                type="number"
+                min="0"
+                max="6"
+                placeholder="D"
+                :model-value="form.first_ultrasound_ga_days ?? ''"
+                class="h-8 w-16 text-sm"
+                @update:model-value="(v) => form.first_ultrasound_ga_days = v ? Number(v) : null"
+                @blur="() => { if (form.first_ultrasound_ga_days !== null && form.first_ultrasound_ga_days > 6) form.first_ultrasound_ga_days = 6 }"
+              />
+              <span class="text-xs text-muted-foreground">d</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-muted-foreground">EDD</span>
+            <span class="font-semibold" :class="form.edd_source === 'ultrasound' ? 'text-primary' : 'text-foreground'">
+              {{ ultrasoundEdd ? formatDateStr(ultrasoundEdd) : '—' }}
+            </span>
+          </div>
+        </button>
+      </div>
 
-        <div class="flex flex-col gap-1.5">
-          <Label class="text-xs">First Ultrasound Date</Label>
-          <MFDatePicker v-model="form.first_ultrasound_date" disable-future />
-        </div>
+      <!-- EDD difference notice -->
+      <div v-if="eddDiffDays && eddDiffDays > 0 && lmpEdd && ultrasoundEdd" class="rounded-md border px-3 py-2 text-xs" :class="eddDiffDays > 7 ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400' : 'bg-muted/50 text-muted-foreground'">
+        LMP and Ultrasound EDDs differ by <span class="font-semibold">{{ eddDiffDays }} days</span>.
+        <span v-if="eddDiffDays > 7"> Consider using the ultrasound EDD for more accurate dating.</span>
+      </div>
 
-        <div class="flex flex-col gap-1.5 sm:col-span-2">
-          <Label for="first_us_ga" class="text-xs">First Ultrasound GA</Label>
-          <Input
-            id="first_us_ga"
-            v-model="form.first_ultrasound_ga"
-            placeholder="e.g. 8w4d"
-            class="h-8 text-sm"
-          />
-        </div>
+      <!-- Active EDD summary -->
+      <div v-if="form.edd" class="flex items-center gap-3 rounded-md border bg-muted/40 px-4 py-2.5 text-sm">
+        <CalendarDays class="size-4 shrink-0 text-muted-foreground" />
+        <span class="text-muted-foreground">Active EDD:</span>
+        <span class="font-semibold">{{ eddDisplay }}</span>
+        <Badge variant="outline" class="text-[10px]">{{ form.edd_source === 'ultrasound' ? 'Ultrasound' : 'LMP' }}</Badge>
       </div>
     </section>
 
@@ -287,14 +430,14 @@ async function handleSubmit(): Promise<void> {
         </h3>
       </div>
 
-      <div class="flex flex-col gap-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div class="flex flex-col gap-1.5">
           <Label for="fetus-count" class="text-xs">Number of Fetuses</Label>
           <Select
             :model-value="String(form.fetus_count)"
             @update:model-value="(v) => { form.fetus_count = Number(v) }"
           >
-            <SelectTrigger class="h-8 w-32 text-sm">
+            <SelectTrigger class="h-8 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -306,10 +449,9 @@ async function handleSubmit(): Promise<void> {
           </Select>
         </div>
 
-        <!-- Gender per fetus -->
-        <div class="grid gap-3" :class="form.fetus_count > 1 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2'">
-          <div v-for="(fetus, idx) in form.fetuses" :key="idx" class="flex flex-col gap-1.5">
-            <Label class="text-xs">{{ form.fetus_count > 1 ? fetus.label : 'Sex' }}</Label>
+        <!-- Sex per fetus -->
+        <div v-for="(fetus, idx) in form.fetuses" :key="idx" class="flex flex-col gap-1.5">
+          <Label class="text-xs">{{ form.fetus_count > 1 ? fetus.label + ' Sex' : 'Sex' }}</Label>
             <Select
               :model-value="fetus.sex"
               @update:model-value="(v) => { form.fetuses[idx].sex = v as 'male' | 'female' | 'unknown' }"
@@ -324,7 +466,6 @@ async function handleSubmit(): Promise<void> {
               </SelectContent>
             </Select>
           </div>
-        </div>
       </div>
     </section>
 
@@ -348,6 +489,21 @@ async function handleSubmit(): Promise<void> {
             placeholder="e.g. Hypertension, Diabetes, Thyroid disorder..."
             class="min-h-20 resize-none text-sm"
           />
+          <div v-if="availableSuggestions.length > 0" class="flex flex-col gap-1.5">
+            <span class="text-[10px] text-muted-foreground">From past consultations:</span>
+            <div class="flex flex-wrap gap-1">
+              <button
+                v-for="dx in availableSuggestions"
+                :key="dx.description"
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/10"
+                @click="addDiagnosisToMedical(dx.description)"
+              >
+                <span>+ {{ dx.description }}</span>
+                <span v-if="dx.code" class="font-mono text-[9px] text-muted-foreground">{{ dx.code }}</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="flex flex-col gap-1.5">
           <Label for="surgical_history" class="text-xs">Surgical History</Label>
@@ -357,27 +513,6 @@ async function handleSubmit(): Promise<void> {
             placeholder="e.g. Appendectomy 2018, Cesarean section..."
             class="min-h-20 resize-none text-sm"
           />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="blood_type" class="text-xs">Blood Type &amp; Rh</Label>
-          <Select
-            :model-value="form.blood_type"
-            @update:model-value="(v) => { form.blood_type = v }"
-          >
-            <SelectTrigger id="blood_type" class="h-8 text-sm">
-              <SelectValue placeholder="Select..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="A+">A+</SelectItem>
-              <SelectItem value="A-">A-</SelectItem>
-              <SelectItem value="B+">B+</SelectItem>
-              <SelectItem value="B-">B-</SelectItem>
-              <SelectItem value="AB+">AB+</SelectItem>
-              <SelectItem value="AB-">AB-</SelectItem>
-              <SelectItem value="O+">O+</SelectItem>
-              <SelectItem value="O-">O-</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
     </section>
@@ -515,31 +650,84 @@ async function handleSubmit(): Promise<void> {
         </h3>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div class="flex flex-col gap-1.5">
-          <Label for="risk_level" class="text-xs">Risk Level</Label>
-          <Select
-            :model-value="form.risk_level"
-            @update:model-value="(v) => { form.risk_level = v as typeof form.risk_level }"
-          >
-            <SelectTrigger id="risk_level" class="h-8 text-sm">
-              <SelectValue placeholder="Select..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low Risk</SelectItem>
-              <SelectItem value="high">High Risk</SelectItem>
-            </SelectContent>
-          </Select>
+      <!-- Evaluate button -->
+      <Button
+        variant="outline"
+        size="sm"
+        class="w-fit"
+        :disabled="isEvaluatingRisk"
+        @click="evaluateRisk"
+      >
+        <LoaderCircle v-if="isEvaluatingRisk" class="size-3.5 animate-spin" />
+        <ShieldCheck v-else class="size-3.5" />
+        {{ isEvaluatingRisk ? 'Evaluating...' : (evaluatedRisk || pregnancy?.risk_level) ? 'Re-evaluate Risk' : 'Calculate Risk' }}
+      </Button>
+
+      <!-- Risk result display -->
+      <div v-if="(evaluatedRisk || pregnancy?.risk_level) && !showRiskOverride" class="flex flex-col gap-3">
+        <div class="flex items-center gap-3 rounded-md border px-4 py-3" :class="(evaluatedRisk?.level ?? pregnancy?.risk_level) === 'high' ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950' : 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950'">
+          <div class="flex size-8 items-center justify-center rounded-full" :class="(evaluatedRisk?.level ?? pregnancy?.risk_level) === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-400' : 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400'">
+            <ShieldCheck class="size-4" />
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-semibold" :class="(evaluatedRisk?.level ?? pregnancy?.risk_level) === 'high' ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'">
+              {{ (evaluatedRisk?.level ?? pregnancy?.risk_level) === 'high' ? 'High Risk' : 'Low Risk' }}
+            </p>
+            <p class="text-xs text-muted-foreground">Based on patient profile and pregnancy data</p>
+          </div>
+          <Button variant="ghost" size="sm" class="shrink-0 text-xs" @click="showRiskOverride = true">
+            Override
+          </Button>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="risk_factors" class="text-xs">Risk Factors</Label>
-          <Textarea
-            id="risk_factors"
-            v-model="form.risk_factors"
-            placeholder="One factor per line..."
-            class="min-h-20 resize-none text-sm"
-          />
-          <p class="text-xs text-muted-foreground">Enter each risk factor on a new line</p>
+        <!-- Risk factors -->
+        <div v-if="(evaluatedRisk?.factors ?? pregnancy?.risk_factors)?.length" class="flex flex-col gap-1.5">
+          <span class="text-xs text-muted-foreground">Detected risk factors:</span>
+          <div class="flex flex-wrap gap-1.5">
+            <Badge
+              v-for="factor in (evaluatedRisk?.factors ?? pregnancy?.risk_factors)"
+              :key="factor"
+              variant="outline"
+              class="text-[11px]"
+              :class="(evaluatedRisk?.level ?? pregnancy?.risk_level) === 'high' ? 'border-red-200 text-red-700 dark:border-red-800 dark:text-red-400' : ''"
+            >
+              {{ factor }}
+            </Badge>
+          </div>
+        </div>
+        <p v-else class="text-xs text-green-600 dark:text-green-400">No risk factors detected.</p>
+      </div>
+
+      <!-- Manual override -->
+      <div v-if="showRiskOverride" class="flex flex-col gap-3">
+        <div class="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          <span>Manual override — risk will not auto-compute on save</span>
+          <button type="button" class="font-medium text-primary underline" @click="showRiskOverride = false">Cancel override</button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="flex flex-col gap-1.5">
+            <Label for="risk_level" class="text-xs">Risk Level</Label>
+            <Select
+              :model-value="form.risk_level"
+              @update:model-value="(v) => { form.risk_level = v as typeof form.risk_level }"
+            >
+              <SelectTrigger id="risk_level" class="h-8 text-sm">
+                <SelectValue placeholder="Select..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low Risk</SelectItem>
+                <SelectItem value="high">High Risk</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <Label for="risk_factors" class="text-xs">Risk Factors</Label>
+            <Textarea
+              id="risk_factors"
+              v-model="form.risk_factors"
+              placeholder="One factor per line..."
+              class="min-h-20 resize-none text-sm"
+            />
+          </div>
         </div>
       </div>
     </section>

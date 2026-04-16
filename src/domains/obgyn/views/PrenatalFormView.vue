@@ -19,6 +19,7 @@ import {
   LoaderCircle,
   Lock,
   Search,
+  Send,
   Stethoscope,
   WifiOff,
   X,
@@ -68,11 +69,22 @@ import LabOrderSection from '@/domains/consultation/components/LabOrderSection.v
 import ProcedureSection from '@/domains/service/components/ProcedureSection.vue'
 import ConsumableSection from '@/domains/consultation/components/ConsumableSection.vue'
 import PaymentTab from '@/domains/consultation/components/tabs/PaymentTab.vue'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import DangerSignsChecklist from '../components/DangerSignsChecklist.vue'
+import PrenatalCareChecklist from '../components/PrenatalCareChecklist.vue'
 import { obgynApi } from '../api/obgynApi'
 import { patientApi } from '@/domains/patient/api/patientApi'
 import type { PatientResponse } from '@/domains/patient/types/patient.types'
-import type { DueReminders, GynProfile, Pregnancy as PregnancyType } from '../types/obgyn.types'
+import { toast } from 'vue-sonner'
+import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
+import { use } from 'echarts/core'
+import { LineChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import VChart from 'vue-echarts'
+
+use([LineChart, GridComponent, TooltipComponent, CanvasRenderer])
+import type { DueReminders, GynProfile, Pregnancy as PregnancyType, BpTrendPoint, FhrTrendPoint } from '../types/obgyn.types'
 import { useClinicalSummary } from '../composables/useClinicalSummary'
 
 // ── Router / stores ─────────────────────────────────────────────────
@@ -120,8 +132,21 @@ function setupTabsObserver() {
 // ── Pregnancy summary (sidebar) ─────────────────────────────────────
 const pregnancyEdd = ref<string | null>(null)
 const pregnancyRiskLevel = ref<string | null>(null)
+const pregnancyLmp = ref<string | null>(null)
 const patientData = ref<PatientResponse | null>(null)
 const gynProfile = ref<GynProfile | null>(null)
+
+// Previous visit comparison + trend data
+const bpTrend = ref<BpTrendPoint[]>([])
+const fhrTrend = ref<FhrTrendPoint[]>([])
+const previousVisitData = ref<{
+  date: string
+  ga: string
+  bp: string | null
+  weight: string | null
+  fhr: string | null
+  fh: string | null
+} | null>(null)
 
 async function loadPregnancySummary() {
   const enc = store.current
@@ -134,6 +159,28 @@ async function loadPregnancySummary() {
       obgynApi.getPregnancy(enc.patient_id, enc.pregnancy_id).then((res) => {
         pregnancyEdd.value = res.data.edd
         pregnancyRiskLevel.value = res.data.risk_level
+        pregnancyLmp.value = res.data.lmp ?? null
+      }).catch(() => {}),
+    )
+    // Load dashboard for previous visit comparison and trend sparklines
+    fetches.push(
+      obgynApi.getDashboard(enc.patient_id, enc.pregnancy_id).then((res) => {
+        const d = res.data
+        bpTrend.value = d.bp_trend ?? []
+        fhrTrend.value = d.fhr_trend ?? []
+        // Extract previous visit from visit_summary (current is last, previous is second-to-last)
+        const visits = d.visit_summary ?? []
+        if (visits.length >= 2) {
+          const prev = visits[visits.length - 2]!
+          previousVisitData.value = {
+            date: new Date(prev.visit_date ?? prev.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            ga: prev.gestational_age_weeks != null ? `${prev.gestational_age_weeks}w${prev.gestational_age_days ?? 0}d` : '—',
+            bp: prev.bp_systolic && prev.bp_diastolic ? `${prev.bp_systolic}/${prev.bp_diastolic}` : null,
+            weight: prev.weight != null ? `${prev.weight} kg` : null,
+            fhr: prev.fetal_heart_rate != null ? `${prev.fetal_heart_rate} bpm` : null,
+            fh: prev.fundal_height != null ? `${prev.fundal_height} cm` : null,
+          }
+        }
       }).catch(() => {}),
     )
   }
@@ -166,7 +213,7 @@ const gpal = computed(() => {
   const pt = gp.parity_preterm ?? '?'
   const a = gp.abortions ?? '?'
   const l = gp.living_children ?? '?'
-  return `G${g}P${t}${pt}A${a}L${l}`
+  return `G${g}P(${t}-${pt}-${a}-${l})`
 })
 
 const activePregnancyRef = computed<PregnancyType | null>(() => {
@@ -174,7 +221,7 @@ const activePregnancyRef = computed<PregnancyType | null>(() => {
   return {
     edd: pregnancyEdd.value,
     risk_level: pregnancyRiskLevel.value as 'low' | 'high' | null,
-    current_ga: gaWeeks !== null ? { weeks: gaWeeks, days: gaDays ?? 0, trimester: trimester.value ?? '' } : null,
+    current_ga: gaWeeks.value !== null ? { weeks: gaWeeks.value, days: gaDays.value ?? 0, trimester: trimester.value ?? '' } : null,
   } as PregnancyType
 })
 
@@ -242,6 +289,7 @@ interface LocalTriage {
   fetal_movement: 'present' | 'decreased' | 'not_yet_felt' | ''
   danger_signs: string[]
   danger_signs_reviewed: boolean
+  mood_screening: string
   vitals: {
     bp_systolic: string
     bp_diastolic: string
@@ -249,6 +297,9 @@ interface LocalTriage {
     respiratory_rate: string
     temperature: string
     weight: string
+    spo2: string
+    urine_protein: string
+    urine_sugar: string
   }
 }
 
@@ -258,6 +309,7 @@ function emptyTriage(): LocalTriage {
     fetal_movement: '',
     danger_signs: [],
     danger_signs_reviewed: false,
+    mood_screening: '',
     vitals: {
       bp_systolic: '',
       bp_diastolic: '',
@@ -265,6 +317,9 @@ function emptyTriage(): LocalTriage {
       respiratory_rate: '',
       temperature: '',
       weight: '',
+      spo2: '',
+      urine_protein: '',
+      urine_sugar: '',
     },
   }
 }
@@ -278,22 +333,29 @@ function syncTriageFromStore(): void {
   localTriage.fetal_movement = (t.fetal_movement as LocalTriage['fetal_movement']) ?? ''
   localTriage.danger_signs = [...(t.danger_signs ?? [])]
   localTriage.danger_signs_reviewed = t.danger_signs_reviewed ?? false
-  localTriage.vitals.bp_systolic = t.vitals?.bp_systolic !== null && t.vitals?.bp_systolic !== undefined ? String(t.vitals.bp_systolic) : ''
-  localTriage.vitals.bp_diastolic = t.vitals?.bp_diastolic !== null && t.vitals?.bp_diastolic !== undefined ? String(t.vitals.bp_diastolic) : ''
-  localTriage.vitals.heart_rate = t.vitals?.heart_rate !== null && t.vitals?.heart_rate !== undefined ? String(t.vitals.heart_rate) : ''
-  localTriage.vitals.respiratory_rate = t.vitals?.respiratory_rate !== null && t.vitals?.respiratory_rate !== undefined ? String(t.vitals.respiratory_rate) : ''
-  localTriage.vitals.temperature = t.vitals?.temperature !== null && t.vitals?.temperature !== undefined ? String(t.vitals.temperature) : ''
-  localTriage.vitals.weight = t.vitals?.weight !== null && t.vitals?.weight !== undefined ? String(t.vitals.weight) : ''
+  localTriage.mood_screening = (t as Record<string, unknown>).mood_screening as string ?? ''
+  const v = t.vitals
+  localTriage.vitals.bp_systolic = v?.bp_systolic != null ? String(v.bp_systolic) : ''
+  localTriage.vitals.bp_diastolic = v?.bp_diastolic != null ? String(v.bp_diastolic) : ''
+  localTriage.vitals.heart_rate = v?.heart_rate != null ? String(v.heart_rate) : ''
+  localTriage.vitals.respiratory_rate = v?.respiratory_rate != null ? String(v.respiratory_rate) : ''
+  localTriage.vitals.temperature = v?.temperature != null ? String(v.temperature) : ''
+  localTriage.vitals.weight = v?.weight != null ? String(v.weight) : ''
+  localTriage.vitals.spo2 = (v as Record<string, unknown>)?.spo2 != null ? String((v as Record<string, unknown>).spo2) : ''
+  localTriage.vitals.urine_protein = ((v as Record<string, unknown>)?.urine_protein as string) ?? ''
+  localTriage.vitals.urine_sugar = ((v as Record<string, unknown>)?.urine_sugar as string) ?? ''
 }
 
-const bpAlert = computed(() => {
+const bpAlert = computed<false | 'elevated' | 'severe'>(() => {
   const sys = Number(localTriage.vitals.bp_systolic)
   const dia = Number(localTriage.vitals.bp_diastolic)
-  if (!sys || !dia) return false
-  return sys >= 140 || dia >= 90
+  if (!sys && !dia) return false
+  if (sys >= 160 || dia >= 110) return 'severe'
+  if (sys >= 140 || dia >= 90) return 'elevated'
+  return false
 })
 
-const showFetalMovement = computed(() => (gaWeeks.value ?? 0) >= 20)
+const showFetalMovement = computed(() => (gaWeeks.value ?? 0) >= 16)
 
 function buildTriagePayload(): PrenatalTriage {
   return {
@@ -302,6 +364,7 @@ function buildTriagePayload(): PrenatalTriage {
     kick_counts_performed: null,
     danger_signs: [...localTriage.danger_signs],
     danger_signs_reviewed: localTriage.danger_signs_reviewed,
+    mood_screening: (localTriage.mood_screening as PrenatalTriage['mood_screening']) || null,
     vitals: {
       bp_systolic: localTriage.vitals.bp_systolic ? Number(localTriage.vitals.bp_systolic) : null,
       bp_diastolic: localTriage.vitals.bp_diastolic ? Number(localTriage.vitals.bp_diastolic) : null,
@@ -309,6 +372,9 @@ function buildTriagePayload(): PrenatalTriage {
       respiratory_rate: localTriage.vitals.respiratory_rate ? Number(localTriage.vitals.respiratory_rate) : null,
       temperature: localTriage.vitals.temperature ? Number(localTriage.vitals.temperature) : null,
       weight: localTriage.vitals.weight ? Number(localTriage.vitals.weight) : null,
+      spo2: localTriage.vitals.spo2 ? Number(localTriage.vitals.spo2) : null,
+      urine_protein: localTriage.vitals.urine_protein || null,
+      urine_sugar: localTriage.vitals.urine_sugar || null,
     },
   }
 }
@@ -325,6 +391,7 @@ interface LocalAssessment {
     fhr_method: string
     fetal_presentation: string
     edema: string
+    edema_location: string[]
   }
   cervical: {
     cervical_dilation: string
@@ -356,6 +423,7 @@ function emptyAssessment(): LocalAssessment {
       fhr_method: '',
       fetal_presentation: '',
       edema: '',
+      edema_location: [],
     },
     cervical: {
       cervical_dilation: '',
@@ -382,6 +450,32 @@ function emptyAssessment(): LocalAssessment {
 
 const localAssessment = reactive<LocalAssessment>(emptyAssessment())
 const cervicalOpen = ref(false)
+const ultrasoundOpen = ref(false)
+
+// Auto-open cervical section at >=38w (done every visit, shouldn't need a click)
+watch(gaWeeks, (w) => {
+  if (w !== null && w >= 38 && !cervicalOpen.value) cervicalOpen.value = true
+}, { immediate: true })
+
+// Documentation by exception: pre-populate normal defaults for new visits
+function applyNormalDefaults(): void {
+  const a = localAssessment
+  const w = gaWeeks.value ?? 0
+  // Triage defaults
+  if (w >= 16 && !localTriage.fetal_movement) localTriage.fetal_movement = w >= 20 ? 'present' : 'not_yet_felt'
+  // Assessment defaults
+  if (!a.ob_exam.edema) a.ob_exam.edema = 'none'
+  if (!a.pregnancy_progress) a.pregnancy_progress = 'normal'
+  // Carry forward risk level from pregnancy
+  if (!a.risk_level_update && pregnancyRiskLevel.value) a.risk_level_update = pregnancyRiskLevel.value
+  // Cervical defaults at >=38w
+  if (w >= 38) {
+    if (!a.cervical.cervical_consistency) a.cervical.cervical_consistency = 'firm'
+    if (!a.cervical.cervical_position) a.cervical.cervical_position = 'posterior'
+  }
+  // Fetal presentation default at >=28w
+  if (w >= 28 && !a.ob_exam.fetal_presentation) a.ob_exam.fetal_presentation = 'cephalic'
+}
 
 function syncAssessmentFromStore(): void {
   const a = store.current?.prenatal_visit?.assessment
@@ -392,6 +486,7 @@ function syncAssessmentFromStore(): void {
   localAssessment.ob_exam.fhr_method = o.fhr_method ?? ''
   localAssessment.ob_exam.fetal_presentation = o.fetal_presentation ?? ''
   localAssessment.ob_exam.edema = o.edema ?? ''
+  localAssessment.ob_exam.edema_location = [...(o.edema_location ?? [])]
   const c = a.cervical
   localAssessment.cervical.cervical_dilation = c.cervical_dilation !== null && c.cervical_dilation !== undefined ? String(c.cervical_dilation) : ''
   localAssessment.cervical.cervical_effacement = c.cervical_effacement !== null && c.cervical_effacement !== undefined ? String(c.cervical_effacement) : ''
@@ -406,19 +501,67 @@ function syncAssessmentFromStore(): void {
   localAssessment.ultrasound.ga_weeks = u.ga_weeks !== null && u.ga_weeks !== undefined ? String(u.ga_weeks) : ''
   localAssessment.ultrasound.ga_days = u.ga_days !== null && u.ga_days !== undefined ? String(u.ga_days) : ''
   localAssessment.ultrasound.edd = u.edd ?? ''
+  // Auto-open ultrasound if data exists
+  if (u.type || u.findings || u.date) ultrasoundOpen.value = true
   localAssessment.pregnancy_progress = a.pregnancy_progress ?? ''
   localAssessment.risk_level_update = a.risk_level_update ?? ''
   localAssessment.diagnoses = [...(a.diagnoses ?? [])]
   localAssessment.notes = a.notes ?? ''
 }
 
-const showFetalPresentation = computed(() => (gaWeeks.value ?? 0) >= 34)
+const showFetalPresentation = computed(() => (gaWeeks.value ?? 0) >= 28)
 const showCervical = computed(() => (gaWeeks.value ?? 0) >= 38)
+
+// FH consistency auto-compute: FH cm should be within ±3 of GA weeks
+const fhConsistency = computed<'consistent' | 'large_for_dates' | 'small_for_dates' | null>(() => {
+  const fh = Number(localAssessment.ob_exam.fundal_height)
+  const ga = gaWeeks.value
+  if (!fh || ga === null) return null
+  if (fh > ga + 3) return 'large_for_dates'
+  if (fh < ga - 3) return 'small_for_dates'
+  return 'consistent'
+})
+
+const fhBadge = computed(() => {
+  switch (fhConsistency.value) {
+    case 'consistent': return { text: 'Consistent with GA', class: 'text-green-600 dark:text-green-400' }
+    case 'large_for_dates': return { text: 'Large for dates', class: 'text-amber-600 dark:text-amber-400' }
+    case 'small_for_dates': return { text: 'Small for dates', class: 'text-amber-600 dark:text-amber-400' }
+    default: return null
+  }
+})
 
 const fhrAlert = computed(() => {
   const v = Number(localAssessment.ob_exam.fetal_heart_rate)
   if (!v) return false
   return v < 110 || v > 160
+})
+
+// Bishop Score auto-calculation from cervical components
+const bishopScoreComputed = computed(() => {
+  const d = Number(localAssessment.cervical.cervical_dilation)
+  const e = Number(localAssessment.cervical.cervical_effacement)
+  const c = localAssessment.cervical.cervical_consistency
+  const p = localAssessment.cervical.cervical_position
+  const s = Number(localAssessment.cervical.fetal_station)
+  // Need at least dilation and effacement to compute
+  if (!d && d !== 0 && !e && e !== 0) return null
+  let score = 0
+  // Dilation: 0=closed, 1=1-2cm, 2=3-4cm, 3=5-6cm
+  if (d >= 5) score += 3; else if (d >= 3) score += 2; else if (d >= 1) score += 1
+  // Effacement: 0=0-30%, 1=40-50%, 2=60-70%, 3=80+%
+  if (e >= 80) score += 3; else if (e >= 60) score += 2; else if (e >= 40) score += 1
+  // Consistency: firm=0, medium=1, soft=2
+  if (c === 'soft') score += 2; else if (c === 'medium') score += 1
+  // Position: posterior=0, mid=1, anterior=2
+  if (p === 'anterior') score += 2; else if (p === 'mid') score += 1
+  // Station: -3=0, -2=1, -1/0=2, +1/+2=3
+  if (s >= 1) score += 3; else if (s >= -1) score += 2; else if (s >= -2) score += 1
+  return score
+})
+
+const fhrMethodMissing = computed(() => {
+  return !!localAssessment.ob_exam.fetal_heart_rate && !localAssessment.ob_exam.fhr_method
 })
 
 const riskBadgeClass = computed(() => {
@@ -435,7 +578,7 @@ function buildAssessmentPayload(): PrenatalAssessment {
   return {
     ob_exam: {
       fundal_height: localAssessment.ob_exam.fundal_height ? Number(localAssessment.ob_exam.fundal_height) : null,
-      fh_consistent_with_ga: null,
+      fh_consistent_with_ga: fhConsistency.value,
       fetal_heart_rate: localAssessment.ob_exam.fetal_heart_rate ? Number(localAssessment.ob_exam.fetal_heart_rate) : null,
       fhr_method: (localAssessment.ob_exam.fhr_method as PrenatalAssessment['ob_exam']['fhr_method']) || null,
       fetal_presentation: localAssessment.ob_exam.fetal_presentation || null,
@@ -443,7 +586,7 @@ function buildAssessmentPayload(): PrenatalAssessment {
       engagement: null,
       leopolds_performed: null,
       edema: localAssessment.ob_exam.edema || null,
-      edema_location: [],
+      edema_location: [...localAssessment.ob_exam.edema_location],
       abdominal_exam: null,
       speculum_exam: null,
       breast_exam: null,
@@ -454,7 +597,7 @@ function buildAssessmentPayload(): PrenatalAssessment {
       cervical_consistency: localAssessment.cervical.cervical_consistency || null,
       cervical_position: localAssessment.cervical.cervical_position || null,
       fetal_station: localAssessment.cervical.fetal_station ? Number(localAssessment.cervical.fetal_station) : null,
-      bishop_score: localAssessment.cervical.bishop_score ? Number(localAssessment.cervical.bishop_score) : null,
+      bishop_score: bishopScoreComputed.value,
     },
     ultrasound: {
       type: localAssessment.ultrasound.type || null,
@@ -611,17 +754,214 @@ const isTrimester3 = computed(() => trimester.value === '3')
 const suggestedVisitInterval = computed(() => {
   const w = gaWeeks.value ?? 0
   if (w >= 36) return 'Weekly visits recommended (36+ weeks)'
-  if (w >= 28) return 'Bi-weekly visits recommended (28–36 weeks)'
+  if (w >= 28) return 'Every 2 weeks recommended (28–36 weeks)'
   return 'Monthly visits recommended (< 28 weeks)'
 })
 
+// Weight gain badge
+const weightGainStatus = computed(() => store.current?.prenatal_visit?.weight_gain_status ?? null)
+const cumulativeWeightGain = computed(() => store.current?.prenatal_visit?.cumulative_weight_gain ?? null)
+
+const weightGainBadge = computed(() => {
+  const status = weightGainStatus.value
+  const gain = cumulativeWeightGain.value
+  if (gain === null) return null
+  const sign = gain >= 0 ? '+' : ''
+  const label = `${sign}${gain.toFixed(1)} kg total`
+  switch (status) {
+    case 'normal': return { text: `On track (${label})`, class: 'text-green-600 dark:text-green-400' }
+    case 'above': return { text: `Above expected (${label})`, class: 'text-amber-600 dark:text-amber-400' }
+    case 'below': return { text: `Below expected (${label})`, class: 'text-amber-600 dark:text-amber-400' }
+    default: return { text: label, class: 'text-muted-foreground' }
+  }
+})
+
+// Next visit auto-suggest date
+function autoSuggestNextVisit(): void {
+  if (localPlan.next_visit_date) return // don't overwrite existing
+  const w = gaWeeks.value ?? 0
+  const today = new Date()
+  let daysToAdd = 28 // monthly
+  if (w >= 36) daysToAdd = 7
+  else if (w >= 28) daysToAdd = 14
+  const nextDate = new Date(today.getTime() + daysToAdd * 24 * 60 * 60 * 1000)
+  localPlan.next_visit_date = nextDate.toISOString().slice(0, 10)
+  savePlan()
+}
+
+// Sparkline chart options for BP and FHR trends
+const bpSparkline = computed(() => {
+  const data = bpTrend.value
+  if (data.length < 2) return null
+  return {
+    grid: { top: 4, right: 4, bottom: 4, left: 4 },
+    xAxis: { show: false, type: 'category', data: data.map((d) => `${d.gestational_age_weeks}w`) },
+    yAxis: { show: false, type: 'value', min: 50, max: 180 },
+    series: [
+      { data: data.map((d) => d.systolic), type: 'line', smooth: true, symbol: 'none', lineStyle: { width: 1.5, color: '#ef4444' }, areaStyle: { color: 'rgba(239,68,68,0.08)' } },
+      { data: data.map((d) => d.diastolic), type: 'line', smooth: true, symbol: 'none', lineStyle: { width: 1.5, color: '#3b82f6' }, areaStyle: { color: 'rgba(59,130,246,0.08)' } },
+    ],
+    tooltip: { trigger: 'axis', textStyle: { fontSize: 10 }, formatter: (p: Array<{ name: string; value: number }>) => `${p[0]?.name}: ${p[0]?.value}/${p[1]?.value}` },
+  }
+})
+
+const fhrSparkline = computed(() => {
+  const data = fhrTrend.value
+  if (data.length < 2) return null
+  return {
+    grid: { top: 4, right: 4, bottom: 4, left: 4 },
+    xAxis: { show: false, type: 'category', data: data.map((d) => `${d.gestational_age_weeks}w`) },
+    yAxis: { show: false, type: 'value', min: 90, max: 180 },
+    series: [
+      { data: data.map((d) => d.fetal_heart_rate), type: 'line', smooth: true, symbol: 'none', lineStyle: { width: 1.5, color: '#8b5cf6' }, areaStyle: { color: 'rgba(139,92,246,0.08)' } },
+    ],
+    tooltip: { trigger: 'axis', textStyle: { fontSize: 10 }, formatter: (p: Array<{ name: string; value: number }>) => `${p[0]?.name}: ${p[0]?.value} bpm` },
+  }
+})
+
+// Create appointment from next visit date
+const isCreatingAppointment = ref(false)
+
+async function createAppointmentFromNextVisit(): Promise<void> {
+  if (!localPlan.next_visit_date || !store.current) return
+  isCreatingAppointment.value = true
+  try {
+    await appointmentApi.create({
+      patient_id: store.current.patient_id,
+      doctor_id: store.current.doctor_id ?? authStore.user!.id,
+      scheduled_at: `${localPlan.next_visit_date}T09:00:00`,
+      reason: 'Prenatal visit',
+      consultation_type: 'follow_up',
+    })
+    toast.success('Follow-up appointment scheduled')
+  } catch {
+    toast.error('Failed to create appointment')
+  } finally {
+    isCreatingAppointment.value = false
+  }
+}
+
+// ── Ultrasound GA ↔ EDD auto-computation ────────────────────────────
+// GA → EDD: EDD = ultrasound_date + (280 - GA_in_days)
+let eddAutoUpdating = false
+function computeEddFromGA(): void {
+  const usDate = localAssessment.ultrasound.date
+  const w = Number(localAssessment.ultrasound.ga_weeks)
+  const d = Number(localAssessment.ultrasound.ga_days) || 0
+  if (!usDate || (!w && w !== 0)) return
+  const gaDays = w * 7 + d
+  if (gaDays <= 0 || gaDays > 308) return // sanity: 0-44 weeks
+  const usDateMs = new Date(usDate).getTime()
+  if (isNaN(usDateMs)) return
+  const eddMs = usDateMs + (280 - gaDays) * 86400000
+  eddAutoUpdating = true
+  localAssessment.ultrasound.edd = new Date(eddMs).toISOString().slice(0, 10)
+  eddAutoUpdating = false
+}
+
+// EDD → GA: GA_in_days = 280 - (EDD - ultrasound_date)
+function computeGAFromEdd(): void {
+  if (eddAutoUpdating) return
+  const usDate = localAssessment.ultrasound.date
+  const edd = localAssessment.ultrasound.edd
+  if (!usDate || !edd) return
+  const usDateMs = new Date(usDate).getTime()
+  const eddMs = new Date(edd).getTime()
+  if (isNaN(usDateMs) || isNaN(eddMs)) return
+  const gaDays = 280 - Math.round((eddMs - usDateMs) / 86400000)
+  if (gaDays < 0 || gaDays > 308) return
+  localAssessment.ultrasound.ga_weeks = String(Math.floor(gaDays / 7))
+  localAssessment.ultrasound.ga_days = String(gaDays % 7)
+}
+
+// Computed EDD from GA for range-limiting manual EDD entry (±14 days)
+const computedUtzEdd = computed(() => {
+  const usDate = localAssessment.ultrasound.date
+  const w = Number(localAssessment.ultrasound.ga_weeks)
+  if (!usDate || (!w && w !== 0)) return null
+  const d = Number(localAssessment.ultrasound.ga_days) || 0
+  const gaDays = w * 7 + d
+  if (gaDays <= 0) return null
+  const usDateMs = new Date(usDate).getTime()
+  if (isNaN(usDateMs)) return null
+  return new Date(usDateMs + (280 - gaDays) * 86400000).toISOString().slice(0, 10)
+})
+
+// ── EDD adoption from ultrasound ────────────────────────────────────
+const showEddAdoptModal = ref(false)
+const eddDeclined = ref(false)
+const isUpdatingEdd = ref(false)
+
+const eddDiffers = computed(() => {
+  const usEdd = localAssessment.ultrasound.edd
+  if (!usEdd || !pregnancyEdd.value) return false
+  return usEdd !== pregnancyEdd.value
+})
+
+const eddComparison = computed(() => {
+  const usEdd = localAssessment.ultrasound.edd
+  if (!usEdd || !pregnancyEdd.value) return null
+  const fmt = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  // Compute GA from each EDD
+  const today = new Date()
+  const calcGA = (edd: string) => {
+    const eddDate = new Date(edd)
+    const gaDays = Math.floor((280 - (eddDate.getTime() - today.getTime()) / 86400000))
+    const w = Math.floor(gaDays / 7)
+    const d = gaDays % 7
+    return { weeks: Math.max(0, w), days: Math.max(0, d), label: `${Math.max(0, w)}w${Math.max(0, d)}d` }
+  }
+  const currentGA = calcGA(pregnancyEdd.value)
+  const newGA = calcGA(usEdd)
+  const diffDays = Math.abs(Math.round((new Date(usEdd).getTime() - new Date(pregnancyEdd.value).getTime()) / 86400000))
+  return {
+    currentEdd: fmt(pregnancyEdd.value),
+    newEdd: fmt(usEdd),
+    currentGA: currentGA.label,
+    newGA: newGA.label,
+    diffDays,
+    rawNewEdd: usEdd,
+  }
+})
+
+async function adoptUltrasoundEdd(): Promise<void> {
+  const enc = store.current
+  if (!enc?.pregnancy_id || !enc.patient_id || !eddComparison.value) return
+  isUpdatingEdd.value = true
+  try {
+    await obgynApi.updatePregnancy(enc.patient_id, enc.pregnancy_id, {
+      edd: eddComparison.value.rawNewEdd,
+      edd_source: 'ultrasound',
+    })
+    pregnancyEdd.value = eddComparison.value.rawNewEdd
+    // Reload encounter to get recalculated GA
+    await store.loadEncounter(enc.id)
+    syncTriageFromStore()
+    syncAssessmentFromStore()
+    syncPlanFromStore()
+    showEddAdoptModal.value = false
+    eddDeclined.value = false
+    toast.success('Pregnancy EDD updated from ultrasound')
+  } catch {
+    toast.error('Failed to update EDD')
+  } finally {
+    isUpdatingEdd.value = false
+  }
+}
+
+function declineEddAdoption(): void {
+  showEddAdoptModal.value = false
+  eddDeclined.value = true
+}
+
 const COUNSELING_OPTIONS = [
   { key: 'nutrition', label: 'Nutrition' },
+  { key: 'medications_supplements', label: 'Medications / Supplements' },
   { key: 'exercise', label: 'Exercise' },
+  { key: 'activity_restrictions', label: 'Activity / Work Restrictions' },
   { key: 'danger_signs', label: 'Danger Signs' },
   { key: 'breastfeeding', label: 'Breastfeeding' },
   { key: 'family_planning', label: 'Family Planning' },
-  { key: 'birth_plan', label: 'Birth Plan' },
 ] as const
 
 function toggleCounseling(key: string): void {
@@ -658,7 +998,12 @@ onMounted(async () => {
     syncAssessmentFromStore()
     syncPlanFromStore()
     loadReminders()
-    loadPregnancySummary()
+    await loadPregnancySummary()
+    // Pre-populate normal defaults for new visits (documentation by exception)
+    const isNewVisit = !store.current?.prenatal_visit?.triage?.concerns
+      && !store.current?.prenatal_visit?.triage?.vitals?.bp_systolic
+      && !store.current?.prenatal_visit?.assessment?.notes
+    if (isNewVisit) applyNormalDefaults()
     setupTabsObserver()
   } catch (err) {
     if (err instanceof HttpError && err.status === 403) {
@@ -697,6 +1042,18 @@ async function handleSave(payload: UpdateEncounterPayload): Promise<void> {
   await store.saveSection(payload)
 }
 
+// Finalize completeness check
+const finalizeMissingItems = computed(() => {
+  const missing: string[] = []
+  const t = localTriage
+  if (!t.vitals.bp_systolic && !t.vitals.bp_diastolic) missing.push('No blood pressure recorded')
+  if (!t.vitals.weight) missing.push('No weight recorded')
+  if (localAssessment.diagnoses.length === 0) missing.push('No diagnosis added')
+  if (!localAssessment.ob_exam.fetal_heart_rate) missing.push('No fetal heart rate recorded')
+  if (t.danger_signs.length > 0 && !t.danger_signs_reviewed) missing.push('Danger signs not reviewed with patient')
+  return missing
+})
+
 async function handleFinalizeConfirm(): Promise<void> {
   await store.finalize()
   if (!store.saveError) {
@@ -718,7 +1075,7 @@ const tabLabels: Record<TabKey, string> = {
 const tabIcons: Record<TabKey, typeof Activity> = {
   triage: Activity,
   assessment: Stethoscope,
-  plan: FlaskConical,
+  plan: ClipboardList,
   billing: DollarSign,
 }
 
@@ -896,9 +1253,34 @@ function goToTab(direction: 'prev' | 'next'): void {
           <TabsTrigger v-for="tab in visibleTabs" :key="tab" :value="tab">{{ tabLabels[tab] }}</TabsTrigger>
         </TabsList>
 
+        <!-- Mobile context chips (visible below lg) -->
+        <div class="flex flex-wrap items-center gap-1.5 py-2 lg:hidden">
+          <Badge v-if="gaLabel" variant="secondary" class="gap-1 font-mono text-[10px]">
+            <Baby class="size-2.5" />
+            {{ gaLabel }}
+          </Badge>
+          <Badge v-if="gpal" variant="outline" class="font-mono text-[10px]">
+            {{ gpal }}
+          </Badge>
+          <Badge v-if="pregnancyEdd" variant="outline" class="text-[10px]">
+            EDD {{ formatEdd() }}
+          </Badge>
+          <Badge
+            v-if="pregnancyRiskLevel"
+            variant="outline"
+            class="text-[10px]"
+            :class="pregnancyRiskLevel === 'high' ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400' : 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400'"
+          >
+            {{ pregnancyRiskLevel === 'high' ? 'High Risk' : 'Low Risk' }}
+          </Badge>
+          <Badge v-if="patientData?.blood_type" variant="outline" class="text-[10px]">
+            {{ patientData.blood_type }}
+          </Badge>
+        </div>
+
         <!-- Step tabs -->
         <div ref="tabsListRef" class="mb-5 py-3">
-          <div class="relative mx-8">
+          <div class="relative mx-0 md:mx-8">
             <!-- Connector line (single continuous line behind circles) -->
             <div class="absolute top-5 left-5 right-5 h-0.5 bg-border">
               <div
@@ -959,137 +1341,73 @@ function goToTab(direction: 'prev' | 'next'): void {
         </div>
 
         <!-- ── TRIAGE TAB ─────────────────────────────────────────── -->
-        <TabsContent value="triage" class="mt-0 flex flex-col gap-6">
+        <TabsContent value="triage" class="mt-0 flex flex-col divide-y divide-dashed divide-border px-0 md:px-8 [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
 
           <!-- GA context banner -->
+          <div v-if="gaLabel">
           <div
-            v-if="gaLabel"
-            class="flex flex-wrap items-center gap-3 rounded-md border bg-muted/40 px-4 py-3 text-sm"
+            class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-md border bg-muted/40 px-4 py-3 text-sm"
           >
-            <Baby class="size-4 shrink-0 text-muted-foreground" />
-            <span class="font-medium">
-              {{ gaWeeks }} weeks{{ gaDays ? ` ${gaDays} days` : '' }}
-            </span>
+            <Baby class="size-3.5 shrink-0 text-muted-foreground" />
+            <span class="font-medium">{{ gaWeeks }} weeks{{ gaDays ? ` ${gaDays} days` : '' }}</span>
             <span v-if="trimesterLabel" class="text-muted-foreground">—</span>
             <span v-if="trimesterLabel" class="text-muted-foreground">{{ trimesterLabel }}</span>
             <span v-if="visitNumber" class="text-muted-foreground">—</span>
             <span v-if="visitNumber" class="text-muted-foreground">Visit #{{ visitNumber }}</span>
+            <span v-if="pregnancyLmp" class="text-muted-foreground">—</span>
+            <span v-if="pregnancyLmp" class="text-muted-foreground">LMP {{ new Date(pregnancyLmp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}</span>
+          </div>
           </div>
 
-          <!-- Concerns -->
-          <div class="flex flex-col gap-2">
-            <Label for="triage-concerns" class="flex items-center gap-1.5">
-              <Activity class="size-3.5 text-muted-foreground" />
-              Concerns / Chief Complaints
-            </Label>
-            <Textarea
-              id="triage-concerns"
-              :model-value="localTriage.concerns"
-              placeholder="Describe the patient's concerns or complaints..."
-              :disabled="store.isFinalized || !canEditTriage"
-              :rows="3"
-              @update:model-value="(v) => localTriage.concerns = String(v)"
-              @blur="saveTriage"
-            />
-          </div>
-
-          <!-- Fetal movement (only >= 20 weeks) -->
-          <div v-if="showFetalMovement" class="flex flex-col gap-2">
-            <Label class="flex items-center gap-1.5">
-              <Baby class="size-3.5 text-muted-foreground" />
-              Fetal Movement
-            </Label>
-            <Select
-              :model-value="localTriage.fetal_movement || undefined"
-              :disabled="store.isFinalized || !canEditTriage"
-              @update:model-value="(v) => { localTriage.fetal_movement = (v as LocalTriage['fetal_movement']) ?? ''; saveTriage() }"
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select fetal movement status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="present">Present</SelectItem>
-                <SelectItem value="decreased">Decreased</SelectItem>
-                <SelectItem value="not_yet_felt">Not yet felt</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <!-- Danger Signs -->
-          <div class="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4">
-            <div class="flex items-center gap-2">
-              <AlertTriangle class="size-4 shrink-0 text-destructive" />
-              <span class="text-sm font-semibold text-destructive">Danger Signs</span>
-            </div>
-            <DangerSignsChecklist
-              :model-value="localTriage.danger_signs"
-              :disabled="store.isFinalized || !canEditTriage"
-              @update:model-value="(v) => { localTriage.danger_signs = v; saveTriage() }"
-            />
-            <div class="flex items-center gap-2 border-t pt-3">
-              <Checkbox
-                id="danger-signs-reviewed"
-                :checked="localTriage.danger_signs_reviewed"
-                :disabled="store.isFinalized || !canEditTriage"
-                @update:checked="(v) => { localTriage.danger_signs_reviewed = !!v; saveTriage() }"
-              />
-              <Label for="danger-signs-reviewed" class="cursor-pointer text-sm font-normal">
-                Danger signs reviewed with patient
-              </Label>
-            </div>
-          </div>
-
-          <!-- Vitals -->
+          <!-- 1. Vitals (nurse fills first) -->
           <div class="flex flex-col gap-4">
-            <h3 class="text-sm font-semibold">Vitals</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Vitals</h3>
 
-            <!-- Blood pressure -->
-            <div class="flex flex-col gap-2">
-              <Label class="flex items-center gap-1.5">
-                <Activity class="size-3.5 text-muted-foreground" />
-                Blood Pressure (mmHg)
-              </Label>
-              <div class="flex items-center gap-2">
-                <Input
-                  type="number"
-                  placeholder="Systolic"
-                  :model-value="localTriage.vitals.bp_systolic"
-                  :disabled="store.isFinalized || !canEditTriage"
-                  class="w-32"
-                  @update:model-value="(v) => localTriage.vitals.bp_systolic = String(v)"
-                  @blur="saveTriage"
-                />
-                <span class="text-muted-foreground">/</span>
-                <Input
-                  type="number"
-                  placeholder="Diastolic"
-                  :model-value="localTriage.vitals.bp_diastolic"
-                  :disabled="store.isFinalized || !canEditTriage"
-                  class="w-32"
-                  @update:model-value="(v) => localTriage.vitals.bp_diastolic = String(v)"
-                  @blur="saveTriage"
-                />
-              </div>
-              <p v-if="bpAlert" class="flex items-center gap-1.5 text-xs font-medium text-destructive">
-                <AlertTriangle class="size-3.5" />
-                BP >= 140/90 — consider hypertensive disorder screening
-              </p>
-            </div>
-
-            <!-- Weight / HR / RR / Temp in a grid -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <!-- Blood pressure (paired inputs in one cell) -->
+              <div class="flex flex-col gap-2">
+                <Label class="text-xs text-muted-foreground">BP (mmHg)</Label>
+                <div class="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    placeholder="Sys"
+                    min="60"
+                    max="250"
+                    :model-value="localTriage.vitals.bp_systolic"
+                    :disabled="store.isFinalized || !canEditTriage"
+                    @update:model-value="(v) => localTriage.vitals.bp_systolic = String(v)"
+                    @blur="saveTriage"
+                  />
+                  <span class="text-muted-foreground">/</span>
+                  <Input
+                    type="number"
+                    placeholder="Dia"
+                    min="40"
+                    max="160"
+                    :model-value="localTriage.vitals.bp_diastolic"
+                    :disabled="store.isFinalized || !canEditTriage"
+                    @update:model-value="(v) => localTriage.vitals.bp_diastolic = String(v)"
+                    @blur="saveTriage"
+                  />
+                </div>
+              </div>
               <div class="flex flex-col gap-2">
                 <Label for="vital-weight" class="text-xs text-muted-foreground">Weight (kg)</Label>
                 <Input
                   id="vital-weight"
                   type="number"
                   step="0.1"
+                  min="30"
+                  max="200"
                   placeholder="e.g. 58.5"
                   :model-value="localTriage.vitals.weight"
                   :disabled="store.isFinalized || !canEditTriage"
                   @update:model-value="(v) => localTriage.vitals.weight = String(v)"
                   @blur="saveTriage"
                 />
+                <p v-if="weightGainBadge" class="text-[10px] font-medium" :class="weightGainBadge.class">
+                  {{ weightGainBadge.text }}
+                </p>
               </div>
               <div class="flex flex-col gap-2">
                 <Label for="vital-hr" class="text-xs text-muted-foreground">Heart Rate (bpm)</Label>
@@ -1128,7 +1446,161 @@ function goToTab(direction: 'prev' | 'next'): void {
                   @blur="saveTriage"
                 />
               </div>
+              <div class="flex flex-col gap-2">
+                <Label for="vital-spo2" class="text-xs text-muted-foreground">SpO2 (%)</Label>
+                <Input
+                  id="vital-spo2"
+                  type="number"
+                  min="85"
+                  max="100"
+                  placeholder="e.g. 98"
+                  :model-value="localTriage.vitals.spo2"
+                  :disabled="store.isFinalized || !canEditTriage"
+                  @update:model-value="(v) => localTriage.vitals.spo2 = String(v)"
+                  @blur="saveTriage"
+                />
+              </div>
             </div>
+
+            <!-- BP alert (below the grid) -->
+            <p v-if="bpAlert === 'severe'" class="flex items-center gap-1.5 rounded-md border border-destructive bg-destructive/10 px-2.5 py-1.5 text-xs font-semibold text-destructive">
+              <AlertTriangle class="size-3.5" />
+              Severe-range BP (>=160/110) — immediate evaluation required
+            </p>
+            <p v-else-if="bpAlert === 'elevated'" class="flex items-center gap-1.5 text-xs font-medium text-destructive">
+              <AlertTriangle class="size-3.5" />
+              BP >= 140/90 — consider hypertensive disorder screening
+            </p>
+          </div>
+
+          <!-- 2. Urine Dipstick (point-of-care, not a vital sign) -->
+          <div class="flex flex-col gap-3">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Urine Dipstick</h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="flex flex-col gap-2">
+                <Label class="text-xs text-muted-foreground">Protein</Label>
+                <Select
+                  :model-value="localTriage.vitals.urine_protein || undefined"
+                  :disabled="store.isFinalized || !canEditTriage"
+                  @update:model-value="(v) => { localTriage.vitals.urine_protein = String(v ?? ''); saveTriage() }"
+                >
+                  <SelectTrigger class="w-full" :class="localTriage.vitals.urine_protein && localTriage.vitals.urine_protein !== 'none' && localTriage.vitals.urine_protein !== 'trace' ? 'border-destructive text-destructive' : ''">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="trace">Trace</SelectItem>
+                    <SelectItem value="1+">1+</SelectItem>
+                    <SelectItem value="2+">2+</SelectItem>
+                    <SelectItem value="3+">3+</SelectItem>
+                    <SelectItem value="4+">4+</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p
+                  v-if="localTriage.vitals.urine_protein && !['none', 'trace'].includes(localTriage.vitals.urine_protein)"
+                  class="flex items-center gap-1.5 text-xs font-medium text-destructive"
+                >
+                  <AlertTriangle class="size-3.5" />
+                  Proteinuria detected — evaluate for preeclampsia
+                </p>
+              </div>
+              <div class="flex flex-col gap-2">
+                <Label class="text-xs text-muted-foreground">Sugar</Label>
+                <Select
+                  :model-value="localTriage.vitals.urine_sugar || undefined"
+                  :disabled="store.isFinalized || !canEditTriage"
+                  @update:model-value="(v) => { localTriage.vitals.urine_sugar = String(v ?? ''); saveTriage() }"
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="trace">Trace</SelectItem>
+                    <SelectItem value="1+">1+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Concerns / Chief Complaints -->
+          <div class="flex flex-col gap-2">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Concerns / Chief Complaints</h3>
+            <Textarea
+              id="triage-concerns"
+              :model-value="localTriage.concerns"
+              placeholder="Describe the patient's concerns or complaints..."
+              :disabled="store.isFinalized || !canEditTriage"
+              :rows="3"
+              @update:model-value="(v) => localTriage.concerns = String(v)"
+              @blur="saveTriage"
+            />
+          </div>
+
+          <!-- 4. Fetal Movement + Mood / Wellbeing -->
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div v-if="showFetalMovement" class="flex flex-col gap-2">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Fetal Movement</h3>
+              <Select
+                :model-value="localTriage.fetal_movement || undefined"
+                :disabled="store.isFinalized || !canEditTriage"
+                @update:model-value="(v) => { localTriage.fetal_movement = (v as LocalTriage['fetal_movement']) ?? ''; saveTriage() }"
+              >
+                <SelectTrigger class="w-full" :class="localTriage.fetal_movement === 'decreased' ? 'border-destructive text-destructive' : ''">
+                  <SelectValue placeholder="Select fetal movement status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="present">Present</SelectItem>
+                  <SelectItem value="decreased">Decreased</SelectItem>
+                  <SelectItem value="not_yet_felt">Not yet felt</SelectItem>
+                </SelectContent>
+              </Select>
+              <p v-if="localTriage.fetal_movement === 'decreased'" class="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                <AlertTriangle class="size-3.5" />
+                Decreased fetal movement — requires further evaluation
+              </p>
+            </div>
+            <div class="flex flex-col gap-2">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Mood / Wellbeing</h3>
+              <Select
+                :model-value="localTriage.mood_screening || undefined"
+                :disabled="store.isFinalized || !canEditTriage"
+                @update:model-value="(v) => { localTriage.mood_screening = String(v ?? ''); saveTriage() }"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no_concerns">No concerns</SelectItem>
+                  <SelectItem value="low_mood_anxiety">Reports low mood or anxiety</SelectItem>
+                  <SelectItem value="referred">Referred for support</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <!-- 6. Danger Signs -->
+          <div class="flex flex-col gap-3">
+          <div class="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-destructive">Danger Signs</h3>
+            <DangerSignsChecklist
+              :model-value="localTriage.danger_signs"
+              :disabled="store.isFinalized || !canEditTriage"
+              @update:model-value="(v) => { localTriage.danger_signs = v; saveTriage() }"
+            />
+            <div class="flex items-center gap-2 border-t pt-3">
+              <Checkbox
+                id="danger-signs-reviewed"
+                :checked="localTriage.danger_signs_reviewed"
+                :disabled="store.isFinalized || !canEditTriage"
+                @update:checked="(v) => { localTriage.danger_signs_reviewed = !!v; saveTriage() }"
+              />
+              <Label for="danger-signs-reviewed" class="cursor-pointer text-sm font-normal">
+                Danger signs reviewed with patient
+              </Label>
+            </div>
+          </div>
           </div>
 
           <!-- Bottom nav -->
@@ -1141,11 +1613,11 @@ function goToTab(direction: 'prev' | 'next'): void {
         </TabsContent>
 
         <!-- ── ASSESSMENT TAB ─────────────────────────────────────── -->
-        <TabsContent v-if="canEditAssessment" value="assessment" class="mt-0 flex flex-col gap-6">
+        <TabsContent v-if="canEditAssessment" value="assessment" class="mt-0 flex flex-col divide-y divide-dashed divide-border px-0 md:px-8 [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
 
           <!-- OB Exam -->
           <div class="flex flex-col gap-4">
-            <h3 class="text-sm font-semibold">OB Examination</h3>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">OB Examination</h3>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <!-- Fundal height -->
@@ -1155,12 +1627,17 @@ function goToTab(direction: 'prev' | 'next'): void {
                   id="ob-fh"
                   type="number"
                   step="0.5"
+                  min="0"
+                  max="50"
                   placeholder="e.g. 28"
                   :model-value="localAssessment.ob_exam.fundal_height"
                   :disabled="store.isFinalized"
                   @update:model-value="(v) => localAssessment.ob_exam.fundal_height = String(v)"
                   @blur="saveAssessment"
                 />
+                <p v-if="fhBadge" class="text-[10px] font-medium" :class="fhBadge.class">
+                  {{ fhBadge.text }}
+                </p>
               </div>
 
               <!-- FHR -->
@@ -1198,6 +1675,9 @@ function goToTab(direction: 'prev' | 'next'): void {
                     <SelectItem value="ctg">CTG</SelectItem>
                   </SelectContent>
                 </Select>
+                <p v-if="fhrMethodMissing" class="text-[10px] text-amber-600 dark:text-amber-400">
+                  Please select the method used to measure FHR
+                </p>
               </div>
 
               <!-- Fetal presentation (>= 34 weeks) -->
@@ -1226,7 +1706,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 <Select
                   :model-value="localAssessment.ob_exam.edema || undefined"
                   :disabled="store.isFinalized"
-                  @update:model-value="(v) => { localAssessment.ob_exam.edema = v ?? ''; saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ob_exam.edema = v ?? ''; if (v === 'none') { localAssessment.ob_exam.edema_location = [] } saveAssessment() }"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select grade" />
@@ -1241,16 +1721,48 @@ function goToTab(direction: 'prev' | 'next'): void {
                 </Select>
               </div>
             </div>
+
+            <!-- Edema location (shown when edema is not none) -->
+            <div v-if="localAssessment.ob_exam.edema && localAssessment.ob_exam.edema !== 'none'" class="flex flex-col gap-2">
+              <Label class="text-xs text-muted-foreground">Edema Location</Label>
+              <div class="flex flex-wrap gap-3">
+                <div v-for="loc in [
+                  { key: 'lower_extremities', label: 'Lower extremities' },
+                  { key: 'upper_extremities', label: 'Upper extremities' },
+                  { key: 'face', label: 'Face' },
+                  { key: 'generalized', label: 'Generalized' },
+                ]" :key="loc.key" class="flex items-center gap-1.5">
+                  <Checkbox
+                    :id="`edema-${loc.key}`"
+                    :model-value="localAssessment.ob_exam.edema_location.includes(loc.key)"
+                    :disabled="store.isFinalized"
+                    @update:model-value="(v) => {
+                      const arr = [...localAssessment.ob_exam.edema_location]
+                      if (v) { arr.push(loc.key) } else { arr.splice(arr.indexOf(loc.key), 1) }
+                      localAssessment.ob_exam.edema_location = arr
+                      saveAssessment()
+                    }"
+                  />
+                  <Label :for="`edema-${loc.key}`" class="cursor-pointer text-xs font-normal" :class="loc.key === 'face' || loc.key === 'generalized' ? 'text-destructive' : ''">
+                    {{ loc.label }}
+                  </Label>
+                </div>
+              </div>
+              <p v-if="localAssessment.ob_exam.edema_location.includes('face') || localAssessment.ob_exam.edema_location.includes('generalized')" class="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                <AlertTriangle class="size-3.5" />
+                Facial/generalized edema — evaluate for preeclampsia
+              </p>
+            </div>
           </div>
 
           <!-- Cervical exam (collapsible, >= 38 weeks) -->
+          <div v-if="showCervical">
           <Collapsible
-            v-if="showCervical"
             v-model:open="cervicalOpen"
             class="rounded-md border"
           >
             <CollapsibleTrigger
-              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-muted/50"
+              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/50"
             >
               Cervical Examination
               <ChevronsUpDown class="size-4 text-muted-foreground" />
@@ -1335,28 +1847,33 @@ function goToTab(direction: 'prev' | 'next'): void {
                   />
                 </div>
                 <div class="flex flex-col gap-2">
-                  <Label for="cx-bishop" class="text-xs text-muted-foreground">Bishop Score</Label>
-                  <Input
-                    id="cx-bishop"
-                    type="number"
-                    min="0"
-                    max="13"
-                    placeholder="0–13"
-                    :model-value="localAssessment.cervical.bishop_score"
-                    :disabled="store.isFinalized"
-                    @update:model-value="(v) => localAssessment.cervical.bishop_score = String(v)"
-                    @blur="saveAssessment"
-                  />
+                  <Label class="text-xs text-muted-foreground">Bishop Score (auto)</Label>
+                  <div class="flex h-9 items-center rounded-md border bg-muted/50 px-3 text-sm font-semibold tabular-nums">
+                    {{ bishopScoreComputed !== null ? bishopScoreComputed : '—' }}
+                    <span v-if="bishopScoreComputed !== null" class="ml-1.5 text-xs font-normal text-muted-foreground">/ 13</span>
+                  </div>
                 </div>
               </div>
             </CollapsibleContent>
           </Collapsible>
+          </div>
 
-          <!-- Ultrasound section -->
-          <div class="flex flex-col gap-4 rounded-md border p-4">
-            <h3 class="text-sm font-semibold">Ultrasound</h3>
+          <!-- Ultrasound section (collapsible, collapsed by default) -->
+          <div>
+          <Collapsible
+            v-model:open="ultrasoundOpen"
+            class="rounded-md border"
+          >
+            <CollapsibleTrigger
+              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/50"
+            >
+              Ultrasound
+              <ChevronsUpDown class="size-4 text-muted-foreground" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+            <div class="flex flex-col gap-4 border-t px-4 pb-4 pt-3">
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div class="flex flex-col gap-2">
                 <Label class="text-xs text-muted-foreground">Type</Label>
                 <Select
@@ -1379,30 +1896,17 @@ function goToTab(direction: 'prev' | 'next'): void {
               </div>
 
               <div class="flex flex-col gap-2">
-                <Label for="utz-date" class="text-xs text-muted-foreground">Date</Label>
-                <Input
-                  id="utz-date"
-                  type="date"
+                <Label class="text-xs text-muted-foreground">Date</Label>
+                <MFDatePicker
                   :model-value="localAssessment.ultrasound.date"
                   :disabled="store.isFinalized"
-                  @update:model-value="(v) => localAssessment.ultrasound.date = String(v)"
-                  @blur="saveAssessment"
+                  disable-future
+                  placeholder="Select date"
+                  @update:model-value="(v) => { localAssessment.ultrasound.date = v ?? ''; computeEddFromGA(); saveAssessment() }"
                 />
               </div>
 
               <div class="flex flex-col gap-2">
-                <Label for="utz-edd" class="text-xs text-muted-foreground">EDD from Ultrasound</Label>
-                <Input
-                  id="utz-edd"
-                  type="date"
-                  :model-value="localAssessment.ultrasound.edd"
-                  :disabled="store.isFinalized"
-                  @update:model-value="(v) => localAssessment.ultrasound.edd = String(v)"
-                  @blur="saveAssessment"
-                />
-              </div>
-
-              <div class="flex flex-col gap-2 sm:col-span-2">
                 <Label class="text-xs text-muted-foreground">GA from Ultrasound</Label>
                 <div class="flex items-center gap-2">
                   <Input
@@ -1414,7 +1918,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                     :disabled="store.isFinalized"
                     class="w-28"
                     @update:model-value="(v) => localAssessment.ultrasound.ga_weeks = String(v)"
-                    @blur="saveAssessment"
+                    @blur="() => { const n = Number(localAssessment.ultrasound.ga_weeks); if (n > 44) localAssessment.ultrasound.ga_weeks = '44'; if (n < 0) localAssessment.ultrasound.ga_weeks = '0'; computeEddFromGA(); saveAssessment() }"
                   />
                   <span class="text-xs text-muted-foreground">wk</span>
                   <Input
@@ -1426,24 +1930,53 @@ function goToTab(direction: 'prev' | 'next'): void {
                     :disabled="store.isFinalized"
                     class="w-24"
                     @update:model-value="(v) => localAssessment.ultrasound.ga_days = String(v)"
-                    @blur="saveAssessment"
+                    @blur="() => { const n = Number(localAssessment.ultrasound.ga_days); if (n > 6) localAssessment.ultrasound.ga_days = '6'; if (n < 0) localAssessment.ultrasound.ga_days = '0'; computeEddFromGA(); saveAssessment() }"
                   />
                   <span class="text-xs text-muted-foreground">d</span>
                 </div>
               </div>
+
+              <div class="flex flex-col gap-2">
+                <Label class="text-xs text-muted-foreground">EDD from Ultrasound</Label>
+                <MFDatePicker
+                  :model-value="localAssessment.ultrasound.edd"
+                  :disabled="store.isFinalized"
+                  :min-date="computedUtzEdd ? new Date(new Date(computedUtzEdd).getTime() - 14 * 86400000).toISOString().slice(0, 10) : undefined"
+                  :max-date="computedUtzEdd ? new Date(new Date(computedUtzEdd).getTime() + 14 * 86400000).toISOString().slice(0, 10) : undefined"
+                  placeholder="Auto from GA"
+                  @update:model-value="(v) => { localAssessment.ultrasound.edd = v ?? ''; computeGAFromEdd(); saveAssessment() }"
+                />
+                <p v-if="computedUtzEdd && localAssessment.ultrasound.edd && computedUtzEdd !== localAssessment.ultrasound.edd" class="text-[10px] text-amber-600 dark:text-amber-400">
+                  Manually adjusted from computed {{ new Date(computedUtzEdd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}
+                </p>
+              </div>
             </div>
 
-            <!-- EDD comparison line -->
+            <!-- EDD comparison + adopt action -->
+            <div v-if="eddDiffers && eddComparison && !store.isFinalized" class="flex flex-col gap-2">
+              <!-- Adopt button -->
+              <div v-if="!eddDeclined" class="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-700 dark:bg-amber-950">
+                <div class="text-xs">
+                  <p class="font-medium text-amber-800 dark:text-amber-300">Ultrasound EDD differs from current EDD by {{ eddComparison.diffDays }} days</p>
+                  <p class="mt-0.5 text-amber-700 dark:text-amber-400">Current: {{ eddComparison.currentEdd }} ({{ eddComparison.currentGA }}) → Ultrasound: {{ eddComparison.newEdd }} ({{ eddComparison.newGA }})</p>
+                </div>
+                <Button size="sm" variant="outline" class="shrink-0 text-xs" @click="showEddAdoptModal = true">
+                  Adopt EDD
+                </Button>
+              </div>
+              <!-- Declined message -->
+              <div v-else class="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                <span class="font-medium">EDD difference noted:</span>
+                Current EDD {{ eddComparison.currentEdd }} ({{ eddComparison.currentGA }}) differs from ultrasound EDD {{ eddComparison.newEdd }} ({{ eddComparison.newGA }}) by {{ eddComparison.diffDays }} days.
+                <button type="button" class="ml-1 font-medium text-primary underline" @click="showEddAdoptModal = true">Review again</button>
+              </div>
+            </div>
+            <!-- Same EDD or read-only -->
             <div
-              v-if="store.current.prenatal_visit && (store.current.prenatal_visit.gestational_age_weeks !== null || localAssessment.ultrasound.edd)"
-              class="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+              v-else-if="store.current.prenatal_visit && localAssessment.ultrasound.edd && !eddDiffers"
+              class="rounded-md bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-950 dark:text-green-400"
             >
-              <span v-if="store.current.prenatal_visit.gestational_age_weeks !== null">
-                Current GA (encounter): {{ store.current.prenatal_visit.gestational_age_weeks }}w{{ store.current.prenatal_visit.gestational_age_days ? `${store.current.prenatal_visit.gestational_age_days}d` : '' }}
-              </span>
-              <span v-if="localAssessment.ultrasound.edd" class="ml-3">
-                | EDD from Ultrasound: {{ localAssessment.ultrasound.edd }}
-              </span>
+              Ultrasound EDD matches current pregnancy EDD.
             </div>
 
             <!-- Findings -->
@@ -1460,14 +1993,16 @@ function goToTab(direction: 'prev' | 'next'): void {
               />
             </div>
           </div>
+            </CollapsibleContent>
+          </Collapsible>
+          </div>
 
           <!-- Pregnancy progress + risk level -->
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="flex flex-col gap-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pregnancy Status</h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="flex flex-col gap-2">
-              <Label class="flex items-center gap-1.5">
-                <Stethoscope class="size-3.5 text-muted-foreground" />
-                Pregnancy Progress
-              </Label>
+              <Label class="text-xs text-muted-foreground">Pregnancy Progress</Label>
               <Select
                 :model-value="localAssessment.pregnancy_progress || undefined"
                 :disabled="store.isFinalized"
@@ -1485,10 +2020,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             </div>
 
             <div class="flex flex-col gap-2">
-              <Label class="flex items-center gap-1.5">
-                <AlertTriangle class="size-3.5 text-muted-foreground" />
-                Risk Level
-              </Label>
+              <Label class="text-xs text-muted-foreground">Risk Level</Label>
               <Select
                 :model-value="localAssessment.risk_level_update || undefined"
                 :disabled="store.isFinalized"
@@ -1513,13 +2045,11 @@ function goToTab(direction: 'prev' | 'next'): void {
               </Badge>
             </div>
           </div>
+          </div>
 
           <!-- Diagnoses -->
           <div class="flex flex-col gap-2">
-            <Label class="flex items-center gap-1.5">
-              <Stethoscope class="size-3.5 text-muted-foreground" />
-              Diagnoses
-            </Label>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Diagnoses</h3>
 
             <!-- Selected diagnoses -->
             <div v-if="localAssessment.diagnoses.length > 0" class="flex flex-wrap gap-2">
@@ -1590,10 +2120,7 @@ function goToTab(direction: 'prev' | 'next'): void {
 
           <!-- Notes -->
           <div class="flex flex-col gap-2">
-            <Label for="assessment-notes" class="flex items-center gap-1.5">
-              <Stethoscope class="size-3.5 text-muted-foreground" />
-              Assessment Notes
-            </Label>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Assessment Notes</h3>
             <Textarea
               id="assessment-notes"
               :model-value="localAssessment.notes"
@@ -1619,7 +2146,7 @@ function goToTab(direction: 'prev' | 'next'): void {
         </TabsContent>
 
         <!-- ── PLAN TAB ───────────────────────────────────────────── -->
-        <TabsContent value="plan" class="mt-0 flex flex-col gap-6">
+        <TabsContent value="plan" class="mt-0 flex flex-col gap-6 px-0 md:px-8">
 
           <!-- Prescriptions -->
           <PrescriptionSection
@@ -1682,6 +2209,14 @@ function goToTab(direction: 'prev' | 'next'): void {
             @update="(c) => { if (store.current) store.current.consumables = c }"
           />
 
+          <!-- Prenatal Care Checklist -->
+          <PrenatalCareChecklist
+            v-if="store.current.pregnancy_id"
+            :patient-id="store.current.patient_id"
+            :pregnancy-id="store.current.pregnancy_id"
+            :disabled="store.isFinalized || !canEditPlan"
+          />
+
           <!-- Next visit -->
           <div class="flex flex-col gap-3 rounded-md border p-4">
             <h3 class="text-sm font-semibold">Next Visit</h3>
@@ -1690,15 +2225,38 @@ function goToTab(direction: 'prev' | 'next'): void {
             </p>
             <div class="flex flex-col gap-2">
               <Label for="plan-next-visit" class="text-xs text-muted-foreground">Scheduled Date</Label>
-              <Input
-                id="plan-next-visit"
-                type="date"
-                :model-value="localPlan.next_visit_date"
-                :disabled="store.isFinalized || !canEditPlan"
-                class="max-w-xs"
-                @update:model-value="(v) => localPlan.next_visit_date = String(v)"
-                @blur="savePlan"
-              />
+              <div class="flex items-center gap-2">
+                <MFDatePicker
+                  :model-value="localPlan.next_visit_date"
+                  :disabled="store.isFinalized || !canEditPlan"
+                  disable-past
+                  placeholder="Select date"
+                  class="max-w-xs"
+                  @update:model-value="(v) => { localPlan.next_visit_date = v ?? ''; savePlan() }"
+                />
+                <Button
+                  v-if="!localPlan.next_visit_date && !store.isFinalized && canEditPlan"
+                  variant="outline"
+                  size="sm"
+                  class="shrink-0 text-xs"
+                  @click="autoSuggestNextVisit"
+                >
+                  <CalendarDays class="size-3.5" />
+                  Set recommended
+                </Button>
+                <Button
+                  v-if="localPlan.next_visit_date && !store.isFinalized && canEditPlan"
+                  variant="outline"
+                  size="sm"
+                  class="shrink-0 text-xs"
+                  :disabled="isCreatingAppointment"
+                  @click="createAppointmentFromNextVisit"
+                >
+                  <LoaderCircle v-if="isCreatingAppointment" class="size-3.5 animate-spin" />
+                  <CalendarDays v-else class="size-3.5" />
+                  Schedule appointment
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1742,7 +2300,7 @@ function goToTab(direction: 'prev' | 'next'): void {
           <!-- Referrals -->
           <div class="flex flex-col gap-2">
             <Label for="plan-referrals" class="flex items-center gap-1.5">
-              <FlaskConical class="size-3.5 text-muted-foreground" />
+              <Send class="size-3.5 text-muted-foreground" />
               Referrals
             </Label>
             <Textarea
@@ -1799,7 +2357,7 @@ function goToTab(direction: 'prev' | 'next'): void {
         </TabsContent>
 
         <!-- ── BILLING TAB ────────────────────────────────────────── -->
-        <TabsContent value="billing" class="mt-0">
+        <TabsContent value="billing" class="mt-0 px-0 md:px-8">
           <PaymentTab
             :disabled="store.isFinalized"
             :consultation-id="store.current.id"
@@ -1846,6 +2404,10 @@ function goToTab(direction: 'prev' | 'next'): void {
                   </div>
                 </div>
               </div>
+              <!-- Blood type prompt if missing -->
+              <p v-if="!patientData?.blood_type" class="rounded-md bg-amber-50 px-2.5 py-1.5 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                Blood type not recorded — update patient profile
+              </p>
 
               <!-- GA Timeline Ruler -->
               <div v-if="gaWeeks !== null" class="flex flex-col gap-1.5">
@@ -1940,6 +2502,45 @@ function goToTab(direction: 'prev' | 'next'): void {
               </div>
             </div>
 
+            <!-- Previous Visit Comparison -->
+            <div v-if="previousVisitData" class="rounded-xl border bg-card p-4">
+              <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Last Visit</p>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <div class="text-muted-foreground">Date</div>
+                <div class="font-medium">{{ previousVisitData.date }}</div>
+                <div class="text-muted-foreground">GA</div>
+                <div class="font-mono font-medium">{{ previousVisitData.ga }}</div>
+                <template v-if="previousVisitData.bp">
+                  <div class="text-muted-foreground">BP</div>
+                  <div class="font-mono font-medium">{{ previousVisitData.bp }}</div>
+                </template>
+                <template v-if="previousVisitData.weight">
+                  <div class="text-muted-foreground">Weight</div>
+                  <div class="font-medium">{{ previousVisitData.weight }}</div>
+                </template>
+                <template v-if="previousVisitData.fhr">
+                  <div class="text-muted-foreground">FHR</div>
+                  <div class="font-medium">{{ previousVisitData.fhr }}</div>
+                </template>
+                <template v-if="previousVisitData.fh">
+                  <div class="text-muted-foreground">FH</div>
+                  <div class="font-medium">{{ previousVisitData.fh }}</div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Trend Sparklines -->
+            <div v-if="bpSparkline || fhrSparkline" class="flex flex-col gap-3">
+              <div v-if="bpSparkline" class="rounded-xl border bg-card p-3">
+                <p class="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">BP Trend</p>
+                <VChart :option="bpSparkline" style="height: 48px; width: 100%" autoresize />
+              </div>
+              <div v-if="fhrSparkline" class="rounded-xl border bg-card p-3">
+                <p class="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">FHR Trend</p>
+                <VChart :option="fhrSparkline" style="height: 48px; width: 100%" autoresize />
+              </div>
+            </div>
+
             <!-- Danger signs alert -->
             <div
               v-if="localTriage.danger_signs.length > 0"
@@ -1954,7 +2555,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                   v-for="sign in localTriage.danger_signs"
                   :key="sign"
                   variant="destructive"
-                  class="text-[10px]"
+                  class="text-[10px] capitalize"
                 >
                   {{ sign.replace(/_/g, ' ') }}
                 </Badge>
@@ -1963,6 +2564,61 @@ function goToTab(direction: 'prev' | 'next'): void {
           </div>
         </aside>
     </div>
+
+    <!-- EDD Adoption Modal -->
+    <Dialog :open="showEddAdoptModal" @update:open="showEddAdoptModal = $event">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Update Pregnancy EDD?</DialogTitle>
+          <DialogDescription>
+            The ultrasound estimated delivery date differs from the current pregnancy EDD. Adopting the ultrasound EDD will change the gestational age calculation for this pregnancy going forward.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div v-if="eddComparison" class="flex flex-col gap-4">
+          <!-- Comparison table -->
+          <div class="grid grid-cols-3 gap-2 rounded-md border p-3 text-sm">
+            <div />
+            <div class="text-center font-semibold text-muted-foreground">Current</div>
+            <div class="text-center font-semibold text-primary">Ultrasound</div>
+
+            <div class="text-muted-foreground">EDD</div>
+            <div class="text-center font-medium">{{ eddComparison.currentEdd }}</div>
+            <div class="text-center font-medium text-primary">{{ eddComparison.newEdd }}</div>
+
+            <div class="text-muted-foreground">GA Today</div>
+            <div class="text-center font-mono font-medium">{{ eddComparison.currentGA }}</div>
+            <div class="text-center font-mono font-medium text-primary">{{ eddComparison.newGA }}</div>
+
+            <div class="text-muted-foreground">Difference</div>
+            <div class="col-span-2 text-center font-medium text-amber-600 dark:text-amber-400">{{ eddComparison.diffDays }} days</div>
+          </div>
+
+          <!-- What changes -->
+          <div class="rounded-md bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+            <p class="mb-1 font-semibold text-foreground">What will change:</p>
+            <ul class="list-inside list-disc space-y-0.5">
+              <li>Pregnancy EDD will update to {{ eddComparison.newEdd }}</li>
+              <li>EDD source will change to "Ultrasound"</li>
+              <li>Gestational age will recalculate to {{ eddComparison.newGA }}</li>
+              <li>Future visits will use the new EDD for GA computation</li>
+              <li>Previous visits retain their original GA (snapshot at time of visit)</li>
+            </ul>
+          </div>
+        </div>
+
+        <DialogFooter class="gap-2 sm:gap-0">
+          <Button variant="outline" @click="declineEddAdoption">
+            Keep Current EDD
+          </Button>
+          <Button :disabled="isUpdatingEdd" @click="adoptUltrasoundEdd">
+            <LoaderCircle v-if="isUpdatingEdd" class="size-3.5 animate-spin" />
+            <CheckCircle2 v-else class="size-3.5" />
+            {{ isUpdatingEdd ? 'Updating...' : 'Adopt Ultrasound EDD' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- Finalize confirmation dialog -->
     <Dialog :open="showFinalizeModal" @update:open="showFinalizeModal = $event">
@@ -1977,6 +2633,12 @@ function goToTab(direction: 'prev' | 'next'): void {
             Are you sure you want to proceed?
           </DialogDescription>
         </DialogHeader>
+        <div v-if="finalizeMissingItems.length > 0" class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950">
+          <p class="mb-1 text-xs font-semibold text-amber-800 dark:text-amber-300">Missing data:</p>
+          <ul class="list-inside list-disc text-xs text-amber-700 dark:text-amber-400">
+            <li v-for="item in finalizeMissingItems" :key="item">{{ item }}</li>
+          </ul>
+        </div>
         <p v-if="store.saveError" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {{ store.saveError }}
         </p>

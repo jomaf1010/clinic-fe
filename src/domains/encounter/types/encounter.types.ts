@@ -31,6 +31,7 @@ export interface PrenatalTriage {
   kick_counts_performed: boolean | null
   danger_signs: string[]
   danger_signs_reviewed: boolean
+  mood_screening: 'no_concerns' | 'low_mood_anxiety' | 'referred' | null
   vitals: {
     bp_systolic: number | null
     bp_diastolic: number | null
@@ -38,13 +39,16 @@ export interface PrenatalTriage {
     respiratory_rate: number | null
     temperature: number | null
     weight: number | null
+    spo2: number | null
+    urine_protein: string | null
+    urine_sugar: string | null
   }
 }
 
 export interface PrenatalAssessment {
   ob_exam: {
     fundal_height: number | null
-    fh_consistent_with_ga: boolean | null
+    fh_consistent_with_ga: 'consistent' | 'large_for_dates' | 'small_for_dates' | null
     fetal_heart_rate: number | null
     fhr_method: 'doppler' | 'fetoscope' | 'ctg' | null
     fetal_presentation: string | null

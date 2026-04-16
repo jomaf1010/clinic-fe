@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RouteNames } from '@/router/routeNames'
 import { toast } from 'vue-sonner'
@@ -43,6 +43,7 @@ import CervicalScreeningIcon from '@/components/icons/CervicalScreeningIcon.vue'
 import FamilyPlanningIcon from '@/components/icons/FamilyPlanningIcon.vue'
 import PatientSectionWidget from '@/domains/patient/components/specialties/PatientSectionWidget.vue'
 import { obgynApi } from '../api/obgynApi'
+import { patientApi } from '@/domains/patient/api/patientApi'
 import type { GynProfile, Pregnancy, ContraceptiveEntry, ScreeningEntry } from '../types/obgyn.types'
 import { CONTRACEPTION_OPTIONS, contraceptionLabel, SCREENING_TYPE_OPTIONS, screeningTypeLabel } from '../types/obgyn.types'
 import type { UpsertGynProfilePayload } from '../api/obgynApi'
@@ -94,6 +95,41 @@ const gynForm = reactive<UpsertGynProfilePayload>({
   living_children: null,
 })
 
+// Patient DOB for year range calculation
+const patientDob = ref<string | null>(null)
+const earliestDeliveryYear = computed(() => {
+  if (!patientDob.value) return 1970
+  return new Date(patientDob.value).getFullYear() + 12 // earliest realistic pregnancy age
+})
+
+interface PrevPregRow {
+  year: number | null
+  outcome: string
+  delivery_type: string
+  complications: string
+  sex: string
+  birth_weight: number | null
+}
+
+function emptyPrevRow(): PrevPregRow {
+  return { year: null, outcome: '', delivery_type: '', complications: '', sex: '', birth_weight: null }
+}
+
+const prevPregnancies = ref<PrevPregRow[]>([])
+
+// Number of delivery rows = term + preterm (live births that need delivery details)
+const prevPregCount = computed(() => {
+  const t = gynForm.parity_term ?? 0
+  const pt = gynForm.parity_preterm ?? 0
+  return t + pt
+})
+
+// Sync rows when G changes
+watch(prevPregCount, (count) => {
+  while (prevPregnancies.value.length < count) prevPregnancies.value.push(emptyPrevRow())
+  if (prevPregnancies.value.length > count) prevPregnancies.value.length = count
+})
+
 const gpalString = computed(() => {
   const p = gynProfile.value
   if (!p) return null
@@ -103,7 +139,7 @@ const gpalString = computed(() => {
   const a = p.abortions
   const l = p.living_children
   if (g === null && pt === null) return null
-  return `G${g ?? 0}P${pt ?? 0}(${pp ?? 0})(${a ?? 0})(${l ?? 0})`
+  return `G${g ?? 0}P(${pt ?? 0}-${pp ?? 0}-${a ?? 0}-${l ?? 0})`
 })
 
 const menstrualWidgetDetail = computed(() => {
@@ -139,6 +175,20 @@ function openGpalDialog() {
     gynForm.parity_preterm = gynProfile.value.parity_preterm
     gynForm.abortions = gynProfile.value.abortions
     gynForm.living_children = gynProfile.value.living_children
+    // Load existing previous pregnancies
+    const existing = gynProfile.value.previous_pregnancies ?? []
+    prevPregnancies.value = existing.map((p: Record<string, unknown>) => ({
+      year: p.year as number | null ?? null,
+      outcome: (p.outcome as string) ?? '',
+      delivery_type: (p.delivery_type as string) ?? '',
+      complications: (p.complications as string) ?? '',
+      sex: (p.sex as string) ?? '',
+      birth_weight: p.birth_weight as number | null ?? null,
+    }))
+    // Pad rows to match G
+    const count = prevPregCount.value
+    while (prevPregnancies.value.length < count) prevPregnancies.value.push(emptyPrevRow())
+    if (prevPregnancies.value.length > count) prevPregnancies.value.length = count
   }
   showGpalDialog.value = true
 }
@@ -176,6 +226,19 @@ async function saveMenstrualHistory() {
   }
 }
 
+const gpalErrors = computed(() => {
+  const errors: string[] = []
+  const g = gynForm.gravidity ?? 0
+  const t = gynForm.parity_term ?? 0
+  const pt = gynForm.parity_preterm ?? 0
+  const a = gynForm.abortions ?? 0
+  const l = gynForm.living_children ?? 0
+  if (g > 20) errors.push('Gravidity cannot exceed 20')
+  if (g > 0 && (t + pt + a) > g) errors.push('Term + Preterm + Abortions cannot exceed Gravidity')
+  if (l > (t + pt)) errors.push('Living children cannot exceed term + preterm deliveries')
+  return errors
+})
+
 async function saveGpal() {
   isSavingGyn.value = true
   try {
@@ -185,6 +248,15 @@ async function saveGpal() {
       parity_preterm: gynForm.parity_preterm,
       abortions: gynForm.abortions,
       living_children: gynForm.living_children,
+      previous_pregnancies: prevPregnancies.value.map((p) => ({
+        year: p.year,
+        outcome: p.outcome || null,
+        delivery_type: p.delivery_type || null,
+        complications: p.complications || null,
+        sex: p.sex || null,
+        birth_weight: p.birth_weight,
+        notes: null,
+      })),
     })
     gynProfile.value = res.data
     showGpalDialog.value = false
@@ -446,10 +518,15 @@ async function removeContraception(index: number) {
 const { clinicalSummary: gynNarrativeSummary } = useClinicalSummary(gynProfile, activePregnancy, gpalString)
 
 // ── Load ──────────────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
   if (!patientId.value) return
   loadGynProfile()
   loadPregnancies()
+  // Fetch patient DOB for delivery year range
+  try {
+    const res = await patientApi.get(patientId.value)
+    patientDob.value = res.data.date_of_birth ?? null
+  } catch { /* non-critical */ }
 })
 </script>
 
@@ -665,8 +742,9 @@ onMounted(() => {
                 :model-value="gynForm.gravidity ?? ''"
                 type="number"
                 min="0"
+                max="20"
                 class="h-8 text-sm text-center"
-                @update:model-value="(v) => gynForm.gravidity = v ? Number(v) : null"
+                @update:model-value="(v) => gynForm.gravidity = v !== '' && v != null ? Number(v) : null"
               />
             </div>
             <div class="flex flex-col gap-1.5">
@@ -675,8 +753,9 @@ onMounted(() => {
                 :model-value="gynForm.parity_term ?? ''"
                 type="number"
                 min="0"
+                max="20"
                 class="h-8 text-sm text-center"
-                @update:model-value="(v) => gynForm.parity_term = v ? Number(v) : null"
+                @update:model-value="(v) => gynForm.parity_term = v !== '' && v != null ? Number(v) : null"
               />
             </div>
             <div class="flex flex-col gap-1.5">
@@ -685,8 +764,9 @@ onMounted(() => {
                 :model-value="gynForm.parity_preterm ?? ''"
                 type="number"
                 min="0"
+                max="20"
                 class="h-8 text-sm text-center"
-                @update:model-value="(v) => gynForm.parity_preterm = v ? Number(v) : null"
+                @update:model-value="(v) => gynForm.parity_preterm = v !== '' && v != null ? Number(v) : null"
               />
             </div>
             <div class="flex flex-col gap-1.5">
@@ -695,8 +775,9 @@ onMounted(() => {
                 :model-value="gynForm.abortions ?? ''"
                 type="number"
                 min="0"
+                max="20"
                 class="h-8 text-sm text-center"
-                @update:model-value="(v) => gynForm.abortions = v ? Number(v) : null"
+                @update:model-value="(v) => gynForm.abortions = v !== '' && v != null ? Number(v) : null"
               />
             </div>
             <div class="flex flex-col gap-1.5">
@@ -705,16 +786,86 @@ onMounted(() => {
                 :model-value="gynForm.living_children ?? ''"
                 type="number"
                 min="0"
+                max="20"
                 class="h-8 text-sm text-center"
-                @update:model-value="(v) => gynForm.living_children = v ? Number(v) : null"
+                @update:model-value="(v) => gynForm.living_children = v !== '' && v != null ? Number(v) : null"
               />
             </div>
           </div>
         </div>
 
+        <!-- Previous Delivery Details (only for live births) -->
+        <div v-if="prevPregCount > 0" class="flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Previous Deliveries</h4>
+            <span class="text-xs text-muted-foreground">{{ prevPregCount }} {{ prevPregCount === 1 ? 'delivery' : 'deliveries' }}</span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <div
+              v-for="(row, idx) in prevPregnancies"
+              :key="idx"
+              class="grid grid-cols-3 items-end gap-2 rounded-md border bg-muted/20 px-3 py-2 sm:grid-cols-4"
+            >
+              <div class="flex flex-col gap-1">
+                <Label class="text-[10px] text-muted-foreground">Delivery #{{ idx + 1 }} — Year</Label>
+                <Select
+                  :model-value="row.year ? String(row.year) : undefined"
+                  @update:model-value="(v) => row.year = v ? Number(v) : null"
+                >
+                  <SelectTrigger class="h-7 text-xs">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="y in Array.from({ length: new Date().getFullYear() - earliestDeliveryYear + 1 }, (_, i) => new Date().getFullYear() - i)"
+                      :key="y"
+                      :value="String(y)"
+                    >
+                      {{ y }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="flex flex-col gap-1">
+                <Label class="text-[10px] text-muted-foreground">Method</Label>
+                <Select
+                  :model-value="row.delivery_type || undefined"
+                  @update:model-value="(v) => row.delivery_type = String(v ?? '')"
+                >
+                  <SelectTrigger class="h-7 text-xs">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nvd">NVD</SelectItem>
+                    <SelectItem value="cs">C-Section</SelectItem>
+                    <SelectItem value="vacuum">Vacuum</SelectItem>
+                    <SelectItem value="forceps">Forceps</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="flex flex-col gap-1 sm:col-span-2">
+                <Label class="text-[10px] text-muted-foreground">Complications</Label>
+                <Input
+                  :model-value="row.complications"
+                  placeholder="e.g. Preeclampsia, GDM..."
+                  class="h-7 text-xs"
+                  @update:model-value="(v) => row.complications = String(v)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="gpalErrors.length > 0" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+          <ul class="list-inside list-disc text-xs text-destructive">
+            <li v-for="err in gpalErrors" :key="err">{{ err }}</li>
+          </ul>
+        </div>
+
         <DialogFooter>
           <Button variant="ghost" @click="showGpalDialog = false">Cancel</Button>
-          <Button :disabled="isSavingGyn" @click="saveGpal">
+          <Button :disabled="isSavingGyn || gpalErrors.length > 0" @click="saveGpal">
             <LoaderCircle v-if="isSavingGyn" class="size-4 animate-spin mr-1" />
             Save
           </Button>

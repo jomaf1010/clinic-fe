@@ -27,6 +27,9 @@ const dangerSigns: DangerSign[] = [
   { key: 'persistent_vomiting', label: 'Persistent Vomiting', description: 'Inability to keep fluids down' },
   { key: 'fever', label: 'Fever', description: 'Temperature above 38°C' },
   { key: 'dysuria', label: 'Dysuria', description: 'Pain or burning on urination' },
+  { key: 'convulsions', label: 'Convulsions / Seizures', description: 'Any episode of seizure or convulsion' },
+  { key: 'difficulty_breathing', label: 'Difficulty Breathing', description: 'Sudden onset shortness of breath or chest tightness' },
+  { key: 'facial_edema', label: 'Swelling of Face or Hands', description: 'Sudden or severe swelling of the face or hands' },
 ]
 
 function isChecked(key: string): boolean {

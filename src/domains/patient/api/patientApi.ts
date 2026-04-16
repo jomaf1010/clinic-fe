@@ -236,4 +236,8 @@ export const patientApi = {
   deleteAllergy(patientId: string, allergyUuid: string): Promise<void> {
     return http.delete<void>(`/patients/${patientId}/allergies/${allergyUuid}`)
   },
+
+  getPastDiagnoses(patientId: string): Promise<{ data: { description: string; code: string | null }[] }> {
+    return http.get<{ data: { description: string; code: string | null }[] }>(`/patients/${patientId}/past-diagnoses`)
+  },
 }

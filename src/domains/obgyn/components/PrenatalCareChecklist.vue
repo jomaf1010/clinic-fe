@@ -63,8 +63,15 @@ const isUnmarking = computed(() => pendingItem.value?.status === 'completed')
 
 function requestToggle(item: ChecklistItem) {
   if (props.disabled) return
-  pendingItem.value = item
-  showConfirm.value = true
+  // Only show confirmation dialog when unmarking (accidental removal protection)
+  // Marking as done is a single tap — no friction
+  if (item.status === 'completed') {
+    pendingItem.value = item
+    showConfirm.value = true
+  } else {
+    pendingItem.value = item
+    confirmToggle()
+  }
 }
 
 async function confirmToggle() {

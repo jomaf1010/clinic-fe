@@ -1,6 +1,8 @@
 export interface PreviousPregnancy {
   year: number | null
   outcome: 'term' | 'preterm' | 'abortion' | 'ectopic' | 'molar' | null
+  delivery_type: 'nvd' | 'cs' | 'vacuum' | 'forceps' | null
+  complications: string | null
   sex: 'male' | 'female' | null
   birth_weight: number | null
   notes: string | null
