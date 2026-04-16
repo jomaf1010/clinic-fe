@@ -37,8 +37,6 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import EditPatientDialog from '../components/EditPatientDialog.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
-import { patientApi } from '../api/patientApi'
-import type { PatientResponse } from '../types/patient.types'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
@@ -80,8 +78,7 @@ async function handleAvatarCrop(blob: Blob) {
   const file = new File([blob], 'avatar.png', { type: 'image/png' })
   isUploadingAvatar.value = true
   try {
-    const res = await patientApi.uploadAvatar(patient.value.id, file)
-    avatarUrl.value = res.data.avatar_url
+    avatarUrl.value = await pdStore.uploadAvatar(file)
     toast.success('Patient photo updated')
   } catch {
     toast.error('Failed to upload photo')

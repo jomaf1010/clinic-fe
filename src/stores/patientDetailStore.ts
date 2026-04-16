@@ -140,6 +140,15 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     }
   }
 
+  async function uploadAvatar(file: File): Promise<string> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    const res = await patientApi.uploadAvatar(patientId.value, file)
+    if (patient.value) {
+      patient.value = { ...patient.value, avatar_url: res.data.avatar_url }
+    }
+    return res.data.avatar_url
+  }
+
   function updatePatientFromSync(updated: PatientResponse): void {
     patient.value = updated
   }
@@ -516,6 +525,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     loadPatient,
     loadCore,
     loadSpecialty,
+    uploadAvatar,
     updatePatientFromSync,
     $reset,
 
