@@ -102,15 +102,21 @@ function encounterTypeBadgeClass(type: EncounterTimelineItem['type']): string {
 
 onMounted(async () => {
   loadError.value = null
-  if (!isNew.value) {
-    try {
+  try {
+    // Ensure patient is loaded in store (may navigate directly to this URL)
+    if (!pdStore.patient) {
+      await pdStore.loadPatient(patientId.value)
+      await pdStore.loadCore()
+      await pdStore.loadObgyn()
+    }
+    if (!isNew.value) {
       await Promise.all([
         pdStore.loadPregnancyDetail(pregnancyId.value),
         encounterStore.loadForPatient(patientId.value, { pregnancy_id: pregnancyId.value }),
       ])
-    } catch {
-      loadError.value = 'Failed to load pregnancy record.'
     }
+  } catch {
+    loadError.value = 'Failed to load pregnancy record.'
   }
 })
 

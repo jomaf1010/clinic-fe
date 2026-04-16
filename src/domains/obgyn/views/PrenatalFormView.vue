@@ -945,6 +945,11 @@ onMounted(async () => {
     loadReminders()
     const enc = store.current
     if (enc?.patient_id) {
+      // Ensure patient is loaded in store (may navigate directly to encounter URL)
+      if (!pdStore.patient) {
+        await pdStore.loadPatient(enc.patient_id)
+        await pdStore.loadCore()
+      }
       // Ensure patient-level OB-GYN data is loaded (gynProfile + pregnancies list)
       if (!pdStore.gynProfile) await pdStore.loadObgyn()
       // Load pregnancy detail (currentPregnancy, dashboard, visits, labsDue)
