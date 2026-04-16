@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { consultationApi } from '../../../api/consultationApi'
-import { patientApi } from '@/domains/patient/api/patientApi'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import AscvdCalculator from './AscvdCalculator.vue'
 import type { DiagnosisSearchResult } from '../../../api/consultationApi'
@@ -27,6 +27,7 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const store = useEncounterStore()
+const pdStore = usePatientDetailStore()
 
 // patientId available from route param (patients/:patientId/consultations/:id)
 const patientId = computed(() => (route.params.patientId as string) || store.current?.patient_id || '')
@@ -239,44 +240,14 @@ watch(
   { deep: true },
 )
 
-onMounted(async () => {
-  if (!patientId.value) return
-  isLoadingProblems.value = true
-  try {
-    const res = await patientApi.getProblems(patientId.value)
-    activeProblems.value = res.data.filter((p) => p.status !== 'resolved')
-    for (const p of activeProblems.value) {
-      initSoapNote(p)
-    }
-  } catch {
-    // silently fail
-  } finally {
-    isLoadingProblems.value = false
+onMounted(() => {
+  // Read from patientDetailStore — already loaded by parent
+  activeProblems.value = pdStore.problems.filter((p) => p.status !== 'resolved')
+  for (const p of activeProblems.value) {
+    initSoapNote(p)
   }
-
-  // Load patient DOB for ASCVD age
-  try {
-    const patient = await patientApi.get(patientId.value)
-    const dob = patient.data.date_of_birth
-    if (dob) {
-      const birthDate = new Date(dob)
-      const today = new Date()
-      let age = today.getFullYear() - birthDate.getFullYear()
-      const monthDiff = today.getMonth() - birthDate.getMonth()
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--
-      ascvdPatientAge.value = age
-    }
-  } catch {
-    // non-critical
-  }
-
-  // Load patient lifestyle for ASCVD smoking status
-  try {
-    const res = await patientApi.getLifestyle(patientId.value)
-    ascvdSmokingStatus.value = res.data?.smoking ?? null
-  } catch {
-    // non-critical
-  }
+  ascvdPatientAge.value = pdStore.patientAge
+  ascvdSmokingStatus.value = pdStore.lifestyle?.smoking ?? null
 })
 
 // ── ASCVD Calculator context ──────────────────────────────────────────────

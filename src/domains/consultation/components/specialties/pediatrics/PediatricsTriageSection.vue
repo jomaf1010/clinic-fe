@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, computed, watch, onMounted } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import { MessageSquare } from 'lucide-vue-next'
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import VitalsSummary from '../../VitalsSummary.vue'
 import VitalFieldRenderer from '../../VitalFieldRenderer.vue'
 import LabOrderSection from '../../LabOrderSection.vue'
-import { patientApi } from '@/domains/patient/api/patientApi'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { ConsultationTriage } from '../../../types/consultation.types'
 import type { LabOrderResponse } from '../../../types/labOrder.types'
 
@@ -32,7 +32,8 @@ const hasLabOrders = computed(() => authStore.hasFeature('lab_orders'))
 const vitalFields = computed(() => specialtyConfigStore.config?.vitals ?? [])
 
 // ── Patient age (for age-based vital ranges) ──────────────────────────────────
-const patientDob = ref<string | null>(null)
+const pdStore = usePatientDetailStore()
+const patientDob = computed(() => pdStore.patient?.date_of_birth ?? null)
 
 const patientAgeDays = computed<number | undefined>(() => {
   if (!patientDob.value) return undefined
@@ -41,14 +42,7 @@ const patientAgeDays = computed<number | undefined>(() => {
   return Math.floor((now.getTime() - dob.getTime()) / (1000 * 60 * 60 * 24))
 })
 
-onMounted(async () => {
-  try {
-    const res = await patientApi.get(props.patientId)
-    patientDob.value = res.data.date_of_birth ?? null
-  } catch {
-    // silent — age ranges will just be hidden
-  }
-})
+// Patient DOB from store — no API call needed
 
 // ── Local state ───────────────────────────────────────────────────────────
 // Single flat record for ALL vitals

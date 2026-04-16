@@ -72,7 +72,6 @@ import PaymentTab from '@/domains/consultation/components/tabs/PaymentTab.vue'
 import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import DangerSignsChecklist from '../components/DangerSignsChecklist.vue'
 import PrenatalCareChecklist from '../components/PrenatalCareChecklist.vue'
-import { obgynApi } from '../api/obgynApi'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { toast } from 'vue-sonner'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
@@ -188,10 +187,9 @@ const dueReminders = ref<DueReminders | null>(null)
 
 async function loadReminders() {
   const enc = store.current
-  if (!enc?.pregnancy_id || !enc.patient_id) return
+  if (!enc?.pregnancy_id) return
   try {
-    const res = await obgynApi.getReminders(enc.patient_id, enc.pregnancy_id)
-    dueReminders.value = res.data
+    dueReminders.value = await pdStore.getReminders(enc.pregnancy_id)
   } catch {
     // non-critical
   }

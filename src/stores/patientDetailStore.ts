@@ -401,6 +401,22 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     prenatalChecklist.value = checklistRes.data as ChecklistItem[]
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function resolvePregnancy(pregnancyId: string, payload: any): Promise<{ data: Pregnancy; encounter_id: string | null }> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    const res = await obgynApi.resolvePregnancy(patientId.value, pregnancyId, payload)
+    currentPregnancy.value = res.data
+    const idx = pregnancies.value.findIndex((p) => p.id === pregnancyId)
+    if (idx !== -1) pregnancies.value[idx] = res.data
+    return res
+  }
+
+  async function getReminders(pregnancyId: string): Promise<{ labs: Array<{ name: string }>; procedures: Array<{ name: string }> } | null> {
+    if (!patientId.value) return null
+    const res = await obgynApi.getReminders(patientId.value, pregnancyId)
+    return res.data
+  }
+
   async function reloadChecklist(pregnancyId: string): Promise<void> {
     if (!patientId.value) return
     const res = await obgynApi.getChecklist(patientId.value, pregnancyId)
@@ -579,6 +595,8 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     updatePregnancy,
     deletePregnancy,
     loadPregnancyDetail,
+    resolvePregnancy,
+    getReminders,
     reloadChecklist,
     toggleChecklistItem,
     reloadDashboard,

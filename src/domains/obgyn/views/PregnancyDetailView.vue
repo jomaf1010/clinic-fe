@@ -24,7 +24,6 @@ import { Separator } from '@/components/ui/separator'
 import { RouteNames } from '@/router/routeNames'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
-import { obgynApi } from '../api/obgynApi'
 import type { EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
 import PregnancySetupForm from '../components/PregnancySetupForm.vue'
 import GACalculator from '../components/GACalculator.vue'
@@ -162,10 +161,7 @@ async function handleResolve(payload: {
   notes?: string | null
 }): Promise<void> {
   try {
-    const result = await obgynApi.resolvePregnancy(patientId.value, pregnancyId.value, payload)
-
-    // Update local pregnancy state
-    pdStore.currentPregnancy = result.data
+    const result = await pdStore.resolvePregnancy(pregnancyId.value, payload)
 
     showResolveModal.value = false
 
