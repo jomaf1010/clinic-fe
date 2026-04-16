@@ -20,6 +20,9 @@ import type {
 } from '@/domains/patient/api/patientApi'
 import type { LifestyleData } from '@/domains/consultation/types/consultation.types'
 import type { ChronicTrendsData } from '@/domains/patient/types/patient.types'
+import { obgynApi } from '@/domains/obgyn/api/obgynApi'
+import type { CreatePregnancyPayload, UpsertGynProfilePayload } from '@/domains/obgyn/api/obgynApi'
+import type { GynProfile, Pregnancy, PregnancyDashboard, PrenatalVisit, LabsDueItem } from '@/domains/obgyn/types/obgyn.types'
 import { pediatricsApi } from '@/domains/patient/api/pediatricsApi'
 import type {
   BirthHistoryResponse,
@@ -55,11 +58,21 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   const growthHistory = ref<GrowthMeasurement[]>([])
   const milestones = ref<MilestoneScheduleResponse | null>(null)
 
+  // ── OB-GYN state ──────────────────────────────────────────────────────────
+  const gynProfile = ref<GynProfile | null>(null)
+  const pregnancies = ref<Pregnancy[]>([])
+  const currentPregnancy = ref<Pregnancy | null>(null)
+  const pregnancyDashboard = ref<PregnancyDashboard | null>(null)
+  const pregnancyVisits = ref<PrenatalVisit[]>([])
+  const labsDue = ref<LabsDueItem[]>([])
+
   // ── Loading flags ─────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const isLoadingCore = ref(false)
   const isLoadingFM = ref(false)
   const isLoadingPeds = ref(false)
+  const isLoadingObgyn = ref(false)
+  const isSavingObgyn = ref(false)
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const patientAge = computed(() => {
@@ -73,6 +86,10 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   })
 
   const patientBloodType = computed(() => patient.value?.blood_type ?? null)
+
+  const activePregnancy = computed(() =>
+    pregnancies.value.find((p) => p.status === 'active') ?? null,
+  )
 
   // ── Core actions ──────────────────────────────────────────────────────────
 
@@ -117,7 +134,9 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       case 'pediatrics':
         await loadPediatrics()
         break
-      // OB-GYN will be added in Phase 4
+      case 'obgyn':
+        await loadObgyn()
+        break
     }
   }
 
@@ -287,6 +306,102 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     chronicTrends.value = res.data
   }
 
+  // ── OB-GYN actions ────────────────────────────────────────────────────────
+
+  async function loadObgyn(): Promise<void> {
+    if (!patientId.value) return
+    isLoadingObgyn.value = true
+    const id = patientId.value
+    try {
+      const [gynRes, pregRes] = await Promise.all([
+        obgynApi.getGynProfile(id).catch(() => ({ data: null })),
+        obgynApi.listPregnancies(id).catch(() => ({ data: [] })),
+      ])
+      gynProfile.value = gynRes.data as GynProfile | null
+      pregnancies.value = pregRes.data as Pregnancy[]
+    } finally {
+      isLoadingObgyn.value = false
+    }
+  }
+
+  async function updateGynProfile(payload: UpsertGynProfilePayload): Promise<GynProfile> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    const res = await obgynApi.upsertGynProfile(patientId.value, payload)
+    gynProfile.value = res.data
+    toast.success('GYN profile updated')
+    return res.data
+  }
+
+  async function createPregnancy(payload: CreatePregnancyPayload): Promise<Pregnancy> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    isSavingObgyn.value = true
+    try {
+      const res = await obgynApi.createPregnancy(patientId.value, payload)
+      pregnancies.value.unshift(res.data)
+      currentPregnancy.value = res.data
+      toast.success('Pregnancy record created')
+      return res.data
+    } catch {
+      toast.error('Failed to create pregnancy record')
+      throw new Error('Failed to create pregnancy record')
+    } finally {
+      isSavingObgyn.value = false
+    }
+  }
+
+  async function updatePregnancy(pregnancyId: string, payload: Partial<CreatePregnancyPayload>): Promise<Pregnancy> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    isSavingObgyn.value = true
+    try {
+      const res = await obgynApi.updatePregnancy(patientId.value, pregnancyId, payload)
+      currentPregnancy.value = res.data
+      const idx = pregnancies.value.findIndex((p) => p.id === pregnancyId)
+      if (idx !== -1) pregnancies.value[idx] = res.data
+      toast.success('Pregnancy record updated')
+      return res.data
+    } catch {
+      toast.error('Failed to update pregnancy record')
+      throw new Error('Failed to update pregnancy record')
+    } finally {
+      isSavingObgyn.value = false
+    }
+  }
+
+  async function deletePregnancy(pregnancyId: string): Promise<void> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    await obgynApi.deletePregnancy(patientId.value, pregnancyId)
+    pregnancies.value = pregnancies.value.filter((p) => p.id !== pregnancyId)
+    if (currentPregnancy.value?.id === pregnancyId) currentPregnancy.value = null
+    toast.success('Pregnancy deleted')
+  }
+
+  async function loadPregnancyDetail(pregnancyId: string): Promise<void> {
+    if (!patientId.value) return
+    const id = patientId.value
+    const [pregRes, dashRes, visitsRes, labsRes] = await Promise.all([
+      obgynApi.getPregnancy(id, pregnancyId),
+      obgynApi.getDashboard(id, pregnancyId).catch(() => ({ data: null })),
+      obgynApi.listVisits(id, pregnancyId).catch(() => ({ data: [] })),
+      obgynApi.getLabsDue(id, pregnancyId).catch(() => ({ data: [] })),
+    ])
+    currentPregnancy.value = pregRes.data
+    pregnancyDashboard.value = dashRes.data as PregnancyDashboard | null
+    pregnancyVisits.value = visitsRes.data as PrenatalVisit[]
+    labsDue.value = labsRes.data as LabsDueItem[]
+  }
+
+  async function reloadDashboard(pregnancyId: string): Promise<void> {
+    if (!patientId.value) return
+    const res = await obgynApi.getDashboard(patientId.value, pregnancyId)
+    pregnancyDashboard.value = res.data
+  }
+
+  async function evaluateRisk(payload: Record<string, unknown>): Promise<{ level: string; factors: string[] }> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    const res = await obgynApi.evaluateRisk(patientId.value, payload)
+    return res.data
+  }
+
   // ── Pediatrics actions ─────────────────────────────────────────────────────
 
   async function loadPediatrics(): Promise<void> {
@@ -367,11 +482,20 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     immunizations.value = null
     growthHistory.value = []
     milestones.value = null
+    // OB-GYN
+    gynProfile.value = null
+    pregnancies.value = []
+    currentPregnancy.value = null
+    pregnancyDashboard.value = null
+    pregnancyVisits.value = []
+    labsDue.value = []
     // Flags
     isLoading.value = false
     isLoadingCore.value = false
     isLoadingFM.value = false
     isLoadingPeds.value = false
+    isLoadingObgyn.value = false
+    isSavingObgyn.value = false
   }
 
   return {
@@ -412,6 +536,27 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     preventiveCare,
     chronicTrends,
     isLoadingFM,
+
+    // State — OB-GYN
+    gynProfile,
+    pregnancies,
+    currentPregnancy,
+    pregnancyDashboard,
+    pregnancyVisits,
+    labsDue,
+    activePregnancy,
+    isLoadingObgyn,
+    isSavingObgyn,
+
+    // Actions — OB-GYN
+    loadObgyn,
+    updateGynProfile,
+    createPregnancy,
+    updatePregnancy,
+    deletePregnancy,
+    loadPregnancyDetail,
+    reloadDashboard,
+    evaluateRisk,
 
     // State — Pediatrics
     birthHistory,
