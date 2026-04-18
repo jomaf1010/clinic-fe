@@ -2,6 +2,7 @@
 import { ref, computed, reactive, watch, onMounted } from 'vue'
 import GrowthChart from './GrowthChart.vue'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
+import { todayYmd } from '@/lib/utils'
 import type { PatientSex } from '@/domains/patient/lib/whoGrowthStandards'
 import {
   Baby,
@@ -217,7 +218,7 @@ const recordSaving = ref(false)
 
 function openRecordDose(vaccineKey: string, vaccineName: string, doseNumber: number, tier: 'epi' | 'recommended' | 'recurring' = 'epi') {
   recordTarget.value = { vaccineKey, vaccineName, doseNumber, tier }
-  recordForm.date_given = new Date().toISOString().slice(0, 10)
+  recordForm.date_given = todayYmd()
   recordForm.batch_number = ''
   recordForm.site = ''
   recordDialog.value = true
@@ -252,7 +253,7 @@ const adhocSaving = ref(false)
 
 function openAdhocDialog() {
   adhocForm.vaccine_name = ''
-  adhocForm.date_given = new Date().toISOString().slice(0, 10)
+  adhocForm.date_given = todayYmd()
   adhocForm.dose_number = 1
   adhocForm.batch_number = ''
   adhocForm.site = ''
@@ -476,7 +477,7 @@ function toggleMilestoneCheckpoint(key: string) {
 
 function openMilestoneAssess(checkpoint: MilestoneCheckpoint) {
   milestoneAssessTarget.value = checkpoint
-  milestoneForm.assessed_at = new Date().toISOString().slice(0, 10)
+  milestoneForm.assessed_at = todayYmd()
   milestoneForm.notes = checkpoint.notes ?? ''
   milestoneForm.items = {}
   for (const item of checkpoint.items) {

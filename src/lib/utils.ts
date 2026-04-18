@@ -6,6 +6,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Format a Date as `YYYY-MM-DD` in the user's local timezone — the canonical
+ * shape the backend accepts on every `date_format:Y-m-d` validated field.
+ *
+ * Prefer this over `date.toISOString().slice(0, 10)`, which silently truncates
+ * full ISO-8601 strings and reads as a timezone bug every time we revisit it.
+ */
+export function toYmd(date: Date): string {
+  const y = String(date.getFullYear()).padStart(4, '0')
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** Today as `YYYY-MM-DD`. */
+export function todayYmd(): string {
+  return toYmd(new Date())
+}
+
 export function formatRelativeTime(dateString: string): string {
   const now = Date.now()
   const date = new Date(dateString).getTime()
