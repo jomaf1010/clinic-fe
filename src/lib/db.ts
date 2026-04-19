@@ -6,10 +6,12 @@ import Dexie, { type Table } from 'dexie'
  * Stores:
  *   - encounters: snapshot of each encounter the user has opened, keyed by `id`.
  *   - labOrders: per-encounter lab-order state, keyed by `encounter_id`.
- *   - pendingActions: FIFO queue of mutations made while offline, auto-incrementing id.
+ *   - pendingActions: FIFO queue of mutations made while offline. Retry
+ *     metadata (attemptCount, nextAttemptAt) lets the SyncEngine apply
+ *     exponential backoff without re-hammering the network.
  *
- * Schema versioning lives in this file — bump `version(N).stores({...})` with
- * an `.upgrade(tx => ...)` callback whenever a store shape changes. Dexie
+ * Schema versioning lives here — bump `version(N).stores({...})` with an
+ * `.upgrade(tx => ...)` callback on every store-shape change. Dexie
  * preserves data across versions, unlike our previous raw-IDB implementation
  * which would silently lose drafts on any schema drift.
  */
@@ -35,6 +37,12 @@ export interface PendingAction {
   method: 'POST' | 'PATCH' | 'DELETE'
   body?: unknown
   createdAt: number
+  /** Number of failed attempts so far. Incremented on every 5xx/network error. */
+  attemptCount?: number
+  /** Earliest wall-clock ms at which the SyncEngine may retry this action. */
+  nextAttemptAt?: number
+  /** Last captured error for diagnostics. Not used by retry logic. */
+  lastError?: string
 }
 
 class AppDatabase extends Dexie {
@@ -46,11 +54,20 @@ class AppDatabase extends Dexie {
     super('clinicapp-offline')
 
     // v1 — initial Dexie schema. Shape matches the preceding raw-IDB stores
-    // so existing cached data remains readable after upgrade.
+    // so cached data read on first load maps cleanly.
     this.version(1).stores({
       encounters: 'id',
       labOrders: 'encounter_id',
       pendingActions: '++id, createdAt, type',
+    })
+
+    // v2 — add retry-metadata indexes for the SyncEngine. Existing rows
+    // are untouched; missing fields resolve to `undefined` and the engine
+    // treats them as attemptCount=0, nextAttemptAt=0 (eligible immediately).
+    this.version(2).stores({
+      encounters: 'id',
+      labOrders: 'encounter_id',
+      pendingActions: '++id, createdAt, type, nextAttemptAt',
     })
   }
 }

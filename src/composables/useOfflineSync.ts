@@ -1,78 +1,106 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
-import { getPendingActions, removePendingAction, getPendingActionCount } from '@/lib/offlineDb'
-import { http } from '@/lib/http'
+import { syncEngine } from '@/lib/sync/SyncEngine'
+
+/**
+ * Connectivity-aware offline composable. Thin wrapper over the SyncEngine
+ * that exposes reactive `isOnline` + `pendingCount` state for the UI, and
+ * triggers a flush whenever the browser reports a transition back online.
+ *
+ * Previous iterations of this file owned the queue-processing loop
+ * directly; that logic lives in SyncEngine now. This composable is purely
+ * the glue between `window.online`/`offline` events, the toast UI, and
+ * the engine.
+ */
 
 const isOnline = ref(navigator.onLine)
 const pendingCount = ref(0)
-let isSyncing = false
 
-function updateStatus() {
+let listenersInstalled = false
+let refCount = 0
+
+// Register the SyncEngine listeners exactly once — not per component —
+// so a single success toast fires even when many views use the composable.
+const unsubSucceeded = syncEngine.on('action-succeeded', () => {
+  // Count update is deferred to queue-drained / queue-stopped so we only
+  // toast once per flush, not once per action.
+})
+const unsubDrained = syncEngine.on('queue-drained', ({ processed }) => {
+  if (processed > 0) {
+    toast.success(`Synced ${processed} offline change${processed > 1 ? 's' : ''}`)
+  }
+  void refreshPendingCount()
+})
+const unsubStopped = syncEngine.on('queue-stopped', ({ reason, processed }) => {
+  if (processed > 0 && reason !== 'offline') {
+    toast.success(`Synced ${processed} offline change${processed > 1 ? 's' : ''}`)
+  }
+  void refreshPendingCount()
+})
+const unsubDiscarded = syncEngine.on('action-discarded', ({ reason }) => {
+  toast.error('An offline change was dropped', { description: reason })
+  void refreshPendingCount()
+})
+
+// The composable unmounts periodically; keep the subscriptions alive for
+// the app lifetime by holding explicit references so GC doesn't nuke them.
+void unsubSucceeded
+void unsubDrained
+void unsubStopped
+void unsubDiscarded
+
+async function refreshPendingCount(): Promise<void> {
+  try {
+    pendingCount.value = await syncEngine.pendingCount()
+  } catch {
+    // best-effort
+  }
+}
+
+function updateStatus(): void {
   isOnline.value = navigator.onLine
   if (isOnline.value) {
-    flushQueue()
+    void syncEngine.flush()
   }
 }
 
-async function refreshPendingCount() {
-  try {
-    pendingCount.value = await getPendingActionCount()
-  } catch {
-    // ignore
-  }
+function installListeners(): void {
+  if (listenersInstalled) return
+  listenersInstalled = true
+  window.addEventListener('online', updateStatus)
+  window.addEventListener('offline', updateStatus)
 }
 
-async function flushQueue() {
-  if (isSyncing) return
-  isSyncing = true
-
-  try {
-    const actions = await getPendingActions()
-    if (!actions.length) return
-
-    let synced = 0
-
-    for (const { key, action } of actions) {
-      if (!navigator.onLine) break
-      try {
-        const method = action.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete'
-        if (method === 'post' || method === 'put' || method === 'patch') {
-          await http[method](action.url, action.body)
-        } else {
-          await http[method](action.url)
-        }
-        await removePendingAction(key)
-        synced++
-      } catch {
-        break
-      }
-    }
-
-    await refreshPendingCount()
-    if (synced > 0) {
-      toast.success(`Synced ${synced} offline change${synced > 1 ? 's' : ''}`)
-    }
-  } finally {
-    isSyncing = false
-  }
+function removeListeners(): void {
+  if (!listenersInstalled) return
+  listenersInstalled = false
+  window.removeEventListener('online', updateStatus)
+  window.removeEventListener('offline', updateStatus)
 }
 
 export function useOfflineSync() {
   onMounted(() => {
-    window.addEventListener('online', updateStatus)
-    window.addEventListener('offline', updateStatus)
-    refreshPendingCount()
+    refCount++
+    installListeners()
+    void refreshPendingCount()
+    // If we mounted in an online state with a backlog, get started.
+    if (navigator.onLine) {
+      void syncEngine.flush()
+    }
   })
 
   onUnmounted(() => {
-    window.removeEventListener('online', updateStatus)
-    window.removeEventListener('offline', updateStatus)
+    refCount--
+    if (refCount <= 0) {
+      refCount = 0
+      removeListeners()
+    }
   })
 
   return {
     isOnline,
     pendingCount,
-    flushQueue,
+    flushQueue: () => syncEngine.flush(),
     refreshPendingCount,
   }
 }
