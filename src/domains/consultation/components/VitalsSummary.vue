@@ -4,10 +4,7 @@ import { toast } from 'vue-sonner'
 import { getAuthToken } from '@/lib/http'
 import { AlertTriangle, CheckCircle2, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
 import Button from '@/components/ui/button/Button.vue'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChartContainer, ChartCrosshair, type ChartConfig } from '@/components/ui/chart'
-import { VisXYContainer, VisLine, VisAxis, VisArea, VisScatter, VisTooltip } from '@unovis/vue'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { http } from '@/lib/http'
 import type { ConsultationTriage, ConsultationResponse, LabOrderSummary } from '../types/consultation.types'
@@ -15,6 +12,7 @@ import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr,
 import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import { labOrderApi } from '../api/labOrderApi'
 import FinalizeModal from './FinalizeModal.vue'
+import ChronicTrendsDialog from '@/domains/patient/components/ChronicTrendsDialog.vue'
 
 interface PastDiagnosis {
   description: string
@@ -29,200 +27,17 @@ const props = defineProps<{
   consultationId?: string
   showTrendsButton?: boolean
   labOrderSummary?: LabOrderSummary | null
+  /** Hide the vitals badges + past diagnoses panel — only render the lab + trends footer row. */
+  hideVitalsPanel?: boolean
 }>()
 
 const vitalsConfig = useVitalsConfigStore()
 
 const pastDiagnoses = ref<PastDiagnosis[]>([])
 const showTrends = ref(false)
-const isLoadingTrends = ref(false)
 
-interface WeightDataPoint {
-  date: string
-  weight: number
-}
-
-interface BPDataPoint {
-  date: string
-  systolic: number
-  diastolic: number
-}
-
-interface BSDataPoint {
-  date: string
-  blood_sugar: number
-}
-
-interface BMIDataPoint {
-  date: string
-  bmi: number
-}
-
-const weightData = ref<WeightDataPoint[]>([])
-const bpData = ref<BPDataPoint[]>([])
-const bsData = ref<BSDataPoint[]>([])
-const bmiData = ref<BMIDataPoint[]>([])
-
-function parseBPString(bp: string | null): { systolic: number; diastolic: number } | null {
-  if (!bp) return null
-  const match = bp.match(/^(\d+)\s*\/\s*(\d+)$/)
-  if (!match) return null
-  return { systolic: parseInt(match[1]), diastolic: parseInt(match[2]) }
-}
-
-async function openTrends() {
+function openTrends() {
   showTrends.value = true
-  if (weightData.value.length > 0 || bpData.value.length > 0 || bsData.value.length > 0) return
-  if (!props.patientId) return
-
-  isLoadingTrends.value = true
-  try {
-    const pages = [1, 2, 3, 4, 5]
-    const weightPoints: WeightDataPoint[] = []
-    const bpPoints: BPDataPoint[] = []
-    const bsPoints: BSDataPoint[] = []
-    const bmiPoints: BMIDataPoint[] = []
-
-    for (const page of pages) {
-      if (weightPoints.length >= 50 && bpPoints.length >= 50 && bsPoints.length >= 50) break
-      const res = await http.get<{ data: ConsultationResponse[]; meta: { pagination: { last_page: number } } }>(
-        `/patients/${props.patientId}/encounters?per_page=10&page=${page}`,
-      )
-      for (const c of res.data) {
-        const date = (c.finalized_at ?? c.created_at).split('T')[0]
-        const weight = c.triage?.vitals?.weight as number | undefined
-        const height = c.triage?.vitals?.height as number | undefined
-        if (weight && weight > 0 && weightPoints.length < 50) {
-          weightPoints.push({ date, weight })
-        }
-        // BMI from weight + height
-        if (weight && weight > 0 && height && height > 0 && bmiPoints.length < 50) {
-          const heightM = height / 100
-          bmiPoints.push({ date, bmi: +(weight / (heightM * heightM)).toFixed(1) })
-        }
-        // BP: try paired fields first (specialty system), then combined string
-        const vitals = c.triage?.vitals
-        const bpSys = vitals?.bp_systolic as number | undefined
-        const bpDia = vitals?.bp_diastolic as number | undefined
-        if (bpSys && bpDia && bpPoints.length < 50) {
-          bpPoints.push({ date, systolic: bpSys, diastolic: bpDia })
-        } else {
-          const bp = parseBPString(vitals?.bp ?? null)
-          if (bp && bpPoints.length < 50) {
-            bpPoints.push({ date, systolic: bp.systolic, diastolic: bp.diastolic })
-          }
-        }
-        if (vitals?.blood_sugar && vitals.blood_sugar > 0 && bsPoints.length < 50) {
-          bsPoints.push({ date, blood_sugar: vitals.blood_sugar })
-        }
-      }
-      if (page >= res.meta.pagination.last_page) break
-    }
-
-    weightData.value = weightPoints.reverse()
-    bpData.value = bpPoints.reverse()
-    bsData.value = bsPoints.reverse()
-    bmiData.value = bmiPoints.reverse()
-  } catch {
-    // silent
-  } finally {
-    isLoadingTrends.value = false
-  }
-}
-
-const weightChartConfig: ChartConfig = {
-  weight: { label: 'Weight (kg)', color: 'hsl(var(--chart-1))' },
-}
-const weightX = (_: WeightDataPoint, i: number) => i
-const weightY = (d: WeightDataPoint) => d.weight
-
-const bpChartConfig: ChartConfig = {
-  systolic: { label: 'Systolic', color: 'hsl(var(--chart-2))' },
-  diastolic: { label: 'Diastolic', color: 'hsl(var(--chart-3))' },
-}
-const bpX = (_: BPDataPoint, i: number) => i
-const bpSystolic = (d: BPDataPoint) => d.systolic
-const bpDiastolic = (d: BPDataPoint) => d.diastolic
-
-function bpStatusColor(systolic: number, diastolic: number): { label: string; color: string } {
-  const s = classifyBpAsStatus(`${systolic}/${diastolic}`, vitalsConfig.config)
-  if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
-  if (s.severity === 'elevated' || s.severity === 'low') return { label: s.label, color: '#d97706' }
-  return { label: s.label, color: '#dc2626' }
-}
-
-function bpTooltipTemplate(d: BPDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = bpStatusColor(d.systolic, d.diastolic)
-  return `<div style="background: var(--popover); border: 1px solid ${status.color}40; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${d.systolic}/${d.diastolic} mmHg</div>
-    <div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
-}
-
-function weightBmiStatus(weight: number): { label: string; color: string } | null {
-  const height = props.triage.vitals?.height as number | undefined
-  if (!height) return null
-  const heightM = height / 100
-  const bmiVal = weight / (heightM * heightM)
-  const cfg = vitalsConfig.config
-  if (bmiVal < cfg.bmi_underweight) return { label: `BMI ${bmiVal.toFixed(1)} · Underweight`, color: '#2563eb' }
-  if (bmiVal < cfg.bmi_normal)      return { label: `BMI ${bmiVal.toFixed(1)} · Normal`, color: '#16a34a' }
-  if (bmiVal < cfg.bmi_overweight)  return { label: `BMI ${bmiVal.toFixed(1)} · Overweight`, color: '#d97706' }
-  return { label: `BMI ${bmiVal.toFixed(1)} · Obese`, color: '#dc2626' }
-}
-
-const bmiChartConfig: ChartConfig = {
-  bmi: { label: 'BMI', color: 'hsl(var(--chart-5))' },
-}
-const bmiX = (_: BMIDataPoint, i: number) => i
-const bmiY = (d: BMIDataPoint) => d.bmi
-
-function bmiTooltipTemplate(d: BMIDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = classifyBmi(d.bmi, vitalsConfig.config)
-  const borderColor = status ? `${status.color}40` : 'var(--border)'
-  return `<div style="background: var(--popover); border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">BMI ${d.bmi}</div>
-    ${status ? `<div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>` : ''}
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
-}
-
-const bsChartConfig: ChartConfig = {
-  blood_sugar: { label: 'Blood Sugar (mg/dL)', color: 'hsl(var(--chart-4))' },
-}
-const bsX = (_: BSDataPoint, i: number) => i
-const bsY = (d: BSDataPoint) => d.blood_sugar
-
-function bsStatusColor(val: number): { label: string; color: string } {
-  const s = classifyBloodSugar(val, vitalsConfig.config)
-  if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
-  if (s.severity === 'low') return { label: s.label, color: '#2563eb' }
-  if (s.severity === 'elevated') return { label: s.label, color: '#d97706' }
-  return { label: s.label, color: '#dc2626' }
-}
-
-function bsTooltipTemplate(d: BSDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = bsStatusColor(d.blood_sugar)
-  return `<div style="background: var(--popover); border: 1px solid ${status.color}40; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${d.blood_sugar} mg/dL</div>
-    <div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
-}
-
-function weightTooltipTemplate(d: WeightDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = weightBmiStatus(d.weight)
-  const borderColor = status ? `${status.color}40` : 'var(--border)'
-  return `<div style="background: var(--popover); border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${d.weight} kg</div>
-    ${status ? `<div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>` : ''}
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
 }
 
 // Lab result preview
@@ -327,7 +142,45 @@ async function openConsultationPreview(consultationId: string) {
   }
 }
 
-onMounted(fetchPastDiagnoses)
+onMounted(() => {
+  fetchPastDiagnoses()
+  loadLabThumbnails()
+})
+
+// ── Lab thumbnails ──────────────────────────────────────────────────────────
+const labItemThumbnails = ref<Record<string, string>>({})
+
+async function loadLabThumbnails() {
+  if (!props.consultationId || !props.labOrderSummary?.completed_items?.length) return
+  try {
+    const res = await labOrderApi.getForEncounter(props.consultationId)
+    const token = getAuthToken()
+    const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
+
+    for (const item of res.data?.items ?? []) {
+      if (item.status !== 'completed' || !item.result_files.length) continue
+      // Find first image file for thumbnail
+      for (const fileUrl of item.result_files) {
+        try {
+          const fileRes = await fetch(`${baseUrl}${fileUrl}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            credentials: 'include',
+          })
+          if (!fileRes.ok) continue
+          const blob = await fileRes.blob()
+          if (blob.type.startsWith('image/')) {
+            labItemThumbnails.value[item.description] = URL.createObjectURL(blob)
+            break
+          }
+        } catch {
+          // skip this file
+        }
+      }
+    }
+  } catch {
+    // silent
+  }
+}
 
 function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -485,8 +338,8 @@ const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value |
 </script>
 
 <template>
-  <TooltipProvider v-if="hasAnything" :delay-duration="200">
-    <div class="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2">
+  <TooltipProvider v-if="hasAnything || (hideVitalsPanel && (hasLabResults || showTrendsButton))" :delay-duration="200">
+    <div v-if="!hideVitalsPanel" class="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2">
     <div v-if="hasAnyVital" class="flex flex-wrap items-center gap-1.5">
       <span
         v-for="badge in vitalBadges"
@@ -546,279 +399,63 @@ const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value |
     </div>
     </div>
 
-    <!-- Lab results + Trends button row -->
-    <div v-if="hasLabResults || showTrendsButton" class="flex flex-wrap items-center gap-1.5 -mt-1 text-xs">
-      <template v-if="hasLabResults">
-        <span class="flex items-center gap-1 font-medium text-muted-foreground">
-          <FlaskConical class="size-3" />
-          Lab
-        </span>
-        <button
-          v-for="item in labOrderSummary!.completed_items"
-          :key="'done-' + item"
-          type="button"
-          class="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-700 transition-colors hover:bg-green-100 dark:border-green-800 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900"
-          @click="viewLabResult(item)"
-        >
-          {{ item }} ✓
-        </button>
-        <span
-          v-for="item in labOrderSummary!.pending_items"
-          :key="'pending-' + item"
-          class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-        >
-          {{ item }}
-        </span>
-      </template>
-      <Button
-        v-if="showTrendsButton"
-        variant="outline"
-        size="sm"
-        class="h-6 gap-1 px-2 text-xs"
-        @click="openTrends"
-      >
-        <TrendingUp class="size-3" />
-        Trends
-      </Button>
+    <!-- Lab results + Trends button row (square thumbnails) -->
+    <div v-if="hasLabResults || showTrendsButton" class="flex flex-wrap items-center gap-2">
+      <!-- Trends square button -->
+      <Tooltip v-if="showTrendsButton">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="flex size-24 flex-col items-center justify-center gap-1 rounded-xl border bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-sm transition-transform hover:scale-105 hover:shadow-md"
+            @click="openTrends"
+          >
+            <TrendingUp class="size-8" />
+            <span class="text-xs font-medium">Trends</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Patient Trends</TooltipContent>
+      </Tooltip>
+
+      <!-- Completed lab thumbnails -->
+      <Tooltip v-for="item in labOrderSummary?.completed_items ?? []" :key="'done-' + item">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="group relative flex size-24 items-center justify-center overflow-hidden rounded-xl border border-green-200 bg-green-50 text-xs font-medium text-green-700 shadow-sm transition-transform hover:scale-105 hover:shadow-md dark:border-green-800 dark:bg-green-950 dark:text-green-400"
+            @click="viewLabResult(item)"
+          >
+            <img
+              v-if="labItemThumbnails[item]"
+              :src="labItemThumbnails[item]"
+              :alt="item"
+              class="size-full object-cover"
+            />
+            <div v-else class="flex flex-col items-center justify-center gap-1 px-2 text-center leading-tight">
+              <FlaskConical class="size-6" />
+              <span class="line-clamp-3 text-[11px]">{{ item }}</span>
+            </div>
+            <span class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-green-500 text-white shadow-sm">
+              <CheckCircle2 class="size-3.5" />
+            </span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ item }} — Result available</TooltipContent>
+      </Tooltip>
+
+      <!-- Pending lab items -->
+      <Tooltip v-for="item in labOrderSummary?.pending_items ?? []" :key="'pending-' + item">
+        <TooltipTrigger as-child>
+          <div class="flex size-24 flex-col items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-center text-[11px] font-medium leading-tight text-amber-700 shadow-sm dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
+            <FlaskConical class="size-6" />
+            <span class="line-clamp-3">{{ item }}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>{{ item }} — Pending result</TooltipContent>
+      </Tooltip>
     </div>
 
-    <!-- Trends Modal -->
-    <Dialog :open="showTrends" @update:open="showTrends = $event">
-      <DialogContent class="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <TrendingUp class="size-5 text-primary" />
-            Patient Trends
-          </DialogTitle>
-          <DialogDescription>
-            Weight trend over past consultations.
-          </DialogDescription>
-        </DialogHeader>
-
-        <!-- Loading -->
-        <div v-if="isLoadingTrends" class="flex items-center justify-center py-12">
-          <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
-        </div>
-
-        <!-- No data -->
-        <div v-else-if="weightData.length === 0 && bpData.length === 0 && bsData.length === 0 && bmiData.length === 0" class="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <div class="flex size-12 items-center justify-center rounded-full bg-muted">
-            <TrendingUp class="size-6 text-muted-foreground" />
-          </div>
-          <p class="text-sm font-medium text-muted-foreground">No vitals data available</p>
-          <p class="text-xs text-muted-foreground">Charts will appear once vitals are recorded in triage.</p>
-        </div>
-
-        <!-- Charts in tabs -->
-        <Tabs v-else default-value="weight" class="w-full">
-          <TabsList class="w-full">
-            <TabsTrigger v-if="weightData.length > 0" value="weight" class="flex-1">
-              Weight
-              <span class="ml-1 text-xs text-muted-foreground">({{ weightData.length }})</span>
-            </TabsTrigger>
-            <TabsTrigger v-if="bpData.length > 0" value="bp" class="flex-1">
-              Blood Pressure
-              <span class="ml-1 text-xs text-muted-foreground">({{ bpData.length }})</span>
-            </TabsTrigger>
-            <TabsTrigger v-if="bsData.length > 0" value="bs" class="flex-1">
-              Blood Sugar
-              <span class="ml-1 text-xs text-muted-foreground">({{ bsData.length }})</span>
-            </TabsTrigger>
-            <TabsTrigger v-if="bmiData.length > 0" value="bmi" class="flex-1">
-              BMI
-              <span class="ml-1 text-xs text-muted-foreground">({{ bmiData.length }})</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <!-- Weight chart -->
-          <TabsContent v-if="weightData.length > 0" value="weight" class="mt-3">
-            <ChartContainer :config="weightChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="weightData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="weightX"
-                  :y="weightY"
-                  color="hsl(var(--chart-1))"
-                  :opacity="0.1"
-                />
-                <VisLine
-                  :x="weightX"
-                  :y="weightY"
-                  color="hsl(var(--chart-1))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="weightX"
-                  :y="weightY"
-                  color="hsl(var(--chart-1))"
-                  :size="5"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => weightData[i]?.date ? new Date(weightData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(weightData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :tick-format="(v: number) => `${v}kg`"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-1))" :template="weightTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-          </TabsContent>
-
-          <!-- Blood Pressure chart -->
-          <TabsContent v-if="bpData.length > 0" value="bp" class="mt-3">
-            <ChartContainer :config="bpChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="bpData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="bpX"
-                  :y="bpSystolic"
-                  color="hsl(var(--chart-2))"
-                  :opacity="0.08"
-                />
-                <VisLine
-                  :x="bpX"
-                  :y="bpSystolic"
-                  color="hsl(var(--chart-2))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bpX"
-                  :y="bpSystolic"
-                  color="hsl(var(--chart-2))"
-                  :size="4"
-                />
-                <VisArea
-                  :x="bpX"
-                  :y="bpDiastolic"
-                  color="hsl(var(--chart-3))"
-                  :opacity="0.08"
-                />
-                <VisLine
-                  :x="bpX"
-                  :y="bpDiastolic"
-                  color="hsl(var(--chart-3))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bpX"
-                  :y="bpDiastolic"
-                  color="hsl(var(--chart-3))"
-                  :size="4"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => bpData[i]?.date ? new Date(bpData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(bpData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-2))" :template="bpTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-            <div class="mt-2 flex items-center justify-center gap-4 text-xs text-muted-foreground">
-              <span class="flex items-center gap-1.5">
-                <span class="size-2 rounded-full" style="background: hsl(var(--chart-2))" />
-                Systolic
-              </span>
-              <span class="flex items-center gap-1.5">
-                <span class="size-2 rounded-full" style="background: hsl(var(--chart-3))" />
-                Diastolic
-              </span>
-            </div>
-          </TabsContent>
-
-          <!-- Blood Sugar chart -->
-          <TabsContent v-if="bsData.length > 0" value="bs" class="mt-3">
-            <ChartContainer :config="bsChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="bsData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="bsX"
-                  :y="bsY"
-                  color="hsl(var(--chart-4))"
-                  :opacity="0.1"
-                />
-                <VisLine
-                  :x="bsX"
-                  :y="bsY"
-                  color="hsl(var(--chart-4))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bsX"
-                  :y="bsY"
-                  color="hsl(var(--chart-4))"
-                  :size="5"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => bsData[i]?.date ? new Date(bsData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(bsData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :tick-format="(v: number) => `${v}`"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-4))" :template="bsTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-          </TabsContent>
-
-          <!-- BMI chart -->
-          <TabsContent v-if="bmiData.length > 0" value="bmi" class="mt-3">
-            <ChartContainer :config="bmiChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="bmiData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="bmiX"
-                  :y="bmiY"
-                  color="hsl(var(--chart-5))"
-                  :opacity="0.1"
-                />
-                <VisLine
-                  :x="bmiX"
-                  :y="bmiY"
-                  color="hsl(var(--chart-5))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bmiX"
-                  :y="bmiY"
-                  color="hsl(var(--chart-5))"
-                  :size="5"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => bmiData[i]?.date ? new Date(bmiData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(bmiData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :tick-format="(v: number) => `${v}`"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-5))" :template="bmiTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter>
-          <Button variant="outline" @click="showTrends = false">Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <!-- Trends Dialog (shared with patient profile) -->
+    <ChronicTrendsDialog v-model:open="showTrends" />
 
     <!-- Lab Result Preview Modal -->
     <Dialog :open="labPreviewOpen" @update:open="onLabPreviewClose">

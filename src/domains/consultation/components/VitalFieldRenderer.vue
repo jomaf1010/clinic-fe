@@ -14,10 +14,29 @@ import type { VitalFieldConfig, VitalAgeRange } from '@/domains/specialty/types/
 const props = defineProps<{
   fieldConfig: VitalFieldConfig
   modelValue: string | number | null
+  vitals?: Record<string, string | number | null>
   patientAgeDays?: number
   disabled?: boolean
   error?: string
 }>()
+
+// For paired fields: read the two values from the paired_storage_keys (fallback: parse from single field key)
+const pairedStorageKeys = computed(() => (props.fieldConfig as unknown as { paired_storage_keys?: string[] | null }).paired_storage_keys ?? null)
+const pairedLabels = computed(() => (props.fieldConfig as unknown as { paired_labels?: string[] | null }).paired_labels ?? ['', ''])
+
+const pairedPart1 = computed<string>(() => {
+  const keys = pairedStorageKeys.value
+  if (!keys || !props.vitals) return ''
+  const v = props.vitals[keys[0] ?? '']
+  return v != null && v !== '' ? String(v) : ''
+})
+
+const pairedPart2 = computed<string>(() => {
+  const keys = pairedStorageKeys.value
+  if (!keys || !props.vitals) return ''
+  const v = props.vitals[keys[1] ?? '']
+  return v != null && v !== '' ? String(v) : ''
+})
 
 // ── Age-based range resolution ────────────────────────────────────────────────
 
@@ -53,8 +72,19 @@ const valueStatus = computed<{ label: string; cls: string } | null>(() => {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number | null]
+  'update:paired': [updates: Record<string, number | null>]
   blur: []
 }>()
+
+function onPairedChange(partIndex: 0 | 1, val: string | number) {
+  const keys = pairedStorageKeys.value
+  if (!keys) return
+  const key = keys[partIndex]
+  if (!key) return
+  const num = val === '' || val == null ? null : Number(val)
+  const safe = num != null && isNaN(num) ? null : num
+  emit('update:paired', { [key]: safe })
+}
 
 const isVisible = computed(() => {
   const si = props.fieldConfig.show_if
@@ -72,44 +102,69 @@ const labelText = computed(() => {
 
 const fieldId = computed(() => `vital-${props.fieldConfig.key}`)
 
-// ── BP input logic (auto-slash, space-to-slash) ──────────────────────────────
-let bpSlashDeleted = false
-
-function onBpInput(e: Event) {
-  const input = e.target as HTMLInputElement
-  let val = input.value.replace(/[^0-9/]/g, '')
-  const parts = val.split('/')
-  if (parts.length > 2) val = parts[0] + '/' + parts.slice(1).join('')
-  if (!bpSlashDeleted && !val.includes('/') && /^\d{3,}$/.test(val)) {
-    val = val.slice(0, 3) + '/' + val.slice(3)
-  }
-  bpSlashDeleted = false
-  input.value = val
-  emit('update:modelValue', val || null)
-}
-
-function onBpKeydown(e: KeyboardEvent) {
-  const input = e.target as HTMLInputElement
-  if (e.key === ' ') {
-    e.preventDefault()
-    const val = input.value
-    if (val && !val.includes('/')) {
-      input.value = val + '/'
-      emit('update:modelValue', input.value)
-    }
-  } else if ((e.key === 'Backspace' || e.key === 'Delete') && input.value.includes('/')) {
-    const pos = input.selectionStart ?? 0
-    const slashIdx = input.value.indexOf('/')
-    if ((e.key === 'Backspace' && pos === slashIdx + 1) || (e.key === 'Delete' && pos === slashIdx)) {
-      bpSlashDeleted = true
-    }
-  }
-}
+const placeholderText = computed(() => {
+  const c = props.fieldConfig
+  const r = resolvedAgeRange.value
+  // Prefer age-based normal, then static normal range, then min/max bounds
+  if (r?.min != null && r?.max != null) return `${r.min}–${r.max}`
+  if (c.normal_min != null && c.normal_max != null) return `${c.normal_min}–${c.normal_max}`
+  if (c.normal_min != null) return `e.g. ${c.normal_min}`
+  if (c.min != null && c.max != null) return `${c.min}–${c.max}`
+  return ''
+})
 
 // ── Number input ─────────────────────────────────────────────────────────────
 function onNumberUpdate(val: string | number) {
   const num = Number(val)
   emit('update:modelValue', isNaN(num) || String(val) === '' ? null : num)
+}
+
+function clampToBounds(val: number | null): number | null {
+  if (val === null) return null
+  const c = props.fieldConfig
+  let result = val
+  if (c.min != null && result < c.min) result = c.min
+  if (c.max != null && result > c.max) result = c.max
+  return result
+}
+
+function onNumberBlur() {
+  // Clamp out-of-range values to the field's min/max bounds before saving.
+  const raw = props.modelValue
+  const num = raw == null || raw === '' ? null : Number(raw)
+  if (num != null && !isNaN(num)) {
+    const clamped = clampToBounds(num)
+    if (clamped !== num) {
+      emit('update:modelValue', clamped)
+    }
+  }
+  emit('blur')
+}
+
+function onPairedBlur(partIndex: 0 | 1) {
+  const keys = pairedStorageKeys.value
+  if (!keys || !props.vitals) {
+    emit('blur')
+    return
+  }
+  const key = keys[partIndex]
+  if (!key) {
+    emit('blur')
+    return
+  }
+  const raw = props.vitals[key]
+  const num = raw == null || raw === '' ? null : Number(raw)
+  if (num != null && !isNaN(num)) {
+    const c = props.fieldConfig
+    let result = num
+    // For paired fields, use overall min/max as a rough bound (per-part bounds aren't in config)
+    if (c.min != null && result < c.min) result = c.min
+    if (c.max != null && result > c.max) result = c.max
+    if (result !== num) {
+      emit('update:paired', { [key]: result })
+    }
+  }
+  emit('blur')
 }
 
 // ── Select ───────────────────────────────────────────────────────────────────
@@ -126,19 +181,36 @@ function onSelectChange(val: any) {
       <span v-if="ageRangeHint" class="text-xs text-muted-foreground">{{ ageRangeHint }}</span>
     </div>
 
-    <!-- Blood pressure: single text input with auto-slash formatting -->
+    <!-- Paired numbers (e.g. BP): two separate inputs with a slash between -->
     <template v-if="fieldConfig.input_type === 'paired_number' || fieldConfig.input_type === 'paired_text'">
-      <Input
-        :id="fieldId"
-        :model-value="(modelValue as string) ?? undefined"
-        type="text"
-        inputmode="numeric"
-        placeholder="120/80"
-        :disabled="disabled"
-        @input="onBpInput"
-        @keydown="onBpKeydown"
-        @blur="emit('blur')"
-      />
+      <div class="flex items-center gap-1">
+        <Input
+          :id="fieldId"
+          :model-value="pairedPart1"
+          :type="fieldConfig.input_type === 'paired_number' ? 'number' : 'text'"
+          :placeholder="pairedLabels[0] ?? 'Sys'"
+          :min="fieldConfig.min ?? undefined"
+          :max="fieldConfig.max ?? undefined"
+          :disabled="disabled"
+          :aria-invalid="!!error"
+          :class="error ? 'border-destructive focus-visible:ring-destructive' : ''"
+          @update:model-value="(v) => onPairedChange(0, v)"
+          @blur="onPairedBlur(0)"
+        />
+        <span class="text-muted-foreground">/</span>
+        <Input
+          :model-value="pairedPart2"
+          :type="fieldConfig.input_type === 'paired_number' ? 'number' : 'text'"
+          :placeholder="pairedLabels[1] ?? 'Dia'"
+          :min="fieldConfig.min ?? undefined"
+          :max="fieldConfig.max ?? undefined"
+          :disabled="disabled"
+          :aria-invalid="!!error"
+          :class="error ? 'border-destructive focus-visible:ring-destructive' : ''"
+          @update:model-value="(v) => onPairedChange(1, v)"
+          @blur="onPairedBlur(1)"
+        />
+      </div>
     </template>
 
     <!-- Numeric / Integer: number input with optional min/max -->
@@ -150,9 +222,12 @@ function onSelectChange(val: any) {
         :step="fieldConfig.type === 'numeric' ? '0.1' : '1'"
         :min="fieldConfig.min ?? undefined"
         :max="fieldConfig.max ?? undefined"
+        :placeholder="placeholderText"
         :disabled="disabled"
+        :aria-invalid="!!error"
+        :class="error ? 'border-destructive focus-visible:ring-destructive' : ''"
         @update:model-value="onNumberUpdate"
-        @blur="emit('blur')"
+        @blur="onNumberBlur"
       />
     </template>
 

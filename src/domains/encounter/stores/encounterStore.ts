@@ -268,6 +268,13 @@ export const useEncounterStore = defineStore('encounter', () => {
     isOfflineCached.value = false
   }
 
+  async function deleteEncounter(id: string): Promise<void> {
+    await encounterApi.delete(id)
+    patientEncounters.value = patientEncounters.value.filter(e => e.id !== id)
+    if (current.value?.id === id) clearCurrent()
+    toast.success('Draft encounter deleted')
+  }
+
   return {
     current,
     patientEncounters,
@@ -289,5 +296,6 @@ export const useEncounterStore = defineStore('encounter', () => {
     handleRealtimeEvent,
     clearCurrent,
     clearPatientEncounters,
+    deleteEncounter,
   }
 })

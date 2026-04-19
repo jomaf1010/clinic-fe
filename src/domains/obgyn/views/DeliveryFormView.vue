@@ -66,7 +66,7 @@ const patientId = computed(() => store.current?.patient_id)
 const { documentUpdate } = useEncounterSync(encounterId, clinicId)
 usePatientSync(patientId, clinicId, () => {})
 
-const canFinalize = computed(() => authStore.hasPermission('consultations.finalize'))
+const canFinalize = computed(() => authStore.hasPermission('encounters.finalize'))
 
 const loadError = ref<string | null>(null)
 const showFinalizeModal = ref(false)

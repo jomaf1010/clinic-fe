@@ -18,6 +18,7 @@ export interface ContraceptiveEntry {
 export type ContraceptionMethod =
   | 'none'
   | 'pills'
+  | 'pop'
   | 'iud_copper'
   | 'iud_hormonal'
   | 'implant'
@@ -25,7 +26,9 @@ export type ContraceptionMethod =
   | 'condoms'
   | 'withdrawal'
   | 'nfp'
+  | 'lam'
   | 'sterilization_female'
+  | 'salpingectomy'
   | 'sterilization_male'
   | 'patch'
   | 'ring'
@@ -33,7 +36,8 @@ export type ContraceptionMethod =
 
 export const CONTRACEPTION_OPTIONS: { value: ContraceptionMethod; label: string }[] = [
   { value: 'none', label: 'None' },
-  { value: 'pills', label: 'Oral Contraceptive Pills' },
+  { value: 'pills', label: 'Combined Oral Contraceptive Pills' },
+  { value: 'pop', label: 'Progestin-Only Pills (POP/Minipill)' },
   { value: 'iud_copper', label: 'IUD — Copper' },
   { value: 'iud_hormonal', label: 'IUD — Hormonal' },
   { value: 'implant', label: 'Subdermal Implant' },
@@ -41,7 +45,9 @@ export const CONTRACEPTION_OPTIONS: { value: ContraceptionMethod; label: string 
   { value: 'condoms', label: 'Condoms' },
   { value: 'withdrawal', label: 'Withdrawal' },
   { value: 'nfp', label: 'Natural Family Planning' },
-  { value: 'sterilization_female', label: 'Bilateral Tubal Ligation' },
+  { value: 'lam', label: 'Lactational Amenorrhea Method (LAM)' },
+  { value: 'sterilization_female', label: 'Bilateral Tubal Ligation (BTL)' },
+  { value: 'salpingectomy', label: 'Bilateral Salpingectomy' },
   { value: 'sterilization_male', label: 'Vasectomy' },
   { value: 'patch', label: 'Contraceptive Patch' },
   { value: 'ring', label: 'Vaginal Ring' },

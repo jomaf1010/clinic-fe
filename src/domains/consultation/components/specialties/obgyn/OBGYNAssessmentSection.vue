@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
-import { X, Search, Stethoscope, ClipboardList } from 'lucide-vue-next'
+import { X, Search } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -29,9 +29,11 @@ const local = reactive<ConsultationAssessment>({
 import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 const encounterStore = useEncounterStore()
 
+const sa = encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null
 const gynNotes = reactive({
-  pelvic_exam: (encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null)?.pelvic_exam ?? null,
-  breast_exam: (encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null)?.breast_exam ?? null,
+  speculum_exam: sa?.speculum_exam ?? sa?.pelvic_exam ?? null,
+  bimanual_exam: sa?.bimanual_exam ?? null,
+  breast_exam: sa?.breast_exam ?? null,
 })
 
 watch(
@@ -39,9 +41,10 @@ watch(
   (val) => {
     local.diagnoses = [...(val?.diagnoses ?? [])]
     local.notes = val?.notes ?? null
-    const sa = encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null
-    gynNotes.pelvic_exam = sa?.pelvic_exam ?? null
-    gynNotes.breast_exam = sa?.breast_exam ?? null
+    const s = encounterStore.current?.consultation?.specialty_assessment as Record<string, string | null> | null
+    gynNotes.speculum_exam = s?.speculum_exam ?? s?.pelvic_exam ?? null
+    gynNotes.bimanual_exam = s?.bimanual_exam ?? null
+    gynNotes.breast_exam = s?.breast_exam ?? null
   },
   { deep: true },
 )
@@ -164,7 +167,8 @@ function emitSave() {
       notes: local.notes,
     },
     specialty_assessment: {
-      pelvic_exam: gynNotes.pelvic_exam,
+      speculum_exam: gynNotes.speculum_exam,
+      bimanual_exam: gynNotes.bimanual_exam,
       breast_exam: gynNotes.breast_exam,
     },
   })
@@ -172,13 +176,10 @@ function emitSave() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Assessment Notes -->
     <div class="flex flex-col gap-2">
-      <Label for="assessment-notes" class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Assessment Notes
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Assessment Notes</h3>
       <Textarea
         id="assessment-notes"
         :model-value="local.notes ?? undefined"
@@ -192,10 +193,7 @@ function emitSave() {
 
     <!-- Diagnoses -->
     <div class="flex flex-col gap-2">
-      <Label class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Diagnoses
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Diagnoses</h3>
 
       <!-- Selected diagnoses -->
       <div v-if="local.diagnoses.length > 0" class="flex flex-wrap gap-2">
@@ -269,29 +267,41 @@ function emitSave() {
 
     <!-- GYN Exam Findings -->
     <div class="flex flex-col gap-4">
-      <h2 class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground uppercase tracking-wide">
-        <ClipboardList class="size-3.5" />
-        GYN Exam Findings
-      </h2>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">GYN Exam Findings</h3>
 
-      <!-- Pelvic Exam -->
+      <!-- Speculum Exam -->
       <div class="flex flex-col gap-2">
-        <Label for="pelvic-exam" class="text-xs">Pelvic Exam Findings</Label>
+        <Label for="speculum-exam" class="text-xs text-muted-foreground">Speculum Exam</Label>
         <Textarea
-          id="pelvic-exam"
-          :model-value="gynNotes.pelvic_exam ?? undefined"
-          placeholder="External genitalia, vagina, cervix, uterus, adnexa..."
+          id="speculum-exam"
+          :model-value="gynNotes.speculum_exam ?? undefined"
+          placeholder="Discharge, cervical appearance, lesions, bleeding..."
           :disabled="disabled"
           :rows="3"
           class="text-sm"
-          @update:model-value="(v: string | number) => { gynNotes.pelvic_exam = String(v) || null }"
+          @update:model-value="(v: string | number) => { gynNotes.speculum_exam = String(v) || null }"
+          @blur="emitSave"
+        />
+      </div>
+
+      <!-- Bimanual Exam -->
+      <div class="flex flex-col gap-2">
+        <Label for="bimanual-exam" class="text-xs text-muted-foreground">Bimanual Exam</Label>
+        <Textarea
+          id="bimanual-exam"
+          :model-value="gynNotes.bimanual_exam ?? undefined"
+          placeholder="Uterine size, tenderness, adnexal masses, cervical motion tenderness..."
+          :disabled="disabled"
+          :rows="3"
+          class="text-sm"
+          @update:model-value="(v: string | number) => { gynNotes.bimanual_exam = String(v) || null }"
           @blur="emitSave"
         />
       </div>
 
       <!-- Breast Exam -->
       <div class="flex flex-col gap-2">
-        <Label for="breast-exam" class="text-xs">Breast Exam Findings</Label>
+        <Label for="breast-exam" class="text-xs text-muted-foreground">Breast Exam</Label>
         <Textarea
           id="breast-exam"
           :model-value="gynNotes.breast_exam ?? undefined"

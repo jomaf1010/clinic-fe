@@ -209,6 +209,77 @@ export interface PostpartumVisitData {
 
 // ── Encounter Response ──────────────────────────────────────────────
 
+// ── Display Summary (rich encounter summary for timeline) ───────────────
+
+export interface DisplaySummaryVitals {
+  bp_systolic?: number | null
+  bp_diastolic?: number | null
+  hr?: number | null
+  rr?: number | null
+  temp?: number | null
+  spo2?: number | null
+  blood_sugar?: number | null
+  blood_glucose_timing?: string | null
+  weight?: number | null
+  height?: number | null
+  pain_score?: number | null
+  waist_circumference?: number | null
+  head_circumference?: number | null
+  [key: string]: number | string | null | undefined
+}
+
+export type BpClassification = 'normal' | 'elevated' | 'stage_1' | 'stage_2' | 'crisis'
+export type BloodSugarClassification = 'hypoglycemia' | 'normal' | 'prediabetic' | 'diabetic'
+
+export type DisplaySummaryContext =
+  | {
+      kind: 'consultation'
+      specialty: 'pediatrics'
+      consultation_type: string
+      age_months?: number
+      weight_kg?: number
+      height_cm?: number
+      head_circumference_cm?: number
+    }
+  | {
+      kind: 'consultation'
+      specialty: 'family_medicine' | 'internal_medicine'
+      consultation_type: string
+      bp_classification?: BpClassification
+      blood_sugar_classification?: BloodSugarClassification
+    }
+  | {
+      kind: 'consultation'
+      specialty: string
+      consultation_type: string
+    }
+  | {
+      kind: 'prenatal'
+      visit_number?: number
+      ga_weeks?: number
+      ga_days?: number
+      fundal_height_cm?: number
+      fetal_heart_rate?: number
+    }
+  | {
+      kind: 'delivery'
+      delivery_mode?: string
+      birth_weight_grams?: number
+      birth_gender?: string
+      apgar_5min?: number
+    }
+  | {
+      kind: 'postpartum'
+      days_postpartum?: number
+    }
+
+export interface DisplaySummary {
+  chief_complaint: string | null
+  diagnoses: string[]
+  vitals: DisplaySummaryVitals
+  context: DisplaySummaryContext
+}
+
 export interface EncounterResponse {
   id: string
   patient_id: string
@@ -220,6 +291,7 @@ export interface EncounterResponse {
   specialty: string
   status: EncounterStatus
   display_line: string | null
+  display_summary: DisplaySummary | null
   patient_name: string | null
   patient_sex: string | null
   doctor_name: string | null
@@ -249,6 +321,7 @@ export interface EncounterTimelineItem {
   pregnancy_id: string | null
   status: EncounterStatus
   display_line: string | null
+  display_summary: DisplaySummary | null
   doctor_id: string
   doctor_name: string | null
   doctor_avatar_url: string | null

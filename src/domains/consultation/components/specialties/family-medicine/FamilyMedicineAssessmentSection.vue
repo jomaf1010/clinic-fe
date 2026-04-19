@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { X, Search, Stethoscope, ChevronRight, ClipboardList, LoaderCircle } from 'lucide-vue-next'
+import { X, Search, ChevronRight, LoaderCircle } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -264,13 +264,10 @@ const ascvdSmokingStatus = ref<string | null>(null)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Assessment Notes -->
     <div class="flex flex-col gap-2">
-      <Label for="assessment-notes" class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Assessment Notes
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Assessment Notes</h3>
       <Textarea
         id="assessment-notes"
         :model-value="local.notes ?? undefined"
@@ -284,10 +281,7 @@ const ascvdSmokingStatus = ref<string | null>(null)
 
     <!-- Diagnoses -->
     <div class="flex flex-col gap-2">
-      <Label class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Diagnoses
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Diagnoses</h3>
 
       <!-- Selected diagnoses -->
       <div v-if="local.diagnoses.length > 0" class="flex flex-wrap gap-2">
@@ -358,12 +352,9 @@ const ascvdSmokingStatus = ref<string | null>(null)
       </p>
     </div>
 
-    <!-- Per-problem SOAP Notes -->
+    <!-- Per-Problem SOAP Notes -->
     <div class="flex flex-col gap-3">
-      <h2 class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground uppercase tracking-wide">
-        <ClipboardList class="size-3.5" />
-        Per-Problem SOAP Notes
-      </h2>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Per-Problem SOAP Notes</h3>
 
       <div v-if="isLoadingProblems" class="flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle class="size-3.5 animate-spin" />
@@ -450,12 +441,15 @@ const ascvdSmokingStatus = ref<string | null>(null)
       </div>
     </div>
 
-    <!-- ASCVD 10-Year Risk Calculator -->
-    <AscvdCalculator
-      :patient-age="ascvdPatientAge"
-      :patient-sex="ascvdPatientSex"
-      :triage-bp="ascvdTriageBp"
-      :smoking-status="ascvdSmokingStatus"
-    />
+    <!-- ASCVD Risk Calculator -->
+    <div class="flex flex-col gap-3">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">ASCVD Risk Calculator</h3>
+      <AscvdCalculator
+        :patient-age="ascvdPatientAge"
+        :patient-sex="ascvdPatientSex"
+        :triage-bp="ascvdTriageBp"
+        :smoking-status="ascvdSmokingStatus"
+      />
+    </div>
   </div>
 </template>

@@ -6,6 +6,7 @@ import SiteHeader from '@/components/layout/SiteHeader.vue'
 import AnnouncementBanners from '@/components/layout/AnnouncementBanners.vue'
 import TrialBanner from '@/components/layout/TrialBanner.vue'
 import GracePeriodBanner from '@/components/layout/GracePeriodBanner.vue'
+import SpecialtySetupDialog from '@/domains/auth/components/SpecialtySetupDialog.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useDmRealtime } from '@/domains/message/composables/useDmRealtime'
 import { useMessageStore } from '@/domains/message/stores/messageStore'
@@ -62,5 +63,6 @@ onUnmounted(() => {
         <RouterView />
       </div>
     </SidebarInset>
+    <SpecialtySetupDialog />
   </SidebarProvider>
 </template>

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
-import { X, Search, Stethoscope } from 'lucide-vue-next'
+import { X, Search } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { consultationApi } from '../../../api/consultationApi'
@@ -160,13 +159,10 @@ function emitSave() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Assessment Notes -->
     <div class="flex flex-col gap-2">
-      <Label for="assessment-notes" class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Assessment Notes
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Assessment Notes</h3>
       <Textarea
         id="assessment-notes"
         :model-value="local.notes ?? undefined"
@@ -180,10 +176,7 @@ function emitSave() {
 
     <!-- Diagnoses -->
     <div class="flex flex-col gap-2">
-      <Label class="flex items-center gap-1.5">
-        <Stethoscope class="size-3.5 text-muted-foreground" />
-        Diagnoses
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Diagnoses</h3>
 
       <!-- Selected diagnoses -->
       <div v-if="local.diagnoses.length > 0" class="flex flex-wrap gap-2">

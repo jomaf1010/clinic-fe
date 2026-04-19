@@ -35,6 +35,10 @@ export const encounterApi = {
     return http.post<FinalizeEncounterResponse>(`/encounters/${id}/finalize`)
   },
 
+  delete(id: string): Promise<void> {
+    return http.delete<void>(`/encounters/${id}`)
+  },
+
   saveConsumables(id: string, consumables: ConsultationConsumable[]): Promise<EncounterDetailResponse> {
     return http.put<EncounterDetailResponse>(`/encounters/${id}/consumables`, { consumables })
   },

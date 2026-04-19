@@ -59,6 +59,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { LifestyleData } from '@/domains/consultation/types/consultation.types'
 import type { FamilyHistoryEntry, FamilyHistoryCondition, StoreMedicationPayload, StorePreventiveCarePayload } from '@/domains/patient/api/patientApi'
+import { classificationLabel, classificationColor } from '@/domains/patient/utils/chronicTrendsLabels'
 
 use([LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
 
@@ -533,16 +534,9 @@ const trendTabs = [
 const trendsWidgetDetail = computed(() => {
   if (!trendsData.value) return 'No data'
   const latest = trendsData.value.bp?.[trendsData.value.bp.length - 1]
-  if (latest?.classification) return latest.classification
+  if (latest?.classification) return classificationLabel(latest.classification)
   return 'Vitals over time'
 })
-
-function classificationColor(c: string): string {
-  const lower = c.toLowerCase()
-  if (lower.includes('normal')) return '#16a34a'
-  if (lower.includes('elevated') || lower.includes('pre')) return '#d97706'
-  return '#dc2626'
-}
 
 const trendsChartOption = computed(() => {
   const tab = activeTrendTab.value
@@ -566,7 +560,7 @@ const trendsChartOption = computed(() => {
           return `<div style="font-size:12px;">
             <b>${date}</b><br/>
             ${pt.systolic}/${pt.diastolic} mmHg
-            ${pt.classification ? `<br/><span style="color:${classificationColor(pt.classification)}">${pt.classification}</span>` : ''}
+            ${pt.classification ? `<br/><span style="color:${classificationColor(pt.classification)}">${classificationLabel(pt.classification)}</span>` : ''}
           </div>`
         },
       },
@@ -629,7 +623,7 @@ const trendsChartOption = computed(() => {
         return `<div style="font-size:12px;">
           <b>${date}</b><br/>
           ${pt.value} ${unit}
-          ${pt.classification ? `<br/><span style="color:${classificationColor(pt.classification)}">${pt.classification}</span>` : ''}
+          ${pt.classification ? `<br/><span style="color:${classificationColor(pt.classification)}">${classificationLabel(pt.classification)}</span>` : ''}
         </div>`
       },
     },
@@ -734,13 +728,13 @@ const narrativeSummary = computed(() => {
   const bp = trendsData.value?.bp
   if (bp && bp.length > 0) {
     const latest = bp[bp.length - 1]!
-    const cls = latest.classification ? ` — ${b(latest.classification)}` : ''
+    const cls = latest.classification ? ` — ${b(classificationLabel(latest.classification))}` : ''
     lines.push(`Latest BP: ${b(`${latest.systolic}/${latest.diastolic}`)} mmHg${cls}.`)
   }
   const bs = trendsData.value?.blood_sugar
   if (bs && bs.length > 0) {
     const latest = bs[bs.length - 1]!
-    const cls = latest.classification ? ` — ${b(latest.classification)}` : ''
+    const cls = latest.classification ? ` — ${b(classificationLabel(latest.classification))}` : ''
     lines.push(`Latest blood sugar: ${b(latest.value!)} mg/dL${cls}.`)
   }
 

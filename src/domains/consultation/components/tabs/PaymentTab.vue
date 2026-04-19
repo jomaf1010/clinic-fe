@@ -86,7 +86,7 @@ const isDraft = computed(() => props.status === 'draft')
 const isFinalized = computed(() => props.status === 'finalized')
 const hasInvoice = computed(() => invoice.value !== null)
 const canManage = computed(() => authStore.hasPermission('billing.manage'))
-const canGenerate = computed(() => authStore.hasPermission('consultations.edit-treatment-plan'))
+const canGenerate = computed(() => authStore.hasPermission('encounters.edit-treatment-plan'))
 
 // Documents
 const prescriptionDoc = ref<GeneratedDocumentResponse | null>(null)

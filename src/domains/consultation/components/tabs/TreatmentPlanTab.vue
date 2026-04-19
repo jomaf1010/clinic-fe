@@ -3,7 +3,6 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { CalendarDate, today, getLocalTimeZone, getDayOfWeek } from '@internationalized/date'
 import {
-  MessageSquareText,
   CalendarDays,
   X,
   LoaderCircle,
@@ -12,10 +11,8 @@ import {
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
-import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { ConsultationTreatmentPlan, ConsultationConsumable } from '../../types/consultation.types'
 import type { PrescriptionResponse } from '../../types/prescription.types'
@@ -221,28 +218,27 @@ function applyPreset(days: number): void {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
     <!-- Prescription -->
-    <PrescriptionSection :consultation-id="consultationId" :disabled="disabled" :realtime-update="prescriptionUpdate" :document-update="documentUpdate" />
-
-    <hr class="border-border" />
+    <div class="flex flex-col gap-4">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prescription</h3>
+      <PrescriptionSection :consultation-id="consultationId" :disabled="disabled" :realtime-update="prescriptionUpdate" :document-update="documentUpdate" />
+    </div>
 
     <!-- Procedures -->
-    <ProcedureSection
-      :encounter-id="consultationId"
-      :procedures="procedures"
-      :disabled="disabled"
-      @update="(p) => emit('procedures-updated', p)"
-    />
-
-    <hr class="border-border" />
+    <div class="flex flex-col gap-4">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Procedures</h3>
+      <ProcedureSection
+        :encounter-id="consultationId"
+        :procedures="procedures"
+        :disabled="disabled"
+        @update="(p) => emit('procedures-updated', p)"
+      />
+    </div>
 
     <!-- Advice / Instructions -->
-    <div class="flex flex-col gap-2">
-      <Label for="advice" class="flex items-center gap-1.5">
-        <MessageSquareText class="size-3.5 text-muted-foreground" />
-        Advice / Instructions
-      </Label>
+    <div class="flex flex-col gap-4">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Advice / Instructions</h3>
       <Textarea
         id="advice"
         v-model="local.advice"
@@ -253,151 +249,148 @@ function applyPreset(days: number): void {
       />
     </div>
 
+    <!-- Lab Orders -->
     <template v-if="hasLabOrders">
-      <hr class="border-border" />
-
-      <!-- Lab Orders -->
-      <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" :document-update="documentUpdate" @lab-updated="emit('lab-updated')" />
+      <div class="flex flex-col gap-4">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
+        <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" :document-update="documentUpdate" @lab-updated="emit('lab-updated')" />
+      </div>
     </template>
 
-    <template v-if="hasAppointments">
-    <hr class="border-border" />
-
     <!-- Follow-up -->
-    <div class="flex flex-col gap-3">
-      <Label class="flex items-center gap-1.5">
-        <CalendarDays class="size-3.5 text-muted-foreground" />
-        Follow-up Appointment
-      </Label>
+    <template v-if="hasAppointments">
+      <div class="flex flex-col gap-4">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Follow-up</h3>
 
-      <!-- Booked state -->
-      <div
-        v-if="appointmentBooked && local.follow_up"
-        class="flex items-center gap-3 rounded-md border border-green-300 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950"
-      >
-        <CheckCircle2 class="size-5 shrink-0 text-green-600 dark:text-green-400" />
-        <div class="flex-1">
-          <p class="text-sm font-medium text-green-800 dark:text-green-300">Follow-up booked</p>
-          <p class="text-xs text-green-700 dark:text-green-400">
-            {{ followUpDisplay }}
-            <span v-if="selectedSlot"> at {{ formatSlotTime(selectedSlot) }}</span>
-          </p>
-        </div>
-        <Button
-          v-if="!disabled"
-          variant="ghost"
-          size="icon"
-          class="size-7 text-green-700 hover:text-destructive dark:text-green-400"
-          @click="clearFollowUp"
+        <!-- Booked state -->
+        <div
+          v-if="appointmentBooked && local.follow_up"
+          class="flex items-center gap-3 rounded-md border border-green-300 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950"
         >
-          <X class="size-4" />
-        </Button>
-      </div>
-
-      <!-- Date + slot picker -->
-      <template v-else-if="!disabled">
-        <div class="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger as-child>
-              <Button
-                variant="outline"
-                class="w-[240px] justify-start text-left font-normal"
-                :class="{ 'text-muted-foreground': !selectedDate }"
-              >
-                <CalendarDays class="mr-2 size-4" />
-                {{ selectedDate ? new Date(selectedDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select a date' }}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent class="w-auto p-0" align="start">
-              <Calendar
-                :model-value="followUpCalendarValue"
-                :min-value="minDate"
-                :is-date-unavailable="isDateUnavailable"
-                @update:model-value="onDateSelect"
-              />
-            </PopoverContent>
-          </Popover>
+          <CheckCircle2 class="size-5 shrink-0 text-green-600 dark:text-green-400" />
+          <div class="flex-1">
+            <p class="text-sm font-medium text-green-800 dark:text-green-300">Follow-up booked</p>
+            <p class="text-xs text-green-700 dark:text-green-400">
+              {{ followUpDisplay }}
+              <span v-if="selectedSlot"> at {{ formatSlotTime(selectedSlot) }}</span>
+            </p>
+          </div>
           <Button
-            v-if="selectedDate"
+            v-if="!disabled"
             variant="ghost"
             size="icon"
-            class="size-8"
+            class="size-7 text-green-700 hover:text-destructive dark:text-green-400"
             @click="clearFollowUp"
           >
             <X class="size-4" />
           </Button>
         </div>
 
-        <!-- Quick presets -->
-        <div class="flex flex-wrap items-center gap-1.5">
-          <span class="text-xs text-muted-foreground">Quick:</span>
-          <button
-            v-for="preset in followUpPresets"
-            :key="preset.days"
-            type="button"
-            class="rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground"
-            @click="applyPreset(preset.days)"
-          >
-            {{ preset.label }}
-          </button>
-        </div>
-
-        <!-- Slot picker -->
-        <div v-if="selectedDate" class="mt-1">
-          <div v-if="slotsLoading" class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-            <LoaderCircle class="size-4 animate-spin" />
-            Loading available slots...
+        <!-- Date + slot picker -->
+        <template v-else-if="!disabled">
+          <div class="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  class="w-[240px] justify-start text-left font-normal"
+                  :class="{ 'text-muted-foreground': !selectedDate }"
+                >
+                  <CalendarDays class="mr-2 size-4" />
+                  {{ selectedDate ? new Date(selectedDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'Select a date' }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="start">
+                <Calendar
+                  :model-value="followUpCalendarValue"
+                  :min-value="minDate"
+                  :is-date-unavailable="isDateUnavailable"
+                  @update:model-value="onDateSelect"
+                />
+              </PopoverContent>
+            </Popover>
+            <Button
+              v-if="selectedDate"
+              variant="ghost"
+              size="icon"
+              class="size-8"
+              @click="clearFollowUp"
+            >
+              <X class="size-4" />
+            </Button>
           </div>
 
-          <div v-else-if="availableSlots.length === 0" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
-            No available slots on this date. Please select another day.
+          <!-- Quick presets -->
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-xs text-muted-foreground">Quick:</span>
+            <button
+              v-for="preset in followUpPresets"
+              :key="preset.days"
+              type="button"
+              class="rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground"
+              @click="applyPreset(preset.days)"
+            >
+              {{ preset.label }}
+            </button>
           </div>
 
-          <div v-else class="flex flex-col gap-2">
-            <p class="text-xs text-muted-foreground">
-              {{ availableSlots.length }} available slot{{ availableSlots.length > 1 ? 's' : '' }} — select a time:
-            </p>
-            <div class="flex flex-wrap gap-1.5">
-              <Button
-                v-for="slot in availableSlots"
-                :key="slot.start"
-                variant="outline"
-                size="sm"
-                class="h-8"
-                :class="{ 'border-primary bg-primary/10 text-primary': selectedSlot === slot.start }"
-                :disabled="isBooking"
-                @click="bookFollowUp(slot)"
-              >
-                <Clock class="mr-1 size-3" />
-                {{ formatSlotTime(slot.start) }}
-              </Button>
+          <!-- Slot picker -->
+          <div v-if="selectedDate" class="mt-1">
+            <div v-if="slotsLoading" class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <LoaderCircle class="size-4 animate-spin" />
+              Loading available slots...
             </div>
-            <div v-if="isBooking" class="flex items-center gap-2 text-xs text-muted-foreground">
-              <LoaderCircle class="size-3 animate-spin" />
-              Booking appointment...
+
+            <div v-else-if="availableSlots.length === 0" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
+              No available slots on this date. Please select another day.
+            </div>
+
+            <div v-else class="flex flex-col gap-2">
+              <p class="text-xs text-muted-foreground">
+                {{ availableSlots.length }} available slot{{ availableSlots.length > 1 ? 's' : '' }} — select a time:
+              </p>
+              <div class="flex flex-wrap gap-1.5">
+                <Button
+                  v-for="slot in availableSlots"
+                  :key="slot.start"
+                  variant="outline"
+                  size="sm"
+                  class="h-8"
+                  :class="{ 'border-primary bg-primary/10 text-primary': selectedSlot === slot.start }"
+                  :disabled="isBooking"
+                  @click="bookFollowUp(slot)"
+                >
+                  <Clock class="mr-1 size-3" />
+                  {{ formatSlotTime(slot.start) }}
+                </Button>
+              </div>
+              <div v-if="isBooking" class="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle class="size-3 animate-spin" />
+                Booking appointment...
+              </div>
             </div>
           </div>
-        </div>
-      </template>
+        </template>
 
-      <!-- Read-only display -->
-      <p v-else-if="local.follow_up" class="text-sm">
-        {{ followUpDisplay }}
-      </p>
-      <p v-else class="text-sm text-muted-foreground">No follow-up scheduled</p>
-    </div>
+        <!-- Read-only display -->
+        <p v-else-if="local.follow_up" class="text-sm">
+          {{ followUpDisplay }}
+        </p>
+        <p v-else class="text-sm text-muted-foreground">No follow-up scheduled</p>
+      </div>
     </template>
 
+    <!-- Consumables -->
     <template v-if="hasConsumables">
-      <hr class="border-border" />
-
-      <!-- Consumables -->
-      <ConsumableSection
-        :consultation-id="consultationId"
-        :consumables="consumables"
-        :disabled="disabled"
-        @update="emit('update:consumables', $event)"
-      />
+      <div class="flex flex-col gap-4">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Consumables</h3>
+        <ConsumableSection
+          :consultation-id="consultationId"
+          :consumables="consumables"
+          :disabled="disabled"
+          @update="emit('update:consumables', $event)"
+        />
+      </div>
     </template>
   </div>
 </template>

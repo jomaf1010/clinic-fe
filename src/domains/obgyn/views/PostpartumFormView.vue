@@ -91,7 +91,7 @@ const patientId = computed(() => store.current?.patient_id)
 const { prescriptionUpdate, labOrderUpdate, documentUpdate } = useEncounterSync(encounterId, clinicId)
 usePatientSync(patientId, clinicId, () => {})
 
-const canFinalize = computed(() => authStore.hasPermission('consultations.finalize'))
+const canFinalize = computed(() => authStore.hasPermission('encounters.finalize'))
 
 const activeTab = ref('triage')
 const showFinalizeModal = ref(false)

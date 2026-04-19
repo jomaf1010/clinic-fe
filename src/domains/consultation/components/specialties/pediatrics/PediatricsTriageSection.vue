@@ -5,7 +5,6 @@ import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import { MessageSquare } from 'lucide-vue-next'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import VitalsSummary from '../../VitalsSummary.vue'
 import VitalFieldRenderer from '../../VitalFieldRenderer.vue'
 import LabOrderSection from '../../LabOrderSection.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
@@ -106,16 +105,10 @@ function emitSave() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Quick Assessment Summary -->
-    <VitalsSummary :triage="{ chief_complaint: local.chief_complaint, vitals: { ...allVitals }, notes: local.notes }" />
-
+  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Chief Complaint -->
     <div class="flex flex-col gap-2">
-      <Label for="chief_complaint" class="flex items-center gap-1.5">
-        <MessageSquare class="size-3.5 text-muted-foreground" />
-        Chief Complaint
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Chief Complaint</h3>
       <Textarea
         id="chief_complaint"
         :model-value="local.chief_complaint ?? undefined"
@@ -129,37 +122,40 @@ function emitSave() {
 
     <!-- Vitals (config-driven — includes Weight, Height, Head Circumference, etc.) -->
     <div>
-      <h2 class="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wide">Vitals</h2>
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Vitals</h3>
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <VitalFieldRenderer
           v-for="field in vitalFields"
           :key="field.key"
           :field-config="field"
           :model-value="allVitals[field.key] ?? null"
+          :vitals="allVitals"
           :patient-age-days="patientAgeDays"
           :disabled="disabled"
           :error="errors[field.key]"
           @update:model-value="(v) => { allVitals[field.key] = v }"
+          @update:paired="(updates) => Object.assign(allVitals, updates)"
           @blur="onBlur"
         />
       </div>
     </div>
 
     <!-- Lab Orders -->
-    <LabOrderSection
-      v-if="hasLabOrders"
-      :consultation-id="consultationId"
-      :disabled="disabled"
-      :realtime-update="labOrderUpdate"
-      @lab-updated="emit('lab-updated')"
-    />
+    <div v-if="hasLabOrders">
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
+      <div class="mt-4">
+        <LabOrderSection
+          :consultation-id="consultationId"
+          :disabled="disabled"
+          :realtime-update="labOrderUpdate"
+          @lab-updated="emit('lab-updated')"
+        />
+      </div>
+    </div>
 
     <!-- Triage Notes -->
     <div class="flex flex-col gap-2">
-      <Label for="triage_notes" class="flex items-center gap-1.5">
-        <MessageSquare class="size-3.5 text-muted-foreground" />
-        Triage Notes
-      </Label>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Triage Notes</h3>
       <Textarea
         id="triage_notes"
         :model-value="local.notes ?? undefined"

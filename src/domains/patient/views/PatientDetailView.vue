@@ -21,6 +21,8 @@ import {
   ChevronUp,
   Camera,
   ArrowRight,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
@@ -35,6 +37,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import EditPatientDialog from '../components/EditPatientDialog.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
@@ -88,18 +100,22 @@ async function handleAvatarCrop(blob: Blob) {
 }
 
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
+const currentRole = computed(() => authStore.currentClinic?.role)
 const currentUserId = computed(() => authStore.user?.id)
+const isSecretaryOrStaff = computed(() => currentRole.value === 'secretary' || currentRole.value === 'staff')
 const canSeeDrafts = computed(() => isOwner.value || authStore.hasPermission('encounters.edit-triage'))
+// Mirrors backend ensureDraftOwnership: owner OR assigned doctor OR secretary/staff with edit-triage.
+const canEditDraftOfOthers = computed(() => isSecretaryOrStaff.value && authStore.hasPermission('encounters.edit-triage'))
 
 const visibleConsultations = computed(() =>
   encounterStore.patientEncounters.filter(c =>
-    c.status !== 'draft' || canSeeDrafts.value || c.created_by === currentUserId.value,
+    c.status !== 'draft' || canSeeDrafts.value || c.doctor_id === currentUserId.value,
   ),
 )
 
 const draftConsultation = computed(() =>
   visibleConsultations.value.find(c =>
-    c.status === 'draft' && (c.created_by === currentUserId.value || isOwner.value),
+    c.status === 'draft' && (c.doctor_id === currentUserId.value || isOwner.value || canEditDraftOfOthers.value),
   ) ?? null,
 )
 
@@ -165,6 +181,31 @@ watch(() => notificationStore.notifications[0], (newest) => {
 
 const editDialogOpen = ref(false)
 const mobileCardExpanded = ref(false)
+
+// ── Discard draft ─────────────────────────────────────────────────────────
+const discardTarget = ref<typeof draftConsultation.value | null>(null)
+const discardOpen = ref(false)
+const discardInFlight = ref(false)
+
+function requestDiscardDraft(draft: typeof draftConsultation.value): void {
+  if (!draft) return
+  discardTarget.value = draft
+  discardOpen.value = true
+}
+
+async function confirmDiscardDraft(): Promise<void> {
+  if (!discardTarget.value) return
+  discardInFlight.value = true
+  try {
+    await encounterStore.deleteEncounter(discardTarget.value.id)
+    discardOpen.value = false
+    discardTarget.value = null
+  } catch {
+    toast.error('Failed to discard draft')
+  } finally {
+    discardInFlight.value = false
+  }
+}
 
 // Problems count from store
 const activeProblemsCount = computed(() =>
@@ -303,21 +344,28 @@ onUnmounted(() => {
   >
     <!-- Left panel -->
     <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-5">
-      <!-- Back button -->
-      <Button
-        variant="outline"
-        size="sm"
-        class="-ml-2 mb-3 gap-1.5"
-        @click="router.back()"
-      >
-        <ArrowLeft class="size-3.5" />
-        Back
-      </Button>
-
       <!-- Profile card -->
       <div class="rounded-3xl border shadow-sm bg-card overflow-hidden">
         <!-- Inset banner -->
-        <div class="m-2 rounded-2xl bg-gradient-to-br from-blue-400/30 to-blue-500/30 h-[120px] sm:h-[140px]" />
+        <div class="relative m-2 rounded-2xl bg-gradient-to-br from-blue-400/30 to-blue-500/30 h-[120px] sm:h-[140px]">
+          <button
+            type="button"
+            class="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-blue-900 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Back"
+            @click="router.back()"
+          >
+            <ArrowLeft class="size-4" />
+            Back
+          </button>
+          <button
+            type="button"
+            class="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-full bg-white/70 text-blue-900 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Edit profile"
+            @click="editDialogOpen = true"
+          >
+            <Pencil class="size-4" />
+          </button>
+        </div>
 
         <!-- Avatar with rainbow completeness ring -->
         <div class="-mt-12 flex justify-center relative z-10">
@@ -402,58 +450,57 @@ onUnmounted(() => {
         </div>
 
         <!-- Action grid -->
-        <div class="grid grid-cols-3 gap-2 mx-3 mb-3">
-          <!-- Edit Profile -->
-          <button
-            type="button"
-            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="editDialogOpen = true"
-          >
-            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-500 to-slate-400 flex items-center justify-center text-white">
-              <Pencil class="size-4" />
-            </div>
-            <span class="text-[11px] font-medium text-center leading-tight">Edit Profile</span>
-          </button>
+        <div class="grid grid-cols-2 gap-2 mx-3 mb-3">
+          <!-- Continue Draft + Discard (only when a draft exists) -->
+          <template v-if="draftConsultation">
+            <button
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
+                <PlayCircle class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">Continue Draft</span>
+            </button>
+            <button
+              v-if="authStore.hasPermission('encounters.delete')"
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="requestDiscardDraft(draftConsultation)"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-rose-400 flex items-center justify-center text-white">
+                <Trash2 class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">Discard Draft</span>
+            </button>
+          </template>
 
-          <!-- Follow Up -->
-          <button
-            v-if="authStore.hasPermission('consultations.create')"
-            type="button"
-            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
-          >
-            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
-              <ArrowRight class="size-4" />
-            </div>
-            <span class="text-[11px] font-medium text-center leading-tight">Follow Up</span>
-          </button>
-          <!-- Placeholder if no create permission -->
-          <div v-else />
-
-          <!-- New Consultation / Continue Draft -->
-          <button
-            v-if="draftConsultation"
-            type="button"
-            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
-          >
-            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
-              <PlayCircle class="size-4" />
-            </div>
-            <span class="text-[11px] font-medium text-center leading-tight">Continue Draft</span>
-          </button>
-          <button
-            v-else-if="authStore.hasPermission('consultations.create')"
-            type="button"
-            class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-            @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id } })"
-          >
-            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
-              <Stethoscope class="size-4" />
-            </div>
-            <span class="text-[11px] font-medium text-center leading-tight">New Consult</span>
-          </button>
-          <div v-else />
+          <!-- No draft → Follow Up + New Consult -->
+          <template v-else>
+            <button
+              v-if="authStore.hasPermission('encounters.create')"
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
+                <ArrowRight class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">Follow Up</span>
+            </button>
+            <button
+              v-if="authStore.hasPermission('encounters.create')"
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id } })"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
+                <Stethoscope class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">New Consult</span>
+            </button>
+          </template>
         </div>
 
         <!-- Expandable details toggle (mobile only) -->
@@ -641,6 +688,7 @@ onUnmounted(() => {
             :consultation="consultation"
             :patient-id="patient!.id"
             :latest="index === latestFinalizedIndex"
+            :previous-vitals="visibleConsultations[index + 1]?.display_summary?.vitals ?? null"
             class="min-w-0 flex-1"
             :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
             @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
@@ -720,6 +768,45 @@ onUnmounted(() => {
       :output-size="256"
       @crop="handleAvatarCrop"
     />
+
+    <!-- Discard Draft Encounter Confirmation -->
+    <AlertDialog :open="discardOpen" @update:open="discardOpen = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle class="flex items-center gap-2">
+            <AlertTriangle class="size-5 text-destructive" />
+            Discard draft encounter?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete the in-progress encounter and everything attached to it. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <p class="font-medium text-foreground">The following will be deleted:</p>
+          <ul class="mt-2 space-y-1 text-muted-foreground list-disc pl-5">
+            <li>Triage vitals &amp; chief complaint</li>
+            <li>Assessment notes &amp; diagnoses</li>
+            <li>Treatment plan &amp; prescription</li>
+            <li>Laboratory orders &amp; results</li>
+            <li>Generated documents (if any)</li>
+          </ul>
+          <p class="mt-2 text-xs text-muted-foreground">
+            The queue visit or appointment entry will be retained, but the encounter link will be removed.
+          </p>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="discardInFlight">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            :disabled="discardInFlight"
+            @click="confirmDiscardDraft"
+          >
+            <LoaderCircle v-if="discardInFlight" class="size-4 animate-spin" />
+            Discard
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
