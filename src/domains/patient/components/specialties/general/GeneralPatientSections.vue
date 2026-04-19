@@ -33,7 +33,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Textarea } from '@/components/ui/textarea'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
 import { consultationApi } from '@/domains/consultation/api/consultationApi'
 import type { Problem, ProblemStatus, CreateProblemPayload } from '@/domains/patient/types/patient.types'
@@ -219,11 +230,25 @@ async function resolveProblem(p: Problem) {
   }
 }
 
-async function deleteProblem(p: Problem) {
+// Delete-confirm targets — keep the full entity in state so the dialog
+// can render description / ICD / allergen for verification.
+const problemToDelete = ref<Problem | null>(null)
+const isDeletingProblem = ref(false)
+
+function requestDeleteProblem(p: Problem) {
+  problemToDelete.value = p
+}
+
+async function confirmDeleteProblem() {
+  if (!problemToDelete.value) return
+  isDeletingProblem.value = true
   try {
-    await pdStore.deleteProblem(p.uuid)
+    await pdStore.deleteProblem(problemToDelete.value.uuid)
+    problemToDelete.value = null
   } catch {
     toast.error('Failed to delete problem')
+  } finally {
+    isDeletingProblem.value = false
   }
 }
 
@@ -329,11 +354,30 @@ async function saveAllergy() {
   }
 }
 
-async function deleteAllergy(a: StructuredAllergy) {
+const allergyToDelete = ref<StructuredAllergy | null>(null)
+const isDeletingAllergy = ref(false)
+
+function requestDeleteAllergy(a: StructuredAllergy) {
+  allergyToDelete.value = a
+}
+
+/// Life-threatening (severe / anaphylaxis) allergies get a stronger
+/// warning message in the confirmation — deleting those is riskier.
+const isLifeThreateningAllergyTarget = computed(() =>
+  allergyToDelete.value?.severity === 'severe' ||
+  allergyToDelete.value?.severity === 'anaphylaxis',
+)
+
+async function confirmDeleteAllergy() {
+  if (!allergyToDelete.value) return
+  isDeletingAllergy.value = true
   try {
-    await pdStore.deleteAllergy(a.uuid)
+    await pdStore.deleteAllergy(allergyToDelete.value.uuid)
+    allergyToDelete.value = null
   } catch {
     toast.error('Failed to delete allergy')
+  } finally {
+    isDeletingAllergy.value = false
   }
 }
 
@@ -482,11 +526,11 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
               <!-- Onset date -->
               <div class="flex flex-col gap-1.5">
                 <Label class="text-xs">Onset Date</Label>
-                <Input
-                  :model-value="newProblem.onset_date ?? ''"
-                  type="date"
+                <MFDatePicker
+                  :model-value="newProblem.onset_date"
+                  disable-future
                   class="h-8 text-xs"
-                  @update:model-value="(v: string | number) => newProblem.onset_date = String(v) || null"
+                  @update:model-value="(v: string | null) => newProblem.onset_date = v"
                 />
               </div>
             </div>
@@ -556,7 +600,7 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
                     <SelectItem value="resolved">Resolved</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input :model-value="editForm.onset_date ?? ''" type="date" class="h-8 text-xs" @update:model-value="(v: string | number) => editForm.onset_date = String(v) || null" />
+                <MFDatePicker :model-value="editForm.onset_date" disable-future class="h-8 text-xs" @update:model-value="(v: string | null) => editForm.onset_date = v" />
               </div>
               <div class="flex gap-2 justify-end">
                 <Button variant="ghost" size="sm" class="h-7 text-xs" @click="cancelEdit">Cancel</Button>
@@ -612,7 +656,7 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
                   size="icon"
                   class="size-6"
                   title="Delete"
-                  @click="deleteProblem(p)"
+                  @click="requestDeleteProblem(p)"
                 >
                   <X class="size-3.5 text-muted-foreground" />
                 </Button>
@@ -720,7 +764,7 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
               <Button variant="ghost" size="icon" class="size-6" title="Edit" @click="openEditAllergy(a)">
                 <Pencil class="size-3.5 text-muted-foreground" />
               </Button>
-              <Button variant="ghost" size="icon" class="size-6" title="Delete" @click="deleteAllergy(a)">
+              <Button variant="ghost" size="icon" class="size-6" title="Delete" @click="requestDeleteAllergy(a)">
                 <Trash2 class="size-3.5 text-muted-foreground" />
               </Button>
             </div>
@@ -787,7 +831,7 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
           <!-- Identified date -->
           <div class="flex flex-col gap-1.5">
             <Label class="text-xs">Date Identified (optional)</Label>
-            <Input v-model="allergyForm.identified_date" type="date" class="h-8 text-sm" />
+            <MFDatePicker v-model="allergyForm.identified_date" disable-future class="h-8 text-sm" />
           </div>
           <!-- Notes -->
           <div class="flex flex-col gap-1.5">
@@ -804,5 +848,66 @@ const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => 
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Delete Problem confirmation -->
+    <AlertDialog
+      :open="problemToDelete !== null"
+      @update:open="(v) => { if (!v) problemToDelete = null }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete {{ problemToDelete?.description
+            }}<template v-if="problemToDelete?.icd_code"> ({{ problemToDelete.icd_code }})</template>?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the problem from the patient's record permanently.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isDeletingProblem">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-white hover:bg-destructive/90"
+            :disabled="isDeletingProblem"
+            @click="confirmDeleteProblem"
+          >
+            <LoaderCircle v-if="isDeletingProblem" class="size-3 animate-spin mr-1.5" />
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Delete Allergy confirmation -->
+    <AlertDialog
+      :open="allergyToDelete !== null"
+      @update:open="(v) => { if (!v) allergyToDelete = null }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete {{ allergyToDelete?.allergen
+            }}<template v-if="allergyToDelete"> · {{ typeLabel(allergyToDelete.type) }}</template>?
+          </AlertDialogTitle>
+          <AlertDialogDescription v-if="isLifeThreateningAllergyTarget">
+            This is a life-threatening allergy. Removing it hides the warning from future clinicians — confirm you want to delete it permanently.
+          </AlertDialogDescription>
+          <AlertDialogDescription v-else>
+            This removes the allergy from the patient's record permanently.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isDeletingAllergy">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-white hover:bg-destructive/90"
+            :disabled="isDeletingAllergy"
+            @click="confirmDeleteAllergy"
+          >
+            <LoaderCircle v-if="isDeletingAllergy" class="size-3 animate-spin mr-1.5" />
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>

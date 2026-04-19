@@ -23,7 +23,9 @@ import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { Button } from '@/components/ui/button'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
+import ChronicTrendsDialog from '@/domains/patient/components/ChronicTrendsDialog.vue'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +44,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
@@ -142,6 +154,7 @@ const familyForm = reactive<{
   relative: string
   conditions: FamilyFormCondition[]
   alive: boolean
+  current_age: number | null
   age_at_death: number | null
   cause_of_death: string
   notes: string
@@ -149,6 +162,7 @@ const familyForm = reactive<{
   relative: '',
   conditions: [],
   alive: true,
+  current_age: null,
   age_at_death: null,
   cause_of_death: '',
   notes: '',
@@ -158,6 +172,7 @@ function resetFamilyForm() {
   familyForm.relative = ''
   familyForm.conditions = []
   familyForm.alive = true
+  familyForm.current_age = null
   familyForm.age_at_death = null
   familyForm.cause_of_death = ''
   familyForm.notes = ''
@@ -179,6 +194,7 @@ function openEditRelative(entry: FamilyHistoryEntry) {
     age_of_onset: c.age_of_onset,
   }))
   familyForm.alive = entry.alive
+  familyForm.current_age = entry.current_age ?? null
   familyForm.age_at_death = entry.age_at_death
   familyForm.cause_of_death = entry.cause_of_death ?? ''
   familyForm.notes = entry.notes ?? ''
@@ -192,6 +208,28 @@ function addConditionRow() {
 function removeConditionRow(index: number) {
   familyForm.conditions.splice(index, 1)
 }
+
+// Upper bound for condition onset age — current_age while alive, age_at_death
+// otherwise. Used to surface inline validation before the backend rejects.
+const familyOnsetCeiling = computed<number | null>(() =>
+  familyForm.alive ? familyForm.current_age : familyForm.age_at_death,
+)
+const familyOnsetCeilingLabel = computed(() =>
+  familyForm.alive ? 'current age' : 'age at death',
+)
+
+function conditionOnsetError(cond: FamilyFormCondition): string | null {
+  const ceiling = familyOnsetCeiling.value
+  if (ceiling == null || cond.age_of_onset == null) return null
+  if (cond.age_of_onset > ceiling) {
+    return `Onset age ${cond.age_of_onset} exceeds ${familyOnsetCeilingLabel.value} (${ceiling}).`
+  }
+  return null
+}
+
+const familyFormHasErrors = computed(() =>
+  familyForm.conditions.some((c) => conditionOnsetError(c) !== null),
+)
 
 async function saveFamilyHistory() {
   if (!familyForm.relative) return
@@ -207,6 +245,7 @@ async function saveFamilyHistory() {
           age_of_onset: c.age_of_onset,
         })),
       alive: familyForm.alive,
+      current_age: familyForm.alive ? familyForm.current_age : null,
       age_at_death: familyForm.alive ? null : familyForm.age_at_death,
       cause_of_death: familyForm.alive ? null : (familyForm.cause_of_death.trim() || null),
       notes: familyForm.notes.trim() || null,
@@ -225,8 +264,25 @@ async function saveFamilyHistory() {
   }
 }
 
-async function deleteFamilyEntry(uuid: string) {
-  await pdStore.deleteFamilyHistory(uuid)
+// Delete confirmation for family-history entries. The full entry object
+// (not just the uuid) lives in state so the dialog can show the relative's
+// label and condition summary to verify what's being removed.
+const familyEntryToDelete = ref<FamilyHistoryEntry | null>(null)
+const isDeletingFamilyEntry = ref(false)
+
+function requestDeleteFamilyEntry(entry: FamilyHistoryEntry) {
+  familyEntryToDelete.value = entry
+}
+
+async function confirmDeleteFamilyEntry() {
+  if (!familyEntryToDelete.value) return
+  isDeletingFamilyEntry.value = true
+  try {
+    await pdStore.deleteFamilyHistory(familyEntryToDelete.value.uuid)
+    familyEntryToDelete.value = null
+  } finally {
+    isDeletingFamilyEntry.value = false
+  }
 }
 
 // ── Medications ───────────────────────────────────────────────────────────
@@ -331,8 +387,31 @@ async function confirmDiscontinue() {
   }
 }
 
-async function deleteMedication(uuid: string) {
-  await pdStore.deleteMedication(uuid)
+// Delete confirmation for medications. Shows drug + dose in the dialog so
+// the doctor can verify before permanently removing the record. For meds
+// that are still active, the dialog also nudges toward Discontinue.
+interface MedForDelete {
+  uuid: string
+  drug_name: string
+  dose: string | null
+  status: 'active' | 'on_hold' | 'discontinued'
+}
+const medToDelete = ref<MedForDelete | null>(null)
+const isDeletingMedication = ref(false)
+
+function requestDeleteMedication(med: MedForDelete) {
+  medToDelete.value = med
+}
+
+async function confirmDeleteMedication() {
+  if (!medToDelete.value) return
+  isDeletingMedication.value = true
+  try {
+    await pdStore.deleteMedication(medToDelete.value.uuid)
+    medToDelete.value = null
+  } finally {
+    isDeletingMedication.value = false
+  }
 }
 
 // ── Preventive Care ───────────────────────────────────────────────────────
@@ -821,7 +900,7 @@ onMounted(async () => {
               <Button variant="ghost" size="icon" class="size-6" title="Discontinue" @click="openDiscontinue(med)">
                 <XCircle class="size-3.5 text-muted-foreground" />
               </Button>
-              <Button variant="ghost" size="icon" class="size-6" title="Delete" @click="deleteMedication(med.uuid)">
+              <Button variant="ghost" size="icon" class="size-6" title="Delete" @click="requestDeleteMedication(med)">
                 <Trash2 class="size-3.5 text-muted-foreground" />
               </Button>
             </div>
@@ -849,7 +928,7 @@ onMounted(async () => {
                       Since {{ formatDate(med.started_date) }}
                     </span>
                   </div>
-                  <Button variant="ghost" size="icon" class="size-6 shrink-0" title="Delete" @click="deleteMedication(med.uuid)">
+                  <Button variant="ghost" size="icon" class="size-6 shrink-0" title="Delete" @click="requestDeleteMedication(med)">
                     <Trash2 class="size-3.5 text-muted-foreground" />
                   </Button>
                 </div>
@@ -1085,7 +1164,7 @@ onMounted(async () => {
                 <span class="text-sm font-semibold">{{ relativeLabels[entry.relative] ?? entry.relative }}</span>
                 <span v-if="entry.alive" class="inline-flex items-center gap-1 text-xs text-green-600">
                   <span class="inline-block size-1.5 rounded-full bg-green-500" />
-                  Alive
+                  Alive<template v-if="entry.current_age != null">, age {{ entry.current_age }}</template>
                 </span>
                 <span v-else class="text-xs text-muted-foreground">
                   Deceased
@@ -1119,7 +1198,7 @@ onMounted(async () => {
                 size="icon"
                 class="size-6"
                 title="Delete"
-                @click="deleteFamilyEntry(entry.uuid)"
+                @click="requestDeleteFamilyEntry(entry)"
               >
                 <Trash2 class="size-3.5 text-muted-foreground" />
               </Button>
@@ -1228,65 +1307,8 @@ onMounted(async () => {
       </DialogContent>
     </Dialog>
 
-    <!-- Patient Trends Modal -->
-    <Dialog v-model:open="showTrendsModal">
-      <DialogContent class="flex sm:max-w-5xl min-h-[40vh] max-h-[85vh] flex-col overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <TrendingUp class="size-5" />
-            Patient Trends
-          </DialogTitle>
-        </DialogHeader>
-
-        <div class="flex flex-1 flex-col gap-4">
-          <!-- Loading -->
-          <div v-if="pdStore.isLoadingFM" class="flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle class="size-3.5 animate-spin" />
-            Loading...
-          </div>
-
-          <!-- Empty -->
-          <div v-else-if="!trendsData || (!trendsData.bp?.length && !trendsData.blood_sugar?.length && !trendsData.weight?.length && !trendsData.bmi?.length)" class="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
-            <TrendingUp class="size-10 text-muted-foreground/30" />
-            <p class="text-sm font-medium text-muted-foreground">No trend data available</p>
-            <p class="max-w-sm text-xs text-muted-foreground/70">Trends are generated from finalized consultations. BP, blood sugar, weight, and BMI are tracked over time.</p>
-          </div>
-
-          <!-- Chart -->
-          <template v-else>
-            <!-- Tab buttons -->
-            <div class="flex gap-1 rounded-lg border bg-muted/40 p-1">
-              <button
-                v-for="tab in trendTabs"
-                :key="tab.key"
-                type="button"
-                class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
-                :class="activeTrendTab === tab.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                @click="activeTrendTab = tab.key"
-              >
-                {{ tab.label }}
-              </button>
-            </div>
-
-            <!-- Chart -->
-            <VChart
-              :option="trendsChartOption"
-              autoresize
-              style="height: 350px; width: 100%;"
-            />
-
-            <!-- Latest reading -->
-            <div v-if="activeTrendTab === 'bp' && trendsData.bp?.length" class="flex items-center gap-2 text-sm">
-              <span class="text-muted-foreground">Latest:</span>
-              <span class="font-semibold">{{ trendsData.bp[trendsData.bp.length - 1]?.systolic }}/{{ trendsData.bp[trendsData.bp.length - 1]?.diastolic }} mmHg</span>
-              <span v-if="trendsData.bp[trendsData.bp.length - 1]?.classification" class="text-xs" :style="{ color: classificationColor(trendsData.bp[trendsData.bp.length - 1]!.classification!) }">
-                {{ trendsData.bp[trendsData.bp.length - 1]?.classification }}
-              </span>
-            </div>
-          </template>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <!-- Patient Trends Modal (shared) -->
+    <ChronicTrendsDialog v-model:open="showTrendsModal" />
 
     <!-- Family History Dialog -->
     <Dialog v-model:open="showFamilyHistoryDialog">
@@ -1357,11 +1379,20 @@ onMounted(async () => {
                     type="number"
                     min="0"
                     placeholder="Age"
-                    class="h-7 text-xs"
+                    :class="[
+                      'h-7 text-xs',
+                      conditionOnsetError(cond) ? 'border-red-500 focus-visible:ring-red-500' : '',
+                    ]"
                     @update:model-value="(v) => cond.age_of_onset = v ? Number(v) : null"
                   />
                 </div>
               </div>
+              <p
+                v-if="conditionOnsetError(cond)"
+                class="mt-1 text-[10px] text-red-600"
+              >
+                {{ conditionOnsetError(cond) }}
+              </p>
             </div>
             <Button
               variant="outline"
@@ -1379,6 +1410,25 @@ onMounted(async () => {
             <Label class="text-xs">Alive</Label>
             <Switch v-model:checked="familyForm.alive" />
           </div>
+
+          <!-- Living: current age -->
+          <template v-if="familyForm.alive">
+            <div class="flex flex-col gap-1.5">
+              <Label class="text-xs">Current Age</Label>
+              <Input
+                :model-value="familyForm.current_age ?? undefined"
+                type="number"
+                min="0"
+                max="120"
+                placeholder="e.g. 72"
+                class="h-8 text-sm"
+                @update:model-value="(v) => familyForm.current_age = v ? Number(v) : null"
+              />
+              <p class="text-[10px] text-muted-foreground">
+                Helps gauge the clinical relevance of the relative's conditions.
+              </p>
+            </div>
+          </template>
 
           <!-- Deceased fields -->
           <template v-if="!familyForm.alive">
@@ -1422,7 +1472,7 @@ onMounted(async () => {
           </Button>
           <Button
             size="sm"
-            :disabled="isSavingFamilyHistory || !familyForm.relative"
+            :disabled="isSavingFamilyHistory || !familyForm.relative || familyFormHasErrors"
             @click="saveFamilyHistory"
           >
             <LoaderCircle v-if="isSavingFamilyHistory" class="size-3 animate-spin mr-1" />
@@ -1505,7 +1555,7 @@ onMounted(async () => {
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1.5">
               <Label class="text-xs">Start Date</Label>
-              <Input v-model="medForm.started_date" type="date" class="h-8 text-sm" />
+              <MFDatePicker v-model="medForm.started_date" disable-future class="h-8 text-sm" />
             </div>
             <div class="flex flex-col gap-1.5">
               <Label class="text-xs">Status</Label>
@@ -1590,9 +1640,9 @@ onMounted(async () => {
           <!-- Date performed (completed only) -->
           <div v-if="screeningForm.status === 'completed'" class="flex flex-col gap-1.5">
             <Label class="text-xs">Date Performed</Label>
-            <Input
+            <MFDatePicker
               v-model="screeningForm.lastDoneDate"
-              type="date"
+              disable-future
               class="h-9 text-sm"
             />
           </div>
@@ -1627,6 +1677,67 @@ onMounted(async () => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Delete Medication confirmation -->
+    <AlertDialog
+      :open="medToDelete !== null"
+      @update:open="(v) => { if (!v) medToDelete = null }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete {{ medToDelete?.drug_name
+            }}<template v-if="medToDelete?.dose"> ({{ medToDelete.dose }})</template>?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the medication record permanently. To preserve history, Discontinue instead.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isDeletingMedication">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-white hover:bg-destructive/90"
+            :disabled="isDeletingMedication"
+            @click="confirmDeleteMedication"
+          >
+            <LoaderCircle v-if="isDeletingMedication" class="size-3 animate-spin mr-1.5" />
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Delete Family History entry confirmation -->
+    <AlertDialog
+      :open="familyEntryToDelete !== null"
+      @update:open="(v) => { if (!v) familyEntryToDelete = null }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete {{ familyEntryToDelete ? (relativeLabels[familyEntryToDelete.relative] ?? familyEntryToDelete.relative) : '' }}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the family history record
+            <template v-if="familyEntryToDelete?.conditions.length">
+              and its {{ familyEntryToDelete.conditions.length }} condition{{ familyEntryToDelete.conditions.length === 1 ? '' : 's' }}
+            </template>
+            permanently. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isDeletingFamilyEntry">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-white hover:bg-destructive/90"
+            :disabled="isDeletingFamilyEntry"
+            @click="confirmDeleteFamilyEntry"
+          >
+            <LoaderCircle v-if="isDeletingFamilyEntry" class="size-3 animate-spin mr-1.5" />
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
   </div>
 </template>

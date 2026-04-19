@@ -27,6 +27,8 @@ export interface FamilyHistoryEntry {
   relative: string
   conditions: FamilyHistoryCondition[]
   alive: boolean
+  /** Current age of the relative — only populated while `alive` is true. */
+  current_age: number | null
   age_at_death: number | null
   cause_of_death: string | null
   notes: string | null
@@ -36,6 +38,7 @@ export interface StoreFamilyHistoryPayload {
   relative: string
   conditions: FamilyHistoryCondition[]
   alive: boolean
+  current_age?: number | null
   age_at_death?: number | null
   cause_of_death?: string | null
   notes?: string | null
