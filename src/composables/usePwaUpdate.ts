@@ -31,7 +31,18 @@ export async function registerPwa(): Promise<void> {
 
   if (!import.meta.env.PROD) return
 
-  const { registerSW } = await import('virtual:pwa-register')
+  // Build the module specifier from a variable so Vite's import-analysis
+  // can't resolve it at dev time — the `virtual:pwa-register` module is
+  // only emitted by vite-plugin-pwa during real builds (or when
+  // devOptions.enabled is true, which we keep off to avoid HMR caching).
+  const mod = 'virtual:pwa-register'
+  const { registerSW } = (await import(/* @vite-ignore */ mod)) as {
+    registerSW: (opts: {
+      immediate?: boolean
+      onNeedRefresh?: () => void
+      onOfflineReady?: () => void
+    }) => (reloadPage?: boolean) => Promise<void>
+  }
 
   updateSW = registerSW({
     immediate: true,
