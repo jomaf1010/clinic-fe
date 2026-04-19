@@ -95,7 +95,8 @@ async function fetchPatients() {
     const response = await patientApi.list(currentPage.value, 10, filters.value)
     patients.value = response.data
     pagination.value = response.meta.pagination
-  } catch {
+  } catch (err) {
+    console.error('[PatientListView] fetchPatients failed:', err)
     error.value = 'Failed to load patients. Please try again.'
   } finally {
     isLoading.value = false
