@@ -82,7 +82,13 @@ export default defineConfig({
         ],
       },
       devOptions: {
-        enabled: false,
+        // Keep the virtual:pwa-register module resolvable during dev so
+        // static imports compile everywhere. The `PROD` guard in
+        // registerPwa() keeps us from ever actually activating a
+        // service worker against the HMR server — no cached stale code.
+        enabled: true,
+        type: 'module',
+        navigateFallback: 'index.html',
       },
     }),
   ],

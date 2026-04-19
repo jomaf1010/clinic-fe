@@ -13,5 +13,5 @@ app.use(router)
 app.mount('#app')
 
 // Register the service worker after mount so the first paint isn't
-// blocked on Workbox initialization. Returns void in dev (no-op).
-void registerPwa()
+// blocked on Workbox initialization. No-op in dev via a PROD guard.
+registerPwa()
