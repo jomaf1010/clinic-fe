@@ -1,14 +1,19 @@
 import { ref } from 'vue'
-import { registerSW } from 'virtual:pwa-register'
 import { toast } from 'vue-sonner'
 
 /**
  * Service-worker registration for MediFlow.
  *
- * `registerPwa()` is called once at app boot from `main.ts` — it registers
- * the Workbox service worker and wires a toast-based "update available"
- * prompt. Clinical workflows shouldn't be interrupted by silent reloads,
- * so updates are explicit: user sees a toast, clicks "Reload".
+ * `registerPwa()` is called once at app boot from `main.ts`. In production
+ * builds it registers the Workbox service worker and wires a toast-based
+ * "update available" prompt — clinical workflows shouldn't be interrupted
+ * by silent reloads, so updates are explicit: user sees a toast, clicks
+ * "Reload".
+ *
+ * In dev the service worker stays off so HMR isn't cached. The import of
+ * `virtual:pwa-register` is lazy + guarded by `import.meta.env.PROD` because
+ * the virtual module is only emitted by vite-plugin-pwa when producing a
+ * real build (or when `devOptions.enabled` is flipped on).
  *
  * `usePwaUpdate()` is a Vue composable that exposes the same reactive
  * refs for components that want to render their own UI (e.g. a banner
@@ -20,9 +25,13 @@ const offlineReady = ref(false)
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null
 let registered = false
 
-export function registerPwa(): void {
+export async function registerPwa(): Promise<void> {
   if (registered) return
   registered = true
+
+  if (!import.meta.env.PROD) return
+
+  const { registerSW } = await import('virtual:pwa-register')
 
   updateSW = registerSW({
     immediate: true,
