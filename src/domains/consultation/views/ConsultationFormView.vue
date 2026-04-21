@@ -674,7 +674,7 @@ function proceedAfterFeeWarning() {
             <TriageTab
               :triage="store.current.consultation?.triage"
               :patient-id="store.current.patient_id"
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :disabled="store.isFinalized || !canEditTriage"
               :lab-order-update="labOrderUpdate"
               @save="handleSave"
@@ -695,7 +695,8 @@ function proceedAfterFeeWarning() {
               <VitalsSummary
                 :triage="store.current.consultation?.triage"
                 :patient-id="store.current.patient_id"
-                :consultation-id="store.current.id"
+                :encounter-id="store.current.id"
+                :specialty="store.current.specialty"
                 :lab-order-summary="store.current.lab_order_summary"
                 :show-trends-button="canShowTrends"
                 hide-vitals-panel
@@ -724,7 +725,7 @@ function proceedAfterFeeWarning() {
           <TabsContent value="treatment-plan" class="mt-0 px-0 md:px-8">
             <TreatmentPlanTab
               :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null }"
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :patient-id="store.current.patient_id"
               :doctor-id="store.current.doctor_id"
               :consumables="store.current.consumables ?? []"
@@ -767,7 +768,7 @@ function proceedAfterFeeWarning() {
           <TabsContent value="payment" class="mt-0 px-0 md:px-8">
             <PaymentTab
               :disabled="store.isFinalized"
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :status="store.current.status"
               :consultation-type="store.current.type"
               :patient-id="store.current.patient_id"

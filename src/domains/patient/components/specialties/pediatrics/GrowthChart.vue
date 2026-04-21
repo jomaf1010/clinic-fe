@@ -139,21 +139,29 @@ function computeYRange(
   p3: Array<[number, number]>,
   p97: Array<[number, number]>,
   patientPts: PatientPoint[],
+  xMax: number,
 ): { min: number; max: number } {
   let lo = Infinity
   let hi = -Infinity
 
-  for (const [, v] of p3) { if (v < lo) lo = v }
-  for (const [, v] of p97) { if (v > hi) hi = v }
+  // Only consider curve points inside the visible age window. Otherwise
+  // Y is scaled for age 60's p97 even when we're showing 0-13 months,
+  // which compresses the patient line into a thin strip at the bottom.
+  for (const [age, v] of p3) {
+    if (age <= xMax && v < lo) lo = v
+  }
+  for (const [age, v] of p97) {
+    if (age <= xMax && v > hi) hi = v
+  }
   for (const pt of patientPts) {
     if (pt.value < lo) lo = pt.value
     if (pt.value > hi) hi = pt.value
   }
 
-  // Add 5% padding on each side and round to nice numbers
-  const padding = (hi - lo) * 0.05
+  // 10% padding top + bottom keeps the plot from hugging the axes.
+  const padding = Math.max((hi - lo) * 0.1, 1)
   return {
-    min: Math.floor(lo - padding),
+    min: Math.max(0, Math.floor(lo - padding)),
     max: Math.ceil(hi + padding),
   }
 }
@@ -173,7 +181,20 @@ const option = computed(() => {
   const innerBand = bandData(p15, p85)
 
   const patientLineData = patientSeries.value.map((pt) => [pt.age, pt.value])
-  const yRange = computeYRange(p3, p97, patientSeries.value)
+
+  // X-axis: scale to latest visit + 2-month headroom so the chart stays
+  // readable for very young infants (1-year-old wouldn't want 0–60 axis).
+  // Capped at 60 since WHO curves end there; floored at 12 so the axis
+  // doesn't feel cramped on the first couple of visits.
+  const latestAge = patientSeries.value.length > 0
+    ? Math.max(...patientSeries.value.map((p) => p.age))
+    : 60
+  const xMax = Math.min(60, Math.max(12, latestAge + 2))
+  const xInterval = xMax <= 12 ? 1 : xMax <= 24 ? 3 : xMax <= 36 ? 6 : 12
+
+  // Y range is computed against the visible X window so the patient line
+  // doesn't get squashed by p97 values at month 60.
+  const yRange = computeYRange(p3, p97, patientSeries.value, xMax)
 
   return {
     animation: true,
@@ -215,8 +236,8 @@ const option = computed(() => {
       nameLocation: 'middle' as const,
       nameGap: 28,
       min: 0,
-      max: 60,
-      interval: 12,
+      max: xMax,
+      interval: xInterval,
       axisLabel: { fontSize: 11 },
       nameTextStyle: { fontSize: 11, color: 'hsl(var(--muted-foreground))' },
       axisLine: { lineStyle: { color: 'hsl(var(--border))' } },

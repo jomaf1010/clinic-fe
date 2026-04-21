@@ -13,23 +13,31 @@ import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import { labOrderApi } from '../api/labOrderApi'
 import FinalizeModal from './FinalizeModal.vue'
 import ChronicTrendsDialog from '@/domains/patient/components/ChronicTrendsDialog.vue'
+import GrowthChartDialog from '@/domains/patient/components/specialties/pediatrics/GrowthChartDialog.vue'
 
 interface PastDiagnosis {
   description: string
   code: string | null
   date: string
-  consultationId: string
+  encounterId: string
 }
 
 const props = defineProps<{
   triage: ConsultationTriage
   patientId?: string
-  consultationId?: string
+  encounterId?: string
   showTrendsButton?: boolean
   labOrderSummary?: LabOrderSummary | null
   /** Hide the vitals badges + past diagnoses panel — only render the lab + trends footer row. */
   hideVitalsPanel?: boolean
+  /** Encounter specialty — swaps the Trends dialog for a specialty-appropriate chart. */
+  specialty?: string | null
 }>()
+
+// Pediatrics uses a Growth Chart (WHO percentiles) instead of the
+// chronic-trends dialog (BP / BS / weight / BMI), which is meant for
+// adult internal / family medicine.
+const isPediatrics = computed(() => props.specialty === 'pediatrics')
 
 const vitalsConfig = useVitalsConfigStore()
 
@@ -48,14 +56,14 @@ const labPreviewIndex = ref(0)
 const isLoadingLabPreview = ref(false)
 
 async function viewLabResult(description: string) {
-  if (!props.consultationId) return
+  if (!props.encounterId) return
   isLoadingLabPreview.value = true
   labPreviewTitle.value = description
   labPreviewIndex.value = 0
   labPreviewOpen.value = true
 
   try {
-    const res = await labOrderApi.getForEncounter(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.encounterId)
     const item = res.data?.items.find((i) => i.description === description && i.status === 'completed')
     if (!item?.result_files.length) {
       labPreviewOpen.value = false
@@ -110,7 +118,7 @@ async function fetchPastDiagnoses() {
     const diagnoses: PastDiagnosis[] = []
     let count = 0
     for (const c of res.data) {
-      if (c.id === props.consultationId) continue
+      if (c.id === props.encounterId) continue
       if (c.status !== 'finalized') continue
       if (count >= 2) break
       for (const d of c.assessment?.diagnoses ?? []) {
@@ -118,7 +126,7 @@ async function fetchPastDiagnoses() {
           description: d.description,
           code: d.code,
           date: c.finalized_at ?? c.created_at,
-          consultationId: c.id,
+          encounterId: c.id,
         })
       }
       count++
@@ -129,11 +137,11 @@ async function fetchPastDiagnoses() {
   }
 }
 
-async function openConsultationPreview(consultationId: string) {
+async function openConsultationPreview(encounterId: string) {
   isLoadingPreview.value = true
   showPreview.value = true
   try {
-    const res = await http.get<{ data: ConsultationResponse }>(`/consultations/${consultationId}`)
+    const res = await http.get<{ data: ConsultationResponse }>(`/consultations/${encounterId}`)
     previewConsultation.value = res.data
   } catch {
     showPreview.value = false
@@ -151,9 +159,9 @@ onMounted(() => {
 const labItemThumbnails = ref<Record<string, string>>({})
 
 async function loadLabThumbnails() {
-  if (!props.consultationId || !props.labOrderSummary?.completed_items?.length) return
+  if (!props.encounterId || !props.labOrderSummary?.completed_items?.length) return
   try {
-    const res = await labOrderApi.getForEncounter(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.encounterId)
     const token = getAuthToken()
     const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
 
@@ -389,7 +397,7 @@ const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value |
           <button
             type="button"
             class="text-left transition-colors hover:text-foreground"
-            @click="openConsultationPreview(dx.consultationId)"
+            @click="openConsultationPreview(dx.encounterId)"
           >
             {{ dx.description }}<span v-if="dx.code" class="ml-0.5 opacity-60">({{ dx.code }})</span>
             <span class="ml-1 opacity-50">{{ formatShortDate(dx.date) }}</span>
@@ -454,8 +462,10 @@ const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value |
       </Tooltip>
     </div>
 
-    <!-- Trends Dialog (shared with patient profile) -->
-    <ChronicTrendsDialog v-model:open="showTrends" />
+    <!-- Trends Dialog — specialty-aware. Pediatrics gets the Growth Chart
+         (WHO percentiles); everyone else gets ChronicTrends (BP / BS / weight / BMI). -->
+    <GrowthChartDialog v-if="isPediatrics" v-model:open="showTrends" />
+    <ChronicTrendsDialog v-else v-model:open="showTrends" />
 
     <!-- Lab Result Preview Modal -->
     <Dialog :open="labPreviewOpen" @update:open="onLabPreviewClose">
