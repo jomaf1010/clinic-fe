@@ -7,13 +7,13 @@ import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 const props = defineProps<{
   current: ConsultationTriage
   previous: ConsultationTriage
-  consultationId: string
+  encounterId: string
 }>()
 
 const vitalsConfig = useVitalsConfigStore()
 
 const narrative = computed(() =>
-  buildVitalsNarrative(props.consultationId, props.current, props.previous, vitalsConfig.config),
+  buildVitalsNarrative(props.encounterId, props.current, props.previous, vitalsConfig.config),
 )
 </script>
 

@@ -2310,7 +2310,7 @@ function goToTab(direction: 'prev' | 'next'): void {
           <div class="flex flex-col gap-4">
             <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prescriptions</h3>
             <PrescriptionSection
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :disabled="store.isFinalized || !canEditPlan || !authStore.hasPermission('prescriptions.create')"
               :realtime-update="prescriptionUpdate"
               :document-update="documentUpdate"
@@ -2356,7 +2356,7 @@ function goToTab(direction: 'prev' | 'next'): void {
               </div>
             </div>
             <LabOrderSection
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :disabled="store.isFinalized || !canEditPlan || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
               :realtime-update="labOrderUpdate"
               :document-update="documentUpdate"
@@ -2368,7 +2368,7 @@ function goToTab(direction: 'prev' | 'next'): void {
           <div class="flex flex-col gap-4">
             <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Consumables</h3>
             <ConsumableSection
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :consumables="store.current.consumables ?? []"
               :disabled="store.isFinalized || !canEditPlan"
               @update="(c) => { if (store.current) store.current.consumables = c }"
@@ -2624,7 +2624,7 @@ function goToTab(direction: 'prev' | 'next'): void {
         <TabsContent value="billing" class="mt-0 flex flex-col gap-5 px-0 md:px-8">
           <PaymentTab
             :disabled="store.isFinalized"
-            :consultation-id="store.current.id"
+            :encounter-id="store.current.id"
             :status="store.current.status"
             :consultation-type="'default'"
             :patient-id="store.current.patient_id"

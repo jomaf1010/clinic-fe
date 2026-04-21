@@ -39,7 +39,7 @@ import { openNewTab, printPdf } from '@/lib/utils'
 import LabRequestDialog from './LabRequestDialog.vue'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   disabled: boolean
   realtimeUpdate?: LabOrderResponse | null
   documentUpdate?: GeneratedDocumentResponse | null
@@ -96,7 +96,7 @@ let activeRow: { description: string; instruction: string } | null = null
 // --- Cache helper ---
 async function cacheCurrentLabOrder() {
   if (labOrder.value) {
-    await cacheLabOrder(props.consultationId, labOrder.value as unknown as Record<string, unknown>)
+    await cacheLabOrder(props.encounterId, labOrder.value as unknown as Record<string, unknown>)
   }
 }
 
@@ -104,12 +104,12 @@ async function cacheCurrentLabOrder() {
 async function loadLabOrder() {
   isLoading.value = true
   try {
-    const res = await labOrderApi.getForEncounter(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.encounterId)
     labOrder.value = res.data ?? null
     if (res.data) await cacheCurrentLabOrder()
   } catch {
     // Offline fallback
-    const cached = await getCachedLabOrder(props.consultationId)
+    const cached = await getCachedLabOrder(props.encounterId)
     if (cached) {
       labOrder.value = cached as unknown as LabOrderResponse
       toast.info('Lab orders loaded from offline cache')
@@ -255,7 +255,7 @@ async function handleCreate() {
 
   isCreating.value = true
   try {
-    const res = await labOrderApi.create(props.consultationId, validItems)
+    const res = await labOrderApi.create(props.encounterId, validItems)
     labOrder.value = res.data
     await cacheCurrentLabOrder()
     showCreateForm.value = false
@@ -501,7 +501,7 @@ const labRequestReady = computed(() => labRequestDoc.value?.status === 'complete
 
 async function loadLabRequestDoc() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     labRequestDoc.value = res.data.find((d) => d.type === 'lab-request') ?? null
   } catch {
     // ignore
@@ -1071,7 +1071,7 @@ function cancelAddForm() {
     <LabRequestDialog
       v-if="labOrder && labOrder.items.some(i => i.status === 'pending')"
       :open="showLabRequestDialog"
-      :consultation-id="consultationId"
+      :encounter-id="encounterId"
       :document-update="documentUpdate"
       @update:open="showLabRequestDialog = $event"
       @generated="labRequestDoc = $event"

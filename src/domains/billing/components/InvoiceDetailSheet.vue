@@ -133,23 +133,23 @@ async function saveItemQty(itemId: string) {
   }
 }
 
-async function silentRegenerate(consultationId: string) {
+async function silentRegenerate(encounterId: string) {
   try {
-    await documentApi.generate(consultationId, 'prescription')
+    await documentApi.generate(encounterId, 'prescription')
     toast.success('Prescription PDF regenerated')
   } catch {
     toast.error('Failed to regenerate prescription PDF')
   }
 }
 
-function promptRegenerate(consultationId: string) {
+function promptRegenerate(encounterId: string) {
   toast('Prescription quantities changed', {
     description: 'Would you like to regenerate the prescription PDF?',
     action: {
       label: 'Regenerate',
       onClick: async () => {
         try {
-          await documentApi.generate(consultationId, 'prescription')
+          await documentApi.generate(encounterId, 'prescription')
           toast.success('Prescription PDF is being regenerated')
         } catch {
           toast.error('Failed to regenerate prescription PDF')

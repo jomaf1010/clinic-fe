@@ -14,7 +14,7 @@ defineOptions({ inheritAttrs: false })
 defineProps<{
   triage: ConsultationTriage
   patientId: string
-  consultationId: string
+  encounterId: string
   disabled: boolean
   labOrderUpdate?: LabOrderResponse | null
 }>()

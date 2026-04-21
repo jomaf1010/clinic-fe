@@ -1178,7 +1178,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
             <div class="flex flex-col gap-4">
               <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prescription</h3>
               <PrescriptionSection
-                :consultation-id="store.current.id"
+                :encounter-id="store.current.id"
                 :disabled="store.isFinalized"
                 :realtime-update="prescriptionUpdate"
                 :document-update="documentUpdate"
@@ -1200,7 +1200,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
             <div class="flex flex-col gap-4">
               <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
               <LabOrderSection
-                :consultation-id="store.current.id"
+                :encounter-id="store.current.id"
                 :disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
                 :realtime-update="labOrderUpdate"
                 :document-update="documentUpdate"
@@ -1531,7 +1531,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
           <TabsContent value="billing" class="mt-0 flex flex-col gap-5 px-0 md:px-8">
             <PaymentTab
               :disabled="store.isFinalized"
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :status="store.current.status"
               consultation-type="default"
               :patient-id="store.current.patient_id"

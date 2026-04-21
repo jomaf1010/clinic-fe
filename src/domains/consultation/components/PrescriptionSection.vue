@@ -50,7 +50,7 @@ import { FREQUENCIES, FREQUENCY_DOSES_PER_DAY, ROUTES } from '@/domains/medicine
 import type { MedicineSearchResult } from '@/domains/medicine/types/medicine.types'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   disabled: boolean
   realtimeUpdate?: PrescriptionResponse | null
   documentUpdate?: GeneratedDocumentResponse | null
@@ -78,7 +78,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function loadDocuments() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     pdfDoc.value = res.data.find((d) => d.type === 'prescription') ?? null
   } catch {
     // ignore
@@ -88,7 +88,7 @@ async function loadDocuments() {
 async function generatePdf() {
   isGeneratingPdf.value = true
   try {
-    const res = await documentApi.generate(props.consultationId, 'prescription')
+    const res = await documentApi.generate(props.encounterId, 'prescription')
     pdfDoc.value = res.data
     startPolling()
   } catch (err: unknown) {
@@ -345,7 +345,7 @@ function parseDuration(duration: string): { value: string; unit: string } {
 async function loadPrescription() {
   isLoading.value = true
   try {
-    const res = await prescriptionApi.getForEncounter(props.consultationId)
+    const res = await prescriptionApi.getForEncounter(props.encounterId)
     prescription.value = res.data ?? null
   } catch {
     // silent
@@ -472,7 +472,7 @@ async function doCreate() {
 
   isSaving.value = true
   try {
-    const res = await prescriptionApi.create(props.consultationId, validItems)
+    const res = await prescriptionApi.create(props.encounterId, validItems)
     prescription.value = res.data
     closeModal()
     toast.success('Prescription created')

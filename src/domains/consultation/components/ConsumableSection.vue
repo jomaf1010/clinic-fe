@@ -27,7 +27,7 @@ import type { ClinicConsumable } from '@/domains/consumable/types/consumable.typ
 import type { ConsultationConsumable } from '../types/consultation.types'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   consumables: ConsultationConsumable[]
   disabled: boolean
 }>()
@@ -116,7 +116,7 @@ async function handleSave() {
 
   isSaving.value = true
   try {
-    const res = await encounterApi.saveConsumables(props.consultationId, consumables)
+    const res = await encounterApi.saveConsumables(props.encounterId, consumables)
     emit('update', res.data.consumables)
     closeModal()
     toast.success('Consumables saved')
@@ -130,7 +130,7 @@ async function handleSave() {
 async function removeConsumable(consumableId: string) {
   const updated = props.consumables.filter((c) => c.consumable_id !== consumableId)
   try {
-    const res = await encounterApi.saveConsumables(props.consultationId, updated)
+    const res = await encounterApi.saveConsumables(props.encounterId, updated)
     emit('update', res.data.consumables)
     toast.success('Consumable removed')
   } catch {

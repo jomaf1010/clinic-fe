@@ -27,7 +27,7 @@ import ProcedureSection from '@/domains/service/components/ProcedureSection.vue'
 
 const props = defineProps<{
   treatmentPlan: ConsultationTreatmentPlan
-  consultationId: string
+  encounterId: string
   patientId: string
   doctorId: string
   consumables: ConsultationConsumable[]
@@ -222,14 +222,14 @@ function applyPreset(days: number): void {
     <!-- Prescription -->
     <div class="flex flex-col gap-4">
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prescription</h3>
-      <PrescriptionSection :consultation-id="consultationId" :disabled="disabled" :realtime-update="prescriptionUpdate" :document-update="documentUpdate" />
+      <PrescriptionSection :encounter-id="encounterId" :disabled="disabled" :realtime-update="prescriptionUpdate" :document-update="documentUpdate" />
     </div>
 
     <!-- Procedures -->
     <div class="flex flex-col gap-4">
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Procedures</h3>
       <ProcedureSection
-        :encounter-id="consultationId"
+        :encounter-id="encounterId"
         :procedures="procedures"
         :disabled="disabled"
         @update="(p) => emit('procedures-updated', p)"
@@ -253,7 +253,7 @@ function applyPreset(days: number): void {
     <template v-if="hasLabOrders">
       <div class="flex flex-col gap-4">
         <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
-        <LabOrderSection :consultation-id="consultationId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" :document-update="documentUpdate" @lab-updated="emit('lab-updated')" />
+        <LabOrderSection :encounter-id="encounterId" :disabled="labOrderDisabled" :realtime-update="labOrderUpdate" :document-update="documentUpdate" @lab-updated="emit('lab-updated')" />
       </div>
     </template>
 
@@ -385,7 +385,7 @@ function applyPreset(days: number): void {
       <div class="flex flex-col gap-4">
         <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Consumables</h3>
         <ConsumableSection
-          :consultation-id="consultationId"
+          :encounter-id="encounterId"
           :consumables="consumables"
           :disabled="disabled"
           @update="emit('update:consumables', $event)"

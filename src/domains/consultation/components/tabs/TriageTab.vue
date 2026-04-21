@@ -6,7 +6,7 @@ import type { LabOrderResponse } from '../../types/labOrder.types'
 const props = defineProps<{
   triage: ConsultationTriage
   patientId: string
-  consultationId: string
+  encounterId: string
   disabled: boolean
   labOrderUpdate?: LabOrderResponse | null
 }>()
@@ -21,7 +21,7 @@ const emit = defineEmits<{
   <TriageFactory
     :triage="triage"
     :patient-id="patientId"
-    :consultation-id="consultationId"
+    :encounter-id="encounterId"
     :disabled="disabled"
     :lab-order-update="labOrderUpdate"
     @save="emit('save', $event)"

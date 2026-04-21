@@ -27,7 +27,7 @@ import type { LabOrderResponse } from '../../../types/labOrder.types'
 const props = defineProps<{
   triage: ConsultationTriage
   patientId: string
-  consultationId: string
+  encounterId: string
   disabled: boolean
   labOrderUpdate?: LabOrderResponse | null
 }>()
@@ -300,7 +300,7 @@ function emitSave() {
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
       <div class="mt-4">
         <LabOrderSection
-          :consultation-id="consultationId"
+          :encounter-id="encounterId"
           :disabled="disabled"
           :realtime-update="labOrderUpdate"
           @lab-updated="emit('lab-updated')"

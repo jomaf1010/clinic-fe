@@ -1058,7 +1058,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
             </div>
             <PaymentTab
               :disabled="store.isFinalized"
-              :consultation-id="store.current.id"
+              :encounter-id="store.current.id"
               :status="store.current.status"
               :consultation-type="store.current.consultation?.type ?? 'default'"
               :patient-id="store.current.patient_id"

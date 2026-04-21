@@ -43,7 +43,7 @@ import { RouteNames } from '@/router/routeNames'
 
 const props = withDefaults(defineProps<{
   disabled: boolean
-  consultationId: string
+  encounterId: string
   status: 'draft' | 'finalized'
   consultationType: ConsultationType
   patientId: string
@@ -96,7 +96,7 @@ const isLoadingDocs = ref(false)
 async function loadDocuments() {
   isLoadingDocs.value = true
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     prescriptionDoc.value = res.data.find((d) => d.type === 'prescription') ?? null
     medCertDoc.value = res.data.find((d) => d.type === 'medical-certificate') ?? null
   } catch {
@@ -160,7 +160,7 @@ const isGeneratingPrescription = ref(false)
 async function generatePrescription() {
   isGeneratingPrescription.value = true
   try {
-    const res = await documentApi.generate(props.consultationId, 'prescription')
+    const res = await documentApi.generate(props.encounterId, 'prescription')
     prescriptionDoc.value = res.data
     startPrescriptionPolling()
   } catch {
@@ -233,7 +233,7 @@ const {
   saveFeeDiscount,
 } = useFeeDiscount(
   () => ({
-    id: props.consultationId,
+    id: props.encounterId,
     payment: props.payment,
   } as any),
   (updated) => {
@@ -386,7 +386,7 @@ function promptRegenerate() {
 
 async function regeneratePdf() {
   try {
-    await documentApi.generate(props.consultationId, 'prescription')
+    await documentApi.generate(props.encounterId, 'prescription')
     toast.success('Prescription PDF is being regenerated')
   } catch {
     toast.error('Failed to regenerate prescription PDF')
@@ -443,7 +443,7 @@ async function fetchInvoice() {
   isLoading.value = true
   loadError.value = null
   try {
-    const result = await billingStore.fetchForEncounter(props.consultationId)
+    const result = await billingStore.fetchForEncounter(props.encounterId)
     invoice.value = result
   } catch {
     loadError.value = 'Failed to load invoice.'
@@ -897,7 +897,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
   <!-- Medical Certificate Dialog -->
   <MedCertDialog
     :open="showMedCertDialog"
-    :consultation-id="consultationId"
+    :encounter-id="encounterId"
     :diagnoses="diagnoses"
     :document-update="documentUpdate"
     :can-generate="canGenerate"
