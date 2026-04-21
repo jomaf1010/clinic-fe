@@ -136,7 +136,27 @@ const previousTriage = computed(() => {
   return visibleConsultations.value[idx]?.triage ?? null
 })
 
-const age = computed(() => pdStore.patientAge)
+const age = computed(() => pdStore.patientAgeLabel)
+
+// Advisory banner for pediatricians looking at adult charts. We don't
+// block anything — pediatric fellows/consultants do sometimes see >18
+// patients (adolescent follow-ups, graduating complex-care kids). The
+// banner is just a visual cue that specialty-specific tools (growth
+// chart, milestone screens) won't carry their usual weight.
+const showPediatricAgeAdvisory = computed(() => {
+  return authStore.user?.specialty === 'pediatrics'
+    && pdStore.patientAge !== null
+    && pdStore.patientAge >= 18
+})
+
+// Same shape of advisory for OB-GYN viewing a male chart. Prenatal,
+// pregnancy, contraception, GYN assessment tools won't apply; the
+// doctor may still be running a general-medicine consult so no
+// functionality is blocked.
+const showObgynMaleAdvisory = computed(() => {
+  return authStore.user?.specialty === 'obgyn'
+    && pdStore.patient?.sex === 'male'
+})
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
@@ -344,6 +364,32 @@ onUnmounted(() => {
   >
     <!-- Left panel -->
     <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-5">
+      <!-- Advisory: pediatrician looking at an adult chart -->
+      <div
+        v-if="showPediatricAgeAdvisory"
+        role="status"
+        class="mb-3 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+      >
+        <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <div class="text-xs leading-snug">
+          <span class="font-medium">Outside pediatric age range.</span>
+          This patient is {{ age }}; pediatric-specific tools (growth chart, milestone tracker) may not apply. No restrictions imposed.
+        </div>
+      </div>
+
+      <!-- Advisory: OB-GYN looking at a male chart -->
+      <div
+        v-if="showObgynMaleAdvisory"
+        role="status"
+        class="mb-3 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+      >
+        <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <div class="text-xs leading-snug">
+          <span class="font-medium">Outside OB-GYN patient scope.</span>
+          This is a male patient; pregnancy, GYN, and contraception tools won't apply. No restrictions imposed.
+        </div>
+      </div>
+
       <!-- Profile card -->
       <div class="rounded-3xl border shadow-sm bg-card overflow-hidden">
         <!-- Inset banner -->
@@ -421,7 +467,7 @@ onUnmounted(() => {
             </span>
             <template v-if="age !== null">
               <span class="text-muted-foreground text-xs">·</span>
-              <span class="text-xs text-muted-foreground">{{ age }}y/o</span>
+              <span class="text-xs text-muted-foreground">{{ age }}</span>
             </template>
             <span class="text-muted-foreground text-xs">·</span>
             <span class="text-xs text-muted-foreground">{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
@@ -678,7 +724,7 @@ onUnmounted(() => {
               v-if="showVitalsComparison"
               :current="consultation.triage"
               :previous="previousTriage!"
-              :consultation-id="consultation.id"
+              :encounter-id="consultation.id"
             />
           </div>
 

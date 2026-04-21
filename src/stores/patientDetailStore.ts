@@ -85,6 +85,35 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     return age
   })
 
+  /**
+   * Age label for the profile card — formatted by band so pediatric patients
+   * aren't shown as "0 y/o":
+   *   - under 12 months: "11 mo"
+   *   - 12 through 35 months: "2y 3mo"
+   *   - 36 months and over: "5 y/o"
+   */
+  const patientAgeLabel = computed<string | null>(() => {
+    if (!patient.value?.date_of_birth) return null
+    const dob = new Date(patient.value.date_of_birth)
+    const today = new Date()
+
+    let months = (today.getFullYear() - dob.getFullYear()) * 12
+      + (today.getMonth() - dob.getMonth())
+    if (today.getDate() < dob.getDate()) months--
+    if (months < 0) return null
+
+    if (months < 12) {
+      return `${months} mo`
+    }
+    if (months < 36) {
+      const y = Math.floor(months / 12)
+      const m = months % 12
+      return m === 0 ? `${y}y` : `${y}y ${m}mo`
+    }
+    const years = Math.floor(months / 12)
+    return `${years} y/o`
+  })
+
   const patientBloodType = computed(() => patient.value?.blood_type ?? null)
 
   const activePregnancy = computed(() =>
@@ -549,6 +578,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
 
     // Computed
     patientAge,
+    patientAgeLabel,
     patientBloodType,
 
     // Actions — core
