@@ -23,6 +23,16 @@ import type { ChronicTrendsData } from '@/domains/patient/types/patient.types'
 import { obgynApi } from '@/domains/obgyn/api/obgynApi'
 import type { CreatePregnancyPayload, UpsertGynProfilePayload } from '@/domains/obgyn/api/obgynApi'
 import type { GynProfile, Pregnancy, PregnancyDashboard, PrenatalVisit, ChecklistItem } from '@/domains/obgyn/types/obgyn.types'
+import { dentalApi } from '@/domains/dental/api/dentalApi'
+import type {
+  DentalProfile,
+  DentalTreatmentPlan,
+  DentalVisitDetail,
+  UpsertDentalProfilePayload,
+  CreateTreatmentPlanPayload,
+  UpdateTreatmentPlanPayload,
+  UpdateDentalVisitPayload,
+} from '@/domains/dental/types/dental.types'
 import { pediatricsApi } from '@/domains/patient/api/pediatricsApi'
 import type {
   BirthHistoryResponse,
@@ -66,6 +76,11 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   const pregnancyVisits = ref<PrenatalVisit[]>([])
   const prenatalChecklist = ref<ChecklistItem[]>([])
 
+  // ── Dental state ──────────────────────────────────────────────────────────
+  const dentalProfile = ref<DentalProfile | null>(null)
+  const dentalTreatmentPlans = ref<DentalTreatmentPlan[]>([])
+  const dentalVisits = ref<DentalVisitDetail[]>([])
+
   // ── Loading flags ─────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const isLoadingCore = ref(false)
@@ -73,6 +88,8 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   const isLoadingPeds = ref(false)
   const isLoadingObgyn = ref(false)
   const isSavingObgyn = ref(false)
+  const isLoadingDental = ref(false)
+  const isSavingDental = ref(false)
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const patientAge = computed(() => {
@@ -165,6 +182,9 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
         break
       case 'obgyn':
         await loadObgyn()
+        break
+      case 'dental':
+        await loadDental()
         break
     }
   }
@@ -345,6 +365,87 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   }
 
   // ── OB-GYN actions ────────────────────────────────────────────────────────
+
+  async function loadDental(): Promise<void> {
+    if (!patientId.value) return
+    isLoadingDental.value = true
+    const id = patientId.value
+    try {
+      const [profileRes, plansRes, visitsRes] = await Promise.all([
+        dentalApi.getProfile(id).catch(() => ({ data: null as unknown as DentalProfile })),
+        dentalApi.listTreatmentPlans(id).catch(() => ({ data: [] as DentalTreatmentPlan[] })),
+        dentalApi.listVisits(id).catch(() => ({ data: [] as DentalVisitDetail[] })),
+      ])
+      dentalProfile.value = profileRes.data
+      dentalTreatmentPlans.value = plansRes.data
+      dentalVisits.value = visitsRes.data
+    } finally {
+      isLoadingDental.value = false
+    }
+  }
+
+  async function updateDentalProfile(payload: UpsertDentalProfilePayload): Promise<DentalProfile> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    isSavingDental.value = true
+    try {
+      const res = await dentalApi.updateProfile(patientId.value, payload)
+      dentalProfile.value = res.data
+      toast.success('Dental profile updated')
+      return res.data
+    } finally {
+      isSavingDental.value = false
+    }
+  }
+
+  async function createDentalTreatmentPlan(payload: CreateTreatmentPlanPayload): Promise<DentalTreatmentPlan> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    isSavingDental.value = true
+    try {
+      const res = await dentalApi.createTreatmentPlan(patientId.value, payload)
+      dentalTreatmentPlans.value.unshift(res.data)
+      toast.success('Treatment plan created')
+      return res.data
+    } finally {
+      isSavingDental.value = false
+    }
+  }
+
+  async function updateDentalTreatmentPlan(planId: string, payload: UpdateTreatmentPlanPayload): Promise<DentalTreatmentPlan> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    isSavingDental.value = true
+    try {
+      const res = await dentalApi.updateTreatmentPlan(patientId.value, planId, payload)
+      const idx = dentalTreatmentPlans.value.findIndex((p) => p.id === planId)
+      if (idx !== -1) dentalTreatmentPlans.value[idx] = res.data
+      toast.success('Treatment plan updated')
+      return res.data
+    } finally {
+      isSavingDental.value = false
+    }
+  }
+
+  async function deleteDentalTreatmentPlan(planId: string): Promise<void> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    await dentalApi.deleteTreatmentPlan(patientId.value, planId)
+    dentalTreatmentPlans.value = dentalTreatmentPlans.value.filter((p) => p.id !== planId)
+    toast.success('Treatment plan removed')
+  }
+
+  async function updateDentalVisit(visitId: string, payload: UpdateDentalVisitPayload): Promise<DentalVisitDetail> {
+    if (!patientId.value) throw new Error('No patient loaded')
+    isSavingDental.value = true
+    try {
+      const res = await dentalApi.updateVisit(patientId.value, visitId, payload)
+      const idx = dentalVisits.value.findIndex((v) => v.id === visitId)
+      if (idx !== -1) dentalVisits.value[idx] = res.data
+      // Pull profile again so DMFT + odontogram reflect the merged delta.
+      const refreshed = await dentalApi.getProfile(patientId.value).catch(() => null)
+      if (refreshed) dentalProfile.value = refreshed.data
+      return res.data
+    } finally {
+      isSavingDental.value = false
+    }
+  }
 
   async function loadObgyn(): Promise<void> {
     if (!patientId.value) return
@@ -557,6 +658,10 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     pregnancyDashboard.value = null
     pregnancyVisits.value = []
     prenatalChecklist.value = []
+    // Dental
+    dentalProfile.value = null
+    dentalTreatmentPlans.value = []
+    dentalVisits.value = []
     // Flags
     isLoading.value = false
     isLoadingCore.value = false
@@ -564,6 +669,8 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     isLoadingPeds.value = false
     isLoadingObgyn.value = false
     isSavingObgyn.value = false
+    isLoadingDental.value = false
+    isSavingDental.value = false
   }
 
   return {
@@ -660,5 +767,20 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     updatePreventiveCare,
     deletePreventiveCare,
     reloadChronicTrends,
+
+    // State — Dental
+    dentalProfile,
+    dentalTreatmentPlans,
+    dentalVisits,
+    isLoadingDental,
+    isSavingDental,
+
+    // Actions — Dental
+    loadDental,
+    updateDentalProfile,
+    createDentalTreatmentPlan,
+    updateDentalTreatmentPlan,
+    deleteDentalTreatmentPlan,
+    updateDentalVisit,
   }
 })

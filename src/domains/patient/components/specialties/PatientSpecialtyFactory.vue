@@ -5,6 +5,7 @@ import GeneralPatientSections from './general/GeneralPatientSections.vue'
 import PediatricsPatientSections from './pediatrics/PediatricsPatientSections.vue'
 import FMPatientSections from './family-medicine/FMPatientSections.vue'
 import ObGynPatientSections from '@/domains/obgyn/components/ObGynPatientSections.vue'
+import DentalPatientSections from '@/domains/dental/components/DentalPatientSections.vue'
 
 const specialtyStore = useSpecialtyConfigStore()
 const specialtyKey = computed(() => specialtyStore.config?.key)
@@ -18,5 +19,6 @@ const specialtyKey = computed(() => specialtyStore.config?.key)
     <FMPatientSections v-if="specialtyKey === 'family_medicine' || specialtyKey === 'internal_medicine'" />
     <PediatricsPatientSections v-else-if="specialtyKey === 'pediatrics'" />
     <ObGynPatientSections v-else-if="specialtyKey === 'obgyn'" />
+    <DentalPatientSections v-else-if="specialtyKey === 'dental'" />
   </div>
 </template>

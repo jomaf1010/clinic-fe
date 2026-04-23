@@ -41,6 +41,7 @@ export const RouteNames = {
   CLINIC_SERVICES: 'clinic-services',
   PRENATAL_VISIT_CREATE: 'prenatal-visit-create',
   PRENATAL_VISIT_DETAIL: 'prenatal-visit-detail',
+  ODONTOGRAM_PLAYGROUND: 'odontogram-playground',
 } as const
 
 export type RouteName = (typeof RouteNames)[keyof typeof RouteNames]

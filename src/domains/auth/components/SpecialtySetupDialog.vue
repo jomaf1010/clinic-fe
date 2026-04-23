@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Banknote, Stethoscope, LoaderCircle, Baby, HeartPulse, Users, Activity } from 'lucide-vue-next'
+import { Banknote, Stethoscope, LoaderCircle, Baby, HeartPulse, Users, Activity, Bone } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../api/authApi'
@@ -21,6 +21,7 @@ const specialties = [
   { key: 'internal_medicine', label: 'Internal Medicine', icon: Activity, color: 'text-blue-500 bg-blue-500/10' },
   { key: 'pediatrics', label: 'Pediatrics', icon: Baby, color: 'text-pink-500 bg-pink-500/10' },
   { key: 'obgyn', label: 'OB-GYN', icon: HeartPulse, color: 'text-rose-500 bg-rose-500/10' },
+  { key: 'dental', label: 'Dental', icon: Bone, color: 'text-cyan-500 bg-cyan-500/10' },
 ] as const
 
 type SpecialtyKey = typeof specialties[number]['key']

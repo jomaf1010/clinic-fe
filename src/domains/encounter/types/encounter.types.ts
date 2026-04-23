@@ -9,6 +9,9 @@ import type {
   ConsultationDocument,
   FMSpecialtyAssessment,
 } from '@/domains/consultation/types/consultation.types'
+import type { DentalVisitData } from '@/domains/dental/types/dental.types'
+
+export type { DentalVisitData }
 
 export type EncounterType = 'consultation' | 'prenatal' | 'delivery' | 'postpartum' | 'dental'
 export type EncounterStatus = 'draft' | 'finalized'
@@ -272,6 +275,14 @@ export type DisplaySummaryContext =
       kind: 'postpartum'
       days_postpartum?: number
     }
+  | {
+      kind: 'dental'
+      pain_score?: number | null
+      procedure_count?: number
+      teeth_worked_on?: string[]
+      teeth_examined_count?: number
+      perio_psr_max?: number | null
+    }
 
 export interface DisplaySummary {
   chief_complaint: string | null
@@ -309,6 +320,7 @@ export interface EncounterResponse {
   prenatal_visit?: PrenatalVisitData | null
   delivery_record?: DeliveryRecordData | null
   postpartum_visit?: PostpartumVisitData | null
+  dental_visit?: DentalVisitData | null
   lab_order_summary: LabOrderSummary | null
   prescription_summary: PrescriptionSummary | null
   documents: ConsultationDocument[]
@@ -340,12 +352,14 @@ export interface CreateEncounterPayload {
 
 export interface UpdateEncounterPayload {
   // Consultation sections
-  triage?: Partial<ConsultationTriage> | Partial<PrenatalTriage> | Partial<PostpartumTriage>
-  assessment?: Partial<ConsultationAssessment> | Partial<PrenatalAssessment> | Partial<PostpartumAssessment>
+  triage?: Partial<ConsultationTriage> | Partial<PrenatalTriage> | Partial<PostpartumTriage> | Partial<import('@/domains/dental/types/dental.types').DentalVisitTriage>
+  assessment?: Partial<ConsultationAssessment> | Partial<PrenatalAssessment> | Partial<PostpartumAssessment> | Partial<import('@/domains/dental/types/dental.types').DentalVisitAssessment>
   specialty_assessment?: Record<string, unknown>
   treatment_plan?: Partial<ConsultationTreatmentPlan>
-  // Prenatal/Postpartum plan section
-  plan?: Partial<PrenatalPlan> | Partial<PostpartumPlan>
+  // Prenatal/Postpartum/Dental plan section
+  plan?: Partial<PrenatalPlan> | Partial<PostpartumPlan> | Partial<import('@/domains/dental/types/dental.types').DentalVisitPlan>
+  // Dental — link a visit to a treatment plan episode
+  treatment_plan_id?: string | null
   // Delivery sections
   labor?: Partial<DeliveryLabor>
   delivery?: Partial<DeliveryOutcome>

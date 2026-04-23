@@ -9,19 +9,41 @@ import { defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { LoaderCircle, AlertTriangle } from 'lucide-vue-next'
 import { useEncounterStore } from '../stores/encounterStore'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { RouteNames } from '@/router/routeNames'
 import ConsultationFormView from '@/domains/consultation/views/ConsultationFormView.vue'
 
 const PrenatalFormView = defineAsyncComponent(() => import('@/domains/obgyn/views/PrenatalFormView.vue'))
 const DeliveryFormView = defineAsyncComponent(() => import('@/domains/obgyn/views/DeliveryFormView.vue'))
 const PostpartumFormView = defineAsyncComponent(() => import('@/domains/obgyn/views/PostpartumFormView.vue'))
+const DentalVisitView = defineAsyncComponent(() => import('@/domains/dental/views/DentalVisitView.vue'))
 
 const route = useRoute()
 const router = useRouter()
 const store = useEncounterStore()
+const authStore = useAuthStore()
 
 const isNewEncounter = route.name === RouteNames.ENCOUNTER_NEW
-const encounterType = ref<string | null>(isNewEncounter ? 'consultation' : null)
+// For new encounters the `?type=` query param picks the form (e.g. `dental`,
+// `prenatal`). If no explicit type is provided and the doctor's specialty
+// maps to a dedicated encounter type (dental → dental visit), we default to
+// that — a dentist shouldn't land on the general consultation form when they
+// click "New encounter" from the patient page.
+const KNOWN_TYPES = new Set(['consultation', 'prenatal', 'delivery', 'postpartum', 'dental'])
+const SPECIALTY_DEFAULT_TYPE: Record<string, string> = {
+  dental: 'dental',
+}
+function resolveInitialType(): string {
+  const queryType = typeof route.query.type === 'string' ? route.query.type : null
+  if (queryType && KNOWN_TYPES.has(queryType)) return queryType
+  // `follow_up` is a *consultation_type*, not an encounter type — it should
+  // still open ConsultationFormView, which reads the same query.
+  if (queryType === 'follow_up' || queryType === 'default') return 'consultation'
+  const specialty = authStore.user?.specialty ?? null
+  if (specialty && SPECIALTY_DEFAULT_TYPE[specialty]) return SPECIALTY_DEFAULT_TYPE[specialty]
+  return 'consultation'
+}
+const encounterType = ref<string | null>(isNewEncounter ? resolveInitialType() : null)
 // Start loading immediately for existing encounters so we never flash the wrong form
 const isPreloading = ref(!isNewEncounter)
 const loadError = ref<string | null>(null)
@@ -81,6 +103,7 @@ function goBack() {
   <PrenatalFormView v-else-if="encounterType === 'prenatal'" />
   <DeliveryFormView v-else-if="encounterType === 'delivery'" />
   <PostpartumFormView v-else-if="encounterType === 'postpartum'" />
+  <DentalVisitView v-else-if="encounterType === 'dental'" />
 
   <!-- Fallback for unknown types -->
   <ConsultationFormView v-else-if="encounterType !== null" />

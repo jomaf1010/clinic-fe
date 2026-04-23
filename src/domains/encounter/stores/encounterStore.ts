@@ -166,6 +166,13 @@ export const useEncounterStore = defineStore('encounter', () => {
       if (payload.assessment) p.assessment = { ...p.assessment, ...payload.assessment } as typeof p.assessment
       if (payload.plan) p.plan = { ...p.plan, ...payload.plan } as typeof p.plan
       updated.postpartum_visit = p
+    } else if (updated.type === 'dental' && updated.dental_visit) {
+      const d = { ...updated.dental_visit }
+      if (payload.triage) d.triage = { ...(d.triage ?? {}), ...payload.triage } as typeof d.triage
+      if (payload.assessment) d.assessment = { ...(d.assessment ?? {}), ...payload.assessment } as typeof d.assessment
+      if (payload.plan) d.plan = { ...(d.plan ?? {}), ...payload.plan } as typeof d.plan
+      if (payload.treatment_plan_id !== undefined) d.treatment_plan_id = payload.treatment_plan_id
+      updated.dental_visit = d
     }
 
     current.value = updated
