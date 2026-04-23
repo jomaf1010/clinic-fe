@@ -10,8 +10,8 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { timeAgo } from '@/lib/utils'
 import { classifyBpString, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyPain } from '@/lib/vitals'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
-import { buildNarrative } from '@/lib/narrative'
 import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
+import EncounterSummaryDetail from './EncounterSummaryDetail.vue'
 
 const props = defineProps<{
   consultation: ConsultationResponse
@@ -84,9 +84,9 @@ const abnormalVitals = computed(() => {
     alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: bs.label, color: badgeColor(bs.severity) })
   }
 
-  const pain = classifyPain(props.consultation.triage?.pain_score, cfg)
+  const pain = classifyPain(vitals.pain_score, cfg)
   if (pain) {
-    alerts.push({ label: 'Pain', value: `${props.consultation.triage?.pain_score}/10`, status: pain.label, color: BADGE_RED })
+    alerts.push({ label: 'Pain', value: `${vitals.pain_score}/10`, status: pain.label, color: BADGE_RED })
   }
 
   return alerts
@@ -101,27 +101,17 @@ const labOrderLabel = computed(() => {
   return `${all[0]} and ${all.length - 1} more`
 })
 
-const narrativeSummary = computed(() => {
-  const c = props.consultation
-  return buildNarrative({
-    id: c.id,
-    complaint: c.triage?.chief_complaint,
-    diagnoses: authStore.hasPermission('consultations.edit-assessment')
-      ? (c.assessment?.diagnoses ?? []).map(d => d.description)
-      : [],
-    advice: authStore.hasPermission('consultations.edit-treatment-plan') ? c.treatment_plan?.advice : null,
-    prescriptionItems: c.prescription_summary?.items,
-  })
-})
-
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
+const currentRole = computed(() => authStore.currentClinic?.role)
+const isSecretaryOrStaff = computed(() => currentRole.value === 'secretary' || currentRole.value === 'staff')
 const isMine = computed(() => props.consultation.created_by === authStore.user?.id)
-const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
-const canContinue = computed(() => isMine.value || isOwner.value || canEditTriage.value)
+const canEditTriage = computed(() => authStore.hasPermission('encounters.edit-triage'))
+// Mirrors backend ensureDraftOwnership: owner OR assigned doctor OR secretary/staff with edit-triage.
+const canContinue = computed(() => isMine.value || isOwner.value || (isSecretaryOrStaff.value && canEditTriage.value))
 
 function openDraft() {
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
+    name: RouteNames.ENCOUNTER_DETAIL,
     params: { patientId: props.patientId, id: props.consultation.id },
   })
 }
@@ -159,8 +149,10 @@ function formatDate(iso: string): string {
             Draft
           </span>
         </div>
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <p v-if="narrativeSummary" class="mt-1 text-sm text-muted-foreground leading-relaxed" v-html="narrativeSummary" />
+        <div v-if="consultation.display_summary" class="mt-1">
+          <EncounterSummaryDetail :summary="consultation.display_summary" />
+        </div>
+        <p v-else-if="consultation.display_line" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ consultation.display_line }}</p>
         <p v-else class="mt-1 text-sm italic text-muted-foreground">No chief complaint yet</p>
 
         <!-- Abnormal vitals -->

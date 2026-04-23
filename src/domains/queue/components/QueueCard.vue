@@ -41,7 +41,7 @@ const waitTime = computed(() => {
 
 const isWaiting = computed(() => props.visit.status === 'waiting')
 const isInProgress = computed(() => props.visit.status === 'in_progress')
-const hasConsultation = computed(() => !!props.visit.consultation_id)
+const hasConsultation = computed(() => !!props.visit.encounter_id)
 const typeLabel = computed(() => (props.visit.type === 'walk_in' ? 'Walk-in' : 'Appointment'))
 
 const isCarryover = computed(() => {
@@ -60,12 +60,12 @@ const carryoverDate = computed(() => {
 })
 
 function openConsultation() {
-  if (!props.visit.consultation_id) return
+  if (!props.visit.encounter_id) return
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
+    name: RouteNames.ENCOUNTER_DETAIL,
     params: {
       patientId: props.visit.patient_id,
-      id: props.visit.consultation_id,
+      id: props.visit.encounter_id,
     },
   })
 }

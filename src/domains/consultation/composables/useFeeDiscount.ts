@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { consultationApi } from '../api/consultationApi'
+import { encounterApi } from '@/domains/encounter/api/encounterApi'
 import type { ConsultationResponse } from '../types/consultation.types'
 
 export function useFeeDiscount(
@@ -24,7 +24,7 @@ export function useFeeDiscount(
     isSavingDiscount.value = true
     try {
       const val = parseFloat(feeDiscountValue.value) || 0
-      await consultationApi.saveFeeDiscount(consultation.id, {
+      await encounterApi.saveFeeDiscount(consultation.id, {
         fee_discount_type: val > 0 ? feeDiscountType.value : null,
         fee_discount_value: val > 0 ? val : null,
       })

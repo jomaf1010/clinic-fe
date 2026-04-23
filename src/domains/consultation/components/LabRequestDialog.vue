@@ -19,7 +19,7 @@ import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 
 const props = defineProps<{
   open: boolean
-  consultationId: string
+  encounterId: string
   documentUpdate?: GeneratedDocumentResponse | null
 }>()
 
@@ -59,7 +59,7 @@ watch(() => props.documentUpdate, (update) => {
 
 async function loadExistingDoc() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     labRequestDoc.value = res.data.find((d) => d.type === 'lab-request') ?? null
   } catch {
     // ignore
@@ -69,7 +69,7 @@ async function loadExistingDoc() {
 async function generate() {
   isGenerating.value = true
   try {
-    const res = await documentApi.generate(props.consultationId, 'lab-request', {
+    const res = await documentApi.generate(props.encounterId, 'lab-request', {
       laboratory_name: laboratoryName.value || null,
     })
     labRequestDoc.value = res.data

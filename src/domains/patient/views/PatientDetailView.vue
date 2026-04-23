@@ -7,22 +7,22 @@ import {
   CalendarDays,
   Phone,
   Mail,
-  ShieldAlert,
-  HeartPulse,
   StickyNote,
   LoaderCircle,
   Stethoscope,
-  Plus,
   Pencil,
   PlayCircle,
-  Filter,
   X,
   FlaskConical,
   CheckCircle2,
   Clock,
   ArrowLeft,
   ChevronDown,
+  ChevronUp,
   Camera,
+  ArrowRight,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
@@ -37,33 +37,46 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import EditPatientDialog from '../components/EditPatientDialog.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
-import { patientApi } from '../api/patientApi'
-import type { PatientResponse } from '../types/patient.types'
+import { usePatientDetailStore } from '@/stores/patientDetailStore'
+import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { RouteNames } from '@/router/routeNames'
 import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
 import FinalizedConsultationCard from '@/domains/patient/components/FinalizedConsultationCard.vue'
 import VitalsComparisonCard from '@/domains/patient/components/VitalsComparisonCard.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { useConsultationStore } from '@/domains/consultation/stores/consultationStore'
+import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { usePatientSync } from '../composables/usePatientSync'
+import PatientSpecialtyFactory from '../components/specialties/PatientSpecialtyFactory.vue'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const consultationStore = useConsultationStore()
+const encounterStore = useEncounterStore()
 const notificationStore = useNotificationStore()
-const patient = ref<PatientResponse | null>(null)
+const pdStore = usePatientDetailStore()
+const specialtyStore = useSpecialtyConfigStore()
+const patient = computed(() => pdStore.patient)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
 const patientIdRef = computed(() => route.params.id as string)
 const clinicIdRef = computed(() => authStore.currentClinic?.id)
 usePatientSync(patientIdRef, clinicIdRef, (updated) => {
-  patient.value = updated
+  pdStore.updatePatientFromSync(updated)
 })
 
 const avatarCropOpen = ref(false)
@@ -77,8 +90,7 @@ async function handleAvatarCrop(blob: Blob) {
   const file = new File([blob], 'avatar.png', { type: 'image/png' })
   isUploadingAvatar.value = true
   try {
-    const res = await patientApi.uploadAvatar(patient.value.id, file)
-    avatarUrl.value = res.data.avatar_url
+    avatarUrl.value = await pdStore.uploadAvatar(file)
     toast.success('Patient photo updated')
   } catch {
     toast.error('Failed to upload photo')
@@ -88,18 +100,22 @@ async function handleAvatarCrop(blob: Blob) {
 }
 
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
+const currentRole = computed(() => authStore.currentClinic?.role)
 const currentUserId = computed(() => authStore.user?.id)
-const canSeeDrafts = computed(() => isOwner.value || authStore.hasPermission('consultations.edit-triage'))
+const isSecretaryOrStaff = computed(() => currentRole.value === 'secretary' || currentRole.value === 'staff')
+const canSeeDrafts = computed(() => isOwner.value || authStore.hasPermission('encounters.edit-triage'))
+// Mirrors backend ensureDraftOwnership: owner OR assigned doctor OR secretary/staff with edit-triage.
+const canEditDraftOfOthers = computed(() => isSecretaryOrStaff.value && authStore.hasPermission('encounters.edit-triage'))
 
 const visibleConsultations = computed(() =>
-  consultationStore.patientConsultations.filter(c =>
-    c.status !== 'draft' || canSeeDrafts.value || c.created_by === currentUserId.value,
+  encounterStore.patientEncounters.filter(c =>
+    c.status !== 'draft' || canSeeDrafts.value || c.doctor_id === currentUserId.value,
   ),
 )
 
 const draftConsultation = computed(() =>
   visibleConsultations.value.find(c =>
-    c.status === 'draft' && (c.created_by === currentUserId.value || isOwner.value),
+    c.status === 'draft' && (c.doctor_id === currentUserId.value || isOwner.value || canEditDraftOfOthers.value),
   ) ?? null,
 )
 
@@ -120,16 +136,26 @@ const previousTriage = computed(() => {
   return visibleConsultations.value[idx]?.triage ?? null
 })
 
-const age = computed(() => {
-  if (!patient.value) return null
-  const dob = new Date(patient.value.date_of_birth)
-  const today = new Date()
-  let years = today.getFullYear() - dob.getFullYear()
-  const monthDiff = today.getMonth() - dob.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-    years--
-  }
-  return years
+const age = computed(() => pdStore.patientAgeLabel)
+
+// Advisory banner for pediatricians looking at adult charts. We don't
+// block anything — pediatric fellows/consultants do sometimes see >18
+// patients (adolescent follow-ups, graduating complex-care kids). The
+// banner is just a visual cue that specialty-specific tools (growth
+// chart, milestone screens) won't carry their usual weight.
+const showPediatricAgeAdvisory = computed(() => {
+  return authStore.user?.specialty === 'pediatrics'
+    && pdStore.patientAge !== null
+    && pdStore.patientAge >= 18
+})
+
+// Same shape of advisory for OB-GYN viewing a male chart. Prenatal,
+// pregnancy, contraception, GYN assessment tools won't apply; the
+// doctor may still be running a general-medicine consult so no
+// functionality is blocked.
+const showObgynMaleAdvisory = computed(() => {
+  return authStore.user?.specialty === 'obgyn'
+    && pdStore.patient?.sex === 'male'
 })
 
 function formatDate(dateStr: string): string {
@@ -147,10 +173,16 @@ async function fetchPatient() {
   avatarUrl.value = null
 
   try {
-    const response = await patientApi.get(route.params.id as string)
-    patient.value = response.data
-
-    await consultationStore.loadForPatient(response.data.id)
+    const id = route.params.id as string
+    await pdStore.loadPatient(id)
+    await Promise.all([
+      encounterStore.loadForPatient(id),
+      pdStore.loadCore(),
+    ])
+    // Load specialty-specific data
+    if (specialtyStore.config?.key) {
+      pdStore.loadSpecialty(specialtyStore.config.key)
+    }
   } catch {
     error.value = 'Failed to load patient details. Please try again.'
   } finally {
@@ -163,12 +195,73 @@ watch(() => route.params.id, () => fetchPatient(), { immediate: true })
 // Refresh timeline when a med cert is generated
 watch(() => notificationStore.notifications[0], (newest) => {
   if (newest?.type === 'medcert.completed' || newest?.type === 'document.generated') {
-    consultationStore.loadForPatient(patient.value?.id ?? '')
+    encounterStore.loadForPatient(patient.value?.id ?? '')
   }
 })
 
 const editDialogOpen = ref(false)
 const mobileCardExpanded = ref(false)
+
+// ── Discard draft ─────────────────────────────────────────────────────────
+const discardTarget = ref<typeof draftConsultation.value | null>(null)
+const discardOpen = ref(false)
+const discardInFlight = ref(false)
+
+function requestDiscardDraft(draft: typeof draftConsultation.value): void {
+  if (!draft) return
+  discardTarget.value = draft
+  discardOpen.value = true
+}
+
+async function confirmDiscardDraft(): Promise<void> {
+  if (!discardTarget.value) return
+  discardInFlight.value = true
+  try {
+    await encounterStore.deleteEncounter(discardTarget.value.id)
+    discardOpen.value = false
+    discardTarget.value = null
+  } catch {
+    toast.error('Failed to discard draft')
+  } finally {
+    discardInFlight.value = false
+  }
+}
+
+// Problems count from store
+const activeProblemsCount = computed(() =>
+  pdStore.problems.filter(p => p.status !== 'resolved').length,
+)
+
+// Profile completeness (0 to 1)
+const profileCompleteness = computed(() => {
+  if (!patient.value) return 0
+  let filled = 0
+  const total = 6
+  if (patient.value.date_of_birth) filled++
+  if (patient.value.contact_number) filled++
+  if (patient.value.email) filled++
+  if (patient.value.formatted_address) filled++
+  if (displayAvatarUrl.value) filled++
+  if (patient.value.note) filled++
+  return filled / total
+})
+
+// Last visit date from finalized consultations
+const lastVisitDate = computed(() => {
+  const finalized = visibleConsultations.value.find(c => c.status === 'finalized')
+  if (!finalized) return null
+  return new Date(finalized.created_at)
+})
+
+const lastVisitFormatted = computed(() => {
+  if (!lastVisitDate.value) return '—'
+  const now = new Date()
+  const opts: Intl.DateTimeFormatOptions =
+    lastVisitDate.value.getFullYear() === now.getFullYear()
+      ? { month: 'short', day: 'numeric' }
+      : { month: 'short', day: 'numeric', year: 'numeric' }
+  return lastVisitDate.value.toLocaleDateString('en-US', opts)
+})
 
 const labOrderDialogOpen = ref(false)
 const labOrderDialogData = ref<LabOrderSummary | null>(null)
@@ -214,14 +307,14 @@ function applyFilter() {
   const filters: { month?: number; year?: number } = {}
   if (filterMonth.value) filters.month = Number(filterMonth.value)
   if (filterYear.value) filters.year = Number(filterYear.value)
-  consultationStore.loadForPatient(patient.value.id, filters)
+  encounterStore.loadForPatient(patient.value.id, filters)
 }
 
 function clearFilter() {
   filterMonth.value = ''
   filterYear.value = ''
   if (!patient.value) return
-  consultationStore.loadForPatient(patient.value.id)
+  encounterStore.loadForPatient(patient.value.id)
 }
 
 watch([filterMonth, filterYear], () => {
@@ -237,7 +330,7 @@ watch(sentinel, (el) => {
   observer = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && patient.value) {
-        consultationStore.loadMoreForPatient(patient.value.id)
+        encounterStore.loadMoreForPatient(patient.value.id)
       }
     },
     { rootMargin: '100px' },
@@ -247,7 +340,8 @@ watch(sentinel, (el) => {
 
 onUnmounted(() => {
   observer?.disconnect()
-  consultationStore.clearPatientConsultations()
+  encounterStore.clearPatientEncounters()
+  pdStore.$reset()
 })
 </script>
 
@@ -269,191 +363,245 @@ onUnmounted(() => {
     class="-mx-4 -mt-4 -mb-4 flex flex-1 flex-col gap-0 overflow-y-auto md:min-h-0 md:flex-row md:overflow-y-hidden"
   >
     <!-- Left panel -->
-    <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-6">
-      <Button
-        variant="outline"
-        size="sm"
-        class="-ml-2 mb-3 gap-1.5"
-        @click="router.back()"
+    <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-5">
+      <!-- Advisory: pediatrician looking at an adult chart -->
+      <div
+        v-if="showPediatricAgeAdvisory"
+        role="status"
+        class="mb-3 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
       >
-        <ArrowLeft class="size-3.5" />
-        Back
-      </Button>
+        <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <div class="text-xs leading-snug">
+          <span class="font-medium">Outside pediatric age range.</span>
+          This patient is {{ age }}; pediatric-specific tools (growth chart, milestone tracker) may not apply. No restrictions imposed.
+        </div>
+      </div>
 
-      <!-- Header — always visible -->
-      <div class="flex items-center gap-3 md:flex-col md:items-center md:text-center">
-        <!-- Patient avatar -->
-        <div class="group relative shrink-0">
-          <PatientAvatar
-            :avatar-url="displayAvatarUrl"
-            :sex="patient.sex"
-            :name="patient.full_name"
-            class="size-12 md:size-16"
-          />
+      <!-- Advisory: OB-GYN looking at a male chart -->
+      <div
+        v-if="showObgynMaleAdvisory"
+        role="status"
+        class="mb-3 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+      >
+        <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <div class="text-xs leading-snug">
+          <span class="font-medium">Outside OB-GYN patient scope.</span>
+          This is a male patient; pregnancy, GYN, and contraception tools won't apply. No restrictions imposed.
+        </div>
+      </div>
 
+      <!-- Profile card -->
+      <div class="rounded-3xl border shadow-sm bg-card overflow-hidden">
+        <!-- Inset banner -->
+        <div class="relative m-2 rounded-2xl bg-gradient-to-br from-blue-400/30 to-blue-500/30 h-[120px] sm:h-[140px]">
           <button
-            v-if="authStore.hasPermission('patients.edit')"
             type="button"
-            class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            :disabled="isUploadingAvatar"
-            aria-label="Upload patient photo"
-            @click="avatarCropOpen = true"
+            class="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-blue-900 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Back"
+            @click="router.back()"
           >
-            <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
-            <Camera v-else class="size-4 text-white" />
+            <ArrowLeft class="size-4" />
+            Back
+          </button>
+          <button
+            type="button"
+            class="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-full bg-white/70 text-blue-900 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Edit profile"
+            @click="editDialogOpen = true"
+          >
+            <Pencil class="size-4" />
           </button>
         </div>
-        <div class="min-w-0 flex-1 md:mt-2 md:w-full md:flex-none">
-          <h2 class="text-base font-semibold md:text-lg">{{ patient.full_name }}</h2>
-          <p v-if="patient.formatted_address" class="mt-0.5 flex max-w-full items-center gap-1 text-sm text-muted-foreground md:justify-center" :title="patient.formatted_address">
-            <MapPin class="size-3.5 shrink-0" />
-            <span class="truncate">{{ patient.formatted_address }}</span>
-          </p>
-        </div>
-      </div>
 
-      <!-- Action buttons — always visible -->
-      <div class="mt-3 flex gap-2">
-        <Button
-          v-if="draftConsultation"
-          size="sm"
-          variant="secondary"
-          class="flex-1"
-          @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
-        >
-          <PlayCircle class="size-3.5" />
-          Continue Draft
-        </Button>
-        <template v-else-if="authStore.hasPermission('consultations.create')">
-          <Button
-            size="sm"
-            class="flex-1"
-            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id } })"
-          >
-            <Plus class="size-3.5" />
-            Consultation
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            class="flex-1"
-            @click="router.push({ name: RouteNames.CONSULTATION_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
-          >
-            <Plus class="size-3.5" />
-            Follow-up
-          </Button>
-        </template>
-        <Button variant="outline" size="sm" @click="editDialogOpen = true">
-          <Pencil class="size-3.5" />
-        </Button>
-      </div>
-
-      <!-- Mobile expand toggle -->
-      <button
-        type="button"
-        class="mt-3 flex w-full items-center justify-center gap-1 text-xs text-muted-foreground md:hidden"
-        @click="mobileCardExpanded = !mobileCardExpanded"
-      >
-        {{ mobileCardExpanded ? 'Show less' : 'Show more details' }}
-        <ChevronDown class="size-3.5 transition-transform" :class="mobileCardExpanded ? 'rotate-180' : ''" />
-      </button>
-
-      <!-- Expandable sections — hidden on mobile unless expanded, always visible on desktop -->
-      <div :class="mobileCardExpanded ? '' : 'hidden md:block'">
-        <!-- Medical (top priority) -->
-        <div
-          v-if="patient.allergies.length > 0 || patient.chronic_conditions.length > 0"
-          class="mt-5 border-t pt-4"
-        >
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Medical
-          </h3>
-          <div class="space-y-3">
-            <div v-if="patient.allergies.length > 0">
-              <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
-                <ShieldAlert class="size-4 shrink-0" />
-                Allergies
-              </div>
-              <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="allergy in patient.allergies"
-                  :key="allergy"
-                  class="rounded-md border border-red-300 bg-red-100 px-2.5 py-1 text-sm font-medium text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400"
-                >
-                  {{ allergy }}
-                </span>
-              </div>
+        <!-- Avatar with rainbow completeness ring -->
+        <div class="-mt-12 flex justify-center relative z-10">
+          <div class="relative">
+            <!-- Rainbow ring track (full circle, gray) -->
+            <div
+              class="absolute inset-0 rounded-full ring-track"
+              style="padding: 3px;"
+            >
+              <div class="w-full h-full rounded-full bg-muted/60" />
             </div>
-            <div v-if="patient.chronic_conditions.length > 0">
-              <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
-                <HeartPulse class="size-4 shrink-0" />
-                Conditions
-              </div>
-              <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="condition in patient.chronic_conditions"
-                  :key="condition"
-                  class="rounded-md border border-amber-300 bg-amber-100 px-2.5 py-1 text-sm font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
-                >
-                  {{ condition }}
-                </span>
-              </div>
+            <!-- Rainbow ring fill (conic-gradient, clipped to completeness) -->
+            <div
+              class="absolute inset-0 rounded-full rainbow-ring-fill"
+              :style="`--completeness-deg: ${Math.round(profileCompleteness * 360)}deg`"
+            />
+            <!-- Avatar -->
+            <div class="group relative p-[5px]">
+              <PatientAvatar
+                :avatar-url="displayAvatarUrl"
+                :sex="patient.sex"
+                :name="patient.full_name"
+                class="size-24 ring-2 ring-card ring-offset-0"
+              />
+              <button
+                v-if="authStore.hasPermission('patients.edit')"
+                type="button"
+                class="absolute inset-[5px] flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                :disabled="isUploadingAvatar"
+                aria-label="Upload patient photo"
+                @click="avatarCropOpen = true"
+              >
+                <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
+                <Camera v-else class="size-4 text-white" />
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Basic Info -->
-        <div class="mt-5 border-t pt-4">
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Basic Info
-          </h3>
-          <div class="space-y-2.5">
-            <div v-if="age !== null" class="flex items-start gap-2 text-sm">
-              <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Age: </span>
-                {{ age }} yrs old
-              </div>
+        <!-- Name + meta -->
+        <div class="mt-2 px-4 text-center">
+          <h2 class="text-lg font-bold leading-tight">{{ patient.full_name }}</h2>
+          <div class="mt-1 flex items-center justify-center gap-1.5 flex-wrap">
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+              :class="patient.status === 'active' || patient.status === 'returning'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : patient.status === 'new'
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'bg-muted text-muted-foreground'"
+            >
+              {{ patient.status.charAt(0).toUpperCase() + patient.status.slice(1) }}
+            </span>
+            <template v-if="age !== null">
+              <span class="text-muted-foreground text-xs">·</span>
+              <span class="text-xs text-muted-foreground">{{ age }}</span>
+            </template>
+            <span class="text-muted-foreground text-xs">·</span>
+            <span class="text-xs text-muted-foreground">{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="mx-3 my-3 bg-muted/50 rounded-2xl py-3 px-2">
+          <div class="grid grid-cols-3 divide-x divide-border">
+            <!-- Visits -->
+            <div class="flex flex-col items-center gap-0.5 px-2">
+              <span class="text-base font-bold leading-none">{{ visibleConsultations.filter(c => c.status === 'finalized').length }}</span>
+              <span class="text-[10px] text-muted-foreground mt-0.5">Visits</span>
             </div>
+            <!-- Problems -->
+            <div class="flex flex-col items-center gap-0.5 px-2">
+              <span class="text-base font-bold leading-none">{{ activeProblemsCount }}</span>
+              <span class="text-[10px] text-muted-foreground mt-0.5">Problems</span>
+            </div>
+            <!-- Last visit -->
+            <div class="flex flex-col items-center gap-0.5 px-2">
+              <span class="text-base font-bold leading-none truncate max-w-full">{{ lastVisitFormatted }}</span>
+              <span class="text-[10px] text-muted-foreground mt-0.5">Last Visit</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action grid -->
+        <div class="grid grid-cols-2 gap-2 mx-3 mb-3">
+          <!-- Continue Draft + Discard (only when a draft exists) -->
+          <template v-if="draftConsultation">
+            <button
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
+                <PlayCircle class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">Continue Draft</span>
+            </button>
+            <button
+              v-if="authStore.hasPermission('encounters.delete')"
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="requestDiscardDraft(draftConsultation)"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-rose-400 flex items-center justify-center text-white">
+                <Trash2 class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">Discard Draft</span>
+            </button>
+          </template>
+
+          <!-- No draft → Follow Up + New Consult -->
+          <template v-else>
+            <button
+              v-if="authStore.hasPermission('encounters.create')"
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
+                <ArrowRight class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">Follow Up</span>
+            </button>
+            <button
+              v-if="authStore.hasPermission('encounters.create')"
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id } })"
+            >
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
+                <Stethoscope class="size-4" />
+              </div>
+              <span class="text-[11px] font-medium text-center leading-tight">New Consult</span>
+            </button>
+          </template>
+        </div>
+
+        <!-- Expandable details toggle (mobile only) -->
+        <div class="flex justify-center pb-3 md:hidden">
+          <button
+            type="button"
+            class="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground transition-colors hover:bg-muted/80"
+            :aria-label="mobileCardExpanded ? 'Collapse details' : 'Expand details'"
+            @click="mobileCardExpanded = !mobileCardExpanded"
+          >
+            <ChevronDown v-if="!mobileCardExpanded" class="size-3.5" />
+            <ChevronUp v-else class="size-3.5" />
+          </button>
+        </div>
+
+        <!-- Detail rows — always visible on desktop, toggled on mobile -->
+        <div :class="mobileCardExpanded ? 'block' : 'hidden md:block'">
+          <div class="px-4 pb-4 space-y-2.5 border-t pt-3">
+            <!-- Note -->
+            <div v-if="patient.note" class="flex items-start gap-2 text-sm">
+              <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <p class="whitespace-pre-wrap text-muted-foreground">{{ patient.note }}</p>
+            </div>
+            <!-- DOB -->
             <div class="flex items-start gap-2 text-sm">
               <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
               <div>
-                <span class="text-muted-foreground">DOB: </span>
-                {{ formatDate(patient.date_of_birth) }}
+                <span class="text-muted-foreground">Born </span>{{ formatDate(patient.date_of_birth) }}
               </div>
             </div>
+            <!-- Sex -->
             <div class="flex items-start gap-2 text-sm">
               <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Sex: </span>
-                {{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}
-              </div>
+              <span>{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
             </div>
+            <!-- Blood Type -->
+            <div v-if="patient.blood_type" class="flex items-start gap-2 text-sm">
+              <FlaskConical class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <span>{{ patient.blood_type }}</span>
+            </div>
+            <!-- Phone -->
             <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
               <Phone class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Phone: </span>
-                {{ patient.contact_number }}
-              </div>
+              <span>{{ patient.contact_number }}</span>
             </div>
+            <!-- Email -->
             <div v-if="patient.email" class="flex items-start gap-2 text-sm">
               <Mail class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Email: </span>
-                {{ patient.email }}
-              </div>
+              <span class="break-all">{{ patient.email }}</span>
             </div>
-          </div>
-        </div>
-
-        <!-- Notes -->
-        <div v-if="patient.note" class="mt-5 border-t pt-4">
-          <h3 class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Notes
-          </h3>
-          <div class="flex items-start gap-2 text-sm">
-            <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-            <p class="whitespace-pre-wrap">{{ patient.note }}</p>
+            <!-- Address -->
+            <div v-if="patient.formatted_address" class="flex items-start gap-2 text-sm">
+              <MapPin class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <span class="text-muted-foreground">{{ patient.formatted_address }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -461,6 +609,9 @@ onUnmounted(() => {
 
     <!-- Right panel -->
     <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+      <!-- Specialty-specific patient sections (between patient info and consultation timeline) -->
+      <PatientSpecialtyFactory class="mb-6" />
+
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <Stethoscope class="size-4 text-muted-foreground" />
@@ -505,7 +656,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Skeleton loading state -->
-      <div v-if="consultationStore.isLoadingConsultations" class="mt-4">
+      <div v-if="encounterStore.isLoadingConsultations" class="mt-4">
         <div
           v-for="n in 5"
           :key="n"
@@ -557,7 +708,7 @@ onUnmounted(() => {
               "
             />
             <div
-              v-if="index < visibleConsultations.length - 1 || consultationStore.hasMore"
+              v-if="index < visibleConsultations.length - 1 || encounterStore.hasMore"
               class="mt-1 flex-1 w-[2px]"
               :class="consultation.status === 'draft' ? 'bg-amber-300' : 'bg-foreground/15'"
             />
@@ -573,7 +724,7 @@ onUnmounted(() => {
               v-if="showVitalsComparison"
               :current="consultation.triage"
               :previous="previousTriage!"
-              :consultation-id="consultation.id"
+              :encounter-id="consultation.id"
             />
           </div>
 
@@ -583,6 +734,7 @@ onUnmounted(() => {
             :consultation="consultation"
             :patient-id="patient!.id"
             :latest="index === latestFinalizedIndex"
+            :previous-vitals="visibleConsultations[index + 1]?.display_summary?.vitals ?? null"
             class="min-w-0 flex-1"
             :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
             @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
@@ -592,7 +744,7 @@ onUnmounted(() => {
         <!-- Infinite scroll sentinel -->
         <!-- Infinite scroll sentinel (skeleton card) -->
         <div
-          v-if="consultationStore.hasMore"
+          v-if="encounterStore.hasMore"
           ref="sentinel"
           class="flex gap-3"
         >
@@ -662,6 +814,45 @@ onUnmounted(() => {
       :output-size="256"
       @crop="handleAvatarCrop"
     />
+
+    <!-- Discard Draft Encounter Confirmation -->
+    <AlertDialog :open="discardOpen" @update:open="discardOpen = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle class="flex items-center gap-2">
+            <AlertTriangle class="size-5 text-destructive" />
+            Discard draft encounter?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete the in-progress encounter and everything attached to it. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <p class="font-medium text-foreground">The following will be deleted:</p>
+          <ul class="mt-2 space-y-1 text-muted-foreground list-disc pl-5">
+            <li>Triage vitals &amp; chief complaint</li>
+            <li>Assessment notes &amp; diagnoses</li>
+            <li>Treatment plan &amp; prescription</li>
+            <li>Laboratory orders &amp; results</li>
+            <li>Generated documents (if any)</li>
+          </ul>
+          <p class="mt-2 text-xs text-muted-foreground">
+            The queue visit or appointment entry will be retained, but the encounter link will be removed.
+          </p>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="discardInFlight">Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            :disabled="discardInFlight"
+            @click="confirmDiscardDraft"
+          >
+            <LoaderCircle v-if="discardInFlight" class="size-4 animate-spin" />
+            Discard
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -680,5 +871,23 @@ onUnmounted(() => {
 @keyframes pulse-primary {
   0% { box-shadow: 0 0 0 0 oklch(0.283 0.090 253.827 / 0.5); }
   100% { box-shadow: 0 0 0 10px oklch(0.283 0.090 253.827 / 0); }
+}
+
+/* Rainbow completeness ring */
+.rainbow-ring-fill {
+  background: conic-gradient(
+    #f87171 0deg,
+    #fb923c 60deg,
+    #facc15 120deg,
+    #4ade80 180deg,
+    #38bdf8 240deg,
+    #818cf8 300deg,
+    #f472b6 var(--completeness-deg),
+    transparent var(--completeness-deg)
+  );
+  -webkit-mask:
+    radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
+  mask:
+    radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
 }
 </style>

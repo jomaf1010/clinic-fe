@@ -2,42 +2,42 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { PublicationContext } from 'centrifuge'
 import { useCentrifugo } from '@/composables/useCentrifugo'
-import { consultationApi } from '../api/consultationApi'
-import { useConsultationStore } from '../stores/consultationStore'
+import { encounterApi } from '../api/encounterApi'
+import { useEncounterStore } from '../stores/encounterStore'
 import { SESSION_ID } from '@/lib/http'
-import type { ConsultationRealtimeEvent } from '../types/realtime.types'
-import type { PrescriptionResponse } from '../types/prescription.types'
-import type { LabOrderResponse } from '../types/labOrder.types'
-import type { GeneratedDocumentResponse } from '../api/documentApi'
+import type { EncounterRealtimeEvent } from '../types/realtime.types'
+import type { PrescriptionResponse } from '@/domains/consultation/types/prescription.types'
+import type { LabOrderResponse } from '@/domains/consultation/types/labOrder.types'
+import type { GeneratedDocumentResponse } from '@/domains/consultation/api/documentApi'
 
-export function useConsultationSync(consultationId: Ref<string | undefined>, clinicId: Ref<string | undefined>) {
+export function useEncounterSync(encounterId: Ref<string | undefined>, clinicId: Ref<string | undefined>) {
   const { connect, subscribe, unsubscribe } = useCentrifugo()
-  const consultationStore = useConsultationStore()
+  const encounterStore = useEncounterStore()
 
   const prescriptionUpdate = ref<PrescriptionResponse | null>(null)
   const labOrderUpdate = ref<LabOrderResponse | null>(null)
   const documentUpdate = ref<GeneratedDocumentResponse | null>(null)
 
-  function isSelf(event: ConsultationRealtimeEvent): boolean {
+  function isSelf(event: EncounterRealtimeEvent): boolean {
     return !!event.session_id && event.session_id === SESSION_ID
   }
 
   function onEvent(ctx: PublicationContext) {
-    const event = ctx.data as ConsultationRealtimeEvent
-    if (event.type.startsWith('consultation.')) {
+    const event = ctx.data as EncounterRealtimeEvent
+    if (event.type.startsWith('encounter.')) {
       if (isSelf(event)) return
-      consultationStore.handleRealtimeEvent(event)
+      encounterStore.handleRealtimeEvent(event)
     } else if (event.type.startsWith('prescription.')) {
       if (isSelf(event)) return
       prescriptionUpdate.value = event.data as PrescriptionResponse
     } else if (event.type.startsWith('lab_order.')) {
       if (isSelf(event)) return
       labOrderUpdate.value = event.data as LabOrderResponse
-      // Silently refresh consultation to update lab_order_summary in the vitals card
-      if (consultationId.value) {
-        consultationApi.get(consultationId.value).then((res) => {
-          if (consultationStore.current?.id === consultationId.value) {
-            consultationStore.current = res.data
+      // Silently refresh encounter to update lab_order_summary in the vitals card
+      if (encounterId.value) {
+        encounterApi.get(encounterId.value).then((res) => {
+          if (encounterStore.current?.id === encounterId.value) {
+            encounterStore.current = res.data
           }
         }).catch(() => {})
       }
@@ -48,8 +48,8 @@ export function useConsultationSync(consultationId: Ref<string | undefined>, cli
   }
 
   const channel = computed(() => {
-    if (!consultationId.value || !clinicId.value) return null
-    return `clinic:${clinicId.value}:consultation:${consultationId.value}`
+    if (!encounterId.value || !clinicId.value) return null
+    return `clinic:${clinicId.value}:encounter:${encounterId.value}`
   })
 
   let currentChannel: string | null = null

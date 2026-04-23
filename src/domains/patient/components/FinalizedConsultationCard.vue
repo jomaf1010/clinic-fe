@@ -18,12 +18,14 @@ import { openNewTab, timeAgo } from '@/lib/utils'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { consultationApi } from '@/domains/consultation/api/consultationApi'
 import { documentApi } from '@/domains/consultation/api/documentApi'
-import { buildNarrative } from '@/lib/narrative'
+import EncounterSummaryDetail from './EncounterSummaryDetail.vue'
+import type { DisplaySummaryVitals } from '@/domains/encounter/types/encounter.types'
 
 const props = defineProps<{
   consultation: ConsultationResponse
   patientId: string
   latest?: boolean
+  previousVitals?: DisplaySummaryVitals | null
 }>()
 
 const emit = defineEmits<{
@@ -35,7 +37,7 @@ const authStore = useAuthStore()
 
 function openConsultation() {
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
+    name: RouteNames.ENCOUNTER_DETAIL,
     params: { patientId: props.patientId, id: props.consultation.id },
   })
 }
@@ -46,9 +48,6 @@ function formatDate(iso: string): string {
     hour: '2-digit', minute: '2-digit',
   })
 }
-
-const canSeeAssessment = computed(() => authStore.hasPermission('consultations.edit-assessment'))
-const canSeeTreatment = computed(() => authStore.hasPermission('consultations.edit-treatment-plan'))
 
 const prescriptionDoc = computed(() =>
   props.consultation.documents?.find((d) => d.type === 'prescription' && d.status === 'completed'),
@@ -103,18 +102,6 @@ async function requestMedCert() {
   }
 }
 
-const summary = computed(() => {
-  const c = props.consultation
-  return buildNarrative({
-    id: c.id,
-    complaint: c.triage?.chief_complaint,
-    diagnoses: canSeeAssessment.value
-      ? (c.assessment?.diagnoses ?? []).map(d => d.description)
-      : [],
-    advice: canSeeTreatment.value ? c.treatment_plan?.advice : null,
-    prescriptionItems: c.prescription_summary?.items,
-  })
-})
 </script>
 
 <template>
@@ -193,8 +180,10 @@ const summary = computed(() => {
         &middot; Dr. {{ consultation.doctor_name }}
       </span>
     </div>
-    <!-- eslint-disable-next-line vue/no-v-html -->
-    <p v-if="summary" class="mt-1 text-sm text-muted-foreground leading-relaxed" v-html="summary" />
+    <div v-if="consultation.display_summary" class="mt-1">
+      <EncounterSummaryDetail :summary="consultation.display_summary" :previous-vitals="previousVitals" />
+    </div>
+    <p v-else-if="consultation.display_line" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ consultation.display_line }}</p>
     <TooltipProvider v-if="consultation.lab_order_summary" :delay-duration="200">
       <div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         <FlaskConical class="size-3 shrink-0" />

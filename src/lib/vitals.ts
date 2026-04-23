@@ -168,22 +168,68 @@ export interface VitalStatus {
 const NORMAL: VitalStatus  = { label: 'Normal', color: 'text-green-600', severity: 'normal' }
 
 /**
+ * Age-based range entry used for specialty-specific vital thresholds.
+ * days_min/days_max define the age window (in days); min/max override the normal range.
+ */
+export interface VitalAgeBasedRange {
+  days_min: number
+  days_max: number | null
+  min: number | null
+  max: number | null
+}
+
+function resolveAgeRange(
+  patientAgeDays: number | undefined,
+  ageRanges: VitalAgeBasedRange[] | undefined,
+): VitalAgeBasedRange | null {
+  if (patientAgeDays === undefined || !ageRanges?.length) return null
+  return (
+    ageRanges.find(
+      (r) => patientAgeDays >= r.days_min && (r.days_max === null || patientAgeDays <= r.days_max),
+    ) ?? null
+  )
+}
+
+/**
  * Heart rate classification (bpm).
  * < 60 Bradycardia, 60-100 Normal, > 100 Tachycardia
+ * Pass patientAgeDays + ageRanges from specialty config to apply age-appropriate thresholds.
  */
-export function classifyHr(hr: number | null | undefined, config: VitalsConfig = DEFAULT_VITALS_CONFIG): VitalStatus | null {
+export function classifyHr(
+  hr: number | null | undefined,
+  config: VitalsConfig = DEFAULT_VITALS_CONFIG,
+  patientAgeDays?: number,
+  ageRanges?: VitalAgeBasedRange[],
+): VitalStatus | null {
   if (hr == null) return null
-  if (hr < config.hr_low)  return { label: 'Bradycardia', color: 'text-blue-600', severity: 'low' }
-  if (hr <= config.hr_high) return NORMAL
+  const range = resolveAgeRange(patientAgeDays, ageRanges)
+  const low = range?.min ?? config.hr_low
+  const high = range?.max ?? config.hr_high
+  if (hr < low)  return { label: 'Bradycardia', color: 'text-blue-600', severity: 'low' }
+  if (hr <= high) return NORMAL
   return { label: 'Tachycardia', color: 'text-red-600', severity: 'high' }
 }
 
 /**
  * Temperature classification (°C).
  * < 36 Hypothermia, 36-37.5 Normal, 37.6-38.5 Low-grade fever, > 38.5 High fever
+ * Pass patientAgeDays + ageRanges from specialty config to apply age-appropriate thresholds.
  */
-export function classifyTemp(temp: number | null | undefined, config: VitalsConfig = DEFAULT_VITALS_CONFIG): VitalStatus | null {
+export function classifyTemp(
+  temp: number | null | undefined,
+  config: VitalsConfig = DEFAULT_VITALS_CONFIG,
+  patientAgeDays?: number,
+  ageRanges?: VitalAgeBasedRange[],
+): VitalStatus | null {
   if (temp == null) return null
+  const range = resolveAgeRange(patientAgeDays, ageRanges)
+  if (range) {
+    const low = range.min ?? config.temp_hypothermia
+    const high = range.max ?? config.temp_normal_max
+    if (temp < low) return { label: 'Hypothermia', color: 'text-blue-600', severity: 'low' }
+    if (temp <= high) return NORMAL
+    return { label: 'Fever', color: 'text-red-600', severity: 'high' }
+  }
   if (temp < config.temp_hypothermia)    return { label: 'Hypothermia', color: 'text-blue-600', severity: 'low' }
   if (temp <= config.temp_normal_max) return NORMAL
   if (temp <= config.temp_low_fever_max) return { label: 'Low-grade fever', color: 'text-amber-600', severity: 'elevated' }
@@ -193,31 +239,63 @@ export function classifyTemp(temp: number | null | undefined, config: VitalsConf
 /**
  * SpO2 classification (%).
  * >= 95 Normal, 90-94 Low, < 90 Critical
+ * Pass patientAgeDays + ageRanges from specialty config to apply age-appropriate thresholds.
  */
-export function classifySpo2(spo2: number | null | undefined, config: VitalsConfig = DEFAULT_VITALS_CONFIG): VitalStatus | null {
+export function classifySpo2(
+  spo2: number | null | undefined,
+  config: VitalsConfig = DEFAULT_VITALS_CONFIG,
+  patientAgeDays?: number,
+  ageRanges?: VitalAgeBasedRange[],
+): VitalStatus | null {
   if (spo2 == null) return null
-  if (spo2 >= config.spo2_normal) return NORMAL
-  if (spo2 >= config.spo2_low) return { label: 'Low', color: 'text-amber-600', severity: 'low' }
+  const range = resolveAgeRange(patientAgeDays, ageRanges)
+  const normal = range?.max ?? config.spo2_normal
+  const low = range?.min ?? config.spo2_low
+  if (spo2 >= normal) return NORMAL
+  if (spo2 >= low) return { label: 'Low', color: 'text-amber-600', severity: 'low' }
   return { label: 'Critical', color: 'text-red-600', severity: 'critical' }
 }
 
 /**
  * Respiratory rate classification (breaths/min).
  * < 12 Low, 12-20 Normal, > 20 Elevated
+ * Pass patientAgeDays + ageRanges from specialty config to apply age-appropriate thresholds.
  */
-export function classifyRr(rr: number | null | undefined, config: VitalsConfig = DEFAULT_VITALS_CONFIG): VitalStatus | null {
+export function classifyRr(
+  rr: number | null | undefined,
+  config: VitalsConfig = DEFAULT_VITALS_CONFIG,
+  patientAgeDays?: number,
+  ageRanges?: VitalAgeBasedRange[],
+): VitalStatus | null {
   if (rr == null) return null
-  if (rr < config.rr_low)  return { label: 'Low', color: 'text-blue-600', severity: 'low' }
-  if (rr <= config.rr_high) return NORMAL
+  const range = resolveAgeRange(patientAgeDays, ageRanges)
+  const low = range?.min ?? config.rr_low
+  const high = range?.max ?? config.rr_high
+  if (rr < low)  return { label: 'Low', color: 'text-blue-600', severity: 'low' }
+  if (rr <= high) return NORMAL
   return { label: 'Elevated', color: 'text-red-600', severity: 'high' }
 }
 
 /**
  * Blood sugar classification (mg/dL, fasting).
  * < 70 Hypoglycemia, 70-100 Normal, 101-125 Pre-diabetic, > 125 Diabetic
+ * Pass patientAgeDays + ageRanges from specialty config to apply age-appropriate thresholds.
  */
-export function classifyBloodSugar(bs: number | null | undefined, config: VitalsConfig = DEFAULT_VITALS_CONFIG): VitalStatus | null {
+export function classifyBloodSugar(
+  bs: number | null | undefined,
+  config: VitalsConfig = DEFAULT_VITALS_CONFIG,
+  patientAgeDays?: number,
+  ageRanges?: VitalAgeBasedRange[],
+): VitalStatus | null {
   if (bs == null) return null
+  const range = resolveAgeRange(patientAgeDays, ageRanges)
+  if (range) {
+    const low = range.min ?? config.bs_hypoglycemia
+    const high = range.max ?? config.bs_normal
+    if (bs < low) return { label: 'Low (Hypoglycemia)', color: 'text-blue-600', severity: 'low' }
+    if (bs <= high) return NORMAL
+    return { label: 'High', color: 'text-red-600', severity: 'high' }
+  }
   if (bs < config.bs_hypoglycemia)   return { label: 'Low (Hypoglycemia)', color: 'text-blue-600', severity: 'low' }
   if (bs <= config.bs_normal) return NORMAL
   if (bs <= config.bs_prediabetic) return { label: 'Pre-diabetic', color: 'text-amber-600', severity: 'elevated' }

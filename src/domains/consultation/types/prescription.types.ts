@@ -17,7 +17,7 @@ export interface PrescriptionItem {
 
 export interface PrescriptionResponse {
   id: string
-  consultation_id: string
+  encounter_id: string
   clinic_id: string
   created_by: string
   items: PrescriptionItem[]

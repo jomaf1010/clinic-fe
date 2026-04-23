@@ -508,7 +508,7 @@ onUnmounted(() => {
               v-for="consultation in stats.recent_consultations"
               :key="consultation.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
-              @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: consultation.patient_id, id: consultation.id } })"
+              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: consultation.patient_id, id: consultation.id } })"
             >
               <PatientAvatar
                 :avatar-url="consultation.patient_avatar_url"

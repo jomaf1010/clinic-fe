@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Pill, FlaskConical, TestTubes, FileText, Building2, Settings, UsersRound, ShieldCheck, ScrollText, Crown } from 'lucide-vue-next'
+import { Pill, FlaskConical, TestTubes, FileText, Building2, Settings, UsersRound, ShieldCheck, ScrollText, Crown, Stethoscope } from 'lucide-vue-next'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
@@ -42,6 +42,7 @@ const tabRouteMap: Record<string, string> = {
   medicines: RouteNames.CLINIC_MEDICINES,
   consumables: RouteNames.CLINIC_CONSUMABLES,
   'lab-services': RouteNames.CLINIC_LAB_SERVICES,
+  services: RouteNames.CLINIC_SERVICES,
   templates: RouteNames.CLINIC_TEMPLATES,
 }
 
@@ -149,6 +150,10 @@ const activeTab = computed({
                 <TooltipContent v-if="!hasLabFeature" side="bottom">Pro feature</TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            <TabsTrigger v-if="canViewLabServices" value="services" class="gap-1.5">
+              <Stethoscope class="size-3.5" />
+              Services
+            </TabsTrigger>
             <TabsTrigger value="templates" class="gap-1.5">
               <FileText class="size-3.5" />
               Templates

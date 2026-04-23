@@ -38,10 +38,9 @@ export interface CreatePatientPayload {
   address: PatientAddress
   date_of_birth: string
   sex: string
+  blood_type?: string | null
   contact_number?: string
   email?: string
-  allergies?: string[]
-  chronic_conditions?: string[]
   note?: string
 }
 
@@ -57,10 +56,9 @@ export interface PatientResponse {
   formatted_address: string
   date_of_birth: string
   sex: string
+  blood_type: string | null
   contact_number: string | null
   email: string | null
-  allergies: string[]
-  chronic_conditions: string[]
   note: string | null
   avatar_url: string | null
   status: PatientStatus
@@ -96,10 +94,9 @@ export interface UpdatePatientPayload {
   address?: PatientAddress
   date_of_birth?: string
   sex?: string
+  blood_type?: string | null
   contact_number?: string | null
   email?: string | null
-  allergies?: string[]
-  chronic_conditions?: string[]
   note?: string | null
 }
 
@@ -119,4 +116,49 @@ export interface PatientSearchResult {
 
 export interface PatientSearchResponse {
   data: PatientSearchResult[]
+}
+
+export type ProblemStatus = 'active' | 'controlled' | 'uncontrolled' | 'resolved'
+
+export interface Problem {
+  uuid: string
+  description: string
+  icd_code: string | null
+  status: ProblemStatus
+  onset_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProblemPayload {
+  description: string
+  icd_code?: string | null
+  status?: ProblemStatus
+  onset_date?: string | null
+}
+
+export interface UpdateProblemPayload {
+  description?: string
+  icd_code?: string | null
+  status?: ProblemStatus
+  onset_date?: string | null
+}
+
+export interface ChronicTrendPoint {
+  date: string
+  value?: number
+  systolic?: number
+  diastolic?: number
+  classification?: string | null
+}
+
+export interface ChronicTrendsData {
+  bp?: ChronicTrendPoint[]
+  blood_sugar?: ChronicTrendPoint[]
+  weight?: ChronicTrendPoint[]
+  bmi?: ChronicTrendPoint[]
+}
+
+export interface ChronicTrendsResponse {
+  data: ChronicTrendsData
 }

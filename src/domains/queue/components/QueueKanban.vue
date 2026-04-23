@@ -109,10 +109,10 @@ function canActOnVisit(visit: QueueVisitResponse): boolean {
 }
 
 function openConsultation(visit: QueueVisitResponse) {
-  if (!visit.consultation_id) return
+  if (!visit.encounter_id) return
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
-    params: { patientId: visit.patient_id, id: visit.consultation_id },
+    name: RouteNames.ENCOUNTER_DETAIL,
+    params: { patientId: visit.patient_id, id: visit.encounter_id },
   })
 }
 </script>
@@ -194,7 +194,7 @@ function openConsultation(visit: QueueVisitResponse) {
           <!-- Actions -->
           <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
             <Button
-              v-if="visit.consultation_id && (visit.status === 'waiting' || visit.status === 'in_progress')"
+              v-if="visit.encounter_id && (visit.status === 'waiting' || visit.status === 'in_progress')"
               variant="outline"
               size="sm"
               class="h-6 gap-1 px-2 text-[11px]"

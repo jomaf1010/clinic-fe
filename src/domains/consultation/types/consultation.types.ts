@@ -1,5 +1,28 @@
+/** @deprecated Status is now on EncounterResponse. Use EncounterStatus from encounter.types. */
 export type ConsultationStatus = 'draft' | 'finalized'
 export type ConsultationType = 'default' | 'follow_up'
+
+export interface LifestyleData {
+  smoking?: 'never' | 'former' | 'current' | null
+  pack_years?: number | null
+  alcohol?: 'none' | 'social' | 'moderate' | 'heavy' | null
+  exercise?: 'none' | 'light' | 'moderate' | 'vigorous' | null
+  diet?: 'poor' | 'fair' | 'good' | 'excellent' | null
+  medication_adherence?: 'non_adherent' | 'partial' | 'adherent' | null
+}
+
+export interface ProblemSoapNote {
+  problem_id: string
+  condition: string
+  subjective: string | null
+  objective: string | null
+  assessment: string | null
+  plan: string | null
+}
+
+export interface FMSpecialtyAssessment {
+  problem_notes?: ProblemSoapNote[]
+}
 
 export interface ConsultationConsumable {
   consumable_id: string
@@ -8,22 +31,13 @@ export interface ConsultationConsumable {
   unit_price: number | null
 }
 
-export interface TriageVitals {
-  bp: string | null
-  hr: number | null
-  rr: number | null
-  temp: number | null
-  spo2: number | null
-  blood_sugar: number | null
-}
-
 export interface ConsultationTriage {
   chief_complaint: string | null
-  vitals: TriageVitals
-  weight: number | null
-  height: number | null
-  pain_score: number | null
+  vitals: Record<string, string | number | null>
   notes: string | null
+  specialty_data?: {
+    lifestyle?: LifestyleData
+  } | null
 }
 
 export interface AssessmentDiagnosis {
@@ -77,6 +91,12 @@ export interface ConsultationDocument {
   status: string
 }
 
+/**
+ * @deprecated Encounter-centric API: use EncounterResponse from encounter.types instead.
+ * This type is kept for backward compatibility with existing views/components that
+ * have not yet been migrated. Identity, status, and billing fields have moved to
+ * EncounterResponse; clinical data is now nested under the `consultation` key there.
+ */
 export interface ConsultationResponse {
   id: string
   patient_id: string
@@ -89,9 +109,8 @@ export interface ConsultationResponse {
   doctor_avatar_url: string | null
   status: ConsultationStatus
   triage: ConsultationTriage
-  patient_allergies: string[]
-  patient_conditions: string[]
   assessment: ConsultationAssessment
+  specialty_assessment?: FMSpecialtyAssessment | null
   treatment_plan: ConsultationTreatmentPlan
   consumables: ConsultationConsumable[]
   payment: ConsultationPayment
@@ -102,6 +121,8 @@ export interface ConsultationResponse {
   medcert_requested_by: string | null
   medcert_requested_at: string | null
   finalized_at: string | null
+  display_line?: string | null
+  display_summary?: import('@/domains/encounter/types/encounter.types').DisplaySummary | null
   created_at: string
   updated_at: string
 }
@@ -109,11 +130,13 @@ export interface ConsultationResponse {
 export interface CreateConsultationPayload {
   patient_id: string
   type?: ConsultationType
+  specialty?: string | null
 }
 
 export interface UpdateConsultationPayload {
   triage?: Partial<ConsultationTriage>
   assessment?: Partial<ConsultationAssessment>
+  specialty_assessment?: Record<string, unknown>
   treatment_plan?: Partial<ConsultationTreatmentPlan>
 }
 

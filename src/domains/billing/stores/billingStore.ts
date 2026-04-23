@@ -49,9 +49,9 @@ export const useBillingStore = defineStore('billing', () => {
     }
   }
 
-  async function fetchForConsultation(consultationId: string): Promise<InvoiceResponse | null> {
+  async function fetchForEncounter(encounterId: string): Promise<InvoiceResponse | null> {
     try {
-      const response = await billingApi.forConsultation(consultationId)
+      const response = await billingApi.forEncounter(encounterId)
       currentInvoice.value = response.data
       return response.data
     } catch {
@@ -150,7 +150,7 @@ export const useBillingStore = defineStore('billing', () => {
     totalInvoices,
     fetchInvoices,
     fetchInvoice,
-    fetchForConsultation,
+    fetchForEncounter,
     fetchSummary,
     createInvoice,
     updateInvoice,

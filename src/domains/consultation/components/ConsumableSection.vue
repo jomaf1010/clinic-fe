@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import {
-  Package,
   Plus,
   Minus,
   X,
@@ -13,7 +12,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -23,13 +21,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { consultationApi } from '../api/consultationApi'
+import { encounterApi } from '@/domains/encounter/api/encounterApi'
 import { consumableApi } from '@/domains/consumable/api/consumableApi'
 import type { ClinicConsumable } from '@/domains/consumable/types/consumable.types'
 import type { ConsultationConsumable } from '../types/consultation.types'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   consumables: ConsultationConsumable[]
   disabled: boolean
 }>()
@@ -118,7 +116,7 @@ async function handleSave() {
 
   isSaving.value = true
   try {
-    const res = await consultationApi.saveConsumables(props.consultationId, consumables)
+    const res = await encounterApi.saveConsumables(props.encounterId, consumables)
     emit('update', res.data.consumables)
     closeModal()
     toast.success('Consumables saved')
@@ -132,7 +130,7 @@ async function handleSave() {
 async function removeConsumable(consumableId: string) {
   const updated = props.consumables.filter((c) => c.consumable_id !== consumableId)
   try {
-    const res = await consultationApi.saveConsumables(props.consultationId, updated)
+    const res = await encounterApi.saveConsumables(props.encounterId, updated)
     emit('update', res.data.consumables)
     toast.success('Consumable removed')
   } catch {
@@ -143,20 +141,14 @@ async function removeConsumable(consumableId: string) {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header -->
-    <div class="flex items-center gap-2">
-      <Label class="flex items-center gap-1.5">
-        <Package class="size-3.5 text-muted-foreground" />
-        Consumables
-      </Label>
-      <Badge
-        v-if="consumables.length"
-        variant="outline"
-        class="border-teal-300 bg-teal-100 text-teal-700 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-400"
-      >
-        {{ consumables.length }} {{ consumables.length === 1 ? 'item' : 'items' }}
-      </Badge>
-    </div>
+    <!-- Badge -->
+    <Badge
+      v-if="consumables.length"
+      variant="outline"
+      class="w-fit border-teal-300 bg-teal-100 text-teal-700 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-400"
+    >
+      {{ consumables.length }} {{ consumables.length === 1 ? 'item' : 'items' }}
+    </Badge>
 
     <!-- Consumables list -->
     <div v-if="consumables.length" class="flex flex-wrap gap-2">

@@ -28,13 +28,10 @@ import {
   Phone,
   Mail,
   LoaderCircle,
-  ShieldAlert,
-  HeartPulse,
   StickyNote,
   CheckCircle2,
 } from 'lucide-vue-next'
 import DateOfBirthPicker from '@/components/DateOfBirthPicker.vue'
-import TagInput from '@/components/TagInput.vue'
 import AddressForm from '@/components/AddressForm.vue'
 import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
@@ -70,10 +67,11 @@ const addressPrefill = clinicAddress?.region_code && clinicAddress?.province_cod
   ? { region_code: clinicAddress.region_code, province_code: clinicAddress.province_code, city_code: clinicAddress.city_code }
   : null
 
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
+
 const name = ref<PatientName | null>(null)
 const address = ref<PatientAddress | null>(null)
-const allergies = ref<string[]>([])
-const chronicConditions = ref<string[]>([])
+const bloodType = ref<string>('')
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
@@ -86,10 +84,6 @@ const { clearDraft } = useFormDraft(
     contact_number: contactNumber,
     email,
     note,
-  },
-  {
-    allergies,
-    chronic_conditions: chronicConditions,
   },
 )
 
@@ -126,10 +120,9 @@ const onSubmit = handleSubmit(async (values) => {
       address: address.value,
       date_of_birth: values.date_of_birth,
       sex: values.sex,
+      blood_type: bloodType.value || null,
       ...(values.contact_number ? { contact_number: values.contact_number } : {}),
       ...(values.email ? { email: values.email } : {}),
-      ...(allergies.value.length > 0 ? { allergies: allergies.value } : {}),
-      ...(chronicConditions.value.length > 0 ? { chronic_conditions: chronicConditions.value } : {}),
       ...(values.note ? { note: values.note } : {}),
     })
 
@@ -137,8 +130,7 @@ const onSubmit = handleSubmit(async (values) => {
     resetForm()
     name.value = null
     address.value = null
-    allergies.value = []
-    chronicConditions.value = []
+    bloodType.value = ''
     emit('created')
     emit('update:open', false)
   } catch (err) {
@@ -219,6 +211,26 @@ const onSubmit = handleSubmit(async (values) => {
           </div>
         </div>
 
+        <!-- Blood Type -->
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="flex flex-col gap-2">
+            <Label for="dlg_blood_type" class="flex items-center gap-1.5">
+              <User class="size-3.5 text-muted-foreground" />
+              Blood type <span class="text-muted-foreground">(optional)</span>
+            </Label>
+            <Select v-model="bloodType">
+              <SelectTrigger id="dlg_blood_type">
+                <SelectValue placeholder="Select blood type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="bt in BLOOD_TYPES" :key="bt" :value="bt">
+                  {{ bt }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="flex flex-col gap-2">
             <Label for="dlg_contact_number" class="flex items-center gap-1.5">
@@ -263,31 +275,6 @@ const onSubmit = handleSubmit(async (values) => {
         </div>
 
         <Separator />
-
-        <!-- Additional Information -->
-        <div class="flex flex-col gap-2">
-          <Label class="flex items-center gap-1.5">
-            <ShieldAlert class="size-3.5 text-muted-foreground" />
-            Allergies <span class="text-muted-foreground">(optional)</span>
-          </Label>
-          <TagInput
-            v-model="allergies"
-            :search-fn="patientApi.searchAllergies"
-            placeholder="Type allergy and press Enter..."
-          />
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <Label class="flex items-center gap-1.5">
-            <HeartPulse class="size-3.5 text-muted-foreground" />
-            Chronic conditions <span class="text-muted-foreground">(optional)</span>
-          </Label>
-          <TagInput
-            v-model="chronicConditions"
-            :search-fn="patientApi.searchConditions"
-            placeholder="Type condition and press Enter..."
-          />
-        </div>
 
         <div class="flex flex-col gap-2">
           <Label for="dlg_note" class="flex items-center gap-1.5">

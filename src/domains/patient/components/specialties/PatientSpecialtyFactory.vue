@@ -1,0 +1,24 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
+import GeneralPatientSections from './general/GeneralPatientSections.vue'
+import PediatricsPatientSections from './pediatrics/PediatricsPatientSections.vue'
+import FMPatientSections from './family-medicine/FMPatientSections.vue'
+import ObGynPatientSections from '@/domains/obgyn/components/ObGynPatientSections.vue'
+import DentalPatientSections from '@/domains/dental/components/DentalPatientSections.vue'
+
+const specialtyStore = useSpecialtyConfigStore()
+const specialtyKey = computed(() => specialtyStore.config?.key)
+</script>
+
+<template>
+  <div :class="['grid grid-cols-1 gap-3 sm:grid-cols-2', specialtyKey === 'obgyn' ? 'lg:grid-cols-4' : 'lg:grid-cols-3']">
+    <!-- Universal sections (problem list + allergies) — all specialties -->
+    <GeneralPatientSections />
+    <!-- Specialty-specific sections -->
+    <FMPatientSections v-if="specialtyKey === 'family_medicine' || specialtyKey === 'internal_medicine'" />
+    <PediatricsPatientSections v-else-if="specialtyKey === 'pediatrics'" />
+    <ObGynPatientSections v-else-if="specialtyKey === 'obgyn'" />
+    <DentalPatientSections v-else-if="specialtyKey === 'dental'" />
+  </div>
+</template>

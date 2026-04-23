@@ -114,15 +114,15 @@ async function saveItemQty(itemId: string) {
     ])
     emit('updated')
 
-    if (isMedicine && props.invoice.consultation_id) {
+    if (isMedicine && props.invoice.encounter_id) {
       const settings = authStore.currentClinic?.settings
       const isAdjustedMode = settings?.prescription_quantity_mode === 'adjusted'
       const autoRegen = isAdjustedMode && settings?.auto_regenerate_pdf_on_qty_change !== false
 
       if (autoRegen) {
-        silentRegenerate(props.invoice.consultation_id)
+        silentRegenerate(props.invoice.encounter_id)
       } else if (isAdjustedMode) {
-        promptRegenerate(props.invoice.consultation_id)
+        promptRegenerate(props.invoice.encounter_id)
       }
     }
   } catch (err: unknown) {
@@ -133,23 +133,23 @@ async function saveItemQty(itemId: string) {
   }
 }
 
-async function silentRegenerate(consultationId: string) {
+async function silentRegenerate(encounterId: string) {
   try {
-    await documentApi.generate(consultationId, 'prescription')
+    await documentApi.generate(encounterId, 'prescription')
     toast.success('Prescription PDF regenerated')
   } catch {
     toast.error('Failed to regenerate prescription PDF')
   }
 }
 
-function promptRegenerate(consultationId: string) {
+function promptRegenerate(encounterId: string) {
   toast('Prescription quantities changed', {
     description: 'Would you like to regenerate the prescription PDF?',
     action: {
       label: 'Regenerate',
       onClick: async () => {
         try {
-          await documentApi.generate(consultationId, 'prescription')
+          await documentApi.generate(encounterId, 'prescription')
           toast.success('Prescription PDF is being regenerated')
         } catch {
           toast.error('Failed to regenerate prescription PDF')
@@ -512,7 +512,7 @@ onBeforeUnmount(() => {
 
       <DialogFooter v-if="invoice" class="shrink-0 flex-row gap-2 border-t pt-4 sm:gap-2">
         <!-- Med cert button -->
-        <template v-if="invoice.consultation_id && invoice.status !== 'void'">
+        <template v-if="invoice.encounter_id && invoice.status !== 'void'">
           <Button
             v-if="!invoice.medcert_status"
             variant="outline"

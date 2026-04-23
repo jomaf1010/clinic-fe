@@ -25,7 +25,7 @@ import type { AssessmentDiagnosis } from '../types/consultation.types'
 
 const props = withDefaults(defineProps<{
   open: boolean
-  consultationId: string
+  encounterId: string
   diagnoses: AssessmentDiagnosis[]
   documentUpdate?: GeneratedDocumentResponse | null
   canGenerate?: boolean
@@ -98,7 +98,7 @@ watch(() => props.documentUpdate, (update) => {
 
 async function loadExistingDoc() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     medCertDoc.value = res.data.find((d) => d.type === 'medical-certificate') ?? null
   } catch {
     // ignore
@@ -108,7 +108,7 @@ async function loadExistingDoc() {
 async function generate() {
   isGenerating.value = true
   try {
-    const res = await documentApi.generate(props.consultationId, 'medical-certificate', {
+    const res = await documentApi.generate(props.encounterId, 'medical-certificate', {
       diagnosis: diagnosis.value,
       recommendation: recommendation.value,
       duration_from: dateRange.value.start?.toString() || null,

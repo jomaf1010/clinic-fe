@@ -249,14 +249,14 @@ function collectChanges(current: ConsultationTriage, previous: ConsultationTriag
   if (curr.blood_sugar != null && prev.blood_sugar != null && curr.blood_sugar !== prev.blood_sugar)
     result.push({ label: 'Blood Sugar', prev: `${prev.blood_sugar} mg/dL`, curr: `${curr.blood_sugar} mg/dL`, direction: curr.blood_sugar > prev.blood_sugar ? 'up' : 'down', concern: curr.blood_sugar > config.bs_prediabetic || curr.blood_sugar < config.bs_hypoglycemia })
 
-  if (current.weight != null && previous.weight != null && current.weight !== previous.weight)
-    result.push({ label: 'Weight', prev: `${previous.weight} kg`, curr: `${current.weight} kg`, direction: current.weight > previous.weight ? 'up' : 'down', concern: false })
+  if (curr.weight != null && prev.weight != null && curr.weight !== prev.weight)
+    result.push({ label: 'Weight', prev: `${prev.weight} kg`, curr: `${curr.weight} kg`, direction: curr.weight > prev.weight ? 'up' : 'down', concern: false })
 
-  if (current.height != null && previous.height != null && current.height !== previous.height)
-    result.push({ label: 'Height', prev: `${previous.height} cm`, curr: `${current.height} cm`, direction: current.height > previous.height ? 'up' : 'down', concern: false })
+  if (curr.height != null && prev.height != null && curr.height !== prev.height)
+    result.push({ label: 'Height', prev: `${prev.height} cm`, curr: `${curr.height} cm`, direction: curr.height > prev.height ? 'up' : 'down', concern: false })
 
-  if (current.pain_score != null && previous.pain_score != null && current.pain_score !== previous.pain_score)
-    result.push({ label: 'Pain Level', prev: `${previous.pain_score}/10`, curr: `${current.pain_score}/10`, direction: current.pain_score > previous.pain_score ? 'up' : 'down', concern: current.pain_score >= config.pain_high })
+  if (curr.pain_score != null && prev.pain_score != null && curr.pain_score !== prev.pain_score)
+    result.push({ label: 'Pain Level', prev: `${prev.pain_score}/10`, curr: `${curr.pain_score}/10`, direction: curr.pain_score > prev.pain_score ? 'up' : 'down', concern: curr.pain_score >= config.pain_high })
 
   return result
 }
@@ -272,9 +272,9 @@ function collectUnchanged(current: ConsultationTriage, previous: ConsultationTri
   if (curr.spo2 != null && prev.spo2 != null && curr.spo2 === prev.spo2) result.push('Oxygen Level')
   if (curr.rr != null && prev.rr != null && curr.rr === prev.rr) result.push('Breathing Rate')
   if (curr.blood_sugar != null && prev.blood_sugar != null && curr.blood_sugar === prev.blood_sugar) result.push('Blood Sugar')
-  if (current.weight != null && previous.weight != null && current.weight === previous.weight) result.push('Weight')
-  if (current.height != null && previous.height != null && current.height === previous.height) result.push('Height')
-  if (current.pain_score != null && previous.pain_score != null && current.pain_score === previous.pain_score) result.push('Pain Level')
+  if (curr.weight != null && prev.weight != null && curr.weight === prev.weight) result.push('Weight')
+  if (curr.height != null && prev.height != null && curr.height === prev.height) result.push('Height')
+  if (curr.pain_score != null && prev.pain_score != null && curr.pain_score === prev.pain_score) result.push('Pain Level')
 
   return result
 }

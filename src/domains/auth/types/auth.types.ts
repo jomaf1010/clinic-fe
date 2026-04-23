@@ -93,6 +93,7 @@ export interface User {
   consultation_fee: number | null
   follow_up_fee: number | null
   emergency_fee: number | null
+  specialty_fees: Record<string, number> | null
   avatar_url: string | null
   onboarding_completed: boolean
   current_clinic: ClinicContext | null

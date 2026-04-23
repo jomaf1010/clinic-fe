@@ -238,7 +238,7 @@ function goToTriage() {
   if (!triagePatientId.value) return
   showTriageDialog.value = false
   router.push({
-    name: RouteNames.CONSULTATION_NEW,
+    name: RouteNames.ENCOUNTER_NEW,
     params: { patientId: triagePatientId.value },
   })
 }

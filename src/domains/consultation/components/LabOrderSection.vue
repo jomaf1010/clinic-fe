@@ -3,7 +3,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { http, getAuthToken } from '@/lib/http'
 import {
-  FlaskConical,
   Plus,
   Pencil,
   X,
@@ -23,7 +22,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Dialog, DialogScrollContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -41,7 +39,7 @@ import { openNewTab, printPdf } from '@/lib/utils'
 import LabRequestDialog from './LabRequestDialog.vue'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   disabled: boolean
   realtimeUpdate?: LabOrderResponse | null
   documentUpdate?: GeneratedDocumentResponse | null
@@ -98,7 +96,7 @@ let activeRow: { description: string; instruction: string } | null = null
 // --- Cache helper ---
 async function cacheCurrentLabOrder() {
   if (labOrder.value) {
-    await cacheLabOrder(props.consultationId, labOrder.value as unknown as Record<string, unknown>)
+    await cacheLabOrder(props.encounterId, labOrder.value as unknown as Record<string, unknown>)
   }
 }
 
@@ -106,12 +104,12 @@ async function cacheCurrentLabOrder() {
 async function loadLabOrder() {
   isLoading.value = true
   try {
-    const res = await labOrderApi.getForConsultation(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.encounterId)
     labOrder.value = res.data ?? null
     if (res.data) await cacheCurrentLabOrder()
   } catch {
     // Offline fallback
-    const cached = await getCachedLabOrder(props.consultationId)
+    const cached = await getCachedLabOrder(props.encounterId)
     if (cached) {
       labOrder.value = cached as unknown as LabOrderResponse
       toast.info('Lab orders loaded from offline cache')
@@ -257,7 +255,7 @@ async function handleCreate() {
 
   isCreating.value = true
   try {
-    const res = await labOrderApi.create(props.consultationId, validItems)
+    const res = await labOrderApi.create(props.encounterId, validItems)
     labOrder.value = res.data
     await cacheCurrentLabOrder()
     showCreateForm.value = false
@@ -503,7 +501,7 @@ const labRequestReady = computed(() => labRequestDoc.value?.status === 'complete
 
 async function loadLabRequestDoc() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     labRequestDoc.value = res.data.find((d) => d.type === 'lab-request') ?? null
   } catch {
     // ignore
@@ -562,24 +560,19 @@ function cancelAddForm() {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header row -->
+    <!-- Actions -->
     <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2">
-        <Label class="flex items-center gap-1.5">
-          <FlaskConical class="size-3.5 text-muted-foreground" />
-          Lab Orders
-        </Label>
-        <Badge
-          v-if="labOrder"
-          variant="outline"
-          class="capitalize"
-          :class="labOrderStatusClass"
-        >
-          <CheckCircle2 v-if="labOrder.status === 'completed'" class="size-3" />
-          <Clock v-else class="size-3" />
-          {{ labOrder.status }}
-        </Badge>
-      </div>
+      <Badge
+        v-if="labOrder"
+        variant="outline"
+        class="capitalize"
+        :class="labOrderStatusClass"
+      >
+        <CheckCircle2 v-if="labOrder.status === 'completed'" class="size-3" />
+        <Clock v-else class="size-3" />
+        {{ labOrder.status }}
+      </Badge>
+      <div v-else />
 
       <div class="flex items-center gap-1.5">
         <template v-if="labOrder && labOrder.items.some(i => i.status === 'pending')">
@@ -1078,7 +1071,7 @@ function cancelAddForm() {
     <LabRequestDialog
       v-if="labOrder && labOrder.items.some(i => i.status === 'pending')"
       :open="showLabRequestDialog"
-      :consultation-id="consultationId"
+      :encounter-id="encounterId"
       :document-update="documentUpdate"
       @update:open="showLabRequestDialog = $event"
       @generated="labRequestDoc = $event"

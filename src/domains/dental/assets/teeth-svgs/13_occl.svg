@@ -1,0 +1,96 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- In-house extension of ZoliQua's React Odontogram Modul — MIT license (2026).
+     Canine INCISAL (top-down) view for anterior teeth (template 13).
+     Tooth outline is a narrower teardrop with a slight buccal cusp tip.
+     Caries / filling path shapes are original irregular blobs (not copies of
+     ZoliQua's posterior paths). Group-id contract matches ZoliQua's
+     posterior occlusal SVGs. -->
+<svg xmlns="http://www.w3.org/2000/svg" id="canine_occl" version="1.1" viewBox="0 0 42 42">
+  <style>[data-active="0"] { display: none; }</style>
+  <g id="base" data-active="1">
+    <rect id="bone-base" x="0" y="0" width="42" height="42" style="fill: #fdecc5;" data-active="1"/>
+    <g id="gum-base" data-active="1">
+      <path id="gum-line-2" d="M8,2.9c7.3-.2,28.5-1.1,30.8-.6,2.3.5,1.9.4,2.9,0s1.1-1.2,0-1.5-3.3-.3-5.9-.2c-4.9.2-10.2.6-12.3.8-5.6.5-6.2.5-12.1.5S4.3,1.4-.2,1.8c-4.6.4-.8,1.4.2,1.4,4.5,0,4.9,0,8-.3Z" style="fill: #f79f9a;" data-active="1"/>
+      <path id="gum-line-1" d="M33.8,39.7c-7.3,0-28.5.6-30.8,0s-1.9-.4-2.9,0-1.1,1.2,0,1.5c1.2.3,3.3.4,5.9.3,4.9,0,10.2-.4,12.4-.6,5.6-.4,6.2-.4,12.1-.3,4.3,0,7.1.6,11.6.3s.8-1.4-.3-1.5c-4.5-.2-4.9,0-8,0h0v.3Z" style="fill: #f79f9a;" data-active="1"/>
+    </g>
+  </g>
+  <g id="tooth" data-active="1">
+    <g id="tooth-base" data-active="1">
+      <path d="M8,21 Q9,12 21,10 Q33,12 34,21 Q33,31 21,32 Q9,31 8,21 Z"
+            style="fill: #f0eff0; stroke: #c8c8c8; stroke-miterlimit: 10;" data-active="1"/>
+    </g>
+    <g id="tooth-healthy-pulp" data-active="1">
+      <ellipse cx="21" cy="21" rx="2.5" ry="1.8" style="fill: #ffb0b0; opacity: 0.55;" data-active="1"/>
+    </g>
+    <g id="tooth-inflam-pulp" style="display: none;" data-active="1">
+      <ellipse cx="21" cy="21" rx="2.5" ry="1.8" style="fill: #ff4b3a;" data-active="1"/>
+    </g>
+  </g>
+  <g id="milktooth" style="display: none;" data-active="1">
+    <path d="M11,21 Q12,14 21,13 Q30,14 31,21 Q30,28 21,29 Q12,28 11,21 Z"
+          style="fill: #faf5e4; stroke: #c8c8c8; stroke-miterlimit: 10;" data-active="1"/>
+    <g id="milktooth-healthy-pulp" data-active="1">
+      <ellipse cx="21" cy="21" rx="2" ry="1.5" style="fill: #ffb0b0; opacity: 0.55;" data-active="1"/>
+    </g>
+    <g id="milktooth-inflam-pulp" style="display: none;" data-active="1">
+      <ellipse cx="21" cy="21" rx="2" ry="1.5" style="fill: #ff4b3a;" data-active="1"/>
+    </g>
+  </g>
+  <g id="surfaces" data-active="1">
+    <g id="fillings" data-active="1">
+      <g id="amalgam" data-active="1">
+        <path id="filling-amalgam-occlusal" d="M17.8,21.3 C17.2,19.5 18.6,17.7 20.6,18.3 C22.4,18.9 23.1,17.5 24.4,18.3 C25.9,19.2 25.5,21.1 24.2,21.8 C22.6,22.4 22.5,23.8 20.8,24.1 C19,24.3 17.9,22.9 17.8,21.3 Z" style="display: none; fill: #aaa; stroke: #aaa; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-amalgam-buccal" d="M16.4,10.8 C16.7,9.1 18.4,8.4 20.2,9 C21.5,9.3 22.6,10.2 23.7,9.4 C25,8.2 27.2,8.7 27.5,10.7 C27.8,12.4 24.4,12.8 21.7,12 C19,11.2 16.5,12.4 16.4,10.8 Z" style="display: none; fill: #aaa; stroke: #aaa; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-amalgam-lingual" d="M16.4,31 C16.7,32.7 18.5,33.5 20.2,33 C21.5,32.6 22.7,31.7 23.7,32.3 C25.2,33.1 27.3,32.4 27.4,30.6 C27.5,29.3 24.4,28.8 21.8,29.4 C19.1,30 16.5,29.4 16.4,31 Z" style="display: none; fill: #aaa; stroke: #aaa; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-amalgam-mesial" d="M31.5,15 C32.9,14.1 34,14.8 33.6,17.3 C33.1,19.2 32.5,21.1 33.1,23.5 C33.4,25.1 34.1,26.9 32.8,27.8 C31.8,28.4 30.6,26.3 31,23.6 C31.2,21.6 30.8,19.6 31.2,17.4 C31.4,16.2 30.6,15.6 31.5,15 Z" style="display: none; fill: #aaa; stroke: #aaa; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-amalgam-distal" d="M10.5,15 C9.1,14.1 8,14.8 8.4,17.3 C8.9,19.2 9.5,21.1 8.9,23.5 C8.6,25.1 7.9,26.9 9.2,27.8 C10.2,28.4 11.4,26.3 11,23.6 C10.8,21.6 11.2,19.6 10.8,17.4 C10.6,16.2 11.4,15.6 10.5,15 Z" style="display: none; fill: #aaa; stroke: #aaa; stroke-miterlimit: 10;" data-active="1"/>
+      </g>
+      <g id="composite" data-active="1">
+        <path id="filling-composite-occlusal" d="M17.8,21.3 C17.2,19.5 18.6,17.7 20.6,18.3 C22.4,18.9 23.1,17.5 24.4,18.3 C25.9,19.2 25.5,21.1 24.2,21.8 C22.6,22.4 22.5,23.8 20.8,24.1 C19,24.3 17.9,22.9 17.8,21.3 Z" style="display: none; fill: #feffbf; stroke: #feffbf; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-composite-buccal" d="M16.4,10.8 C16.7,9.1 18.4,8.4 20.2,9 C21.5,9.3 22.6,10.2 23.7,9.4 C25,8.2 27.2,8.7 27.5,10.7 C27.8,12.4 24.4,12.8 21.7,12 C19,11.2 16.5,12.4 16.4,10.8 Z" style="display: none; fill: #feffbf; stroke: #feffbf; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-composite-lingual" d="M16.4,31 C16.7,32.7 18.5,33.5 20.2,33 C21.5,32.6 22.7,31.7 23.7,32.3 C25.2,33.1 27.3,32.4 27.4,30.6 C27.5,29.3 24.4,28.8 21.8,29.4 C19.1,30 16.5,29.4 16.4,31 Z" style="display: none; fill: #feffbf; stroke: #feffbf; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-composite-mesial" d="M31.5,15 C32.9,14.1 34,14.8 33.6,17.3 C33.1,19.2 32.5,21.1 33.1,23.5 C33.4,25.1 34.1,26.9 32.8,27.8 C31.8,28.4 30.6,26.3 31,23.6 C31.2,21.6 30.8,19.6 31.2,17.4 C31.4,16.2 30.6,15.6 31.5,15 Z" style="display: none; fill: #feffbf; stroke: #feffbf; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-composite-distal" d="M10.5,15 C9.1,14.1 8,14.8 8.4,17.3 C8.9,19.2 9.5,21.1 8.9,23.5 C8.6,25.1 7.9,26.9 9.2,27.8 C10.2,28.4 11.4,26.3 11,23.6 C10.8,21.6 11.2,19.6 10.8,17.4 C10.6,16.2 11.4,15.6 10.5,15 Z" style="display: none; fill: #feffbf; stroke: #feffbf; stroke-miterlimit: 10;" data-active="1"/>
+      </g>
+      <g id="gic" data-active="1">
+        <path id="filling-gic-occlusal" d="M17.8,21.3 C17.2,19.5 18.6,17.7 20.6,18.3 C22.4,18.9 23.1,17.5 24.4,18.3 C25.9,19.2 25.5,21.1 24.2,21.8 C22.6,22.4 22.5,23.8 20.8,24.1 C19,24.3 17.9,22.9 17.8,21.3 Z" style="display: none; fill: #f9ae94; stroke: #f99; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-gic-buccal" d="M16.4,10.8 C16.7,9.1 18.4,8.4 20.2,9 C21.5,9.3 22.6,10.2 23.7,9.4 C25,8.2 27.2,8.7 27.5,10.7 C27.8,12.4 24.4,12.8 21.7,12 C19,11.2 16.5,12.4 16.4,10.8 Z" style="display: none; fill: #f9ae94; stroke: #f99; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-gic-lingual" d="M16.4,31 C16.7,32.7 18.5,33.5 20.2,33 C21.5,32.6 22.7,31.7 23.7,32.3 C25.2,33.1 27.3,32.4 27.4,30.6 C27.5,29.3 24.4,28.8 21.8,29.4 C19.1,30 16.5,29.4 16.4,31 Z" style="display: none; fill: #f9ae94; stroke: #f99; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-gic-mesial" d="M31.5,15 C32.9,14.1 34,14.8 33.6,17.3 C33.1,19.2 32.5,21.1 33.1,23.5 C33.4,25.1 34.1,26.9 32.8,27.8 C31.8,28.4 30.6,26.3 31,23.6 C31.2,21.6 30.8,19.6 31.2,17.4 C31.4,16.2 30.6,15.6 31.5,15 Z" style="display: none; fill: #f9ae94; stroke: #f99; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-gic-distal" d="M10.5,15 C9.1,14.1 8,14.8 8.4,17.3 C8.9,19.2 9.5,21.1 8.9,23.5 C8.6,25.1 7.9,26.9 9.2,27.8 C10.2,28.4 11.4,26.3 11,23.6 C10.8,21.6 11.2,19.6 10.8,17.4 C10.6,16.2 11.4,15.6 10.5,15 Z" style="display: none; fill: #f9ae94; stroke: #f99; stroke-miterlimit: 10;" data-active="1"/>
+      </g>
+      <g id="temporary" data-active="1">
+        <path id="filling-temporary-occlusal" d="M17.8,21.3 C17.2,19.5 18.6,17.7 20.6,18.3 C22.4,18.9 23.1,17.5 24.4,18.3 C25.9,19.2 25.5,21.1 24.2,21.8 C22.6,22.4 22.5,23.8 20.8,24.1 C19,24.3 17.9,22.9 17.8,21.3 Z" style="display: none; fill: #fff; stroke: #eee; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-temporary-buccal" d="M16.4,10.8 C16.7,9.1 18.4,8.4 20.2,9 C21.5,9.3 22.6,10.2 23.7,9.4 C25,8.2 27.2,8.7 27.5,10.7 C27.8,12.4 24.4,12.8 21.7,12 C19,11.2 16.5,12.4 16.4,10.8 Z" style="display: none; fill: #fff; stroke: #eee; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-temporary-lingual" d="M16.4,31 C16.7,32.7 18.5,33.5 20.2,33 C21.5,32.6 22.7,31.7 23.7,32.3 C25.2,33.1 27.3,32.4 27.4,30.6 C27.5,29.3 24.4,28.8 21.8,29.4 C19.1,30 16.5,29.4 16.4,31 Z" style="display: none; fill: #fff; stroke: #eee; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-temporary-mesial" d="M31.5,15 C32.9,14.1 34,14.8 33.6,17.3 C33.1,19.2 32.5,21.1 33.1,23.5 C33.4,25.1 34.1,26.9 32.8,27.8 C31.8,28.4 30.6,26.3 31,23.6 C31.2,21.6 30.8,19.6 31.2,17.4 C31.4,16.2 30.6,15.6 31.5,15 Z" style="display: none; fill: #fff; stroke: #eee; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="filling-temporary-distal" d="M10.5,15 C9.1,14.1 8,14.8 8.4,17.3 C8.9,19.2 9.5,21.1 8.9,23.5 C8.6,25.1 7.9,26.9 9.2,27.8 C10.2,28.4 11.4,26.3 11,23.6 C10.8,21.6 11.2,19.6 10.8,17.4 C10.6,16.2 11.4,15.6 10.5,15 Z" style="display: none; fill: #fff; stroke: #eee; stroke-miterlimit: 10;" data-active="1"/>
+      </g>
+    </g>
+    <g id="caries" data-active="1">
+      <path id="caries-buccal" d="M16.4,10.8 C16.7,9.1 18.4,8.4 20.2,9 C21.5,9.3 22.6,10.2 23.7,9.4 C25,8.2 27.2,8.7 27.5,10.7 C27.8,12.4 24.4,12.8 21.7,12 C19,11.2 16.5,12.4 16.4,10.8 Z" style="display: none; fill: #0a1018; stroke: #000; stroke-miterlimit: 10;" data-active="1"/>
+      <path id="caries-lingual" d="M16.4,31 C16.7,32.7 18.5,33.5 20.2,33 C21.5,32.6 22.7,31.7 23.7,32.3 C25.2,33.1 27.3,32.4 27.4,30.6 C27.5,29.3 24.4,28.8 21.8,29.4 C19.1,30 16.5,29.4 16.4,31 Z" style="display: none; fill: #0a1018; stroke: #000; stroke-miterlimit: 10;" data-active="1"/>
+      <g id="caries-mesial" style="display: none;" data-active="1">
+        <path id="mesial-shape" d="M31.5,15 C32.9,14.1 34,14.8 33.6,17.3 C33.1,19.2 32.5,21.1 33.1,23.5 C33.4,25.1 34.1,26.9 32.8,27.8 C31.8,28.4 30.6,26.3 31,23.6 C31.2,21.6 30.8,19.6 31.2,17.4 C31.4,16.2 30.6,15.6 31.5,15 Z" style="fill: #0a1018; stroke: #000; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="mesial-patch1" d="M32.7,16.6 C33.2,16.1 33.6,16.6 33.3,17.4 C33,17.9 32.3,17.6 32.7,16.6 Z" style="fill: #fff;" data-active="1"/>
+        <path id="mesial-patch2" d="M32.2,24.5 C32.9,24 33.2,24.6 33,25.6 C32.6,26.1 31.9,25.8 32.2,24.5 Z" style="fill: #fff;" data-active="1"/>
+      </g>
+      <g id="caries-distal" style="display: none;" data-active="1">
+        <path id="distal-shape" d="M10.5,15 C9.1,14.1 8,14.8 8.4,17.3 C8.9,19.2 9.5,21.1 8.9,23.5 C8.6,25.1 7.9,26.9 9.2,27.8 C10.2,28.4 11.4,26.3 11,23.6 C10.8,21.6 11.2,19.6 10.8,17.4 C10.6,16.2 11.4,15.6 10.5,15 Z" style="fill: #0a1018; stroke: #000; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="distal-patch1" d="M9.3,16.6 C8.8,16.1 8.4,16.6 8.7,17.4 C9,17.9 9.7,17.6 9.3,16.6 Z" style="fill: #fff;" data-active="1"/>
+        <path id="distal-patch2" d="M9.8,24.5 C9.1,24 8.8,24.6 9,25.6 C9.4,26.1 10.1,25.8 9.8,24.5 Z" style="fill: #fff;" data-active="1"/>
+      </g>
+      <g id="caries-occlusal" style="display: none;" data-active="1">
+        <path id="occlusal-shape" d="M17.8,21.3 C17.2,19.5 18.6,17.7 20.6,18.3 C22.4,18.9 23.1,17.5 24.4,18.3 C25.9,19.2 25.5,21.1 24.2,21.8 C22.6,22.4 22.5,23.8 20.8,24.1 C19,24.3 17.9,22.9 17.8,21.3 Z" style="fill: #0a1018; stroke: #000; stroke-miterlimit: 10;" data-active="1"/>
+        <path id="occlusal-patch1" d="M19.6,20.1 C20.3,19.7 20.7,20.5 20,20.9 C19.2,21 19,20.3 19.6,20.1 Z" style="fill: #fff;" data-active="1"/>
+        <path id="occlusal-patch2" d="M22.4,21.3 C23.3,20.9 23.7,21.8 22.8,22.2 C21.9,22.3 21.9,21.5 22.4,21.3 Z" style="fill: #fff;" data-active="1"/>
+      </g>
+    </g>
+  </g>
+  <g id="specials" data-active="1">
+    <g id="missing-closed" style="display: none;" data-active="1">
+      <line x1="6" y1="6" x2="36" y2="36" style="stroke: #000; stroke-width: 2;" data-active="1"/>
+      <line x1="6" y1="36" x2="36" y2="6" style="stroke: #000; stroke-width: 2;" data-active="1"/>
+    </g>
+  </g>
+</svg>

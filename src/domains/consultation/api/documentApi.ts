@@ -11,12 +11,12 @@ export interface GeneratedDocumentResponse {
 }
 
 export const documentApi = {
-  generate(consultationId: string, type: string, meta?: Record<string, unknown>): Promise<{ data: GeneratedDocumentResponse }> {
-    return http.post<{ data: GeneratedDocumentResponse }>(`/consultations/${consultationId}/documents`, { type, ...(meta ? { meta } : {}) })
+  generate(encounterId: string, type: string, meta?: Record<string, unknown>): Promise<{ data: GeneratedDocumentResponse }> {
+    return http.post<{ data: GeneratedDocumentResponse }>(`/encounters/${encounterId}/documents`, { type, ...(meta ? { meta } : {}) })
   },
 
-  list(consultationId: string): Promise<{ data: GeneratedDocumentResponse[] }> {
-    return http.get<{ data: GeneratedDocumentResponse[] }>(`/consultations/${consultationId}/documents`)
+  list(encounterId: string): Promise<{ data: GeneratedDocumentResponse[] }> {
+    return http.get<{ data: GeneratedDocumentResponse[] }>(`/encounters/${encounterId}/documents`)
   },
 
   async getSignedUrl(documentId: string): Promise<string> {
