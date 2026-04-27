@@ -24,6 +24,8 @@ function isRemoval(v: unknown): boolean {
 
 function hasAnyLiveSurface(map: unknown): boolean {
   if (!map || typeof map !== 'object') return false
+  // Field-level `{__remove: true}` is a clear, not a live finding.
+  if (isRemoval(map)) return false
   for (const k of SURFACE_FIELDS) {
     const leaf = (map as Record<string, unknown>)[k]
     if (leaf == null) continue

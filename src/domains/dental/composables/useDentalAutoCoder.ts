@@ -202,6 +202,14 @@ export function resolveDentalCode(q: AutoCoderQuery): string | undefined {
       // RCT codes depend on tooth class; refuse to resolve without a tooth
       // rather than silently pricing as molar.
       if (!q.tooth) return undefined
+      // Primary teeth use pulpal-therapy codes (D3230 anterior /
+      // D3240 posterior) instead of full root-canal codes — distinct
+      // billing and clinically pulpotomy-style. Without this branch the
+      // resolver returned the adult anterior code D3310 for a primary
+      // anterior tooth, which insurance rejects.
+      if (isPrimaryTooth(q.tooth)) {
+        return isAnteriorTooth(q.tooth) ? 'D3230' : 'D3240'
+      }
       if (isAnteriorTooth(q.tooth)) return 'D3310'
       if (isPremolarTooth(q.tooth)) return 'D3320'
       if (isMolarTooth(q.tooth)) return 'D3330'
@@ -209,6 +217,11 @@ export function resolveDentalCode(q: AutoCoderQuery): string | undefined {
     }
     case 'rct_retreatment': {
       if (!q.tooth) return undefined
+      // Primary teeth don't have a retreatment code — fall back to the
+      // pulpal-therapy code clinically appropriate for the tooth.
+      if (isPrimaryTooth(q.tooth)) {
+        return isAnteriorTooth(q.tooth) ? 'D3230' : 'D3240'
+      }
       if (isPremolarTooth(q.tooth)) return 'D3347'
       if (isMolarTooth(q.tooth)) return 'D3348'
       // Anterior retreat isn't a standalone code in our seeder;

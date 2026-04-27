@@ -746,7 +746,21 @@ function hydrateFromVisit() {
   followUpAppointmentId.value = p.follow_up_appointment_id ?? null
 }
 
-watch(visit, hydrateFromVisit, { immediate: true })
+// Hydrate only when the encounter identity changes — server replies to a
+// PATCH save shouldn't reset local refs (the local IS what we just sent;
+// the server reply often arrives mid-keystroke and would silently drop
+// in-progress edits to the diagnoses textarea or odontogramDelta).
+const hydratedEncounterUuid = ref<string | null>(null)
+watch(
+  visit,
+  (v) => {
+    const id = (v as { uuid?: string } | null)?.uuid ?? null
+    if (id !== null && id === hydratedEncounterUuid.value) return
+    hydratedEncounterUuid.value = id
+    hydrateFromVisit()
+  },
+  { immediate: true },
+)
 
 // Apply a stamped delta to a base tooth, honouring `{ __remove: true }`
 // sentinels at every leaf the same way the backend OdontogramMergeService
@@ -764,9 +778,18 @@ function mergeToothDelta(base: StampedToothState, delta: Partial<StampedToothSta
   for (const f of SURFACE_FIELDS) {
     const incoming = (delta as Record<string, unknown>)[f] as Record<string, unknown> | undefined
     if (!incoming) continue
+    // Field-level `{ __remove: true }` wipes the entire surface map
+    // (e.g. extraction clearing all caries on the tooth in one shot).
+    // Without this, the sentinel was being interpreted as a surface
+    // called "__remove" and the existing surfaces were never cleared.
+    if (isRemoveLeaf(incoming)) {
+      delete out[f]
+      continue
+    }
     const baseSurfaces = ((base as Record<string, unknown>)[f] as Record<string, unknown> | undefined) ?? {}
     const next: Record<string, unknown> = { ...baseSurfaces }
     for (const [surf, leaf] of Object.entries(incoming)) {
+      if (surf === '__remove') continue
       if (isRemoveLeaf(leaf)) {
         delete next[surf]
       } else {

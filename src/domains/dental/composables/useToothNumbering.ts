@@ -107,7 +107,10 @@ export function parseToothInput(input: string, system: ToothNumbering): number |
   if (system === 'universal') {
     const upper = s.toUpperCase()
     if (UNIVERSAL_PRIMARY_TO_FDI[upper] != null) return UNIVERSAL_PRIMARY_TO_FDI[upper]
-    return UNIVERSAL_PERMANENT_TO_FDI[s] ?? null
+    // Strip leading zeros so "08" matches the lookup key "8". Without
+    // this the picker silently rejected zero-padded input.
+    const numeric = s.replace(/^0+(?=\d)/, '')
+    return UNIVERSAL_PERMANENT_TO_FDI[numeric] ?? null
   }
   return palmerToFdi(s)
 }

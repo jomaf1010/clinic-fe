@@ -196,6 +196,33 @@ function clearFollowUp(): void {
 
 <template>
   <div v-if="hasAppointments" class="flex flex-col gap-4">
+    <!-- Orphaned date warning — `followUp` is set but no appointment id
+         exists (failed booking, legacy data, or a clear that didn't
+         finish). Surfaced before the picker so the dentist sees the
+         dangling date instead of being confronted with an empty form. -->
+    <div
+      v-if="!appointmentBooked && followUp && !disabled"
+      class="flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-500/40 dark:bg-amber-500/10"
+    >
+      <CalendarDays class="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div class="flex-1">
+        <p class="text-sm font-medium text-amber-900 dark:text-amber-200">
+          Saved follow-up date with no booking
+        </p>
+        <p class="text-xs text-amber-800 dark:text-amber-300">
+          {{ followUpDisplay }} — pick a time-slot below to confirm, or clear it.
+        </p>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="size-7 text-amber-700 hover:text-destructive dark:text-amber-300"
+        @click="clearFollowUp"
+      >
+        <X class="size-4" />
+      </Button>
+    </div>
+
     <!-- Booked state -->
     <div
       v-if="appointmentBooked && followUp"

@@ -62,7 +62,11 @@ watch(
 )
 
 function formatDate(iso: string | null): string {
-  if (!iso) return '—'
+  // An event without a date typically comes from an encounter that was
+  // created but not finalized (visit_date is set on finalize). "Pending
+  // visit" reads better than a cryptic em-dash and signals to the dentist
+  // that the row is real but not yet locked in.
+  if (!iso) return 'Pending visit'
   try {
     const d = new Date(iso)
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
