@@ -1,11 +1,14 @@
 import { http } from '@/lib/http'
 import type {
   DentalProfile,
+  DentalServiceCatalogEntry,
+  DentalToothHistory,
   DentalTreatmentPlan,
   DentalVisitDetail,
   UpsertDentalProfilePayload,
   CreateTreatmentPlanPayload,
   UpdateTreatmentPlanPayload,
+  UpdateDentalServicePayload,
   UpdateDentalVisitPayload,
 } from '../types/dental.types'
 
@@ -48,5 +51,19 @@ export const dentalApi = {
   },
   deleteVisit(patientId: string, visitId: string): Promise<void> {
     return http.delete(`/patients/${patientId}/dental-visits/${visitId}`) as Promise<void>
+  },
+
+  // Service catalog / fee schedule
+  listServices(): Promise<{ data: DentalServiceCatalogEntry[] }> {
+    return http.get('/dental/services') as Promise<{ data: DentalServiceCatalogEntry[] }>
+  },
+  updateService(clinicServiceUuid: string, payload: UpdateDentalServicePayload): Promise<{ data: DentalServiceCatalogEntry }> {
+    return http.patch(`/dental/services/${clinicServiceUuid}`, payload) as Promise<{ data: DentalServiceCatalogEntry }>
+  },
+
+  // Per-tooth history (aggregated across profile, visits, and treatment plans)
+  toothHistory(patientId: string, tooth: string): Promise<{ data: DentalToothHistory }> {
+    const qs = new URLSearchParams({ tooth }).toString()
+    return http.get(`/patients/${patientId}/dental-history?${qs}`) as Promise<{ data: DentalToothHistory }>
   },
 }

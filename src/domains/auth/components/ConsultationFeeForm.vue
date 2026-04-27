@@ -12,11 +12,13 @@ import { useAuthStore } from '../stores/authStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import { authApi } from '../api/authApi'
 import type { ValidationError } from '../types/auth.types'
+import DentalBillingTab from '@/domains/dental/components/DentalBillingTab.vue'
 
 const authStore = useAuthStore()
 const specialtyConfigStore = useSpecialtyConfigStore()
 
 const isObgyn = computed(() => specialtyConfigStore.config?.key === 'obgyn')
+const isDental = computed(() => specialtyConfigStore.config?.key === 'dental')
 
 const consultationFee = ref(
   authStore.user?.consultation_fee != null ? String(authStore.user.consultation_fee) : '',
@@ -201,6 +203,13 @@ async function onSubmit() {
     </CardContent>
 
     <Separator />
+
+    <!-- Dental fee schedule (dental only) -->
+    <CardContent v-if="isDental" class="pt-6">
+      <DentalBillingTab />
+    </CardContent>
+
+    <Separator v-if="isDental" />
 
     <CardFooter class="flex flex-col items-stretch gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
       <p class="text-center text-xs text-muted-foreground sm:text-left">These fees are used as defaults for consultation payments.</p>

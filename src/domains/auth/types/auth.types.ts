@@ -36,12 +36,23 @@ export interface Membership {
   is_trial: boolean
 }
 
+export type ToothNumberingPreference = 'fdi' | 'universal' | 'palmer'
+
 export interface ClinicSettings {
   default_consultation_fee?: number | null
   default_follow_up_fee?: number | null
   auto_generate_prescription_pdf?: boolean
   prescription_quantity_mode?: 'absolute' | 'adjusted'
   auto_regenerate_pdf_on_qty_change?: boolean
+  /** Display-only — odontogram persistence is always FDI. Acts as the
+   *  clinic-wide default; individual users can override on their profile. */
+  tooth_numbering?: ToothNumberingPreference | null
+}
+
+export interface UserPreferences {
+  /** When set, overrides the clinic's `tooth_numbering` default for this
+   *  user. Null/undefined = inherit from clinic. */
+  tooth_numbering?: ToothNumberingPreference | null
 }
 
 export interface PlanLimit {
@@ -98,6 +109,7 @@ export interface User {
   onboarding_completed: boolean
   current_clinic: ClinicContext | null
   theme: 'light' | 'dark' | null
+  preferences: UserPreferences | null
 }
 
 export type LoginResponse = {

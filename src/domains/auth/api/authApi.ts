@@ -32,7 +32,10 @@ export const authApi = {
     return http.post<SelectClinicResponse>('/auth/select-clinic', { clinic_id: clinicId })
   },
 
-  async updatePreferences(data: { theme: 'light' | 'dark' }): Promise<void> {
+  async updatePreferences(data: {
+    theme?: 'light' | 'dark'
+    tooth_numbering?: 'fdi' | 'universal' | 'palmer' | null
+  }): Promise<void> {
     await http.patch('/auth/preferences', data)
   },
 

@@ -68,6 +68,17 @@ The only shared assets are ZoliQua's gum-line (`gum-line-1`,
 
 Released under the MIT license.
 
+### Bridge restoration overlays (added 2026-04-26)
+
+`11_occl.svg` and `13_occl.svg` now also carry a `<g id="restorations">`
+group with `prosthesis`, `telescope`, `zircon`, `metal`, and
+`temporary-restorations` sub-groups (each containing a `*-bridge-connector`
+or `*-connector` and a `*-crown` path). The path `d` data was **copied
+verbatim from `14_occl.svg`** so the bridge UI works on incisor / canine
+occlusal cells without the dentist seeing a blank cell when bridge
+material is set. Anatomically the crown shape is a premolar — replace
+with proper anterior versions when authoring time is available.
+
 ## Phase-2 plan
 
 Replace each file with an in-house original once we have bandwidth for

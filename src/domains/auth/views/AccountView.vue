@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Camera, LoaderCircle, User, Lock, Stethoscope, Banknote } from 'lucide-vue-next'
+import { Camera, LoaderCircle, User, Lock, Stethoscope, Banknote, SlidersHorizontal } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../api/authApi'
@@ -13,6 +13,7 @@ import ProfileForm from '../components/ProfileForm.vue'
 import PasswordForm from '../components/PasswordForm.vue'
 import CredentialsForm from '../components/CredentialsForm.vue'
 import ConsultationFeeForm from '../components/ConsultationFeeForm.vue'
+import PreferencesForm from '../components/PreferencesForm.vue'
 import ImageCropDialog from '@/components/ImageCropDialog.vue'
 
 const authStore = useAuthStore()
@@ -127,6 +128,10 @@ async function handleAvatarCrop(blob: Blob) {
           <Banknote class="size-3.5" />
           Financial/Billing
         </TabsTrigger>
+        <TabsTrigger v-if="isDoctor" value="preferences" class="gap-1.5">
+          <SlidersHorizontal class="size-3.5" />
+          Preferences
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="profile" class="mt-4">
@@ -143,6 +148,10 @@ async function handleAvatarCrop(blob: Blob) {
 
       <TabsContent v-if="isDoctor" value="financial" class="mt-4">
         <ConsultationFeeForm />
+      </TabsContent>
+
+      <TabsContent v-if="isDoctor" value="preferences" class="mt-4">
+        <PreferencesForm />
       </TabsContent>
     </Tabs>
 

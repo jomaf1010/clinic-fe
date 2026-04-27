@@ -13,8 +13,9 @@ import { LoaderCircle, Plus, Stethoscope } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { RouteNames } from '@/router/routeNames'
-import OdontogramChart from './OdontogramChart.vue'
+import DentalChart from './DentalChart.vue'
 import DmftBadge from './DmftBadge.vue'
+import type { StampedOdontogram } from '../types/dental.types'
 
 const pdStore = usePatientDetailStore()
 const router = useRouter()
@@ -26,7 +27,9 @@ onMounted(() => {
 })
 
 const profile = computed(() => pdStore.dentalProfile)
-const showPrimaryTeeth = computed(() => (pdStore.patientAge ?? 99) < 12)
+const stampedOdontogram = computed<StampedOdontogram>(
+  () => (profile.value?.odontogram ?? {}) as StampedOdontogram,
+)
 const activePlans = computed(() => pdStore.dentalTreatmentPlans.filter((p) => p.status === 'active'))
 const recentVisits = computed(() => pdStore.dentalVisits.slice(0, 3))
 
@@ -76,12 +79,7 @@ function newDentalVisit() {
     <div v-else-if="!profile" class="rounded-lg border-dashed border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
       No dental profile yet. Start a dental visit to begin charting.
     </div>
-    <OdontogramChart
-      v-else
-      :model-value="profile.odontogram"
-      :show-primary="showPrimaryTeeth"
-      readonly
-    />
+    <DentalChart v-else :stamped="stampedOdontogram" />
   </section>
 
   <!-- Active treatment plans -->
