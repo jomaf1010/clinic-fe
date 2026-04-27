@@ -196,7 +196,13 @@ function projectPlanItem(
       plan_item_id: item.id,
       cdt_code: item.procedure,
     })
-    tooth.missing = { status: 'proposed' }
+    // Don't downgrade an already-existing missing tooth to "proposed".
+    // A tooth that was extracted years ago shouldn't suddenly visually
+    // become "planned for extraction" because the dentist added a
+    // bookkeeping plan item on it.
+    if (tooth.missing?.status !== 'existing') {
+      tooth.missing = { status: 'proposed' }
+    }
   } else {
     tooth.layers.push({
       field,

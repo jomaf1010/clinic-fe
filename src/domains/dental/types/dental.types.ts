@@ -15,7 +15,7 @@ export type FractureVariant =
   | 'mesial' | 'distal' | 'incisal' | 'mesial-distal' | 'mesial-incisal'
   | 'distal-incisal' | 'mesial-distal-incisal'
 export type SealantValue = 'partial' | 'complete' | 'lost'
-export type EndoType = 'endo-filling' | 'endo-filling-incomplete' | 'endo-resection'
+export type EndoType = 'endo-filling' | 'endo-filling-incomplete' | 'endo-resection' | 'pulpotomy'
 export type PostMaterial = 'glass' | 'metal'
 export type ImplantStage = 'base' | 'healing-abutment' | 'bar' | 'locator-screw'
 export type BridgeMaterial = 'zircon' | 'metal' | 'telescope' | 'temporary' | 'prosthesis'

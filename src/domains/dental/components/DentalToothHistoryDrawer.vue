@@ -36,17 +36,26 @@ const history = ref<DentalToothHistory | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// Track the in-flight request key so a stale response (e.g. tooth 16
+// resolving after the user already clicked tooth 17) doesn't overwrite
+// the newer load.
+let activeRequestKey: string | null = null
+
 async function load(patientId: string, tooth: string) {
+  const requestKey = `${patientId}|${tooth}|${Date.now()}`
+  activeRequestKey = requestKey
   loading.value = true
   error.value = null
   try {
     const res = await dentalApi.toothHistory(patientId, tooth)
+    if (activeRequestKey !== requestKey) return  // newer fetch took over
     history.value = res.data
   } catch (err) {
+    if (activeRequestKey !== requestKey) return
     error.value = err instanceof Error ? err.message : 'Failed to load tooth history.'
     history.value = null
   } finally {
-    loading.value = false
+    if (activeRequestKey === requestKey) loading.value = false
   }
 }
 

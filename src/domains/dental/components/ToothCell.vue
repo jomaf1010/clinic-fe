@@ -297,7 +297,10 @@ watch(() => props.fdi, () => {
         'is-active': isActive,
         'is-selected': isSelected,
         'is-hovered': isHovered,
-        'is-missing': !!stampedState?.missing,
+        // Stamped path drives the chart while editing; display path
+        // drives read-only callers (history snapshots, projected
+        // profile views). Either signal qualifies.
+        'is-missing': !!stampedState?.missing || displayState?.missing?.status === 'existing',
       },
     ]"
     role="button"
@@ -331,7 +334,10 @@ watch(() => props.fdi, () => {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-    <TooltipProvider v-if="hasPerio && variant === 'buccal'" :delay-duration="150">
+    <!-- Hide the perio indicator on a missing tooth — `perio_chart`
+         entries from before the tooth was extracted linger and would
+         otherwise paint a red dot on an empty socket. -->
+    <TooltipProvider v-if="hasPerio && variant === 'buccal' && !stampedState?.missing" :delay-duration="150">
       <Tooltip>
         <TooltipTrigger as-child>
           <span

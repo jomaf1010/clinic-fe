@@ -208,7 +208,18 @@ function onClearPerioForTooth(fdi: number) {
 // the sidebar Mobility chip stay in sync.
 function onPerioMobilityModChange(fdi: number, present: boolean) {
   const key = String(fdi)
-  const has = !!renderedStampedOdontogram.value[key]?.mods?.some((m) => m.kind === 'mobility')
+  // Read directly from the merged delta + profile mods map (skipping
+  // `renderedStampedOdontogram`'s virtual-mobility injection from
+  // `perio_chart`). The injection is exactly the source we're trying to
+  // sync FROM — if we read it back we get a stale view because Vue
+  // batches computed invalidation until the next flush.
+  const profileMods = (profile.value?.odontogram?.[key] as { mods?: Array<{ kind?: string; __remove?: boolean }> } | undefined)?.mods ?? []
+  const deltaMods = (odontogramDelta.value[key] as { mods?: Array<{ kind?: string; __remove?: boolean }> } | undefined)?.mods ?? []
+  // Last write per kind wins (matches OdontogramMergeService).
+  const map = new Map<string, boolean>()
+  for (const m of profileMods) if (m.kind) map.set(m.kind, !(m.__remove === true))
+  for (const m of deltaMods) if (m.kind) map.set(m.kind, !(m.__remove === true))
+  const has = map.get('mobility') === true
   if (has === present) return
   onToothSave(key, {
     mods: [{ kind: 'mobility', ...(present ? {} : { __remove: true }) }] as never,
@@ -232,7 +243,7 @@ const paymentDiagnoses = computed(() => {
 // name so the billing breakdown reads naturally:
 //   "D2393 Composite filling — #16 MOD · composite"
 const paymentProcedures = computed(() => {
-  return procedures.value.map((p) => {
+  return procedures.value.map((p, i) => {
     const teethLabel = (p.teeth ?? []).map((t) => `#${formatActiveTooth(Number(t))}`).join(', ')
     const surfacesLabel = (p.surfaces ?? []).map((s) => s.charAt(0).toUpperCase()).join('')
     const detailParts = [teethLabel || null, surfacesLabel || null, p.material ?? null]
@@ -241,8 +252,13 @@ const paymentProcedures = computed(() => {
     const name = detailParts.length > 0
       ? `${codePrefix}${p.procedure} — ${detailParts.join(' · ')}`
       : `${codePrefix}${p.procedure}`
+    // Suffix the index when no stable id exists — two auto-coder
+    // procedures with the same CDT code on different teeth would
+    // otherwise collide on the v-for `:key` in PaymentTab's
+    // breakdown and Vue would patch the wrong row.
+    const stableId = p.service_id ?? p.id ?? `${p.cdt_code ?? p.procedure}#${i}`
     return {
-      service_id: p.service_id ?? p.id ?? p.cdt_code ?? p.procedure,
+      service_id: stableId,
       name,
       quantity: 1,
       unit_price: typeof p.billable_amount === 'number' ? p.billable_amount : null,
@@ -993,17 +1009,27 @@ async function saveAssessment() {
   // Encounter API expects structured diagnoses ({description, source, ...}).
   // Dental UI keeps them as plain text in a textarea; wrap each line so the
   // request validator accepts the payload.
-  const diagnoses: DentalDiagnosis[] = diagnosesText.value
+  const lines = diagnosesText.value
     .split('\n').map((s) => s.trim()).filter(Boolean)
-    .map((description) => {
-      const code = diagnosisCodeMap.value[description] ?? null
-      return {
-        description,
-        code,
-        diagnosis_id: null,
-        source: code ? 'icd' : 'manual',
-      }
-    })
+  const diagnoses: DentalDiagnosis[] = lines.map((description) => {
+    const code = diagnosisCodeMap.value[description] ?? null
+    return {
+      description,
+      code,
+      diagnosis_id: null,
+      source: code ? 'icd' : 'manual',
+    }
+  })
+
+  // Prune the code map to only keys that still exist in the textarea —
+  // editing a description after accepting a suggestion used to leave a
+  // stale entry behind, which could later auto-attach the old code to a
+  // different (but identically-worded) line. Plus the map otherwise
+  // grows unbounded across a long charting session.
+  const stillPresent = new Set(lines)
+  diagnosisCodeMap.value = Object.fromEntries(
+    Object.entries(diagnosisCodeMap.value).filter(([k]) => stillPresent.has(k)),
+  )
 
   const payload: { assessment: DentalVisitAssessment } = {
     assessment: {

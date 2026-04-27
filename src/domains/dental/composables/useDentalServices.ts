@@ -1,4 +1,5 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { dentalApi } from '../api/dentalApi'
 import type {
   DentalServiceCatalogEntry,
@@ -9,11 +10,15 @@ import type {
 /**
  * Central access point for a clinic's dental fee schedule.
  *
- * - Fetched once per session (lazy on first consumer).
- * - Components read through computed getters; mutations go through
- *   `updateService` which patches the backend and refreshes cache.
- * - `findByCode(code)` returns a single entry (used by the auto-coder
- *   composable in Phase 5).
+ * - Fetched lazily on first consumer.
+ * - Cache invalidates when the active clinic changes (clinic switch /
+ *   logout / re-login) so a dentist who moves between clinics doesn't
+ *   bill with the prior clinic's prices. The cache also invalidates
+ *   on `window.focus` so a price change made by the clinic admin in
+ *   another tab is picked up the next time the dentist looks at the
+ *   chart.
+ * - `updateService` patches the backend and refreshes cache for the
+ *   originating tab.
  */
 
 const services = ref<DentalServiceCatalogEntry[]>([])
@@ -22,6 +27,36 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 let pendingLoad: Promise<void> | null = null
+let initialised = false
+
+function invalidate(): void {
+  services.value = []
+  loaded.value = false
+  pendingLoad = null
+}
+
+function bindCacheBusters(): void {
+  if (initialised || typeof window === 'undefined') return
+  initialised = true
+
+  const auth = useAuthStore()
+  // Clinic switch / logout — pricing belongs to the active clinic.
+  watch(
+    () => auth.currentClinic?.id ?? null,
+    (next, prev) => {
+      if (prev != null && prev !== next) invalidate()
+    },
+  )
+
+  // Cross-tab freshness — clinic admin tweaks a price in another tab,
+  // dentist's tab refetches on next focus instead of running stale
+  // until full reload.
+  window.addEventListener('focus', () => {
+    if (loaded.value) {
+      void ensureLoaded(true)
+    }
+  })
+}
 
 async function ensureLoaded(force = false): Promise<void> {
   if (loaded.value && !force) return
@@ -62,6 +97,8 @@ async function updateService(clinicServiceUuid: string, payload: UpdateDentalSer
 }
 
 export function useDentalServices() {
+  bindCacheBusters()
+
   const groupedByCategory = computed<Record<DentalServiceCategory, DentalServiceCatalogEntry[]>>(() => {
     const groups: Partial<Record<DentalServiceCategory, DentalServiceCatalogEntry[]>> = {}
     for (const s of services.value) {
