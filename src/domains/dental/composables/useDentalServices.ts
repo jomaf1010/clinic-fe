@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, effectScope, ref, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { dentalApi } from '../api/dentalApi'
 import type {
@@ -35,26 +35,49 @@ function invalidate(): void {
   pendingLoad = null
 }
 
+// Detached scope so the watcher gets a stop handle (Vite HMR can call
+// `cacheBusterScope.stop()` to release it) and the focus listener is
+// trackable. Without this, both leaked across hot reloads in dev and
+// across logout/login in long-lived production sessions.
+const cacheBusterScope = effectScope(true)
+let cacheBusterFocusHandler: (() => void) | null = null
+
 function bindCacheBusters(): void {
   if (initialised || typeof window === 'undefined') return
   initialised = true
 
-  const auth = useAuthStore()
-  // Clinic switch / logout — pricing belongs to the active clinic.
-  watch(
-    () => auth.currentClinic?.id ?? null,
-    (next, prev) => {
-      if (prev != null && prev !== next) invalidate()
-    },
-  )
+  cacheBusterScope.run(() => {
+    const auth = useAuthStore()
+    // Clinic switch / logout — pricing belongs to the active clinic.
+    watch(
+      () => auth.currentClinic?.id ?? null,
+      (next, prev) => {
+        if (prev != null && prev !== next) invalidate()
+      },
+    )
+  })
 
   // Cross-tab freshness — clinic admin tweaks a price in another tab,
   // dentist's tab refetches on next focus instead of running stale
   // until full reload.
-  window.addEventListener('focus', () => {
+  cacheBusterFocusHandler = () => {
     if (loaded.value) {
       void ensureLoaded(true)
     }
+  }
+  window.addEventListener('focus', cacheBusterFocusHandler)
+}
+
+// HMR cleanup so dev hot-reloads don't compound watchers / listeners.
+// Production runs once and these never fire.
+if (typeof import.meta !== 'undefined' && import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    cacheBusterScope.stop()
+    if (cacheBusterFocusHandler && typeof window !== 'undefined') {
+      window.removeEventListener('focus', cacheBusterFocusHandler)
+      cacheBusterFocusHandler = null
+    }
+    initialised = false
   })
 }
 

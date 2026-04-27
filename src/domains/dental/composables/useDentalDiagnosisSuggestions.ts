@@ -112,6 +112,21 @@ export function suggestDentalDiagnoses(
     }
   }
 
+  // Also detect mobility from `perio_chart[fdi].mobility > 0` even when
+  // the mods list doesn't have the mobility kind. The view used to feed
+  // a virtual-injected odontogram that already had the mod, but that
+  // injection now lives downstream of suggestions to avoid invalidating
+  // the suggestion walk on every PD keystroke. Pulling mobility from
+  // both signals keeps the K08.81 suggestion correct.
+  for (const [rawFdi, rec] of Object.entries(perio ?? {})) {
+    if (!rec || (rec.mobility ?? 0) <= 0) continue
+    const fdi = Number(rawFdi.startsWith('t') ? rawFdi.slice(1) : rawFdi)
+    if (!Number.isFinite(fdi)) continue
+    if (!teethByCategory.mobility!.includes(fdi)) {
+      teethByCategory.mobility!.push(fdi)
+    }
+  }
+
   if (teethByCategory.caries!.length > 0) {
     const t = teethByCategory.caries!.sort((a, b) => a - b)
     const severeTeeth = teethByCategory.cariesSevere!.sort((a, b) => a - b)

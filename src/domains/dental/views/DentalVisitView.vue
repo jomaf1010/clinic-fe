@@ -435,6 +435,10 @@ function valueToFdi(v: string): number {
 // what matters in state.
 const acSingleToothValue = computed(() => {
   const first = acTeeth.value.values().next().value
+  // Single Select can only highlight one option. Prefer the
+  // arch-group form ("16"); the session-group form ("s:16") shows
+  // un-checked but the user already sees the selection in the bottom
+  // arch grid.
   return first != null ? String(first) : undefined
 })
 
@@ -444,11 +448,20 @@ function setSingleTooth(v: string | null | undefined): void {
   if (Number.isFinite(fdi)) acTeeth.value = new Set([fdi])
 }
 
-// Multi-tooth Combobox model: array of FDI strings. Session shortcut
-// values get collapsed back to plain FDI on read.
-const acMultiToothValues = computed(() =>
-  Array.from(acTeeth.value).map(String),
-)
+// Multi-tooth Combobox model: emit BOTH the plain FDI ("16") and the
+// session-shortcut form ("s:16") for every selected tooth that has a
+// session-finding entry. That way the session-group chip and the
+// all-teeth chip both render as selected; otherwise picking from the
+// session group leaves the session chip visually un-checked despite
+// the underlying state being correct.
+const acMultiToothValues = computed(() => {
+  const out: string[] = []
+  for (const fdi of acTeeth.value) {
+    out.push(String(fdi))
+    if (sessionFindingFdis.value.has(fdi)) out.push(`s:${fdi}`)
+  }
+  return out
+})
 
 function setMultiTeeth(arr: string[] | null | undefined): void {
   if (!arr) { acTeeth.value = new Set(); return }
@@ -715,6 +728,30 @@ async function addFromAutoCoder() {
 // ── Hydrate local state from server response ─────────────────────────
 function hydrateFromVisit() {
   if (!visit.value) return
+  // Reset UI-only refs so navigating from one encounter to another
+  // doesn't carry over the previous chart's selections, dialogs, or
+  // anchor references — `quickAnchor` in particular used to point at
+  // a detached DOM element from the prior chart, which would still
+  // host the floating quick-actions panel until it was clicked away.
+  activeFdi.value = null
+  quickAnchor.value = null
+  toothDialogOpen.value = false
+  editingFdi.value = null
+  editingStampedState.value = null
+  historyDrawerOpen.value = false
+  historyFdi.value = null
+  editingProcedureIdx.value = null
+  editingProcedureDraft.value = null
+  editTeeth.value = new Set()
+  editSurfaces.value = new Set()
+  hoveredFdi.value = null
+  // Auto-coder draft state — same reasoning, plus the family-change
+  // watcher would otherwise fire on the first hydrate setting acFamily.
+  acTeeth.value = new Set()
+  acSurfaces.value = new Set()
+  acArches.value = new Set()
+  acNotes.value = ''
+
   const t = visit.value.triage ?? {}
   chiefComplaint.value = t.chief_complaint ?? ''
   painScore.value = t.pain_score ?? null
@@ -860,17 +897,28 @@ function mergeToothDelta(base: StampedToothState, delta: Partial<StampedToothSta
   return out as StampedToothState
 }
 
-const renderedStampedOdontogram = computed<StampedOdontogram>(() => {
+// Heavy merge — depends on profile + odontogramDelta only. NOT on
+// perioChart, so PD typing in the full perio chart doesn't reinvoke
+// the 32-tooth merge or the downstream suggestion walks. Suggestion
+// composables consume this lighter base and read perio mobility
+// directly from `perioChart` for the few teeth where it matters.
+const mergedOdontogram = computed<StampedOdontogram>(() => {
   const base = (profile.value?.odontogram ?? {}) as StampedOdontogram
   const merged: StampedOdontogram = { ...base }
   for (const [fdi, partial] of Object.entries(odontogramDelta.value)) {
     merged[fdi] = mergeToothDelta((base[fdi] ?? {}) as StampedToothState, partial as Partial<StampedToothState>)
   }
-  // Virtual mobility sync — if `perio_chart[fdi].mobility > 0` but the
-  // tooth has no `mobility` mod, inject one so every consumer (SVG painter,
-  // sidebar Mobility chip, perio dot tooltip) shows the tooth as mobile
-  // without having to dirty the visit. Legacy data that pre-dates the sync
-  // wiring lands here and renders correctly.
+  return merged
+})
+
+// Render-time projection — adds the virtual-mobility injection from
+// `perio_chart` so the SVG painter, sidebar mobility chip, and perio
+// dot all see the tooth as mobile without dirtying the visit. This
+// computed DOES depend on `perioChart`, so it invalidates on every PD
+// keystroke; that's tolerable because it only re-overlays per-tooth
+// mods on top of the already-cached `mergedOdontogram`.
+const renderedStampedOdontogram = computed<StampedOdontogram>(() => {
+  const merged: StampedOdontogram = { ...mergedOdontogram.value }
   for (const [rawFdi, rec] of Object.entries(perioChart.value ?? {})) {
     if (!rec || (rec.mobility ?? 0) <= 0) continue
     const fdi = rawFdi.startsWith('t') ? rawFdi.slice(1) : rawFdi
@@ -896,8 +944,13 @@ const projectedProfile = computed(() => {
 // Suggested ICD-10 diagnoses derived from the merged odontogram + perio
 // chart. Filters out anything whose description already appears in the
 // textarea so the rail is always "things you haven't accepted yet".
+// Suggestions consume `mergedOdontogram` (no perio dep) so PD typing
+// doesn't reinvoke the full odontogram walk inside the composables.
+// The composables already read `perioChart` directly for mobility /
+// pocket-depth signals, so dropping the virtual-mobility injection
+// from the input doesn't change suggestion correctness.
 const rawDiagnosisSuggestions = useDentalDiagnosisSuggestions(
-  renderedStampedOdontogram,
+  mergedOdontogram,
   perioChart,
   perioPsr,
 )
@@ -925,7 +978,7 @@ function acceptDiagnosisSuggestion(s: DiagnosisSuggestion) {
 // dentist input). Filtered to hide already-added matches so the rail
 // shrinks as the dentist works through it.
 const { suggestions: rawProcedureSuggestions } = useDentalProcedureSuggestions(
-  renderedStampedOdontogram,
+  mergedOdontogram,
   perioChart,
   perioPsr,
 )
@@ -946,22 +999,33 @@ const procedureSuggestions = computed<ProcedureSuggestion[]>(() => {
   })
 })
 
+// Guards against rapid double-tap on a suggestion chip — without it the
+// two `await nextTick()` points let a second invocation interleave and
+// duplicate the procedure on the plan.
+const acceptingProcedureSuggestion = ref(false)
+
 async function acceptProcedureSuggestion(s: ProcedureSuggestion) {
   if (!canEditPlan.value || isFinalized.value) return
-  // Family change triggers the watcher that resets teeth/surfaces/arches,
-  // so set family first, await the reactive flush, then load the rest of
-  // the prefill payload.
-  acFamily.value = s.prefill.family
-  await nextTick()
-  if (s.prefill.material !== undefined) acMaterial.value = s.prefill.material
-  acTeeth.value = new Set(s.prefill.teeth ?? [])
-  acSurfaces.value = new Set(s.prefill.surfaces ?? [])
-  acArches.value = new Set(s.prefill.arches ?? [])
+  if (acceptingProcedureSuggestion.value) return
+  acceptingProcedureSuggestion.value = true
+  try {
+    // Family change triggers the watcher that resets teeth/surfaces/arches,
+    // so set family first, await the reactive flush, then load the rest of
+    // the prefill payload.
+    acFamily.value = s.prefill.family
+    await nextTick()
+    if (s.prefill.material !== undefined) acMaterial.value = s.prefill.material
+    acTeeth.value = new Set(s.prefill.teeth ?? [])
+    acSurfaces.value = new Set(s.prefill.surfaces ?? [])
+    acArches.value = new Set(s.prefill.arches ?? [])
 
-  if (!s.canAutoAdd) return
-  // Wait one more tick so acDraftLines recomputes from the new state.
-  await nextTick()
-  await addFromAutoCoder()
+    if (!s.canAutoAdd) return
+    // Wait one more tick so acDraftLines recomputes from the new state.
+    await nextTick()
+    await addFromAutoCoder()
+  } finally {
+    acceptingProcedureSuggestion.value = false
+  }
 }
 
 const activeTreatmentPlan = computed<DentalTreatmentPlan | null>(

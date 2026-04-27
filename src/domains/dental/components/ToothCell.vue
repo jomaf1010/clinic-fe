@@ -276,10 +276,15 @@ function paint(): void {
 }
 
 onMounted(paint)
+// Reference-only watch is sufficient — the parent rebuilds new
+// `displayState` / `stampedState` references whenever the merged
+// odontogram recomputes, so Vue's prop diff catches changes in O(1)
+// per cell. With 32 cells re-rendering on every PD keystroke, the
+// previous `{ deep: true }` walked the whole stamped object 32× per
+// keystroke for no extra signal.
 watch(
   () => [props.displayState, props.stampedState] as const,
   paint,
-  { deep: true },
 )
 watch(() => props.fdi, () => {
   // SVG markup is re-rendered via v-html on fdi change; wait a tick.
