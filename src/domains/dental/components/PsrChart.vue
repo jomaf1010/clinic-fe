@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PSR_SEXTANTS, type PsrSextantKey } from '../composables/useFdiTeeth'
+import { PSR_SEXTANTS, sextantForFdi, type PsrSextantKey } from '../composables/useFdiTeeth'
 import type { PerioPSR } from '../types/dental.types'
 
 /**
@@ -14,8 +14,20 @@ import type { PerioPSR } from '../types/dental.types'
  *   3 — pockets 4-5 mm
  *   4 — pockets ≥ 6 mm or furcation
  */
-const props = defineProps<{ modelValue: PerioPSR | null }>()
+const props = withDefaults(defineProps<{
+  modelValue: PerioPSR | null
+  /** Active tooth (chart selection). Highlights its containing sextant. */
+  activeFdi?: number | null
+  /** Hovered tooth from the chart — also highlights its sextant. */
+  hoveredFdi?: number | null
+}>(), {
+  activeFdi: null,
+  hoveredFdi: null,
+})
 const emit = defineEmits<{ 'update:modelValue': [value: PerioPSR] }>()
+
+const activeSextant = computed(() => sextantForFdi(props.activeFdi))
+const hoveredSextant = computed(() => sextantForFdi(props.hoveredFdi))
 
 const value = computed<PerioPSR>(() => props.modelValue ?? {})
 
@@ -39,7 +51,15 @@ function colorClass(code: number | null | undefined): string {
     <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Periodontal Screening (PSR)</p>
 
     <div class="grid grid-cols-3 gap-2">
-      <div v-for="s in PSR_SEXTANTS" :key="s.key" class="flex flex-col gap-1">
+      <div
+        v-for="s in PSR_SEXTANTS"
+        :key="s.key"
+        class="flex flex-col gap-1 rounded-md p-1 transition-shadow"
+        :class="{
+          'sextant-active': activeSextant === s.key,
+          'sextant-hovered': activeSextant !== s.key && hoveredSextant === s.key,
+        }"
+      >
         <p class="text-xs font-medium">{{ s.label }}</p>
         <div class="flex gap-1">
           <button
@@ -63,3 +83,14 @@ function colorClass(code: number | null | undefined): string {
     </p>
   </div>
 </template>
+
+<style scoped>
+.sextant-active {
+  background: rgba(59, 123, 255, 0.14);
+  box-shadow: inset 0 0 0 1.5px rgba(59, 123, 255, 0.55);
+}
+.sextant-hovered {
+  background: rgba(59, 123, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(59, 123, 255, 0.3);
+}
+</style>

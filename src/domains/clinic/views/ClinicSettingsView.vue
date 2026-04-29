@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { FileText, Receipt, LoaderCircle, Banknote } from 'lucide-vue-next'
+import { ref, onMounted, computed } from 'vue'
+import { FileText, Receipt, LoaderCircle, Banknote, Stethoscope } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { clinicApi } from '@/domains/clinic/api/clinicApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import type { ToothNumberingPreference } from '@/domains/auth/types/auth.types'
 
 const authStore = useAuthStore()
 const isFetching = ref(true)
@@ -21,6 +23,30 @@ const suppliesAsClinicRevenue = ref(true)
 const defaultConsultationFee = ref('')
 const defaultFollowUpFee = ref('')
 
+// ── Specialties ────────────────────────────────────────────────────
+// One tab per specialty. Future specialties get their own tab + ref +
+// hydrate-on-mount line. Tooth numbering is dental-only for now.
+const specialtyTab = ref<'dental'>('dental')
+const dentalToothNumbering = ref<ToothNumberingPreference>('fdi')
+
+const toothNumberingOptions: { value: ToothNumberingPreference; label: string; full: string }[] = [
+  { value: 'fdi',       label: 'FDI',    full: 'FDI / ISO-3950 (international)' },
+  { value: 'universal', label: 'US',     full: 'Universal Numbering System (1–32)' },
+  { value: 'palmer',    label: 'Palmer', full: 'Palmer notation (UR/UL/LL/LR + position)' },
+]
+
+function setToothNumbering(v: ToothNumberingPreference): void {
+  if (dentalToothNumbering.value === v) return
+  dentalToothNumbering.value = v
+  saveSetting('tooth_numbering', v)
+}
+
+// Surface specialties dynamically — only render tabs for specialties that
+// have at least one wired setting. New specialties append here.
+const availableSpecialties = computed<{ value: 'dental'; label: string }[]>(() => [
+  { value: 'dental', label: 'Dental' },
+])
+
 onMounted(async () => {
   try {
     const res = await clinicApi.show()
@@ -31,6 +57,8 @@ onMounted(async () => {
     suppliesAsClinicRevenue.value = settings.billing_supplies_as_clinic_revenue !== false
     defaultConsultationFee.value = settings.default_consultation_fee != null ? String(settings.default_consultation_fee) : ''
     defaultFollowUpFee.value = settings.default_follow_up_fee != null ? String(settings.default_follow_up_fee) : ''
+    const tn = (settings as { tooth_numbering?: ToothNumberingPreference | null }).tooth_numbering
+    dentalToothNumbering.value = tn === 'universal' || tn === 'palmer' ? tn : 'fdi'
   } catch {
     toast.error('Failed to load settings')
   } finally {
@@ -220,6 +248,68 @@ function saveFeeSetting(key: string, value: string) {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <!-- Specialties — tab per specialty so each one can grow its own
+           settings cleanly without crowding the main settings page. Only
+           specialties with at least one wired setting appear as tabs. -->
+      <Card>
+        <CardHeader>
+          <div class="flex items-center gap-2">
+            <Stethoscope class="size-4 text-muted-foreground" />
+            <CardTitle class="text-base">Specialties</CardTitle>
+          </div>
+          <CardDescription>
+            Clinic-wide defaults per specialty. Individual doctors can override
+            most of these on their own profile.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <Tabs v-model="specialtyTab" class="w-full">
+            <TabsList>
+              <TabsTrigger
+                v-for="s in availableSpecialties"
+                :key="s.value"
+                :value="s.value"
+              >{{ s.label }}</TabsTrigger>
+            </TabsList>
+
+            <!-- Dental -->
+            <TabsContent value="dental" class="mt-4 flex flex-col gap-6">
+              <div class="flex flex-col gap-2">
+                <Label class="text-sm font-medium">Tooth numbering system</Label>
+                <p class="text-xs text-muted-foreground">
+                  Display-only — odontogram data is always stored in FDI / ISO-3950
+                  regardless of this choice. Staff and doctors who haven't set their
+                  own preference will see this default. Dentists can override on their
+                  own profile.
+                </p>
+                <div
+                  role="group"
+                  aria-label="Tooth numbering system"
+                  class="mt-1 inline-flex w-fit items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 text-[12px] font-semibold"
+                >
+                  <button
+                    v-for="opt in toothNumberingOptions"
+                    :key="opt.value"
+                    type="button"
+                    :aria-pressed="dentalToothNumbering === opt.value"
+                    :title="opt.full"
+                    :disabled="isSaving"
+                    :class="[
+                      'rounded px-3 py-1.5 transition focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-wait',
+                      dentalToothNumbering === opt.value
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    ]"
+                    @click="setToothNumbering(opt.value)"
+                  >{{ opt.label }}</button>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </template>

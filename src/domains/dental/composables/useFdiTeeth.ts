@@ -34,23 +34,42 @@ export function quadrantOf(fdi: string): 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | null {
   return q >= 1 && q <= 8 ? (q as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8) : null
 }
 
-// PSR sextants (general convention):
-//   sextant_1 = upper right posterior (17-14)
+// PSR sextants (general convention — sextant numbering is fixed by BPE,
+// not by display order):
+//   sextant_1 = upper right (17-14)
 //   sextant_2 = upper anterior (13-23)
-//   sextant_3 = upper left posterior (24-27)
-//   sextant_4 = lower left posterior (37-34)
+//   sextant_3 = upper left (24-27)
+//   sextant_4 = lower left (37-34)
 //   sextant_5 = lower anterior (33-43)
-//   sextant_6 = lower right posterior (44-47)
+//   sextant_6 = lower right (44-47)
+//
+// Array order below drives the **render order** in the PSR grid; we lay it
+// out left-to-right so it matches the odontogram's chart-reading direction
+// (patient's right on the visual left, patient's left on the visual right):
+//   [Upper Right] [Upper Anterior] [Upper Left]
+//   [Lower Right] [Lower Anterior] [Lower Left]
 export const PSR_SEXTANTS = [
-  { key: 'sextant_1' as const, label: 'UR Posterior', teeth: ['17', '16', '15', '14'] },
+  { key: 'sextant_1' as const, label: 'Upper Right', teeth: ['17', '16', '15', '14'] },
   { key: 'sextant_2' as const, label: 'Upper Anterior', teeth: ['13', '12', '11', '21', '22', '23'] },
-  { key: 'sextant_3' as const, label: 'UL Posterior', teeth: ['24', '25', '26', '27'] },
-  { key: 'sextant_4' as const, label: 'LL Posterior', teeth: ['37', '36', '35', '34'] },
+  { key: 'sextant_3' as const, label: 'Upper Left', teeth: ['24', '25', '26', '27'] },
+  { key: 'sextant_6' as const, label: 'Lower Right', teeth: ['44', '45', '46', '47'] },
   { key: 'sextant_5' as const, label: 'Lower Anterior', teeth: ['33', '32', '31', '41', '42', '43'] },
-  { key: 'sextant_6' as const, label: 'LR Posterior', teeth: ['44', '45', '46', '47'] },
+  { key: 'sextant_4' as const, label: 'Lower Left', teeth: ['37', '36', '35', '34'] },
 ] as const
 
 export type PsrSextantKey = typeof PSR_SEXTANTS[number]['key']
+
+/** Returns the PSR sextant a given FDI tooth belongs to, or null if it
+ *  doesn't fit any sextant (third molars 18/28/38/48 are typically excluded
+ *  from PSR; primary teeth aren't tracked in PSR either). */
+export function sextantForFdi(fdi: number | string | null | undefined): PsrSextantKey | null {
+  if (fdi == null) return null
+  const key = String(fdi)
+  for (const s of PSR_SEXTANTS) {
+    if ((s.teeth as readonly string[]).includes(key)) return s.key
+  }
+  return null
+}
 
 // ── Tooth-type metadata (for labels inside the center panel) ─────────────
 export type ToothKind = 'Incisor' | 'Canine' | 'Premolar' | 'Molar'

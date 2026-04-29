@@ -20,6 +20,7 @@ import {
   Activity,
 } from 'lucide-vue-next'
 
+import type { TreatmentStatus } from '../types/dental.types'
 import tooth11Raw from '../assets/teeth-svgs/11.svg?raw'
 import tooth11OcclRaw from '../assets/teeth-svgs/11_occl.svg?raw'
 import tooth13Raw from '../assets/teeth-svgs/13.svg?raw'
@@ -76,8 +77,6 @@ type PostVariant = 'glass' | 'metal'
 type ImplantStage = 'base' | 'healing-abutment' | 'bar' | 'locator-screw'
 type BridgeMat = 'zircon' | 'metal' | 'telescope' | 'temporary' | 'prosthesis'
 type BridgeRole = 'abutment' | 'pontic'
-
-type TreatmentStatus = 'existing' | 'proposed' | 'completed'
 
 type ToothState = {
   treatment: TreatmentStatus
@@ -138,7 +137,9 @@ const activeTooth = ref<number | null>(null)
 const selected = ref<Set<number>>(new Set())
 const hoveredTooth = ref<number | null>(null) // syncs hover across chart + perio
 
-// Tri-state mode — each state change stamps the active tooth(s) with this status
+// Playground tri-state is fixed at `existing` — real app derives status from
+// DentalProfile (existing) + DentalTreatmentPlan (proposed) + current
+// DentalVisit (completed). The manual mode dial is gone.
 const treatmentMode = ref<TreatmentStatus>('existing')
 
 // ---------- Quick actions (floating panel: always-on caries wheel + context bar) ----------
@@ -631,19 +632,6 @@ function applyToSelected(mutate: (s: ToothState) => void) {
     const st = getState(fdi)
     mutate(st)
     st.treatment = treatmentMode.value
-    paint(fdi)
-  }
-}
-
-function setTreatmentMode(status: TreatmentStatus) {
-  treatmentMode.value = status
-}
-
-/** Retroactively re-stamp the selected teeth's status — separate button so it's opt-in. */
-function stampSelected(status: TreatmentStatus) {
-  const targets = selected.value.size > 0 ? [...selected.value] : activeTooth.value != null ? [activeTooth.value] : []
-  for (const fdi of targets) {
-    getState(fdi).treatment = status
     paint(fdi)
   }
 }
@@ -1235,35 +1223,6 @@ function onDocMouseDown(e: MouseEvent) {
           </div>
         </div>
 
-        <!-- Treatment mode -->
-        <section class="panel">
-          <h4 class="panel-title">Treatment mode</h4>
-          <p class="mb-2 text-xs text-slate-500">New entries stamp the active tooth with this status.</p>
-          <div class="mode-group">
-            <button
-              class="mode-btn mode-existing"
-              :aria-pressed="treatmentMode === 'existing'"
-              @click="setTreatmentMode('existing')"
-            >Existing</button>
-            <button
-              class="mode-btn mode-proposed"
-              :aria-pressed="treatmentMode === 'proposed'"
-              @click="setTreatmentMode('proposed')"
-            >Proposed</button>
-            <button
-              class="mode-btn mode-completed"
-              :aria-pressed="treatmentMode === 'completed'"
-              @click="setTreatmentMode('completed')"
-            >Completed</button>
-          </div>
-          <div v-if="activeState" class="mt-2 flex gap-2 text-xs">
-            <span class="text-slate-500 self-center">Re-stamp selected →</span>
-            <button class="mode-restamp" @click="stampSelected('existing')">E</button>
-            <button class="mode-restamp mode-restamp-p" @click="stampSelected('proposed')">P</button>
-            <button class="mode-restamp mode-restamp-c" @click="stampSelected('completed')">C</button>
-          </div>
-        </section>
-
         <!-- Presets -->
         <section class="panel">
           <h4 class="panel-title">Statuses</h4>
@@ -1731,48 +1690,10 @@ function onDocMouseDown(e: MouseEvent) {
   filter: hue-rotate(80deg) saturate(1.2);
 }
 
-/* Mode selector */
-.mode-group {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.mode-btn {
-  padding: 10px 6px;
-  font-size: 12px;
-  font-weight: 700;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  background: #f8fafc;
-  color: #475569;
-  text-align: center;
-}
-.mode-btn[aria-pressed='true'] {
-  color: white;
-}
-.mode-existing[aria-pressed='true'] { background: #475569; border-color: #334155; }
-.mode-proposed[aria-pressed='true'] { background: #f59e0b; border-color: #d97706; }
-.mode-completed[aria-pressed='true'] { background: #16a34a; border-color: #15803d; }
-.mode-existing { border-color: rgba(71, 85, 105, 0.3); }
-.mode-proposed { border-color: rgba(245, 158, 11, 0.3); color: #b45309; }
-.mode-completed { border-color: rgba(22, 163, 74, 0.3); color: #15803d; }
-
-/* Cell-level treatment badge */
+/* Cell-level treatment badge — still consumed by proposed/completed layers
+ * once the derivation composable (Phase 4) stamps them onto the tooth. */
 .cell.tx-proposed { box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.6); }
 .cell.tx-completed { box-shadow: inset 0 0 0 2px rgba(22, 163, 74, 0.6); }
-
-.mode-restamp {
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #f1f5f9;
-  cursor: pointer;
-}
-.mode-restamp-p { border-color: rgba(245, 158, 11, 0.5); color: #b45309; }
-.mode-restamp-c { border-color: rgba(22, 163, 74, 0.5); color: #15803d; }
 
 /* Quick-actions panel: caries wheel + context bar + sub-panel */
 .quick-panel {

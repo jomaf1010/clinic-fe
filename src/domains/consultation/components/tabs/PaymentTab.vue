@@ -616,9 +616,26 @@ watch(() => props.status, (newStatus, oldStatus) => {
           <span class="text-muted-foreground">Medicines</span>
           <span class="tabular-nums">{{ formatCurrency(medicinesTotalEstimate) }}</span>
         </div>
-        <div v-if="proceduresTotalEstimate > 0" class="flex justify-between text-sm">
-          <span class="text-muted-foreground">Procedures ({{ procedures?.length }})</span>
-          <span class="tabular-nums">{{ formatCurrency(proceduresTotalEstimate) }}</span>
+        <div v-if="proceduresTotalEstimate > 0" class="flex flex-col gap-0.5">
+          <div class="flex justify-between text-sm">
+            <span class="text-muted-foreground">Procedures ({{ procedures?.length }})</span>
+            <span class="tabular-nums">{{ formatCurrency(proceduresTotalEstimate) }}</span>
+          </div>
+          <!-- Per-line breakdown so the dentist / front-desk can see exactly
+               which procedures sum to the total above. -->
+          <ul class="ml-3 flex flex-col gap-0.5 border-l border-border/60 pl-3">
+            <li
+              v-for="(proc, i) in procedures ?? []"
+              :key="proc.service_id || i"
+              class="flex justify-between gap-3 text-xs text-muted-foreground"
+            >
+              <span class="min-w-0 flex-1 truncate">
+                <span v-if="proc.quantity > 1" class="mr-1 font-mono text-[10px]">×{{ proc.quantity }}</span>
+                {{ proc.name }}
+              </span>
+              <span class="tabular-nums">{{ formatCurrency(proc.quantity * (proc.unit_price ?? 0)) }}</span>
+            </li>
+          </ul>
         </div>
         <div v-if="consumablesTotalEstimate > 0" class="flex justify-between text-sm">
           <span class="text-muted-foreground">Consumables</span>
