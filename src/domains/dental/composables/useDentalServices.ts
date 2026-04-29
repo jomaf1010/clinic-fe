@@ -78,6 +78,14 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
       cacheBusterFocusHandler = null
     }
     initialised = false
+    // Reset module-scoped state too. Without this, the next hot-reload
+    // re-initialises with stale `loaded === true` and skips the fetch
+    // that would have rebuilt `services`.
+    services.value = []
+    loaded.value = false
+    loading.value = false
+    error.value = null
+    pendingLoad = null
   })
 }
 

@@ -34,6 +34,8 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const authStore = useAuthStore()
+const timelineLine = computed(() => props.consultation.auto_display_line ?? props.consultation.display_line ?? null)
+const timelineSummary = computed(() => props.consultation.auto_display_summary ?? null)
 
 function openConsultation() {
   router.push({
@@ -181,9 +183,15 @@ async function requestMedCert() {
       </span>
     </div>
     <div v-if="consultation.display_summary" class="mt-1">
-      <EncounterSummaryDetail :summary="consultation.display_summary" :previous-vitals="previousVitals" />
+      <EncounterSummaryDetail
+        :summary="consultation.display_summary"
+        :headline="timelineLine"
+        :display-summary="timelineSummary"
+        :previous-vitals="previousVitals"
+      />
     </div>
-    <p v-else-if="consultation.display_line" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ consultation.display_line }}</p>
+    <p v-else-if="timelineLine" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ timelineLine }}</p>
+    <p v-if="!consultation.display_summary && timelineSummary" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ timelineSummary }}</p>
     <TooltipProvider v-if="consultation.lab_order_summary" :delay-duration="200">
       <div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         <FlaskConical class="size-3 shrink-0" />
