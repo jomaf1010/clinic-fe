@@ -77,13 +77,14 @@ watch(
       <Input
         :model-value="query"
         placeholder="Search patients..."
-        class="pl-8"
+        class="truncate pl-8 pr-14"
         @update:model-value="onInput"
         @focus="showResults = results.length > 0"
       />
       <button
         v-if="selectedName"
-        class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+        type="button"
+        class="absolute right-2 top-1/2 -translate-y-1/2 bg-background pl-1 text-xs text-muted-foreground hover:text-foreground"
         @click="clear"
       >
         Clear

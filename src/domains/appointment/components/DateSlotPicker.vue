@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { CalendarIcon, Clock, LoaderCircle } from 'lucide-vue-next'
 import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
@@ -15,6 +15,7 @@ const props = defineProps<{
   duration?: number | null // total minutes
   initialDate?: string // ISO date "2026-03-27"
   autoSelectTime?: string // ISO datetime — auto-select matching slot after load
+  allowDurationSelection?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -22,16 +23,19 @@ const emit = defineEmits<{
   'update:duration': [value: number]
 }>()
 
-function parseInitialDate() {
+function parseInitialDate(): CalendarDate {
+  const minDate = today(getLocalTimeZone())
   if (props.initialDate) {
     const [y, m, d] = props.initialDate.split('-').map(Number)
-    if (y && m && d) return new CalendarDate(y, m, d)
+    if (y && m && d) {
+      const initial = new CalendarDate(y, m, d)
+      return initial.compare(minDate) < 0 ? minDate : initial
+    }
   }
-  return today(getLocalTimeZone())
+  return minDate
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dateValue = ref<any>(parseInitialDate())
+const dateValue = shallowRef<DateValue>(parseInitialDate())
 const slots = ref<Slot[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
@@ -43,7 +47,7 @@ const selectedIndices = ref<Set<number>>(new Set())
 const dateLabel = computed(() => {
   const d = dateValue.value
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${months[d.month - 1]} ${d.day}, ${d.year}`
+  return `${months[d.month - 1] ?? ''} ${d.day}, ${d.year}`
 })
 
 const selectionSummary = computed(() => {
@@ -51,8 +55,11 @@ const selectionSummary = computed(() => {
   if (count === 0) return null
   const totalMin = count * slotDuration.value
   const sorted = [...selectedIndices.value].sort((a, b) => a - b)
-  const first = slots.value[sorted[0]]
-  const last = slots.value[sorted[sorted.length - 1]]
+  const firstIndex = sorted[0]
+  const lastIndex = sorted[sorted.length - 1]
+  if (firstIndex === undefined || lastIndex === undefined) return null
+  const first = slots.value[firstIndex]
+  const last = slots.value[lastIndex]
   if (!first || !last) return null
   return {
     count,
@@ -68,10 +75,14 @@ const selectionSummary = computed(() => {
 // Which indices can be added (adjacent to current selection and available)
 const extendableIndices = computed(() => {
   const ext = new Set<number>()
+  if (props.allowDurationSelection === false) return ext
   if (selectedIndices.value.size === 0) return ext
   const sorted = [...selectedIndices.value].sort((a, b) => a - b)
-  const before = sorted[0] - 1
-  const after = sorted[sorted.length - 1] + 1
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  if (first === undefined || last === undefined) return ext
+  const before = first - 1
+  const after = last + 1
   if (before >= 0 && slots.value[before]?.available) ext.add(before)
   if (after < slots.value.length && slots.value[after]?.available) ext.add(after)
   return ext
@@ -109,6 +120,7 @@ async function loadAvailability() {
 
 function onDateChange(date: DateValue | undefined) {
   if (!date) return
+  if (date.compare(today(getLocalTimeZone())) < 0) return
   dateValue.value = date
   clearSelection()
   loadAvailability()
@@ -117,6 +129,12 @@ function onDateChange(date: DateValue | undefined) {
 function selectSlot(index: number) {
   const slot = slots.value[index]
   if (!slot?.available) return
+
+  if (props.allowDurationSelection === false) {
+    selectedIndices.value = new Set([index])
+    emitSelection()
+    return
+  }
 
   const selected = selectedIndices.value
 
@@ -128,6 +146,7 @@ function selectSlot(index: number) {
     const sorted = [...selected].sort((a, b) => a - b)
     const min = sorted[0]
     const max = sorted[sorted.length - 1]
+    if (min === undefined || max === undefined) return
     if (index === min || index === max) {
       const next = new Set(selected)
       next.delete(index)
@@ -137,6 +156,7 @@ function selectSlot(index: number) {
     const sorted = [...selected].sort((a, b) => a - b)
     const min = sorted[0]
     const max = sorted[sorted.length - 1]
+    if (min === undefined || max === undefined) return
 
     if (index === min - 1) {
       // Extend backward
@@ -162,7 +182,18 @@ function emitSelection() {
   }
 
   const sorted = [...selected].sort((a, b) => a - b)
-  const firstSlot = slots.value[sorted[0]]
+  const firstIndex = sorted[0]
+  if (firstIndex === undefined) {
+    emit('update:modelValue', null)
+    emit('update:duration', slotDuration.value)
+    return
+  }
+  const firstSlot = slots.value[firstIndex]
+  if (!firstSlot) {
+    emit('update:modelValue', null)
+    emit('update:duration', slotDuration.value)
+    return
+  }
   const totalMin = selected.size * slotDuration.value
 
   emit('update:modelValue', firstSlot.start)
@@ -189,7 +220,7 @@ function slotClass(index: number): string {
   if (isSelected) return 'border-primary bg-primary text-primary-foreground'
   if (!slot.available) return 'cursor-not-allowed bg-muted text-muted-foreground opacity-50'
   if (isExtendable) return 'cursor-pointer border-primary/40 bg-primary/10 hover:bg-primary/20'
-  if (selectedIndices.value.size > 0) return 'cursor-pointer opacity-60 hover:bg-accent'
+  if (selectedIndices.value.size > 0 && props.allowDurationSelection !== false) return 'cursor-pointer opacity-60 hover:bg-accent'
   return 'cursor-pointer hover:border-primary/50 hover:bg-accent'
 }
 
@@ -216,7 +247,11 @@ watch(
           </Button>
         </PopoverTrigger>
         <PopoverContent class="w-auto p-0" align="start">
-          <Calendar v-model="dateValue" @update:model-value="onDateChange" />
+          <Calendar
+            v-model="dateValue"
+            :min-value="today(getLocalTimeZone())"
+            @update:model-value="onDateChange"
+          />
         </PopoverContent>
       </Popover>
     </div>
@@ -260,7 +295,7 @@ watch(
     <!-- Slot grid -->
     <div v-else>
       <p class="mb-2 text-xs text-muted-foreground">
-        Click a slot to select, click adjacent slots to extend the duration.
+        {{ allowDurationSelection === false ? 'Click a slot to select the new appointment time.' : 'Click a slot to select, click adjacent slots to extend the duration.' }}
       </p>
       <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
         <button

@@ -42,6 +42,7 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 }
 
 const props = defineProps<{
+  doctorFilter?: string
   statusFilter?: string
 }>()
 
@@ -119,6 +120,9 @@ async function eventSourceFn(
     const start = info.startStr.slice(0, 10)
     const end = info.endStr.slice(0, 10)
     const filters: AppointmentListFilters = { start_date: start, end_date: end }
+    if (props.doctorFilter && props.doctorFilter !== 'all') {
+      filters.doctor_id = props.doctorFilter
+    }
     if (props.statusFilter && props.statusFilter !== 'all') {
       filters.status = props.statusFilter as AppointmentListFilters['status']
     }
@@ -169,6 +173,10 @@ async function eventSourceFn(
 
     // Calendar block events
     for (const block of blocksRes.data) {
+      if (props.doctorFilter && props.doctorFilter !== 'all' && block.user_id !== props.doctorFilter) {
+        continue
+      }
+
       const colors = BLOCK_TYPE_COLORS[block.type] ?? BLOCK_TYPE_COLORS.unavailable
       const typeLabel = BLOCK_TYPE_LABELS[block.type] ?? block.type
       const doctorLabel = block.user_name ? `Dr. ${block.user_name}` : ''
@@ -199,8 +207,8 @@ async function eventSourceFn(
   }
 }
 
-// Refetch when status filter changes
-watch(() => props.statusFilter, () => {
+// Refetch when filters change
+watch(() => [props.doctorFilter, props.statusFilter], () => {
   calendarRef.value?.getApi()?.refetchEvents()
 })
 
