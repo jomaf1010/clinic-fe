@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { HttpError } from '@/lib/http'
 import { encounterApi } from '../api/encounterApi'
-import type { EncounterResponse, EncounterTimelineItem, EncounterType, UpdateEncounterPayload } from '../types/encounter.types'
+import type { EncounterResponse, EncounterTimelineItem, EncounterType, SoapDraftResponse, UpdateEncounterPayload } from '../types/encounter.types'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { EncounterRealtimeEvent } from '../types/realtime.types'
 import {
@@ -19,7 +19,9 @@ export const useEncounterStore = defineStore('encounter', () => {
   const isLoadingEncounters = ref(false)
   const isLoadingMore = ref(false)
   const isSaving = ref(false)
+  const isGeneratingSoapDraft = ref(false)
   const saveError = ref<string | null>(null)
+  const soapDraftError = ref<string | null>(null)
   const currentPage = ref(1)
   const lastPage = ref(1)
   const hasMore = computed(() => currentPage.value < lastPage.value)
@@ -145,12 +147,14 @@ export const useEncounterStore = defineStore('encounter', () => {
         c.specialty_assessment = { ...(c.specialty_assessment ?? {}), ...payload.specialty_assessment }
       }
       if (payload.treatment_plan) c.treatment_plan = { ...c.treatment_plan, ...payload.treatment_plan }
+      if (payload.soap_note) c.soap_note = payload.soap_note
       updated.consultation = c
     } else if (updated.type === 'prenatal' && updated.prenatal_visit) {
       const v = { ...updated.prenatal_visit }
       if (payload.triage) v.triage = { ...v.triage, ...payload.triage } as typeof v.triage
       if (payload.assessment) v.assessment = { ...v.assessment, ...payload.assessment } as typeof v.assessment
       if (payload.plan) v.plan = { ...v.plan, ...payload.plan } as typeof v.plan
+      if (payload.soap_note) v.soap_note = payload.soap_note
       updated.prenatal_visit = v
     } else if (updated.type === 'delivery' && updated.delivery_record) {
       const d = { ...updated.delivery_record }
@@ -159,12 +163,14 @@ export const useEncounterStore = defineStore('encounter', () => {
       if (payload.maternal) d.maternal = { ...d.maternal, ...payload.maternal }
       if (payload.neonatal) d.neonatal = { ...d.neonatal, ...payload.neonatal }
       if (payload.notes !== undefined) d.notes = payload.notes ?? null
+      if (payload.soap_note) d.soap_note = payload.soap_note
       updated.delivery_record = d
     } else if (updated.type === 'postpartum' && updated.postpartum_visit) {
       const p = { ...updated.postpartum_visit }
       if (payload.triage) p.triage = { ...p.triage, ...payload.triage } as typeof p.triage
       if (payload.assessment) p.assessment = { ...p.assessment, ...payload.assessment } as typeof p.assessment
       if (payload.plan) p.plan = { ...p.plan, ...payload.plan } as typeof p.plan
+      if (payload.soap_note) p.soap_note = payload.soap_note
       updated.postpartum_visit = p
     } else if (updated.type === 'dental' && updated.dental_visit) {
       const d = { ...updated.dental_visit }
@@ -172,6 +178,7 @@ export const useEncounterStore = defineStore('encounter', () => {
       if (payload.assessment) d.assessment = { ...(d.assessment ?? {}), ...payload.assessment } as typeof d.assessment
       if (payload.plan) d.plan = { ...(d.plan ?? {}), ...payload.plan } as typeof d.plan
       if (payload.treatment_plan_id !== undefined) d.treatment_plan_id = payload.treatment_plan_id
+      if (payload.soap_note) d.soap_note = payload.soap_note
       updated.dental_visit = d
     }
 
@@ -223,6 +230,36 @@ export const useEncounterStore = defineStore('encounter', () => {
     }
   }
 
+  async function generateSoapDraft(): Promise<SoapDraftResponse | null> {
+    if (!current.value) return null
+    if (!navigator.onLine) {
+      soapDraftError.value = 'Cannot generate SOAP note while offline.'
+      return null
+    }
+
+    isGeneratingSoapDraft.value = true
+    soapDraftError.value = null
+    try {
+      const response = await encounterApi.generateSoapDraft(current.value.id)
+      return response.data
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 422) {
+        const data = error.data
+        const validationMessage = typeof data === 'object' && data !== null && 'message' in data
+          ? (data as { message?: unknown }).message
+          : null
+        soapDraftError.value = typeof validationMessage === 'string'
+          ? validationMessage
+          : 'Add clinical details before generating a SOAP note.'
+      } else {
+        soapDraftError.value = 'Failed to generate SOAP note. Please try again.'
+      }
+      return null
+    } finally {
+      isGeneratingSoapDraft.value = false
+    }
+  }
+
   function handleRealtimeEvent(event: EncounterRealtimeEvent): void {
     if (!current.value) return
     if (current.value.id !== event.encounter_id) return
@@ -236,12 +273,14 @@ export const useEncounterStore = defineStore('encounter', () => {
         if (data.triage) c.triage = { ...c.triage, ...data.triage }
         if (data.assessment) c.assessment = data.assessment
         if (data.treatment_plan) c.treatment_plan = { ...c.treatment_plan, ...data.treatment_plan }
+        if (data.soap_note) c.soap_note = data.soap_note
         updated.consultation = c
       } else if (updated.type === 'prenatal' && updated.prenatal_visit) {
         const v = { ...updated.prenatal_visit }
         if (data.triage) v.triage = { ...v.triage, ...data.triage }
         if (data.assessment) v.assessment = { ...v.assessment, ...data.assessment }
         if (data.plan) v.plan = { ...v.plan, ...data.plan }
+        if (data.soap_note) v.soap_note = data.soap_note
         updated.prenatal_visit = v
       } else if (updated.type === 'delivery' && updated.delivery_record) {
         const d = { ...updated.delivery_record }
@@ -249,13 +288,22 @@ export const useEncounterStore = defineStore('encounter', () => {
         if (data.delivery) d.delivery = { ...d.delivery, ...data.delivery }
         if (data.maternal) d.maternal = { ...d.maternal, ...data.maternal }
         if (data.neonatal) d.neonatal = { ...d.neonatal, ...data.neonatal }
+        if (data.soap_note) d.soap_note = data.soap_note
         updated.delivery_record = d
       } else if (updated.type === 'postpartum' && updated.postpartum_visit) {
         const p = { ...updated.postpartum_visit }
         if (data.triage) p.triage = { ...p.triage, ...data.triage }
         if (data.assessment) p.assessment = { ...p.assessment, ...data.assessment }
         if (data.plan) p.plan = { ...p.plan, ...data.plan }
+        if (data.soap_note) p.soap_note = data.soap_note
         updated.postpartum_visit = p
+      } else if (updated.type === 'dental' && updated.dental_visit) {
+        const d = { ...updated.dental_visit }
+        if (data.triage) d.triage = { ...(d.triage ?? {}), ...data.triage }
+        if (data.assessment) d.assessment = { ...(d.assessment ?? {}), ...data.assessment }
+        if (data.plan) d.plan = { ...(d.plan ?? {}), ...data.plan }
+        if (data.soap_note) d.soap_note = data.soap_note
+        updated.dental_visit = d
       }
 
       current.value = updated
@@ -289,7 +337,9 @@ export const useEncounterStore = defineStore('encounter', () => {
     isLoadingEncounters,
     isLoadingMore,
     isSaving,
+    isGeneratingSoapDraft,
     saveError,
+    soapDraftError,
     hasMore,
     isFinalized,
     isDraft,
@@ -299,6 +349,7 @@ export const useEncounterStore = defineStore('encounter', () => {
     loadForPatient,
     loadMoreForPatient,
     saveSection,
+    generateSoapDraft,
     finalize,
     handleRealtimeEvent,
     clearCurrent,

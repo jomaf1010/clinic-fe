@@ -5,6 +5,7 @@ import type {
   EncounterDetailResponse,
   EncounterListResponse,
   FinalizeEncounterResponse,
+  SoapDraftApiResponse,
   UpdateEncounterPayload,
   UpdateEncounterResponse,
 } from '../types/encounter.types'
@@ -33,6 +34,10 @@ export const encounterApi = {
 
   finalize(id: string): Promise<FinalizeEncounterResponse> {
     return http.post<FinalizeEncounterResponse>(`/encounters/${id}/finalize`)
+  },
+
+  generateSoapDraft(id: string): Promise<SoapDraftApiResponse> {
+    return http.post<SoapDraftApiResponse>(`/encounters/${id}/soap-draft`)
   },
 
   delete(id: string): Promise<void> {
