@@ -239,7 +239,11 @@ const rrStatus = computed(() => {
 })
 
 const bsStatus = computed(() => {
-  const s = classifyBloodSugar(props.triage.vitals?.blood_sugar, vitalsConfig.config)
+  const s = classifyBloodSugar(
+    props.triage.vitals?.blood_sugar,
+    vitalsConfig.config,
+    props.triage.vitals?.blood_glucose_timing,
+  )
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
@@ -329,9 +333,12 @@ const vitalBadges = computed(() => {
   }
 
   if (bsStatus.value) {
+    const timing = typeof vitals.blood_glucose_timing === 'string'
+      ? vitals.blood_glucose_timing.replaceAll('_', ' ')
+      : null
     badges.push({
       label: 'Sugar',
-      value: `${vitals.blood_sugar} mg/dL`,
+      value: `${vitals.blood_sugar} mg/dL${timing ? ` · ${timing}` : ''}`,
       status: bsStatus.value.label,
       badgeClass: severityToBadge(bsStatus.value.severity),
     })

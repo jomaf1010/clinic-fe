@@ -122,6 +122,8 @@ export interface ConsultationResponse {
   medcert_requested_at: string | null
   finalized_at: string | null
   display_line?: string | null
+  auto_display_line?: string | null
+  auto_display_summary?: string | null
   display_summary?: import('@/domains/encounter/types/encounter.types').DisplaySummary | null
   created_at: string
   updated_at: string
