@@ -178,6 +178,20 @@ function minutesForIso(value: string): number {
 const weekDays = computed(() => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(selectedDate.value), index)))
 const todayDate = computed(() => toLocalDate(currentTime.value))
 
+const selectedDayLabel = computed(() => {
+  if (selectedDate.value === todayDate.value) return 'Today'
+  if (selectedDate.value === addDays(todayDate.value, 1)) return 'Tomorrow'
+  if (selectedDate.value === addDays(todayDate.value, -1)) return 'Yesterday'
+  return formatShortDate(selectedDate.value)
+})
+
+const selectedFlowTitle = computed(() => {
+  if (selectedDate.value === todayDate.value) return "Today's flow"
+  if (selectedDate.value === addDays(todayDate.value, 1)) return "Tomorrow's flow"
+  if (selectedDate.value === addDays(todayDate.value, -1)) return "Yesterday's flow"
+  return `${selectedDayLabel.value} flow`
+})
+
 const weekCounts = computed(() => {
   const counts: Record<string, number> = {}
   for (const day of weekDays.value) counts[day] = 0
@@ -502,7 +516,7 @@ defineExpose({ refetch: fetchBoard })
             <CalendarDays class="size-6" />
           </span>
           <div>
-            <span class="text-sm text-muted-foreground">Today</span>
+            <span class="text-sm text-muted-foreground">{{ selectedDayLabel }}</span>
             <p class="text-2xl font-semibold leading-tight">{{ stats.total }}</p>
           </div>
           <ChevronRight class="size-4 text-muted-foreground" />
@@ -562,7 +576,7 @@ defineExpose({ refetch: fetchBoard })
     <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(430px,0.86fr)]">
       <section class="overflow-hidden rounded-lg border bg-background shadow-sm">
         <div class="flex items-center justify-between border-b px-4 py-3">
-          <h2 class="text-base font-semibold">Today's flow</h2>
+          <h2 class="text-base font-semibold">{{ selectedFlowTitle }}</h2>
         </div>
 
         <div v-if="isLoading" class="m-5 flex items-center justify-center rounded-lg border py-16">

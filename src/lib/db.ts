@@ -73,3 +73,19 @@ class AppDatabase extends Dexie {
 }
 
 export const db = new AppDatabase()
+
+// Some users carry a stale IndexedDB from the pre-Dexie raw-IDB era (or an
+// older Dexie shape) whose primary keys don't match what we declare above.
+// Dexie can't upgrade across primary-key changes, so it throws
+// `UpgradeError: Not yet support for changing primary key` on first open.
+// Recover by wiping the local DB and re-opening — this only loses cached
+// reads + the FIFO of pending actions, both of which the SyncEngine will
+// re-fetch on the next tick.
+db.open().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  if (!/changing primary key|UpgradeError/i.test(message)) {
+    return
+  }
+  db.close()
+  void Dexie.delete('clinicapp-offline').then(() => db.open())
+})
