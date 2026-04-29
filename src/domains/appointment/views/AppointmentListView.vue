@@ -487,9 +487,9 @@ onUnmounted(() => {
         <div class="flex flex-wrap items-center gap-2 lg:justify-end">
           <Select v-model="doctorFilter" @update:model-value="onFilterChange">
             <SelectTrigger class="h-10 w-[170px]">
-              <span class="flex min-w-0 items-center gap-2">
+              <span class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                 <UserRound class="size-4 shrink-0" />
-                <SelectValue placeholder="All doctors" />
+                <SelectValue class="min-w-0 flex-1 truncate" placeholder="All doctors" />
               </span>
             </SelectTrigger>
             <SelectContent>
