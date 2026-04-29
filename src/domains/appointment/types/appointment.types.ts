@@ -5,6 +5,7 @@ export interface AppointmentResponse {
   clinic_id: string
   patient_id: string
   patient_name: string | null
+  patient_avatar_url: string | null
   doctor_id: string
   doctor_name: string | null
   doctor_avatar_url: string | null

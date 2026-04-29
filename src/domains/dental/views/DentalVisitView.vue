@@ -252,11 +252,12 @@ const paymentProcedures = computed(() => {
     const name = detailParts.length > 0
       ? `${codePrefix}${p.procedure} — ${detailParts.join(' · ')}`
       : `${codePrefix}${p.procedure}`
-    // Suffix the index when no stable id exists — two auto-coder
-    // procedures with the same CDT code on different teeth would
-    // otherwise collide on the v-for `:key` in PaymentTab's
-    // breakdown and Vue would patch the wrong row.
-    const stableId = p.service_id ?? p.id ?? `${p.cdt_code ?? p.procedure}#${i}`
+    // Per-row `id` wins over `service_id` (which is shared across every
+    // procedure pointing at the same clinic service — two D2393 entries
+    // on different teeth would otherwise collide on the v-for `:key` in
+    // PaymentTab's breakdown and Vue would patch the wrong row when one
+    // is removed).
+    const stableId = p.id ?? p.service_id ?? `${p.cdt_code ?? p.procedure}#${i}`
     return {
       service_id: stableId,
       name,
@@ -314,15 +315,10 @@ function toggleAcArch(arch: 'upper' | 'lower') {
   acArches.value = next
 }
 
-// Family changes can invalidate the current selection (e.g. switching from
-// filling → prophy clears teeth & surfaces; → SRP keeps teeth but unfreezes
-// multi-select). Reset everything family-driven so the user starts clean.
-watch(acFamily, () => {
-  acTeeth.value = new Set()
-  acSurfaces.value = new Set()
-  acArches.value = new Set()
-  acNotes.value = ''
-})
+// Family changes invalidate everything family-driven — selection scope
+// (teeth / surfaces / arches), the free-text note, and the material
+// default. Bundled into one watcher so resets land atomically and
+// don't depend on registration order.
 
 // FDI arch lists for the picker grid. Chart-mirror layout: each arch shows
 // right-quadrant teeth then left-quadrant teeth, reading L→R as the
@@ -490,11 +486,13 @@ function toggleAcSurface(s: ToothSurface) {
   acSurfaces.value = next
 }
 
-// Switching procedure family invalidates the previous material selection.
 watch(acFamily, (family) => {
+  acTeeth.value = new Set()
+  acSurfaces.value = new Set()
+  acArches.value = new Set()
+  acNotes.value = ''
   const opts = MATERIAL_OPTIONS[family] ?? []
   acMaterial.value = opts[0]?.value ?? ''
-  if (family !== 'filling') acSurfaces.value = new Set()
 })
 
 // Selected teeth from the chip picker, sorted in chart order so the
@@ -720,10 +718,17 @@ async function addFromAutoCoder() {
     acNotes.value = ''
     await savePlan()
   } catch (err) {
-    console.error('addFromAutoCoder failed', err)
     toast.error(`Failed to add procedure: ${err instanceof Error ? err.message : 'unknown error'}`)
   }
 }
+
+// Procedure edit state is reset during first hydration. Keep these refs before
+// the immediate visit watcher so route loads cannot touch them before setup
+// initializes them.
+const editingProcedureIdx = ref<number | null>(null)
+const editingProcedureDraft = ref<DentalProcedureLog | null>(null)
+const editTeeth = ref<Set<number>>(new Set())
+const editSurfaces = ref<Set<ToothSurface>>(new Set())
 
 // ── Hydrate local state from server response ─────────────────────────
 function hydrateFromVisit() {
@@ -794,7 +799,13 @@ function hydrateFromVisit() {
   diagnosisCodeMap.value = codeMap
 
   const p = visit.value.plan ?? {}
-  procedures.value = (p.procedures ?? []) as DentalProcedureLog[]
+  // Backfill a stable client-side id on every procedure so v-for keys in
+  // PaymentTab / Plan editor stay correct after row removals (otherwise
+  // duplicate CDT codes would collide on `service_id` and Vue would
+  // patch the wrong row).
+  procedures.value = ((p.procedures ?? []) as DentalProcedureLog[]).map((proc) => (
+    proc.id ? proc : { ...proc, id: makeLocalId() }
+  ))
   followUpDate.value = p.follow_up ?? null
   followUpAppointmentId.value = p.follow_up_appointment_id ?? null
 }
@@ -807,7 +818,11 @@ const hydratedEncounterUuid = ref<string | null>(null)
 watch(
   visit,
   (v) => {
-    const id = (v as { uuid?: string } | null)?.uuid ?? null
+    // DentalVisitDetail exposes the primary key as `id`, not `uuid` — the
+    // older guard read `v.uuid` and always saw `null`, so the early-return
+    // never fired and every PATCH reply re-hydrated the form, clobbering
+    // mid-keystroke edits.
+    const id = v?.id ?? null
     if (id !== null && id === hydratedEncounterUuid.value) return
     hydratedEncounterUuid.value = id
     hydrateFromVisit()
@@ -1274,7 +1289,12 @@ function onChartingReset() {
   if (existing.implant) wipe.implant = { __remove: true }
   if (existing.bridge) wipe.bridge = { __remove: true }
   if (existing.missing) wipe.missing = { __remove: true }
-  if (existing.mods?.length) wipe.mods = existing.mods.map((m) => ({ kind: m.kind, __remove: true }))
+  // Mobility lives in `perio_chart[fdi].mobility`, not on the tooth's
+  // `mods` — the entry rendered into `mods` is a virtual injection.
+  // Excluding it here keeps perio findings intact when the user resets
+  // the chart (which is meant to wipe clinical findings, not perio data
+  // collected separately).
+  if (existing.mods?.length) wipe.mods = existing.mods.filter((m) => m.kind !== 'mobility').map((m) => ({ kind: m.kind, __remove: true }))
   if (existing.specials?.length) wipe.specials = existing.specials.map((s) => ({ kind: s.kind, __remove: true }))
   if (existing.notes) wipe.notes = null
   onToothSave(fdi, wipe as Partial<StampedToothState>)
@@ -1303,11 +1323,6 @@ function removeProcedure(idx: number) {
 // object) so the multi-tooth picker and surface chips bind reactively
 // the same way. The draft only holds non-collection fields (notes,
 // billable_amount) plus the read-only header info.
-const editingProcedureIdx = ref<number | null>(null)
-const editingProcedureDraft = ref<DentalProcedureLog | null>(null)
-const editTeeth = ref<Set<number>>(new Set())
-const editSurfaces = ref<Set<ToothSurface>>(new Set())
-
 function startEditProcedure(idx: number) {
   if (isFinalized.value || !canEditPlan.value) return
   const proc = procedures.value[idx]
@@ -1490,30 +1505,50 @@ const psrSummary = computed(() => {
   return { max: Math.max(...codes), count: codes.length }
 })
 
-const clinicalSummary = computed<string | null>(() => {
-  const lines: string[] = []
+type ClinicalSummarySegment = { text: string; bold: boolean }
+
+const clinicalSummary = computed<ClinicalSummarySegment[][] | null>(() => {
+  const lines: ClinicalSummarySegment[][] = []
   const problems = pdStore.problems.filter((p) => p.status !== 'resolved')
   const meds = pdStore.medications.filter((m) => m.status === 'active')
   const allergies = pdStore.allergies
   const ls = pdStore.lifestyle
-  const b = (t: string | number) => `<b>${t}</b>`
 
   if (problems.length) {
-    const top = problems.slice(0, 3).map((p) => b(p.description)).join(', ')
-    const more = problems.length > 3 ? ` (+${problems.length - 3} more)` : ''
-    lines.push(`Active conditions: ${top}${more}.`)
+    const top = problems.slice(0, 3)
+    const segs: ClinicalSummarySegment[] = [{ text: 'Active conditions: ', bold: false }]
+    top.forEach((p, i) => {
+      segs.push({ text: p.description, bold: true })
+      if (i < top.length - 1) segs.push({ text: ', ', bold: false })
+    })
+    if (problems.length > 3) segs.push({ text: ` (+${problems.length - 3} more)`, bold: false })
+    segs.push({ text: '.', bold: false })
+    lines.push(segs)
   }
   if (meds.length) {
-    lines.push(`On ${b(meds.length + ' active medication' + (meds.length > 1 ? 's' : ''))}.`)
+    lines.push([
+      { text: 'On ', bold: false },
+      { text: `${meds.length} active medication${meds.length > 1 ? 's' : ''}`, bold: true },
+      { text: '.', bold: false },
+    ])
   }
   if (allergies.length) {
-    const names = allergies.slice(0, 3).map((a) => b(a.allergen)).join(', ')
-    lines.push(`Allergic to ${names}.`)
+    const top = allergies.slice(0, 3)
+    const segs: ClinicalSummarySegment[] = [{ text: 'Allergic to ', bold: false }]
+    top.forEach((a, i) => {
+      segs.push({ text: a.allergen, bold: true })
+      if (i < top.length - 1) segs.push({ text: ', ', bold: false })
+    })
+    segs.push({ text: '.', bold: false })
+    lines.push(segs)
   }
   if (ls?.smoking && ls.smoking !== 'never') {
-    lines.push(`${b(ls.smoking + ' smoker')}.`)
+    lines.push([
+      { text: `${ls.smoking} smoker`, bold: true },
+      { text: '.', bold: false },
+    ])
   }
-  return lines.length ? lines.join(' ') : null
+  return lines.length ? lines : null
 })
 
 function formatVisitDate(iso: string | null): string {
@@ -1579,10 +1614,17 @@ onUnmounted(() => {
   tabsObserver?.disconnect()
   tabsObserver = null
   // Flush any pending perio save so the last keystroke isn't dropped.
+  // Capture the encounter id we expect to be writing to and bail if the
+  // store has already moved on — otherwise a fast tab navigation would
+  // late-fire `saveSection` against the *next* encounter and stamp this
+  // visit's perio data onto someone else's chart.
   if (perioSaveTimer) {
     clearTimeout(perioSaveTimer)
     perioSaveTimer = null
-    saveAssessment()
+    const flushTargetId = visit.value?.id ?? null
+    if (flushTargetId !== null && store.current?.dental_visit?.id === flushTargetId) {
+      saveAssessment()
+    }
   }
 })
 
@@ -2572,7 +2614,9 @@ function goBack() {
               </div>
               <div class="min-w-0 flex-1">
                 <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Clinical Summary</p>
-                <p v-if="clinicalSummary" class="mt-1 text-xs leading-relaxed text-muted-foreground [&_b]:text-foreground [&_b]:font-semibold" v-html="clinicalSummary" />
+                <p v-if="clinicalSummary" class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  <template v-for="(line, li) in clinicalSummary" :key="li"><template v-for="(seg, si) in line" :key="si"><b v-if="seg.bold" class="font-semibold text-foreground">{{ seg.text }}</b><template v-else>{{ seg.text }}</template></template><template v-if="li < clinicalSummary.length - 1"> </template></template>
+                </p>
                 <p v-else class="mt-1 text-xs italic text-muted-foreground/50">No clinical history recorded yet.</p>
               </div>
             </div>
@@ -2943,4 +2987,3 @@ function goBack() {
 
   </Tabs>
 </template>
-

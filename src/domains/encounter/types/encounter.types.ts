@@ -10,8 +10,10 @@ import type {
   FMSpecialtyAssessment,
 } from '@/domains/consultation/types/consultation.types'
 import type { DentalVisitData } from '@/domains/dental/types/dental.types'
+import type { SoapNote } from './soapNote.types'
 
 export type { DentalVisitData }
+export type { SoapDraftApiResponse, SoapDraftResponse, SoapNote } from './soapNote.types'
 
 export type EncounterType = 'consultation' | 'prenatal' | 'delivery' | 'postpartum' | 'dental'
 export type EncounterStatus = 'draft' | 'finalized'
@@ -24,6 +26,7 @@ export interface ConsultationData {
   assessment: ConsultationAssessment
   specialty_assessment?: FMSpecialtyAssessment | null
   treatment_plan: ConsultationTreatmentPlan
+  soap_note?: SoapNote | null
 }
 
 // ── Prenatal Visit (OB) ─────────────────────────────────────────────
@@ -112,6 +115,7 @@ export interface PrenatalVisitData {
   triage: PrenatalTriage
   assessment: PrenatalAssessment
   plan: PrenatalPlan
+  soap_note?: SoapNote | null
 }
 
 // ── Delivery Record (OB) ────────────────────────────────────────────
@@ -158,6 +162,7 @@ export interface DeliveryRecordData {
   maternal: DeliveryMaternal
   neonatal: DeliveryNeonatal
   notes: string | null
+  soap_note?: SoapNote | null
 }
 
 // ── Postpartum Visit (OB) ───────────────────────────────────────────
@@ -208,6 +213,7 @@ export interface PostpartumVisitData {
   triage: PostpartumTriage
   assessment: PostpartumAssessment
   plan: PostpartumPlan
+  soap_note?: SoapNote | null
 }
 
 // ── Encounter Response ──────────────────────────────────────────────
@@ -302,6 +308,8 @@ export interface EncounterResponse {
   specialty: string
   status: EncounterStatus
   display_line: string | null
+  auto_display_line: string | null
+  auto_display_summary: string | null
   display_summary: DisplaySummary | null
   patient_name: string | null
   patient_sex: string | null
@@ -333,6 +341,8 @@ export interface EncounterTimelineItem {
   pregnancy_id: string | null
   status: EncounterStatus
   display_line: string | null
+  auto_display_line: string | null
+  auto_display_summary: string | null
   display_summary: DisplaySummary | null
   doctor_id: string
   doctor_name: string | null
@@ -356,6 +366,7 @@ export interface UpdateEncounterPayload {
   assessment?: Partial<ConsultationAssessment> | Partial<PrenatalAssessment> | Partial<PostpartumAssessment> | Partial<import('@/domains/dental/types/dental.types').DentalVisitAssessment>
   specialty_assessment?: Record<string, unknown>
   treatment_plan?: Partial<ConsultationTreatmentPlan>
+  soap_note?: SoapNote
   // Prenatal/Postpartum/Dental plan section
   plan?: Partial<PrenatalPlan> | Partial<PostpartumPlan> | Partial<import('@/domains/dental/types/dental.types').DentalVisitPlan>
   // Dental — link a visit to a treatment plan episode
@@ -408,4 +419,3 @@ export type {
   ConsultationDocument,
   FMSpecialtyAssessment,
 } from '@/domains/consultation/types/consultation.types'
-

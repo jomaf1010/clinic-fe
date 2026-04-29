@@ -100,8 +100,17 @@ watch(() => props.anchor, () => {
   reanchor()
 }, { immediate: true })
 
+// Scroll fires at ~60-120Hz on trackpads; getBoundingClientRect inside
+// reanchor forces layout each call. rAF-throttle so we run at most once
+// per frame.
+let scrollRafId: number | null = null
 function onScrollOrResize() {
-  if (props.anchor) reanchor()
+  if (!props.anchor) return
+  if (scrollRafId !== null) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = null
+    if (props.anchor) reanchor()
+  })
 }
 
 function onDocMouseDown(ev: MouseEvent) {
@@ -126,6 +135,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScrollOrResize, true)
   window.removeEventListener('resize', onScrollOrResize)
   document.removeEventListener('mousedown', onDocMouseDown, true)
+  if (scrollRafId !== null) {
+    cancelAnimationFrame(scrollRafId)
+    scrollRafId = null
+  }
 })
 
 // ── Wheel geometry ────────────────────────────────────────────────────

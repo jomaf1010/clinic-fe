@@ -61,6 +61,8 @@ import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { usePatientSync } from '../composables/usePatientSync'
 import PatientSpecialtyFactory from '../components/specialties/PatientSpecialtyFactory.vue'
+import PatientCompletenessRing from '../components/PatientCompletenessRing.vue'
+import { calculatePatientProfileCompleteness } from '../utils/profileCompleteness'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,9 +77,24 @@ const error = ref<string | null>(null)
 
 const patientIdRef = computed(() => route.params.id as string)
 const clinicIdRef = computed(() => authStore.currentClinic?.id)
-usePatientSync(patientIdRef, clinicIdRef, (updated) => {
-  pdStore.updatePatientFromSync(updated)
-})
+usePatientSync(
+  patientIdRef,
+  clinicIdRef,
+  (updated) => {
+    pdStore.updatePatientFromSync(updated)
+  },
+  (data) => {
+    const idx = encounterStore.patientEncounters.findIndex((e) => e.id === data.encounter_id)
+    if (idx >= 0) {
+      encounterStore.patientEncounters[idx] = {
+        ...encounterStore.patientEncounters[idx],
+        auto_display_line: data.auto_display_line,
+        auto_display_summary: data.auto_display_summary,
+        updated_at: data.updated_at,
+      }
+    }
+  },
+)
 
 const avatarCropOpen = ref(false)
 const isUploadingAvatar = ref(false)
@@ -235,15 +252,7 @@ const activeProblemsCount = computed(() =>
 // Profile completeness (0 to 1)
 const profileCompleteness = computed(() => {
   if (!patient.value) return 0
-  let filled = 0
-  const total = 6
-  if (patient.value.date_of_birth) filled++
-  if (patient.value.contact_number) filled++
-  if (patient.value.email) filled++
-  if (patient.value.formatted_address) filled++
-  if (displayAvatarUrl.value) filled++
-  if (patient.value.note) filled++
-  return filled / total
+  return calculatePatientProfileCompleteness(patient.value, displayAvatarUrl.value)
 })
 
 // Last visit date from finalized consultations
@@ -415,40 +424,28 @@ onUnmounted(() => {
 
         <!-- Avatar with rainbow completeness ring -->
         <div class="-mt-12 flex justify-center relative z-10">
-          <div class="relative">
-            <!-- Rainbow ring track (full circle, gray) -->
-            <div
-              class="absolute inset-0 rounded-full ring-track"
-              style="padding: 3px;"
-            >
-              <div class="w-full h-full rounded-full bg-muted/60" />
-            </div>
-            <!-- Rainbow ring fill (conic-gradient, clipped to completeness) -->
-            <div
-              class="absolute inset-0 rounded-full rainbow-ring-fill"
-              :style="`--completeness-deg: ${Math.round(profileCompleteness * 360)}deg`"
+          <PatientCompletenessRing
+            :completeness="profileCompleteness"
+            content-class="group relative p-[5px]"
+          >
+            <PatientAvatar
+              :avatar-url="displayAvatarUrl"
+              :sex="patient.sex"
+              :name="patient.full_name"
+              class="size-24 ring-2 ring-card ring-offset-0"
             />
-            <!-- Avatar -->
-            <div class="group relative p-[5px]">
-              <PatientAvatar
-                :avatar-url="displayAvatarUrl"
-                :sex="patient.sex"
-                :name="patient.full_name"
-                class="size-24 ring-2 ring-card ring-offset-0"
-              />
-              <button
-                v-if="authStore.hasPermission('patients.edit')"
-                type="button"
-                class="absolute inset-[5px] flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                :disabled="isUploadingAvatar"
-                aria-label="Upload patient photo"
-                @click="avatarCropOpen = true"
-              >
-                <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
-                <Camera v-else class="size-4 text-white" />
-              </button>
-            </div>
-          </div>
+            <button
+              v-if="authStore.hasPermission('patients.edit')"
+              type="button"
+              class="absolute inset-[5px] flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              :disabled="isUploadingAvatar"
+              aria-label="Upload patient photo"
+              @click="avatarCropOpen = true"
+            >
+              <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
+              <Camera v-else class="size-4 text-white" />
+            </button>
+          </PatientCompletenessRing>
         </div>
 
         <!-- Name + meta -->
@@ -873,21 +870,4 @@ onUnmounted(() => {
   100% { box-shadow: 0 0 0 10px oklch(0.283 0.090 253.827 / 0); }
 }
 
-/* Rainbow completeness ring */
-.rainbow-ring-fill {
-  background: conic-gradient(
-    #f87171 0deg,
-    #fb923c 60deg,
-    #facc15 120deg,
-    #4ade80 180deg,
-    #38bdf8 240deg,
-    #818cf8 300deg,
-    #f472b6 var(--completeness-deg),
-    transparent var(--completeness-deg)
-  );
-  -webkit-mask:
-    radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
-  mask:
-    radial-gradient(farthest-side, transparent calc(100% - 4px), black calc(100% - 4px));
-}
 </style>

@@ -49,6 +49,7 @@ import TreatmentPlanTab from '../components/tabs/TreatmentPlanTab.vue'
 import PaymentTab from '../components/tabs/PaymentTab.vue'
 import VitalsSummary from '../components/VitalsSummary.vue'
 import FinalizeModal from '../components/FinalizeModal.vue'
+import SoapNoteSection from '@/domains/encounter/components/SoapNoteSection.vue'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import { openNewTab, printPdf } from '@/lib/utils'
 import type { UpdateEncounterPayload } from '@/domains/encounter/types/encounter.types'
@@ -73,6 +74,7 @@ const canEditTriage = computed(() => authStore.hasPermission('encounters.edit-tr
 const canEditAssessment = computed(() => authStore.hasPermission('encounters.edit-assessment'))
 const canEditTreatmentPlan = computed(() => authStore.hasPermission('encounters.edit-treatment-plan'))
 const canFinalize = computed(() => authStore.hasPermission('encounters.finalize'))
+const canEditSoapNote = computed(() => canEditAssessment.value || canFinalize.value)
 
 const activeTab = ref('triage')
 const showPreviewModal = ref(false)
@@ -314,7 +316,7 @@ const lifestyleSummary = computed(() => {
 
 const recentEncounters = computed(() => {
   return store.patientEncounters
-    .filter((e) => e.status === 'finalized' && e.id !== store.current?.id && e.display_line)
+    .filter((e) => e.status === 'finalized' && e.id !== store.current?.id && (e.auto_display_line ?? e.display_line))
     .slice(0, 3)
 })
 
@@ -383,6 +385,11 @@ const currentVitals = computed(() => {
   const hasAny = Object.values(vitals).some((v) => v != null && v !== '')
   return hasAny ? vitals : null
 })
+
+function formatBloodGlucoseTiming(timing: unknown): string | null {
+  if (typeof timing !== 'string' || timing.trim() === '') return null
+  return timing.replaceAll('_', ' ')
+}
 
 // ── Tabs ────────────────────────────────────────────────────────────────
 const allTabs = ['triage', 'assessment', 'treatment-plan', 'payment'] as const
@@ -723,23 +730,33 @@ function proceedAfterFeeWarning() {
 
           <!-- ── Treatment Plan Tab ───────────────────────────────────── -->
           <TabsContent value="treatment-plan" class="mt-0 px-0 md:px-8">
-            <TreatmentPlanTab
-              :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null }"
-              :encounter-id="store.current.id"
-              :patient-id="store.current.patient_id"
-              :doctor-id="store.current.doctor_id"
-              :consumables="store.current.consumables ?? []"
-              :procedures="store.current.procedures ?? []"
-              :disabled="store.isFinalized || !canEditTreatmentPlan"
-              :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
-              :prescription-update="prescriptionUpdate"
-              :lab-order-update="labOrderUpdate"
-              :document-update="documentUpdate"
-              @save="handleSave"
-              @update:consumables="(c) => { if (store.current) store.current.consumables = c }"
-              @procedures-updated="(p) => { if (store.current) store.current.procedures = p }"
-              @lab-updated="store.loadEncounter(store.current!.id)"
-            />
+            <div class="flex flex-col gap-5">
+              <TreatmentPlanTab
+                :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null }"
+                :encounter-id="store.current.id"
+                :patient-id="store.current.patient_id"
+                :doctor-id="store.current.doctor_id"
+                :consumables="store.current.consumables ?? []"
+                :procedures="store.current.procedures ?? []"
+                :disabled="store.isFinalized || !canEditTreatmentPlan"
+                :lab-order-disabled="store.isFinalized || !authStore.hasPermission('lab-orders.create') || !authStore.hasFeature('lab_orders')"
+                :prescription-update="prescriptionUpdate"
+                :lab-order-update="labOrderUpdate"
+                :document-update="documentUpdate"
+                @save="handleSave"
+                @update:consumables="(c) => { if (store.current) store.current.consumables = c }"
+                @procedures-updated="(p) => { if (store.current) store.current.procedures = p }"
+                @lab-updated="store.loadEncounter(store.current!.id)"
+              />
+
+              <SoapNoteSection
+                :soap-note="store.current.consultation?.soap_note ?? null"
+                :disabled="store.isFinalized || !canEditSoapNote"
+                :can-generate="store.isDraft && canFinalize"
+                :is-generating="store.isGeneratingSoapDraft"
+                :error="store.soapDraftError"
+              />
+            </div>
             <div class="mt-5 flex items-center justify-between">
               <Button variant="outline" @click="goToTab('prev')">
                 <ChevronLeft class="mr-1 size-4" />
@@ -859,7 +876,7 @@ function proceedAfterFeeWarning() {
                     class="flex flex-col gap-0.5 rounded-md border border-transparent bg-muted/30 px-2 py-1.5 text-left text-xs transition-colors hover:border-border hover:bg-muted"
                     @click="openEncounter(enc.id)"
                   >
-                    <p class="font-medium leading-tight">{{ enc.display_line }}</p>
+                    <p class="font-medium leading-tight">{{ enc.auto_display_line ?? enc.display_line }}</p>
                     <p class="text-[10px] text-muted-foreground">{{ formatEncounterDate(enc.finalized_at) }}</p>
                   </button>
                 </div>
@@ -902,7 +919,12 @@ function proceedAfterFeeWarning() {
                   </div>
                   <div v-if="currentVitals.blood_sugar">
                     <span class="text-muted-foreground">Blood Sugar</span>
-                    <p class="font-medium">{{ currentVitals.blood_sugar }} mg/dL</p>
+                    <p class="font-medium">
+                      {{ currentVitals.blood_sugar }} mg/dL
+                      <span v-if="formatBloodGlucoseTiming(currentVitals.blood_glucose_timing)" class="capitalize text-muted-foreground">
+                        · {{ formatBloodGlucoseTiming(currentVitals.blood_glucose_timing) }}
+                      </span>
+                    </p>
                   </div>
                   <div v-if="currentVitals.height">
                     <span class="text-muted-foreground">Height</span>

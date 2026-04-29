@@ -534,7 +534,7 @@ async function closePostpartum(): Promise<void> {
                       {{ e.status }}
                     </Badge>
                   </div>
-                  <p v-if="e.display_line" class="text-sm font-medium leading-snug">{{ e.display_line }}</p>
+                  <p v-if="e.auto_display_line ?? e.display_line" class="text-sm font-medium leading-snug">{{ e.auto_display_line ?? e.display_line }}</p>
                   <p class="mt-1 text-xs text-muted-foreground">{{ formatDate(e.created_at) }}</p>
                 </div>
               </div>

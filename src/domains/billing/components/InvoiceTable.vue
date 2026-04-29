@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import { Download, FileText, LoaderCircle } from 'lucide-vue-next'
 import {
@@ -20,7 +20,7 @@ import { billingApi } from '../api/billingApi'
 import type { GeneratedDocumentResponse } from '@/domains/consultation/api/documentApi'
 import type { InvoiceResponse } from '../types/billing.types'
 
-defineProps<{
+const props = defineProps<{
   invoices: InvoiceResponse[]
   loading: boolean
 }>()
@@ -33,24 +33,33 @@ const emit = defineEmits<{
 const invoiceDocs = ref<Record<string, GeneratedDocumentResponse | null>>({})
 const generatingIds = ref<Set<string>>(new Set())
 
-async function loadInvoiceDoc(invoice: InvoiceResponse) {
-  if (invoice.status === 'void' || invoiceDocs.value[invoice.id] !== undefined) return
-  try {
-    const res = await billingApi.getPdf(invoice.id)
-    invoiceDocs.value[invoice.id] = res.data
-  } catch {
-    // ignore
-  }
-}
+watch(
+  () => props.invoices,
+  (invoices) => {
+    for (const invoice of invoices) {
+      if (invoice.status === 'void') continue
+      if (!Object.prototype.hasOwnProperty.call(invoiceDocs.value, invoice.id)) {
+        invoiceDocs.value[invoice.id] = invoice.invoice_pdf_document
+      }
+      if (getDoc(invoice)?.status === 'pending' && !generatingIds.value.has(invoice.id)) {
+        generatingIds.value.add(invoice.id)
+        pollForCompletion(invoice)
+      }
+    }
+  },
+  { immediate: true },
+)
 
-function getDoc(invoiceId: string): GeneratedDocumentResponse | null | undefined {
-  return invoiceDocs.value[invoiceId]
+function getDoc(invoice: InvoiceResponse): GeneratedDocumentResponse | null | undefined {
+  return Object.prototype.hasOwnProperty.call(invoiceDocs.value, invoice.id)
+    ? invoiceDocs.value[invoice.id]
+    : invoice.invoice_pdf_document
 }
 
 async function handlePdfClick(e: Event, invoice: InvoiceResponse) {
   e.stopPropagation()
 
-  const doc = getDoc(invoice.id)
+  const doc = getDoc(invoice)
 
   // If ready, download
   if (doc?.status === 'completed' && doc.id) {
@@ -62,6 +71,12 @@ async function handlePdfClick(e: Event, invoice: InvoiceResponse) {
       tab.close()
       toast.error('Failed to download invoice PDF')
     }
+    return
+  }
+
+  if (doc?.status === 'pending') {
+    generatingIds.value.add(invoice.id)
+    pollForCompletion(invoice)
     return
   }
 
@@ -155,7 +170,6 @@ function formatDate(iso: string): string {
             :key="invoice.id"
             class="cursor-pointer hover:bg-muted/50"
             @click="emit('select', invoice)"
-            @vue:mounted="loadInvoiceDoc(invoice)"
           >
             <TableCell class="font-medium">{{ invoice.invoice_number }}</TableCell>
             <TableCell>{{ invoice.patient_name ?? '—' }}</TableCell>
@@ -179,13 +193,13 @@ function formatDate(iso: string): string {
                     @click="handlePdfClick($event, invoice)"
                   >
                     <LoaderCircle v-if="generatingIds.has(invoice.id)" class="size-3.5 animate-spin text-muted-foreground" />
-                    <Download v-else-if="getDoc(invoice.id)?.status === 'completed'" class="size-3.5" />
+                    <Download v-else-if="getDoc(invoice)?.status === 'completed'" class="size-3.5" />
                     <FileText v-else class="size-3.5 text-muted-foreground" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <span v-if="generatingIds.has(invoice.id)">Generating...</span>
-                  <span v-else-if="getDoc(invoice.id)?.status === 'completed'">Download Invoice PDF</span>
+                  <span v-else-if="getDoc(invoice)?.status === 'completed'">Download Invoice PDF</span>
                   <span v-else>Generate Invoice PDF</span>
                 </TooltipContent>
               </Tooltip>

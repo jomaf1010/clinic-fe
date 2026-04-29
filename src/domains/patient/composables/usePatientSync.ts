@@ -10,6 +10,7 @@ export function usePatientSync(
   patientId: Ref<string | undefined>,
   clinicId: Ref<string | undefined>,
   onPatientUpdated?: (patient: PatientResponse) => void,
+  onTimelineUpdated?: (data: { encounter_id: string; auto_display_line: string; auto_display_summary: string | null; updated_at: string }) => void,
 ) {
   const { connect, subscribe, unsubscribe } = useCentrifugo()
 
@@ -30,6 +31,8 @@ export function usePatientSync(
       if (patientUpdate.value) {
         patientUpdate.value = { ...patientUpdate.value, avatar_url: event.data.avatar_url }
       }
+    } else if (event.type === 'encounter.timeline_updated') {
+      onTimelineUpdated?.(event.data)
     }
   }
 

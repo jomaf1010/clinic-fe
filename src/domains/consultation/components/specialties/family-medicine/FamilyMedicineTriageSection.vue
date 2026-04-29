@@ -3,8 +3,16 @@ import { reactive, ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import { MessageSquare } from 'lucide-vue-next'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import VitalFieldRenderer from '../../VitalFieldRenderer.vue'
 import LabOrderSection from '../../LabOrderSection.vue'
 import type { ConsultationTriage } from '../../../types/consultation.types'
@@ -28,6 +36,16 @@ const specialtyConfigStore = useSpecialtyConfigStore()
 const hasLabOrders = computed(() => authStore.hasFeature('lab_orders'))
 
 const vitalFields = computed(() => specialtyConfigStore.config?.vitals ?? [])
+const renderedVitalFields = computed(() => vitalFields.value.filter((field) => field.key !== 'blood_sugar'))
+const BLOOD_GLUCOSE_TIMING_OPTIONS = [
+  { value: 'fasting', label: 'Fasting' },
+  { value: 'random', label: 'Random' },
+  { value: 'postprandial', label: 'Post-prandial' },
+  { value: 'pre_meal', label: 'Pre-meal' },
+  { value: 'post_meal', label: 'Post-meal' },
+  { value: 'bedtime', label: 'Bedtime' },
+] as const
+type BloodGlucoseTiming = typeof BLOOD_GLUCOSE_TIMING_OPTIONS[number]['value']
 
 // ── Local state ───────────────────────────────────────────────────────────
 const allVitals = reactive<Record<string, string | number | null>>({
@@ -78,6 +96,19 @@ function onBlur(): void {
   emitSave()
 }
 
+function onBloodSugarUpdate(val: string | number) {
+  const num = Number(val)
+  allVitals['blood_sugar'] = isNaN(num) || String(val) === '' ? null : num
+  if (allVitals['blood_sugar'] !== null && !allVitals['blood_glucose_timing']) {
+    allVitals['blood_glucose_timing'] = 'random'
+  }
+}
+
+function onBloodGlucoseTimingUpdate(val: BloodGlucoseTiming) {
+  allVitals['blood_glucose_timing'] = val
+  onBlur()
+}
+
 function emitSave() {
   emit('save', {
     triage: {
@@ -111,7 +142,7 @@ function emitSave() {
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Vitals</h3>
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <VitalFieldRenderer
-          v-for="field in vitalFields"
+          v-for="field in renderedVitalFields"
           :key="field.key"
           :field-config="field"
           :model-value="allVitals[field.key] ?? null"
@@ -122,6 +153,47 @@ function emitSave() {
           @update:paired="(updates) => Object.assign(allVitals, updates)"
           @blur="onBlur"
         />
+
+        <div class="flex flex-col gap-2">
+          <div class="flex h-6 items-center">
+            <Label for="blood_sugar">Blood Sugar (mg/dL)</Label>
+          </div>
+          <div class="grid grid-cols-[minmax(0,1fr)_minmax(8.5rem,0.85fr)] gap-1.5">
+            <Input
+              id="blood_sugar"
+              :model-value="(allVitals['blood_sugar'] as number | null) ?? undefined"
+              type="number"
+              min="20"
+              max="600"
+              step="1"
+              placeholder="70-200"
+              :disabled="disabled"
+              :aria-invalid="!!errors.blood_sugar"
+              :class="errors.blood_sugar ? 'border-destructive focus-visible:ring-destructive' : ''"
+              @update:model-value="onBloodSugarUpdate"
+              @blur="onBlur"
+            />
+            <Select
+              :model-value="(allVitals['blood_glucose_timing'] as string | null) ?? undefined"
+              :disabled="disabled"
+              @update:model-value="(v) => onBloodGlucoseTimingUpdate(v as BloodGlucoseTiming)"
+            >
+              <SelectTrigger aria-label="Blood glucose timing">
+                <SelectValue placeholder="Timing" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="option in BLOOD_GLUCOSE_TIMING_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p v-if="errors.blood_sugar" class="text-xs text-destructive">{{ errors.blood_sugar }}</p>
+        </div>
       </div>
     </div>
 

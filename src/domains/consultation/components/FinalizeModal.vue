@@ -65,7 +65,11 @@ const hrInd = computed(() => vitalIndicator(classifyHr(vitals.value?.hr, vitalsC
 const rrInd = computed(() => vitalIndicator(classifyRr(vitals.value?.rr, vitalsConfig.config)))
 const tempInd = computed(() => vitalIndicator(classifyTemp(vitals.value?.temp, vitalsConfig.config)))
 const spo2Ind = computed(() => vitalIndicator(classifySpo2(vitals.value?.spo2, vitalsConfig.config)))
-const bsInd = computed(() => vitalIndicator(classifyBloodSugar(vitals.value?.blood_sugar, vitalsConfig.config)))
+const bsInd = computed(() => vitalIndicator(classifyBloodSugar(
+  vitals.value?.blood_sugar,
+  vitalsConfig.config,
+  vitals.value?.blood_glucose_timing,
+)))
 const painInd = computed(() => vitalIndicator(classifyPain(vitals.value?.pain_score as number | null, vitalsConfig.config)))
 
 const bmi = computed(() => {

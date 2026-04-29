@@ -4,6 +4,8 @@
 // strings to preserve leading zeros if any (none in FDI but matches
 // MongoDB key shape).
 
+import type { SoapNote } from '@/domains/encounter/types/soapNote.types'
+
 // ---- Shared enums ----
 
 export type CariesSeverity = 'early' | 'moderate' | 'severe'
@@ -301,6 +303,7 @@ export interface DentalVisitData {
   triage: DentalVisitTriage | null
   assessment: DentalVisitAssessment | null
   plan: DentalVisitPlan | null
+  soap_note?: SoapNote | null
 }
 
 export interface DentalVisitDetail extends DentalVisitData {
@@ -342,6 +345,7 @@ export interface UpdateDentalVisitPayload {
   triage?: DentalVisitTriage
   assessment?: DentalVisitAssessment
   plan?: DentalVisitPlan
+  soap_note?: SoapNote
 }
 
 // ---- Fee schedule / catalog ----

@@ -3,6 +3,7 @@ import type {
   ConsultationAssessment,
   ConsultationTreatmentPlan,
 } from '@/domains/consultation/types/consultation.types'
+import type { SoapNote } from './soapNote.types'
 import type { PrescriptionResponse } from '@/domains/consultation/types/prescription.types'
 import type { LabOrderResponse } from '@/domains/consultation/types/labOrder.types'
 
@@ -13,10 +14,11 @@ export interface EncounterUpdatedEvent {
   encounter_id: string
   timestamp: string
   data: {
-    sections: ('triage' | 'assessment' | 'treatment_plan')[]
+    sections: ('triage' | 'assessment' | 'treatment_plan' | 'soap_note')[]
     triage?: ConsultationTriage
     assessment?: ConsultationAssessment
     treatment_plan?: ConsultationTreatmentPlan
+    soap_note?: SoapNote
     updated_at: string
   }
 }

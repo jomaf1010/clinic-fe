@@ -276,14 +276,17 @@ export function classifyRr(
   return { label: 'Elevated', color: 'text-red-600', severity: 'high' }
 }
 
+export type BloodGlucoseTiming = 'fasting' | 'random' | 'postprandial' | 'pre_meal' | 'post_meal' | 'bedtime'
+
 /**
- * Blood sugar classification (mg/dL, fasting).
- * < 70 Hypoglycemia, 70-100 Normal, 101-125 Pre-diabetic, > 125 Diabetic
+ * Blood sugar classification (mg/dL). Fasting/pre-meal uses the tighter
+ * 100/126 thresholds; random/post-meal/bedtime uses 140/200.
  * Pass patientAgeDays + ageRanges from specialty config to apply age-appropriate thresholds.
  */
 export function classifyBloodSugar(
   bs: number | null | undefined,
   config: VitalsConfig = DEFAULT_VITALS_CONFIG,
+  timing?: BloodGlucoseTiming | string | null,
   patientAgeDays?: number,
   ageRanges?: VitalAgeBasedRange[],
 ): VitalStatus | null {
@@ -296,9 +299,15 @@ export function classifyBloodSugar(
     if (bs <= high) return NORMAL
     return { label: 'High', color: 'text-red-600', severity: 'high' }
   }
-  if (bs < config.bs_hypoglycemia)   return { label: 'Low (Hypoglycemia)', color: 'text-blue-600', severity: 'low' }
-  if (bs <= config.bs_normal) return NORMAL
-  if (bs <= config.bs_prediabetic) return { label: 'Pre-diabetic', color: 'text-amber-600', severity: 'elevated' }
+  const isFastingLike = timing === 'fasting' || timing === 'pre_meal'
+  if (bs < config.bs_hypoglycemia) return { label: 'Low (Hypoglycemia)', color: 'text-blue-600', severity: 'low' }
+  if (isFastingLike) {
+    if (bs <= config.bs_normal) return NORMAL
+    if (bs <= config.bs_prediabetic) return { label: 'Pre-diabetic', color: 'text-amber-600', severity: 'elevated' }
+    return { label: 'High (Diabetic)', color: 'text-red-600', severity: 'high' }
+  }
+  if (bs < 140) return NORMAL
+  if (bs < 200) return { label: 'Pre-diabetic', color: 'text-amber-600', severity: 'elevated' }
   return { label: 'High (Diabetic)', color: 'text-red-600', severity: 'high' }
 }
 

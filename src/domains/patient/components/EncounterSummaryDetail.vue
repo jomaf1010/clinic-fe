@@ -5,6 +5,8 @@ import type { DisplaySummary, DisplaySummaryVitals, BpClassification } from '@/d
 
 const props = defineProps<{
   summary: DisplaySummary
+  headline?: string | null
+  displaySummary?: string | null
   previousVitals?: DisplaySummaryVitals | null
 }>()
 
@@ -25,6 +27,7 @@ const BP_CLASS_COLOR: Record<BpClassification, string> = {
 }
 
 const vitals = computed(() => props.summary.vitals)
+const headline = computed(() => props.headline ?? props.summary.chief_complaint ?? null)
 
 // Vitals to render as a compact inline chip row
 function fmt1(n: number): string {
@@ -97,9 +100,13 @@ function ageLabel(months: number): string {
 <template>
   <div class="flex flex-col gap-1.5">
     <!-- Chief complaint + specialty context inline -->
-    <div v-if="summary.chief_complaint" class="text-sm text-foreground leading-relaxed">
-      {{ summary.chief_complaint }}
+    <div v-if="headline" class="text-sm text-foreground leading-relaxed">
+      {{ headline }}
     </div>
+
+    <p v-if="displaySummary" class="text-sm text-muted-foreground leading-relaxed">
+      {{ displaySummary }}
+    </p>
 
     <!-- Specialty context line -->
     <div v-if="ctx.kind !== 'consultation' || bpClassLabel" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">

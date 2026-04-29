@@ -100,8 +100,14 @@ async function handleResponse<T>(
   retry: () => Promise<Response>,
 ): Promise<T> {
   if (response.status === 503) {
-    isMaintenanceMode.value = true
-    throw new HttpError(503, 'Service temporarily unavailable')
+    const data = await parseBody(response)
+    const errorCode = typeof data === 'object' && data !== null && 'error_code' in data
+      ? (data as { error_code?: unknown }).error_code
+      : null
+    if (typeof data === 'string' || errorCode === 'maintenance_mode') {
+      isMaintenanceMode.value = true
+    }
+    throw new HttpError(503, 'Service temporarily unavailable', data)
   }
 
   if (response.status === 401) {

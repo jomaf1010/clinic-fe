@@ -25,6 +25,8 @@ const emit = defineEmits<{
 const router = useRouter()
 const authStore = useAuthStore()
 const vitalsConfig = useVitalsConfigStore()
+const timelineLine = computed(() => props.consultation.auto_display_line ?? props.consultation.display_line ?? null)
+const timelineSummary = computed(() => props.consultation.auto_display_summary ?? null)
 
 const doctorInitials = computed(() => {
   const name = props.consultation.doctor_name ?? ''
@@ -79,7 +81,7 @@ const abnormalVitals = computed(() => {
     alerts.push({ label: 'RR', value: `${vitals.rr}/min`, status: rr.label, color: badgeColor(rr.severity) })
   }
 
-  const bs = classifyBloodSugar(vitals.blood_sugar, cfg)
+  const bs = classifyBloodSugar(vitals.blood_sugar, cfg, vitals.blood_glucose_timing)
   if (bs && bs.severity !== 'normal') {
     alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: bs.label, color: badgeColor(bs.severity) })
   }
@@ -150,10 +152,15 @@ function formatDate(iso: string): string {
           </span>
         </div>
         <div v-if="consultation.display_summary" class="mt-1">
-          <EncounterSummaryDetail :summary="consultation.display_summary" />
+          <EncounterSummaryDetail
+            :summary="consultation.display_summary"
+            :headline="timelineLine"
+            :display-summary="timelineSummary"
+          />
         </div>
-        <p v-else-if="consultation.display_line" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ consultation.display_line }}</p>
-        <p v-else class="mt-1 text-sm italic text-muted-foreground">No chief complaint yet</p>
+        <p v-else-if="timelineLine" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ timelineLine }}</p>
+        <p v-if="!consultation.display_summary && timelineSummary" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ timelineSummary }}</p>
+        <p v-else-if="!timelineLine" class="mt-1 text-sm italic text-muted-foreground">No chief complaint yet</p>
 
         <!-- Abnormal vitals -->
         <div v-if="abnormalVitals.length" class="mt-2 flex flex-wrap gap-1.5">
