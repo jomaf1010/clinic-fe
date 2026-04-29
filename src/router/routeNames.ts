@@ -4,6 +4,7 @@ export const RouteNames = {
   SIGNUP: 'signup',
   VERIFY_EMAIL_NOTICE: 'verify-email-notice',
   VERIFY_EMAIL: 'verify-email',
+  LINK_GOOGLE: 'link-google',
   ONBOARDING_CREATE_CLINIC: 'onboarding-create-clinic',
   SELECT_CLINIC: 'select-clinic',
   PATIENT_LIST: 'patient-list',

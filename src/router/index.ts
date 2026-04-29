@@ -220,6 +220,12 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/link-google',
+      name: RouteNames.LINK_GOOGLE,
+      component: () => import('@/domains/auth/views/LinkGoogleView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/forgot-password',
       name: RouteNames.FORGOT_PASSWORD,
       component: () => import('@/domains/auth/views/ForgotPasswordView.vue'),
