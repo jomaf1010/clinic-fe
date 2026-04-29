@@ -117,6 +117,15 @@ export type LoginResponse = {
   meta: { memberships: Membership[] }
 }
 
+export type GoogleAuthResponse = LoginResponse
+
+export interface GoogleLinkRequiredResponse {
+  message: string
+  status: 'link_required'
+  email: string
+  error_code?: string
+}
+
 export type SignupResponse = {
   message: string
 }

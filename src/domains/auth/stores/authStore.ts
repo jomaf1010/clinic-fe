@@ -4,7 +4,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import { setAuthToken } from '@/lib/http'
 import { authApi } from '../api/authApi'
-import type { ClinicContext, LoginCredentials, Membership, SignupCredentials, User } from '../types/auth.types'
+import type { ClinicContext, GoogleAuthResponse, LoginCredentials, LoginResponse, Membership, SignupCredentials, User } from '../types/auth.types'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null)
@@ -90,8 +90,7 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchUser()
   }
 
-  async function login(credentials: LoginCredentials): Promise<void> {
-    const response = await authApi.login(credentials)
+  async function completeTokenLogin(response: LoginResponse | GoogleAuthResponse): Promise<void> {
     setToken(response.data.access_token)
     memberships.value = response.meta.memberships
     const activeMemberships = response.meta.memberships.filter((m) => m.status === 'active')
@@ -103,6 +102,22 @@ export const useAuthStore = defineStore('auth', () => {
     } else {
       await fetchUser()
     }
+  }
+
+  async function login(credentials: LoginCredentials): Promise<void> {
+    await completeTokenLogin(await authApi.login(credentials))
+  }
+
+  async function googleLogin(credential: string, rememberMe: boolean): Promise<void> {
+    await completeTokenLogin(await authApi.googleAuth({ credential, remember_me: rememberMe }))
+  }
+
+  async function requestGoogleLink(credential: string): Promise<void> {
+    await authApi.requestGoogleLink({ credential })
+  }
+
+  async function confirmGoogleLink(email: string, token: string, rememberMe: boolean): Promise<void> {
+    await completeTokenLogin(await authApi.confirmGoogleLink({ email, token, remember_me: rememberMe }))
   }
 
   async function signup(credentials: SignupCredentials): Promise<void> {
@@ -166,6 +181,9 @@ export const useAuthStore = defineStore('auth', () => {
     setToken,
     fetchUser,
     login,
+    googleLogin,
+    requestGoogleLink,
+    confirmGoogleLink,
     signup,
     selectClinic,
     logout,

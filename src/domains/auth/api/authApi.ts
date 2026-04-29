@@ -1,5 +1,5 @@
 import { http, getAuthToken } from '@/lib/http'
-import type { LoginCredentials, LoginResponse, MeResponse, MessageResponse, RefreshResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
+import type { GoogleAuthResponse, LoginCredentials, LoginResponse, MeResponse, MessageResponse, RefreshResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
 
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
@@ -14,6 +14,18 @@ export const authApi = {
       ...credentials,
       password: btoa(credentials.password),
     })
+  },
+
+  async googleAuth(data: { credential: string; remember_me?: boolean }): Promise<GoogleAuthResponse> {
+    return http.post<GoogleAuthResponse>('/auth/google', data)
+  },
+
+  async requestGoogleLink(data: { credential: string }): Promise<MessageResponse> {
+    return http.post<MessageResponse>('/auth/google/link-request', data)
+  },
+
+  async confirmGoogleLink(data: { email: string; token: string; remember_me?: boolean }): Promise<GoogleAuthResponse> {
+    return http.post<GoogleAuthResponse>('/auth/google/link-confirm', data)
   },
 
   async verifyEmail(payload: VerifyEmailPayload): Promise<MessageResponse> {

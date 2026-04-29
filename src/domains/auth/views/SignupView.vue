@@ -6,6 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Input, PasswordInput } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Card,
   CardContent,
   CardDescription,
@@ -20,13 +30,15 @@ import { signupSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
 import { useRecaptcha } from '@/composables/useRecaptcha'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
-import type { ValidationError } from '../types/auth.types'
+import type { GoogleLinkRequiredResponse, ValidationError } from '../types/auth.types'
 import PasswordStrengthBar from '../components/PasswordStrengthBar.vue'
+import GoogleSignInButton from '../components/GoogleSignInButton.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const { canvasRef } = useNeuralNetwork()
+const hasGoogleSignIn = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
 
 const { handleSubmit, setFieldError } = useForm({
   validationSchema: signupSchema,
@@ -40,9 +52,15 @@ const { value: password, errorMessage: passwordError } = useField<string>('passw
 const { load: loadRecaptcha, execute: executeRecaptcha } = useRecaptcha()
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
+const generalNotice = ref<string | null>(null)
+const linkDialogOpen = ref(false)
+const pendingGoogleCredential = ref<string | null>(null)
+const pendingGoogleEmail = ref<string | null>(null)
+const linkRequestLoading = ref(false)
 
 const ready = ref(false)
 onMounted(() => {
+  void canvasRef.value
   loadRecaptcha()
   requestAnimationFrame(() => {
     ready.value = true
@@ -55,6 +73,7 @@ onMounted(() => {
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
+  generalNotice.value = null
   isLoading.value = true
 
   try {
@@ -88,6 +107,62 @@ const onSubmit = handleSubmit(async (values) => {
     isLoading.value = false
   }
 })
+
+function handleGoogleError(err: unknown): void {
+  if (err instanceof HttpError) {
+    if (err.status === 409) {
+      const body = err.data as GoogleLinkRequiredResponse
+      if (body.status === 'link_required') {
+        pendingGoogleEmail.value = body.email
+        linkDialogOpen.value = true
+        return
+      }
+    }
+
+    if (err.status === 422) {
+      const body = err.data as ValidationError
+      generalError.value = body.message ?? 'Google sign-up could not be verified.'
+      return
+    }
+  }
+
+  generalError.value = 'Google sign-up failed. Please try again.'
+}
+
+async function onGoogleCredential(credential: string): Promise<void> {
+  generalError.value = null
+  generalNotice.value = null
+  pendingGoogleCredential.value = credential
+  isLoading.value = true
+
+  try {
+    await authStore.googleLogin(credential, true)
+    router.push({ name: RouteNames.HOME })
+  } catch (err) {
+    handleGoogleError(err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function requestGoogleLink(): Promise<void> {
+  if (!pendingGoogleCredential.value) {
+    return
+  }
+
+  linkRequestLoading.value = true
+  generalError.value = null
+
+  try {
+    await authStore.requestGoogleLink(pendingGoogleCredential.value)
+    linkDialogOpen.value = false
+    generalNotice.value = `Check ${pendingGoogleEmail.value ?? 'your email'} to finish linking Google sign-in.`
+  } catch {
+    generalError.value = 'Unable to send the Google link email. Please try again.'
+  } finally {
+    linkRequestLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -123,6 +198,32 @@ const onSubmit = handleSubmit(async (values) => {
                 class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
               >
                 {{ generalError }}
+              </div>
+
+              <div
+                v-if="generalNotice"
+                role="status"
+                class="rounded-md border border-emerald-600/30 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700"
+              >
+                {{ generalNotice }}
+              </div>
+
+              <div
+                v-if="hasGoogleSignIn"
+                class="transition-all delay-300 duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <GoogleSignInButton :disabled="isLoading" text="signup_with" @credential="onGoogleCredential" />
+              </div>
+
+              <div
+                v-if="hasGoogleSignIn"
+                class="flex items-center gap-3 transition-all delay-300 duration-500 ease-out"
+                :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
+              >
+                <div class="h-px flex-1 bg-border" />
+                <span class="text-xs text-muted-foreground">or</span>
+                <div class="h-px flex-1 bg-border" />
               </div>
 
               <div
@@ -255,5 +356,23 @@ const onSubmit = handleSubmit(async (values) => {
         </Card>
       </div>
     </div>
+
+    <AlertDialog :open="linkDialogOpen" @update:open="linkDialogOpen = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Link Google sign-in?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ pendingGoogleEmail }} already has a MediFlow account. We will email a one-time confirmation link before enabling Google sign-in for that account.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="linkRequestLoading">Cancel</AlertDialogCancel>
+          <AlertDialogAction :disabled="linkRequestLoading" @click.prevent="requestGoogleLink">
+            <LoaderCircle v-if="linkRequestLoading" class="size-4 animate-spin" />
+            Send link email
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
