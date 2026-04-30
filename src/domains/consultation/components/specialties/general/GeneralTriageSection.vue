@@ -180,7 +180,7 @@ function onBlur(): void {
 }
 
 function onPainScoreChange(val: number[]) {
-  allVitals['pain_score'] = val[0]
+  allVitals['pain_score'] = val[0] ?? null
   emitSave()
 }
 
@@ -378,7 +378,7 @@ function emitSave() {
             :step="1"
             :disabled="disabled"
             class="mt-2.5 w-full"
-            @update:model-value="onPainScoreChange"
+            @update:model-value="(e) => { if (e) onPainScoreChange(e) }"
           />
           <div class="flex justify-between text-[10px] text-muted-foreground">
             <span>0 - No pain</span>

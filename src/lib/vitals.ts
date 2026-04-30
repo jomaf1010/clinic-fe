@@ -59,8 +59,8 @@ export function parseBp(bp: string | null | undefined): BpReading | null {
   if (!bp) return null
   const parts = bp.split('/')
   if (parts.length !== 2) return null
-  const systolic = parseInt(parts[0], 10)
-  const diastolic = parseInt(parts[1], 10)
+  const systolic = parseInt(parts[0]!, 10)
+  const diastolic = parseInt(parts[1]!, 10)
   if (isNaN(systolic) || isNaN(diastolic) || systolic <= 0 || diastolic <= 0) return null
   return { systolic, diastolic }
 }

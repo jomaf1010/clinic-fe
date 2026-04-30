@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { CalendarDate, today, getLocalTimeZone, getDayOfWeek } from '@internationalized/date'
+import { CalendarDate, today, getLocalTimeZone, getDayOfWeek, type DateValue } from '@internationalized/date'
 import {
   CalendarDays,
   X,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { ConsultationTreatmentPlan, ConsultationConsumable } from '../../types/consultation.types'
+import type { GeneratedDocumentResponse } from '../../api/documentApi'
 import type { PrescriptionResponse } from '../../types/prescription.types'
 import type { LabOrderResponse } from '../../types/labOrder.types'
 import type { DaySchedule, Slot } from '@/domains/schedule/types/schedule.types'
@@ -36,7 +37,7 @@ const props = defineProps<{
   labOrderDisabled: boolean
   prescriptionUpdate?: PrescriptionResponse | null
   labOrderUpdate?: LabOrderResponse | null
-  documentUpdate?: { type: string; status: string; download_url?: string | null } | null
+  documentUpdate?: GeneratedDocumentResponse | null
 }>()
 
 const emit = defineEmits<{
@@ -131,7 +132,8 @@ const followUpDisplay = computed(() => {
   })
 })
 
-async function onDateSelect(date: CalendarDate): Promise<void> {
+async function onDateSelect(date: DateValue | undefined): Promise<void> {
+  if (!date) return
   const iso = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
   selectedDate.value = iso
   selectedSlot.value = null

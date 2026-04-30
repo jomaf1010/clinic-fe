@@ -34,6 +34,17 @@ const props = withDefaults(defineProps<{
   previewOnly: false,
 })
 
+// Coerce mixed string|number|null vital values to number|null
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function toStr(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
 // Adapter: extract consultation-level data from EncounterResponse
 const triage = computed(() => props.consultation.consultation?.triage ?? { chief_complaint: null, vitals: {}, notes: null })
 const assessment = computed(() => props.consultation.consultation?.assessment ?? { diagnoses: [], notes: null })
@@ -60,15 +71,15 @@ function vitalIndicator(status: VitalStatus | null): { icon: typeof ArrowUp | ty
   return { icon: ArrowUp, class: 'text-red-600 dark:text-red-400' }
 }
 
-const bpInd = computed(() => vitalIndicator(classifyBpAsStatus(vitals.value?.bp, vitalsConfig.config)))
-const hrInd = computed(() => vitalIndicator(classifyHr(vitals.value?.hr, vitalsConfig.config)))
-const rrInd = computed(() => vitalIndicator(classifyRr(vitals.value?.rr, vitalsConfig.config)))
-const tempInd = computed(() => vitalIndicator(classifyTemp(vitals.value?.temp, vitalsConfig.config)))
-const spo2Ind = computed(() => vitalIndicator(classifySpo2(vitals.value?.spo2, vitalsConfig.config)))
+const bpInd = computed(() => vitalIndicator(classifyBpAsStatus(toStr(vitals.value?.bp), vitalsConfig.config)))
+const hrInd = computed(() => vitalIndicator(classifyHr(toNum(vitals.value?.hr), vitalsConfig.config)))
+const rrInd = computed(() => vitalIndicator(classifyRr(toNum(vitals.value?.rr), vitalsConfig.config)))
+const tempInd = computed(() => vitalIndicator(classifyTemp(toNum(vitals.value?.temp), vitalsConfig.config)))
+const spo2Ind = computed(() => vitalIndicator(classifySpo2(toNum(vitals.value?.spo2), vitalsConfig.config)))
 const bsInd = computed(() => vitalIndicator(classifyBloodSugar(
-  vitals.value?.blood_sugar,
+  toNum(vitals.value?.blood_sugar),
   vitalsConfig.config,
-  vitals.value?.blood_glucose_timing,
+  toStr(vitals.value?.blood_glucose_timing),
 )))
 const painInd = computed(() => vitalIndicator(classifyPain(vitals.value?.pain_score as number | null, vitalsConfig.config)))
 

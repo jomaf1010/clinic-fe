@@ -679,7 +679,7 @@ function proceedAfterFeeWarning() {
           <!-- ── Triage Tab ──────────────────────────────────────────── -->
           <TabsContent value="triage" class="mt-0 px-0 md:px-8">
             <TriageTab
-              :triage="store.current.consultation?.triage"
+              :triage="(store.current.consultation?.triage ?? { chief_complaint: null, vitals: {}, notes: null })"
               :patient-id="store.current.patient_id"
               :encounter-id="store.current.id"
               :disabled="store.isFinalized || !canEditTriage"
@@ -700,7 +700,7 @@ function proceedAfterFeeWarning() {
             <!-- Lab Results + Trends (compact, no vitals panel since sidebar shows them) -->
             <div v-if="hasLabSummary || canShowTrends">
               <VitalsSummary
-                :triage="store.current.consultation?.triage"
+                :triage="(store.current.consultation?.triage ?? { chief_complaint: null, vitals: {}, notes: null })"
                 :patient-id="store.current.patient_id"
                 :encounter-id="store.current.id"
                 :specialty="store.current.specialty"
@@ -711,7 +711,7 @@ function proceedAfterFeeWarning() {
             </div>
             <div>
               <AssessmentTab
-                :assessment="store.current.consultation?.assessment"
+                :assessment="(store.current.consultation?.assessment ?? { diagnoses: [], notes: null })"
                 :disabled="store.isFinalized"
                 @save="handleSave"
               />
@@ -732,7 +732,7 @@ function proceedAfterFeeWarning() {
           <TabsContent value="treatment-plan" class="mt-0 px-0 md:px-8">
             <div class="flex flex-col gap-5">
               <TreatmentPlanTab
-                :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null }"
+                :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null, follow_up_appointment_id: null }"
                 :encounter-id="store.current.id"
                 :patient-id="store.current.patient_id"
                 :doctor-id="store.current.doctor_id"
@@ -787,7 +787,7 @@ function proceedAfterFeeWarning() {
               :disabled="store.isFinalized"
               :encounter-id="store.current.id"
               :status="store.current.status"
-              :consultation-type="store.current.type"
+              :consultation-type="store.current.consultation?.type ?? 'default'"
               :patient-id="store.current.patient_id"
               :diagnoses="store.current.consultation?.assessment?.diagnoses ?? []"
               :document-update="documentUpdate"

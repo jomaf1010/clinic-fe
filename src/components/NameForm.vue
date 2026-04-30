@@ -88,7 +88,7 @@ function emitValue() {
 
     <div class="flex flex-col gap-2">
       <Label class="text-xs text-muted-foreground">Suffix <span class="text-muted-foreground">(optional)</span></Label>
-      <Select :model-value="suffix || undefined" :disabled="disabled" @update:model-value="(val: string) => { suffix = val === 'none' ? '' : val; emitValue() }">
+      <Select :model-value="suffix || undefined" :disabled="disabled" @update:model-value="(val) => { const v = val as string; suffix = v === 'none' ? '' : v; emitValue() }">
         <SelectTrigger>
           <SelectValue placeholder="None" />
         </SelectTrigger>

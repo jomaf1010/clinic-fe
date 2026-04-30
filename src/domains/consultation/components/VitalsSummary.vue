@@ -207,41 +207,51 @@ const bmiCategory = computed(() => {
   return { label: result.label, color: result.color }
 })
 
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function toStr(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
 const tempStatus = computed(() => {
-  const s = classifyTemp(props.triage.vitals?.temp, vitalsConfig.config)
+  const s = classifyTemp(toNum(props.triage.vitals?.temp), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bpStatus = computed(() => {
-  const s = classifyBpAsStatus(props.triage.vitals?.bp, vitalsConfig.config)
+  const s = classifyBpAsStatus(toStr(props.triage.vitals?.bp), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const hrStatus = computed(() => {
-  const s = classifyHr(props.triage.vitals?.hr, vitalsConfig.config)
+  const s = classifyHr(toNum(props.triage.vitals?.hr), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const spo2Status = computed(() => {
-  const s = classifySpo2(props.triage.vitals?.spo2, vitalsConfig.config)
+  const s = classifySpo2(toNum(props.triage.vitals?.spo2), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const rrStatus = computed(() => {
-  const s = classifyRr(props.triage.vitals?.rr, vitalsConfig.config)
+  const s = classifyRr(toNum(props.triage.vitals?.rr), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bsStatus = computed(() => {
   const s = classifyBloodSugar(
-    props.triage.vitals?.blood_sugar,
+    toNum(props.triage.vitals?.blood_sugar),
     vitalsConfig.config,
-    props.triage.vitals?.blood_glucose_timing,
+    toStr(props.triage.vitals?.blood_glucose_timing),
   )
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
@@ -289,7 +299,7 @@ const vitalBadges = computed(() => {
   if (bpStatus.value) {
     badges.push({
       label: 'BP',
-      value: vitals.bp ?? '',
+      value: toStr(vitals.bp) ?? '',
       status: bpStatus.value.label,
       badgeClass: severityToBadge(bpStatus.value.severity),
     })

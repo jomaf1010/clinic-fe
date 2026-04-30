@@ -102,13 +102,14 @@ function cancelEditing() {
 async function saveItemQty(itemId: string) {
   if (!props.invoice) return
   const original = props.invoice.line_items.find((i) => i.id === itemId)
-  if (!original || editedQuantities.value[itemId] === original.quantity) return
+  const editedQty = editedQuantities.value[itemId]
+  if (!original || editedQty === undefined || editedQty === original.quantity) return
 
   const isMedicine = original.type === 'medicine'
 
   try {
     await billingStore.updateInvoice(props.invoice.id, [
-      { id: itemId, quantity: editedQuantities.value[itemId] },
+      { id: itemId, quantity: editedQty },
     ])
     emit('updated')
 

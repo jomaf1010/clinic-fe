@@ -258,7 +258,7 @@ onUnmounted(() => {
             :max="getMaxZoom()"
             :step="0.01"
             class="flex-1"
-            @update:model-value="handleZoomChange"
+            @update:model-value="(e) => { if (e) handleZoomChange(e) }"
           />
           <ZoomIn class="size-4 shrink-0 text-muted-foreground" />
         </div>

@@ -66,7 +66,7 @@ function humanizeFrequency(freq: string): string {
 }
 
 function joinList(items: string[]): string {
-  if (items.length === 1) return items[0]
+  if (items.length === 1) return items[0]!
   return items.slice(0, -1).join(', ') + ` and ${items[items.length - 1]}`
 }
 
@@ -215,10 +215,34 @@ const vitalsIntroPhrases = [
   'Versus the previous visit, ',
 ]
 
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function toStr(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
+function normalizeVitals(v: ConsultationTriage['vitals']) {
+  return {
+    bp: toStr(v.bp),
+    hr: toNum(v.hr),
+    temp: toNum(v.temp),
+    spo2: toNum(v.spo2),
+    rr: toNum(v.rr),
+    blood_sugar: toNum(v.blood_sugar),
+    weight: toNum(v.weight),
+    height: toNum(v.height),
+    pain_score: toNum(v.pain_score),
+  }
+}
+
 function collectChanges(current: ConsultationTriage, previous: ConsultationTriage, config: VitalsConfig): VitalChange[] {
   const result: VitalChange[] = []
-  const curr = current.vitals
-  const prev = previous.vitals
+  const curr = normalizeVitals(current.vitals)
+  const prev = normalizeVitals(previous.vitals)
 
   // BP — AHA category comparison
   const currBp = parseBp(curr.bp)

@@ -74,7 +74,7 @@ import DangerSignsChecklist from '../components/DangerSignsChecklist.vue'
 import PrenatalCareChecklist from '../components/PrenatalCareChecklist.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { toast } from 'vue-sonner'
-import { CalendarDate, today, getLocalTimeZone, getDayOfWeek } from '@internationalized/date'
+import { CalendarDate, today, getLocalTimeZone, getDayOfWeek, type DateValue } from '@internationalized/date'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
@@ -815,7 +815,8 @@ async function loadDoctorSchedule(): Promise<void> {
   }
 }
 
-async function onFollowUpDateSelect(date: CalendarDate): Promise<void> {
+async function onFollowUpDateSelect(date: DateValue | undefined): Promise<void> {
+  if (!date) return
   const iso = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
   followUpSelectedDate.value = iso
   followUpSelectedSlot.value = null
@@ -1822,7 +1823,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 <Select
                   :model-value="localAssessment.ob_exam.fhr_method || undefined"
                   :disabled="store.isFinalized"
-                  @update:model-value="(v) => { localAssessment.ob_exam.fhr_method = v ?? ''; saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ob_exam.fhr_method = (v as string | null) ?? ''; saveAssessment() }"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select method" />
@@ -1844,7 +1845,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 <Select
                   :model-value="localAssessment.ob_exam.fetal_presentation || undefined"
                   :disabled="store.isFinalized"
-                  @update:model-value="(v) => { localAssessment.ob_exam.fetal_presentation = v ?? ''; saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ob_exam.fetal_presentation = (v as string | null) ?? ''; saveAssessment() }"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select presentation" />
@@ -1864,7 +1865,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 <Select
                   :model-value="localAssessment.ob_exam.edema || undefined"
                   :disabled="store.isFinalized"
-                  @update:model-value="(v) => { localAssessment.ob_exam.edema = v ?? ''; if (v === 'none') { localAssessment.ob_exam.edema_location = [] } saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ob_exam.edema = (v as string | null) ?? ''; if (v === 'none') { localAssessment.ob_exam.edema_location = [] } saveAssessment() }"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select grade" />
@@ -1961,7 +1962,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                   <Select
                     :model-value="localAssessment.cervical.cervical_consistency || undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v) => { localAssessment.cervical.cervical_consistency = v ?? ''; saveAssessment() }"
+                    @update:model-value="(v) => { localAssessment.cervical.cervical_consistency = (v as string | null) ?? ''; saveAssessment() }"
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select" />
@@ -1978,7 +1979,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                   <Select
                     :model-value="localAssessment.cervical.cervical_position || undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v) => { localAssessment.cervical.cervical_position = v ?? ''; saveAssessment() }"
+                    @update:model-value="(v) => { localAssessment.cervical.cervical_position = (v as string | null) ?? ''; saveAssessment() }"
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select" />
@@ -2037,7 +2038,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 <Select
                   :model-value="localAssessment.ultrasound.type || undefined"
                   :disabled="store.isFinalized"
-                  @update:model-value="(v) => { localAssessment.ultrasound.type = v ?? ''; saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ultrasound.type = (v as string | null) ?? ''; saveAssessment() }"
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -2060,7 +2061,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                   :disabled="store.isFinalized"
                   disable-future
                   placeholder="Select date"
-                  @update:model-value="(v) => { localAssessment.ultrasound.date = v ?? ''; computeEddFromGA(); saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ultrasound.date = (v as string | null) ?? ''; computeEddFromGA(); saveAssessment() }"
                 />
               </div>
 
@@ -2102,7 +2103,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                   :min-date="computedUtzEdd ? new Date(new Date(computedUtzEdd).getTime() - 14 * 86400000).toISOString().slice(0, 10) : undefined"
                   :max-date="computedUtzEdd ? new Date(new Date(computedUtzEdd).getTime() + 14 * 86400000).toISOString().slice(0, 10) : undefined"
                   placeholder="Auto from GA"
-                  @update:model-value="(v) => { localAssessment.ultrasound.edd = v ?? ''; computeGAFromEdd(); saveAssessment() }"
+                  @update:model-value="(v) => { localAssessment.ultrasound.edd = (v as string | null) ?? ''; computeGAFromEdd(); saveAssessment() }"
                 />
                 <p v-if="computedUtzEdd && localAssessment.ultrasound.edd && computedUtzEdd !== localAssessment.ultrasound.edd" class="text-[10px] text-amber-600 dark:text-amber-400">
                   Manually adjusted from computed {{ new Date(computedUtzEdd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}
@@ -2164,7 +2165,7 @@ function goToTab(direction: 'prev' | 'next'): void {
               <Select
                 :model-value="localAssessment.pregnancy_progress || undefined"
                 :disabled="store.isFinalized"
-                @update:model-value="(v) => { localAssessment.pregnancy_progress = v ?? ''; saveAssessment() }"
+                @update:model-value="(v) => { localAssessment.pregnancy_progress = (v as string | null) ?? ''; saveAssessment() }"
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select progress" />
@@ -2182,7 +2183,7 @@ function goToTab(direction: 'prev' | 'next'): void {
               <Select
                 :model-value="localAssessment.risk_level_update || undefined"
                 :disabled="store.isFinalized"
-                @update:model-value="(v) => { localAssessment.risk_level_update = v ?? ''; saveAssessment() }"
+                @update:model-value="(v) => { localAssessment.risk_level_update = (v as string | null) ?? ''; saveAssessment() }"
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select risk level" />

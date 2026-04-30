@@ -50,7 +50,7 @@ async function evaluateRisk(): Promise<void> {
     const res = await store.evaluateRisk({
       pre_pregnancy_weight: form.pre_pregnancy_weight,
       height: form.height,
-      medical_conditions: form.medical_conditions ? form.medical_conditions.split('\n').map((s: string) => s.trim()).filter(Boolean) : null,
+      medical_conditions: form.medical_conditions || null,
       fetus_count: form.fetus_count,
       smoking: form.smoking || null,
       alcohol: form.alcohol || null,
@@ -270,7 +270,7 @@ async function handleSubmit(): Promise<void> {
     fetuses: form.fetuses,
     pre_pregnancy_weight: form.pre_pregnancy_weight,
     height: form.height,
-    medical_conditions: form.medical_conditions ? form.medical_conditions.split('\n').map((s: string) => s.trim()).filter(Boolean) : null,
+    medical_conditions: form.medical_conditions || null,
     surgical_history: form.surgical_history || null,
     ...(form.smoking ? { smoking: form.smoking } : {}),
     ...(form.alcohol ? { alcohol: form.alcohol } : {}),

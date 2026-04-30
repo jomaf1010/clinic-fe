@@ -576,7 +576,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       </Card>
 
       <!-- Trend Charts ─────────────────────────────────────────────────── -->
-      <PrenatalTrendCharts :dashboard-data="mergedDashboardData" :show-fetal-charts="pregnancy.status === 'active'" />
+      <PrenatalTrendCharts v-if="mergedDashboardData" :dashboard-data="mergedDashboardData" :show-fetal-charts="pregnancy.status === 'active'" />
 
       <!-- Prenatal Care Checklist (active only) ──────────────────────── -->
       <PrenatalCareChecklist
