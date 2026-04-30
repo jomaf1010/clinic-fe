@@ -22,6 +22,9 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: false,
     include: ['src/**/*.{test,spec}.ts'],
+    // Loaded for every test file — installs fresh Pinia, stubs
+    // `navigator.onLine`, restores mocks afterEach. See setup.ts.
+    setupFiles: ['src/__tests__/setup.ts'],
     // Speed: a single thread keeps module-mocked tests deterministic
     // (vi.doMock + dynamic imports don't always survive cross-thread
     // pool serialization in Vitest 3 yet).
@@ -29,6 +32,30 @@ export default defineConfig({
     poolOptions: {
       forks: {
         singleFork: true,
+      },
+    },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      // Don't fail builds on tier-0 / infra files that exist mostly to
+      // bootstrap testing or are environment-specific.
+      exclude: [
+        'src/__tests__/**',
+        'src/main.ts',
+        'src/router/**',
+        'src/types/**',
+        '**/*.d.ts',
+        '**/*.spec.ts',
+        '**/*.test.ts',
+      ],
+      // Thresholds apply only to files that have at least one test.
+      // Tightening these as the suite stabilises is the way; starting
+      // permissive avoids blocking the first PR on coverage gaps.
+      thresholds: {
+        lines: 70,
+        branches: 70,
+        functions: 70,
+        statements: 70,
       },
     },
   },
