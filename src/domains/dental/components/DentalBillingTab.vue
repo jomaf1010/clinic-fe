@@ -8,9 +8,15 @@ import { LoaderCircle, Search, Stethoscope } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { HttpError } from '@/lib/http'
 import { useDentalServices } from '../composables/useDentalServices'
-import type { DentalServiceCategory } from '../types/dental.types'
+import type { DentalServiceCatalogEntry, DentalServiceCategory } from '../types/dental.types'
 
-const { services, groupedByCategory, loaded, loading, error, ensureLoaded, updateService } = useDentalServices()
+const props = withDefaults(defineProps<{
+  scope?: 'clinic' | 'doctor'
+}>(), {
+  scope: 'doctor',
+})
+
+const { services, groupedByCategory, loaded, loading, error, ensureLoaded, updateService } = useDentalServices({ scope: props.scope })
 
 const search = ref('')
 const openCategories = ref<Set<DentalServiceCategory>>(new Set(['preventive', 'restorative', 'endodontic']))
@@ -25,12 +31,45 @@ onMounted(async () => {
   }
 })
 
-// Sync drafts whenever catalog arrives/refreshes
-watch(services, (next) => {
-  const drafts: Record<string, string> = {}
-  for (const s of next) {
-    if (s.clinic_service_uuid) drafts[s.clinic_service_uuid] = String(s.clinic_price)
+// Drafts seed differently per scope:
+// - clinic: prefill the editable clinic price
+// - doctor: prefill ONLY the override (blank when no override exists)
+//   so the input shows clinic price as a placeholder until the dentist
+//   types something. Submitting a blank value sends `null`, which the
+//   backend reads as "use clinic default" and clears the override.
+//
+// Preserve in-flight typing: when a sibling row mutates (toggle, save),
+// the cache is replaced and this watcher refires with the same `services`
+// reference but new entries. We rebuild drafts from the current rows but
+// keep any draft the user has already typed for a row we've shown
+// before — otherwise the user loses unsaved keystrokes whenever any row
+// changes elsewhere in the list.
+function seedDraft(s: DentalServiceCatalogEntry, scope: 'clinic' | 'doctor'): string {
+  if (scope === 'doctor') {
+    return s.override_price != null ? String(s.override_price) : ''
   }
+  return s.clinic_price != null ? String(s.clinic_price) : ''
+}
+
+watch([services, () => props.scope], ([next, scope], oldVal) => {
+  const previousScope = Array.isArray(oldVal) ? oldVal[1] : undefined
+  const isScopeChange = previousScope !== undefined && previousScope !== scope
+  const previous = priceDrafts.value
+  const drafts: Record<string, string> = {}
+
+  for (const s of next) {
+    const uuid = s.clinic_service_uuid
+    if (!uuid) continue
+    // Preserve user typing across sibling-row updates. On scope change we
+    // re-seed everything because the values mean different things
+    // (override vs clinic).
+    if (!isScopeChange && uuid in previous) {
+      drafts[uuid] = previous[uuid] ?? ''
+      continue
+    }
+    drafts[uuid] = seedDraft(s, scope)
+  }
+
   priceDrafts.value = drafts
 }, { immediate: true })
 
@@ -52,6 +91,12 @@ const CATEGORY_LABELS: Record<DentalServiceCategory, string> = {
   other: 'Other',
 }
 
+const description = computed(() =>
+  props.scope === 'clinic'
+    ? "Set the clinic-wide default prices. Individual dentists can override these on their own profile."
+    : "Override your clinic's prices for procedures you charge differently. Leave a price blank to use the clinic default.",
+)
+
 const filteredGroups = computed(() => {
   const q = search.value.trim().toLowerCase()
   const out: { category: DentalServiceCategory; label: string; items: typeof services.value }[] = []
@@ -69,7 +114,18 @@ const filteredGroups = computed(() => {
   return out
 })
 
-const activeCount = computed(() => services.value.filter((s) => s.is_active).length)
+// Activation flag the row's UI should reflect — clinic_is_active when the
+// clinic admin is editing, effective_is_active for the dentist (so a
+// per-doctor opt-out shows as off even when the clinic still offers it).
+function rowIsActive(item: DentalServiceCatalogEntry): boolean {
+  return props.scope === 'doctor' ? item.effective_is_active : item.clinic_is_active
+}
+
+function rowUsesClinicDefault(item: DentalServiceCatalogEntry): boolean {
+  return props.scope === 'doctor' && item.override_price == null
+}
+
+const activeCount = computed(() => services.value.filter((s) => rowIsActive(s)).length)
 
 function toggleCategory(cat: DentalServiceCategory) {
   const next = new Set(openCategories.value)
@@ -84,10 +140,16 @@ async function savePrice(clinicServiceUuid: string) {
     toast.error('Enter a valid non-negative amount.')
     return
   }
+  // Clinic price is required (the catalog row must have a price); doctor
+  // override is allowed to clear back to null.
+  if (props.scope === 'clinic' && parsed === null) {
+    toast.error('Clinic price is required. Enter a non-negative amount.')
+    return
+  }
   saving.value.add(clinicServiceUuid)
   try {
     await updateService(clinicServiceUuid, { price: parsed })
-    toast.success('Price updated.')
+    toast.success(props.scope === 'doctor' && parsed === null ? 'Override cleared.' : 'Price updated.')
   } catch (err) {
     const msg = err instanceof HttpError ? err.message : 'Failed to save price.'
     toast.error(msg)
@@ -97,14 +159,25 @@ async function savePrice(clinicServiceUuid: string) {
   }
 }
 
-async function toggleActive(clinicServiceUuid: string, next: boolean) {
-  saving.value.add(clinicServiceUuid)
+async function toggleActive(item: DentalServiceCatalogEntry, next: boolean) {
+  const uuid = item.clinic_service_uuid
+  if (!uuid) return
+  saving.value.add(uuid)
   try {
-    await updateService(clinicServiceUuid, { is_active: next })
+    if (props.scope === 'doctor') {
+      // Doctor toggle writes to override_is_active. Setting it to match
+      // the clinic flag again would still leave a sparse override row;
+      // pass `null` so the backend clears the activation override (and
+      // deletes the row when both fields revert to defaults).
+      const overrideValue: boolean | null = next === item.clinic_is_active ? null : next
+      await updateService(uuid, { is_active: overrideValue })
+    } else {
+      await updateService(uuid, { is_active: next })
+    }
   } catch {
     toast.error('Failed to update service.')
   } finally {
-    saving.value.delete(clinicServiceUuid)
+    saving.value.delete(uuid)
     saving.value = new Set(saving.value)
   }
 }
@@ -118,7 +191,7 @@ async function toggleActive(clinicServiceUuid: string, next: boolean) {
         <CardTitle class="text-base">Dental Fee Schedule</CardTitle>
       </div>
       <CardDescription>
-        Enable or disable the procedures you offer, and set your price per service. CDT-aligned codes with Philippine-market defaults.
+        {{ description }}
         <span v-if="loaded" class="text-foreground">{{ activeCount }} of {{ services.length }} active.</span>
       </CardDescription>
     </CardHeader>
@@ -131,6 +204,10 @@ async function toggleActive(clinicServiceUuid: string, next: boolean) {
 
       <div v-else-if="error" role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
         {{ error }}
+      </div>
+
+      <div v-else-if="services.length === 0" class="py-8 text-center text-sm text-muted-foreground">
+        No dental services configured yet.
       </div>
 
       <div v-else>
@@ -183,6 +260,9 @@ async function toggleActive(clinicServiceUuid: string, next: boolean) {
                     <span v-if="item.material && item.description"> · </span>
                     <span>{{ item.description ?? '' }}</span>
                   </div>
+                  <p v-if="rowUsesClinicDefault(item)" class="mt-0.5 text-[11px] text-muted-foreground">
+                    Uses clinic default
+                  </p>
                 </div>
 
                 <div class="text-right text-xs text-muted-foreground">
@@ -199,16 +279,17 @@ async function toggleActive(clinicServiceUuid: string, next: boolean) {
                     step="0.01"
                     min="0"
                     class="h-8"
-                    :disabled="!item.is_active || saving.has(item.clinic_service_uuid ?? '')"
+                    :placeholder="props.scope === 'doctor' && item.clinic_price != null ? String(item.clinic_price) : undefined"
+                    :disabled="!rowIsActive(item) || saving.has(item.clinic_service_uuid ?? '')"
                     @blur="item.clinic_service_uuid && savePrice(item.clinic_service_uuid)"
                     @keyup.enter="item.clinic_service_uuid && savePrice(item.clinic_service_uuid)"
                   />
                 </div>
 
                 <Switch
-                  :model-value="item.is_active"
+                  :model-value="rowIsActive(item)"
                   :disabled="saving.has(item.clinic_service_uuid ?? '')"
-                  @update:model-value="item.clinic_service_uuid && toggleActive(item.clinic_service_uuid, $event)"
+                  @update:model-value="toggleActive(item, $event)"
                 />
               </div>
             </div>

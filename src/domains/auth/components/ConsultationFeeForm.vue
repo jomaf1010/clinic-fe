@@ -206,7 +206,7 @@ async function onSubmit() {
 
     <!-- Dental fee schedule (dental only) -->
     <CardContent v-if="isDental" class="pt-6">
-      <DentalBillingTab />
+      <DentalBillingTab scope="doctor" />
     </CardContent>
 
     <Separator v-if="isDental" />

@@ -385,13 +385,53 @@ export interface DentalServiceCatalogEntry {
   default_price: number
   price_min: number | null
   price_max: number | null
-  clinic_price: number
+  /**
+   * Clinic-wide price. Nullable — can be `null` when neither the clinic has
+   * set a price nor the SystemService row has a default. Consumers should
+   * guard before formatting (placeholder, range hint, etc.).
+   * In doctor scope this is the fallback shown as a placeholder.
+   * In clinic scope this is the editable value.
+   */
+  clinic_price: number | null
+  /** Clinic-level activation flag. Always present. */
+  clinic_is_active: boolean
+  /**
+   * Doctor's per-procedure price override. `null` means the doctor uses
+   * the clinic price. Only meaningful in doctor scope; in clinic scope
+   * the backend sets this to `null`.
+   */
+  override_price: number | null
+  /**
+   * Doctor's per-procedure activation override. `null` means the doctor
+   * inherits `clinic_is_active`. Only meaningful in doctor scope.
+   */
+  override_is_active: boolean | null
+  /** Backend-computed: `override_price ?? clinic_price`. */
+  effective_price: number | null
+  /** Backend-computed: `override_is_active ?? clinic_is_active`. */
+  effective_is_active: boolean
+  /**
+   * Back-compat alias. In clinic scope == `clinic_is_active`.
+   * In doctor scope == `effective_is_active`. Existing consumers
+   * (auto-coder, odontogram display, visit view) read this.
+   */
   is_active: boolean
 }
 
 export interface UpdateDentalServicePayload {
   price?: number | null
   is_active?: boolean
+}
+
+/**
+ * Doctor-override upsert payload. `price === null` clears the price
+ * override (falls back to clinic price). `is_active === null` clears
+ * the activation override (falls back to clinic activation). When both
+ * are null, the backend deletes the override row entirely.
+ */
+export interface UpdateDoctorDentalServicePayload {
+  price?: number | null
+  is_active?: boolean | null
 }
 
 // ---- Per-tooth history ----
