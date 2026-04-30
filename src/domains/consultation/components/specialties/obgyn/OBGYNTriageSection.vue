@@ -176,7 +176,7 @@ function emitSave() {
           <Select
             :model-value="local.menstrual_regularity ?? undefined"
             :disabled="disabled"
-            @update:model-value="(v: string) => { local.menstrual_regularity = v || null; onBlur() }"
+            @update:model-value="(v) => { local.menstrual_regularity = (v as string) || null; onBlur() }"
           >
             <SelectTrigger class="h-9">
               <SelectValue placeholder="Select" />
@@ -195,7 +195,7 @@ function emitSave() {
           <Select
             :model-value="local.flow_amount ?? undefined"
             :disabled="disabled"
-            @update:model-value="(v: string) => { local.flow_amount = v || null; onBlur() }"
+            @update:model-value="(v) => { local.flow_amount = (v as string) || null; onBlur() }"
           >
             <SelectTrigger class="h-9">
               <SelectValue placeholder="Select" />
@@ -214,7 +214,7 @@ function emitSave() {
           <Select
             :model-value="local.dysmenorrhea ?? undefined"
             :disabled="disabled"
-            @update:model-value="(v: string) => { local.dysmenorrhea = v || null; onBlur() }"
+            @update:model-value="(v) => { local.dysmenorrhea = (v as string) || null; onBlur() }"
           >
             <SelectTrigger class="h-9">
               <SelectValue placeholder="Select" />
@@ -259,7 +259,7 @@ function emitSave() {
           <Select
             :model-value="local.last_pap_smear ?? undefined"
             :disabled="disabled"
-            @update:model-value="(v: string) => { local.last_pap_smear = v || null; onBlur() }"
+            @update:model-value="(v) => { local.last_pap_smear = (v as string) || null; onBlur() }"
           >
             <SelectTrigger class="h-9">
               <SelectValue placeholder="Select" />

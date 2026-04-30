@@ -582,7 +582,7 @@ onMounted(async () => {
           <div class="grid grid-cols-3 gap-3">
             <div class="flex flex-col gap-1.5">
               <Label class="text-xs">Regularity</Label>
-              <Select :model-value="gynForm.regularity ?? undefined" @update:model-value="(v) => gynForm.regularity = v || null">
+              <Select :model-value="gynForm.regularity ?? undefined" @update:model-value="(v) => gynForm.regularity = (v as 'regular' | 'irregular') || null">
                 <SelectTrigger class="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="regular">Regular</SelectItem>
@@ -592,7 +592,7 @@ onMounted(async () => {
             </div>
             <div class="flex flex-col gap-1.5">
               <Label class="text-xs">Flow</Label>
-              <Select :model-value="gynForm.flow ?? undefined" @update:model-value="(v) => gynForm.flow = v || null">
+              <Select :model-value="gynForm.flow ?? undefined" @update:model-value="(v) => gynForm.flow = (v as 'light' | 'moderate' | 'heavy') || null">
                 <SelectTrigger class="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="light">Light</SelectItem>
@@ -603,7 +603,7 @@ onMounted(async () => {
             </div>
             <div class="flex flex-col gap-1.5">
               <Label class="text-xs">Dysmenorrhea</Label>
-              <Select :model-value="gynForm.dysmenorrhea ?? undefined" @update:model-value="(v) => gynForm.dysmenorrhea = v || null">
+              <Select :model-value="gynForm.dysmenorrhea ?? undefined" @update:model-value="(v) => gynForm.dysmenorrhea = (v as 'none' | 'mild' | 'moderate' | 'severe') || null">
                 <SelectTrigger class="h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>

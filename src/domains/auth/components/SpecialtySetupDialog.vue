@@ -82,7 +82,7 @@ async function onSubmit() {
     if (err instanceof HttpError && err.status === 422) {
       const body = err.data as ValidationError
       for (const [field, messages] of Object.entries(body.errors ?? {})) {
-        fieldErrors.value[field] = messages[0]
+        if (messages[0]) fieldErrors.value[field] = messages[0]
       }
       error.value = body.message ?? 'Validation failed.'
     } else {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { today, getLocalTimeZone } from '@internationalized/date'
 import type { DateRange, DateValue } from 'reka-ui'
 import { toast } from 'vue-sonner'
@@ -39,10 +39,10 @@ const emit = defineEmits<{
 
 const diagnosis = ref('')
 const recommendation = ref('')
-const dateRange = ref<DateRange>({
+const dateRange = ref({
   start: today(getLocalTimeZone()),
   end: today(getLocalTimeZone()),
-})
+}) as Ref<DateRange>
 const purpose = ref('')
 
 const isGenerating = ref(false)
@@ -59,8 +59,8 @@ function formatDate(date: DateValue | undefined): string {
 }
 
 const rangeDateLabel = computed(() => {
-  const start = dateRange.value.start
-  const end = dateRange.value.end
+  const start = dateRange.value.start as DateValue | undefined
+  const end = dateRange.value.end as DateValue | undefined
   if (start && end) return `${formatDate(start)} — ${formatDate(end)}`
   if (start) return formatDate(start)
   return 'Select duration'

@@ -128,7 +128,8 @@ function onSearchKeydown(e: KeyboardEvent) {
   } else if (e.key === 'Enter') {
     e.preventDefault()
     if (showDropdown.value && highlightedIndex.value >= 0 && highlightedIndex.value < searchResults.value.length) {
-      selectDiagnosis(searchResults.value[highlightedIndex.value])
+      const item = searchResults.value[highlightedIndex.value]
+      if (item) selectDiagnosis(item)
     } else if (searchQuery.value.trim()) {
       addManualDiagnosis()
     }
@@ -249,9 +250,10 @@ onMounted(() => {
 const ascvdPatientAge = ref<number | null>(null)
 const ascvdPatientSex = computed(() => store.current?.patient_sex ?? null)
 
-const ascvdTriageBp = computed(() => {
+const ascvdTriageBp = computed<string | null>(() => {
   const vitals = store.current?.consultation?.triage?.vitals
-  return vitals?.bp ?? null
+  const bp = vitals?.bp
+  return bp == null ? null : String(bp)
 })
 
 const ascvdSmokingStatus = ref<string | null>(null)

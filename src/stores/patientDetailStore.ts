@@ -22,7 +22,7 @@ import type { LifestyleData } from '@/domains/consultation/types/consultation.ty
 import type { ChronicTrendsData } from '@/domains/patient/types/patient.types'
 import { obgynApi } from '@/domains/obgyn/api/obgynApi'
 import type { CreatePregnancyPayload, UpsertGynProfilePayload } from '@/domains/obgyn/api/obgynApi'
-import type { GynProfile, Pregnancy, PregnancyDashboard, PrenatalVisit, ChecklistItem } from '@/domains/obgyn/types/obgyn.types'
+import type { GynProfile, Pregnancy, PregnancyDashboard, PrenatalVisit, ChecklistItem, DueReminders } from '@/domains/obgyn/types/obgyn.types'
 import { dentalApi } from '@/domains/dental/api/dentalApi'
 import type {
   DentalProfile,
@@ -541,7 +541,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     return res
   }
 
-  async function getReminders(pregnancyId: string): Promise<{ labs: Array<{ name: string }>; procedures: Array<{ name: string }> } | null> {
+  async function getReminders(pregnancyId: string): Promise<DueReminders | null> {
     if (!patientId.value) return null
     const res = await obgynApi.getReminders(patientId.value, pregnancyId)
     return res.data

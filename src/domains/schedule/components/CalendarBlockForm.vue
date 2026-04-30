@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, type Ref } from 'vue'
 import { CalendarDate, type DateValue, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateRange } from 'reka-ui'
 import { CalendarIcon, LoaderCircle } from 'lucide-vue-next'
@@ -61,11 +61,11 @@ const title = ref('')
 const type = ref<BlockType>('leave')
 const allDay = ref(true)
 const recurring = ref(false)
-const singleDate = ref<DateValue>(today(getLocalTimeZone()))
-const dateRange = ref<DateRange>({
+const singleDate = ref(today(getLocalTimeZone())) as Ref<DateValue>
+const dateRange = ref({
   start: today(getLocalTimeZone()),
   end: today(getLocalTimeZone()),
-})
+}) as Ref<DateRange>
 const startTime = ref('08:00')
 const endTime = ref('17:00')
 const notes = ref('')

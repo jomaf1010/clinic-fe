@@ -391,6 +391,7 @@ function openEditModal(item: PrescriptionItem) {
     quantity: item.quantity ?? null,
     is_multi_dose: item.is_multi_dose ?? false,
     doses_per_unit: item.doses_per_unit ?? null,
+    out_of_stock: item.out_of_stock ?? false,
   }
   durationWarning.value = false
   showModal.value = true

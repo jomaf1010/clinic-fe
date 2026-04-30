@@ -268,7 +268,7 @@ function clearFollowUp(): void {
               :model-value="followUpCalendarValue"
               :min-value="minDate"
               :is-date-unavailable="isDateUnavailable"
-              @update:model-value="onDateSelect"
+              @update:model-value="(date) => { if (date) void onDateSelect(date as CalendarDate) }"
             />
           </PopoverContent>
         </Popover>

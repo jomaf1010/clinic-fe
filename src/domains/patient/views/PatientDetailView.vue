@@ -83,9 +83,10 @@ usePatientSync(
   },
   (data) => {
     const idx = encounterStore.patientEncounters.findIndex((e) => e.id === data.encounter_id)
-    if (idx >= 0) {
+    const existing = idx >= 0 ? encounterStore.patientEncounters[idx] : null
+    if (existing) {
       encounterStore.patientEncounters[idx] = {
-        ...encounterStore.patientEncounters[idx],
+        ...existing,
         auto_display_line: data.auto_display_line,
         auto_display_summary: data.auto_display_summary,
         updated_at: data.updated_at,

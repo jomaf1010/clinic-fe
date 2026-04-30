@@ -148,11 +148,11 @@ const chiefComplaint = ref('')
 const painScore = ref<number | null>(null)
 const anxiety = ref<'' | 'none' | 'mild' | 'moderate' | 'severe'>('')
 const triageNotes = ref('')
-const bpSystolic = ref<number | null>(null)
-const bpDiastolic = ref<number | null>(null)
-const hr = ref<number | null>(null)
-const temp = ref<number | null>(null)
-const spo2 = ref<number | null>(null)
+const bpSystolic = ref<number | undefined>(undefined)
+const bpDiastolic = ref<number | undefined>(undefined)
+const hr = ref<number | undefined>(undefined)
+const temp = ref<number | undefined>(undefined)
+const spo2 = ref<number | undefined>(undefined)
 
 // Assessment — stamped v2 delta keyed by FDI
 const odontogramDelta = ref<StampedOdontogram>({})
@@ -743,11 +743,11 @@ function hydrateFromVisit() {
   anxiety.value = (t.anxiety ?? '') as typeof anxiety.value
   triageNotes.value = t.notes ?? ''
   const v = t.vitals ?? {}
-  bpSystolic.value = v.bp_systolic ?? null
-  bpDiastolic.value = v.bp_diastolic ?? null
-  hr.value = v.hr ?? null
-  temp.value = v.temp ?? null
-  spo2.value = v.spo2 ?? null
+  bpSystolic.value = v.bp_systolic ?? undefined
+  bpDiastolic.value = v.bp_diastolic ?? undefined
+  hr.value = v.hr ?? undefined
+  temp.value = v.temp ?? undefined
+  spo2.value = v.spo2 ?? undefined
 
   const a = visit.value.assessment ?? {}
   const rawDelta = a.odontogram_delta
@@ -1047,11 +1047,11 @@ async function saveTriage() {
       anxiety: anxiety.value || null,
       notes: triageNotes.value || null,
       vitals: {
-        bp_systolic: bpSystolic.value,
-        bp_diastolic: bpDiastolic.value,
-        hr: hr.value,
-        temp: temp.value,
-        spo2: spo2.value,
+        bp_systolic: bpSystolic.value ?? null,
+        bp_diastolic: bpDiastolic.value ?? null,
+        hr: hr.value ?? null,
+        temp: temp.value ?? null,
+        spo2: spo2.value ?? null,
       },
     },
   }
@@ -2275,7 +2275,7 @@ function goBack() {
                 <Label class="text-xs">Tooth ({{ numberingLabel }})</Label>
                 <Select
                   :model-value="acSingleToothValue"
-                  @update:model-value="(v) => setSingleTooth(v)"
+                  @update:model-value="(v) => setSingleTooth(v as string | null | undefined)"
                 >
                   <SelectTrigger class="w-full sm:max-w-md">
                     <SelectValue :placeholder="`Select tooth (${numberingLabel})`" />
@@ -2843,7 +2843,7 @@ function goBack() {
             <Select
               v-if="!editIsMultiTooth"
               :model-value="editSingleToothValue"
-              @update:model-value="(v) => setEditTooth(v)"
+              @update:model-value="(v) => setEditTooth(v as string | null | undefined)"
             >
               <SelectTrigger class="w-full">
                 <SelectValue :placeholder="`Select tooth (${numberingLabel})`" />
@@ -2917,20 +2917,22 @@ function goBack() {
           <div class="flex flex-col gap-1.5">
             <Label class="text-xs">Billable amount (₱)</Label>
             <Input
-              v-model.number="editingProcedureDraft.billable_amount"
+              :model-value="editingProcedureDraft.billable_amount ?? undefined"
               type="number"
               min="0"
               step="0.01"
               placeholder="0.00"
+              @update:model-value="(v) => editingProcedureDraft && (editingProcedureDraft.billable_amount = v == null || v === '' ? null : Number(v))"
             />
           </div>
 
           <div class="flex flex-col gap-1.5">
             <Label class="text-xs">Notes</Label>
             <Textarea
-              v-model="editingProcedureDraft.notes"
+              :model-value="editingProcedureDraft.notes ?? undefined"
               rows="2"
               placeholder="Optional notes for this procedure"
+              @update:model-value="(v) => editingProcedureDraft && (editingProcedureDraft.notes = v == null || v === '' ? null : String(v))"
             />
           </div>
         </div>

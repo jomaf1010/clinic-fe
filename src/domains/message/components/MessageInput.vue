@@ -74,7 +74,7 @@ function detectMention() {
   if (match) {
     mentionTextNode = node as Text
     mentionStartOffset = beforeCursor.lastIndexOf('@')
-    mentionQuery.value = match[1]
+    mentionQuery.value = match[1] ?? null
     mentionRange = range.cloneRange()
   } else {
     closeMention()

@@ -61,7 +61,7 @@ const appointments = ref<AppointmentResponse[]>([])
 const doctorColorIndex = new Map<string, string>()
 function getDoctorColor(doctorId: string): string {
   if (!doctorColorIndex.has(doctorId)) {
-    doctorColorIndex.set(doctorId, DOCTOR_BORDER_COLORS[doctorColorIndex.size % DOCTOR_BORDER_COLORS.length])
+    doctorColorIndex.set(doctorId, DOCTOR_BORDER_COLORS[doctorColorIndex.size % DOCTOR_BORDER_COLORS.length]!)
   }
   return doctorColorIndex.get(doctorId)!
 }
@@ -177,7 +177,7 @@ async function eventSourceFn(
         continue
       }
 
-      const colors = BLOCK_TYPE_COLORS[block.type] ?? BLOCK_TYPE_COLORS.unavailable
+      const colors = BLOCK_TYPE_COLORS[block.type] ?? BLOCK_TYPE_COLORS.unavailable!
       const typeLabel = BLOCK_TYPE_LABELS[block.type] ?? block.type
       const doctorLabel = block.user_name ? `Dr. ${block.user_name}` : ''
       const doctorColor = getDoctorColor(block.user_id)

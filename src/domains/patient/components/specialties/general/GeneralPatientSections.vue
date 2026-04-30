@@ -517,7 +517,7 @@ const allergiesWidgetDetail = computed(() => {
               <div class="flex flex-col gap-1.5">
                 <Label class="text-xs">Onset Date</Label>
                 <MFDatePicker
-                  :model-value="newProblem.onset_date"
+                  :model-value="newProblem.onset_date ?? null"
                   disable-future
                   class="h-8 text-xs"
                   @update:model-value="(v: string | null) => newProblem.onset_date = v"

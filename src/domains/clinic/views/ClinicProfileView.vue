@@ -105,7 +105,7 @@ const onSubmit = handleSubmit(async (values) => {
     if (err instanceof HttpError && err.status === 422) {
       const body = err.data as ValidationError
       for (const [field, messages] of Object.entries(body.errors ?? {})) {
-        setFieldError(field, messages[0])
+        setFieldError(field as 'email' | 'contact_number' | 'clinic_name', messages[0])
       }
       generalError.value = body.message ?? 'Validation failed.'
     } else {

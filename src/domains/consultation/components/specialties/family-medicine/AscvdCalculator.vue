@@ -61,7 +61,7 @@ watch(open, (isOpen) => {
 
   // Systolic BP from triage
   if (props.triageBp) {
-    const systolic = parseInt(props.triageBp.split('/')[0], 10)
+    const systolic = parseInt(props.triageBp.split('/')[0] ?? '', 10)
     if (!isNaN(systolic)) systolicBp.value = systolic
   }
 

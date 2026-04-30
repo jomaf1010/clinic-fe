@@ -284,7 +284,7 @@ function savePlanSection() {
   store.saveSection({
     plan: {
       contraception_discussed: localPlan.contraception_discussed,
-      contraception_method: localPlan.contraception_discussed ? localPlan.contraception_methods : [],
+      contraception_method: localPlan.contraception_discussed ? (localPlan.contraception_methods?.join(', ') ?? null) : null,
       infant_feeding: localPlan.infant_feeding,
       breastfeeding_challenges: showBreastfeedingChallenges.value ? localPlan.breastfeeding_challenges : null,
       return_to_activity_cleared: localPlan.return_to_activity_cleared,
@@ -988,7 +988,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
                   <Select
                     :model-value="localAssessment.lochia ?? undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v: string) => { localAssessment.lochia = v as PostpartumAssessment['lochia']; saveAssessmentSection() }"
+                    @update:model-value="(v) => { localAssessment.lochia = v as PostpartumAssessment['lochia']; saveAssessmentSection() }"
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select lochia type" />
@@ -1008,7 +1008,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
                   <Select
                     :model-value="localAssessment.wound_healing ?? undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v: string) => { localAssessment.wound_healing = v as PostpartumAssessment['wound_healing']; saveAssessmentSection() }"
+                    @update:model-value="(v) => { localAssessment.wound_healing = v as PostpartumAssessment['wound_healing']; saveAssessmentSection() }"
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select healing status" />
@@ -1087,7 +1087,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
                   <Select
                     :model-value="localAssessment.phq2_q1 !== null ? String(localAssessment.phq2_q1) : undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v: string) => { localAssessment.phq2_q1 = Number(v); saveAssessmentSection() }"
+                    @update:model-value="(v) => { localAssessment.phq2_q1 = Number(v); saveAssessmentSection() }"
                   >
                     <SelectTrigger class="h-9 sm:max-w-xs">
                       <SelectValue placeholder="Select frequency" />
@@ -1109,7 +1109,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
                   <Select
                     :model-value="localAssessment.phq2_q2 !== null ? String(localAssessment.phq2_q2) : undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v: string) => { localAssessment.phq2_q2 = Number(v); saveAssessmentSection() }"
+                    @update:model-value="(v) => { localAssessment.phq2_q2 = Number(v); saveAssessmentSection() }"
                   >
                     <SelectTrigger class="h-9 sm:max-w-xs">
                       <SelectValue placeholder="Select frequency" />
@@ -1276,7 +1276,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
                   <Select
                     :model-value="localPlan.infant_feeding ?? undefined"
                     :disabled="store.isFinalized"
-                    @update:model-value="(v: string) => { localPlan.infant_feeding = v as PostpartumPlan['infant_feeding']; savePlanSection() }"
+                    @update:model-value="(v) => { localPlan.infant_feeding = v as PostpartumPlan['infant_feeding']; savePlanSection() }"
                   >
                     <SelectTrigger class="h-9 sm:max-w-xs">
                       <SelectValue placeholder="Select feeding method" />

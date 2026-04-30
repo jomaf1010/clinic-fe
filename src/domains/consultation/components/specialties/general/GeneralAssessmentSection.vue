@@ -119,7 +119,8 @@ function onSearchKeydown(e: KeyboardEvent) {
   } else if (e.key === 'Enter') {
     e.preventDefault()
     if (showDropdown.value && highlightedIndex.value >= 0 && highlightedIndex.value < searchResults.value.length) {
-      selectDiagnosis(searchResults.value[highlightedIndex.value])
+      const result = searchResults.value[highlightedIndex.value]
+      if (result) selectDiagnosis(result)
     } else if (searchQuery.value.trim()) {
       addManualDiagnosis()
     }

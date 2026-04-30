@@ -277,9 +277,9 @@ export const useEncounterStore = defineStore('encounter', () => {
         updated.consultation = c
       } else if (updated.type === 'prenatal' && updated.prenatal_visit) {
         const v = { ...updated.prenatal_visit }
-        if (data.triage) v.triage = { ...v.triage, ...data.triage }
-        if (data.assessment) v.assessment = { ...v.assessment, ...data.assessment }
-        if (data.plan) v.plan = { ...v.plan, ...data.plan }
+        if (data.triage) v.triage = { ...v.triage, ...data.triage } as typeof v.triage
+        if (data.assessment) v.assessment = { ...v.assessment, ...data.assessment } as typeof v.assessment
+        if ('plan' in data && data.plan) v.plan = { ...v.plan, ...data.plan } as typeof v.plan
         if (data.soap_note) v.soap_note = data.soap_note
         updated.prenatal_visit = v
       } else if (updated.type === 'delivery' && updated.delivery_record) {
@@ -292,9 +292,9 @@ export const useEncounterStore = defineStore('encounter', () => {
         updated.delivery_record = d
       } else if (updated.type === 'postpartum' && updated.postpartum_visit) {
         const p = { ...updated.postpartum_visit }
-        if (data.triage) p.triage = { ...p.triage, ...data.triage }
-        if (data.assessment) p.assessment = { ...p.assessment, ...data.assessment }
-        if (data.plan) p.plan = { ...p.plan, ...data.plan }
+        if (data.triage) p.triage = { ...p.triage, ...data.triage } as typeof p.triage
+        if (data.assessment) p.assessment = { ...p.assessment, ...data.assessment } as typeof p.assessment
+        if ('plan' in data && data.plan) p.plan = { ...p.plan, ...data.plan } as typeof p.plan
         if (data.soap_note) p.soap_note = data.soap_note
         updated.postpartum_visit = p
       } else if (updated.type === 'dental' && updated.dental_visit) {

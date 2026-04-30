@@ -60,7 +60,7 @@ function getTemplateConfig(category: string, variation: string): PrescriptionTem
   const found = savedTemplates.value.find(
     (t) => t.category === category && t.variation === variation,
   )
-  return found?.config ?? null
+  return (found?.config as PrescriptionTemplate | undefined) ?? null
 }
 
 function openTemplateEditor(category: string, variation: string) {

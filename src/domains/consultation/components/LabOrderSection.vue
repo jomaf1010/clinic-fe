@@ -205,8 +205,11 @@ function onSearchKeydown(e: KeyboardEvent) {
     }
   } else if (e.key === 'Enter') {
     if (showSuggestions.value && highlightedIndex.value >= 0 && highlightedIndex.value < suggestions.value.length) {
-      e.preventDefault()
-      selectSuggestion(suggestions.value[highlightedIndex.value])
+      const suggestion = suggestions.value[highlightedIndex.value]
+      if (suggestion) {
+        e.preventDefault()
+        selectSuggestion(suggestion)
+      }
     }
   } else if (e.key === 'Escape') {
     showSuggestions.value = false
