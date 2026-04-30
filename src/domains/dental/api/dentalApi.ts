@@ -9,6 +9,7 @@ import type {
   CreateTreatmentPlanPayload,
   UpdateTreatmentPlanPayload,
   UpdateDentalServicePayload,
+  UpdateDoctorDentalServicePayload,
   UpdateDentalVisitPayload,
 } from '../types/dental.types'
 
@@ -53,12 +54,22 @@ export const dentalApi = {
     return http.delete(`/patients/${patientId}/dental-visits/${visitId}`) as Promise<void>
   },
 
-  // Service catalog / fee schedule
+  // Service catalog / fee schedule (clinic-wide defaults)
   listServices(): Promise<{ data: DentalServiceCatalogEntry[] }> {
     return http.get('/dental/services') as Promise<{ data: DentalServiceCatalogEntry[] }>
   },
   updateService(clinicServiceUuid: string, payload: UpdateDentalServicePayload): Promise<{ data: DentalServiceCatalogEntry }> {
     return http.patch(`/dental/services/${clinicServiceUuid}`, payload) as Promise<{ data: DentalServiceCatalogEntry }>
+  },
+
+  // Per-doctor overrides on the active clinic's catalog. Returns the same
+  // catalog rows but with `override_price` / `override_is_active` populated
+  // from the dentist's `DoctorService` rows and `effective_*` computed.
+  listMyServices(): Promise<{ data: DentalServiceCatalogEntry[] }> {
+    return http.get('/me/dental/services') as Promise<{ data: DentalServiceCatalogEntry[] }>
+  },
+  updateMyService(clinicServiceUuid: string, payload: UpdateDoctorDentalServicePayload): Promise<{ data: DentalServiceCatalogEntry }> {
+    return http.patch(`/me/dental/services/${clinicServiceUuid}`, payload) as Promise<{ data: DentalServiceCatalogEntry }>
   },
 
   // Per-tooth history (aggregated across profile, visits, and treatment plans)

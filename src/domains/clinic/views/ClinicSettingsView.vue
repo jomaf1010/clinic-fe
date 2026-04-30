@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { clinicApi } from '@/domains/clinic/api/clinicApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ToothNumberingPreference } from '@/domains/auth/types/auth.types'
+import DentalBillingTab from '@/domains/dental/components/DentalBillingTab.vue'
 
 const authStore = useAuthStore()
 const isFetching = ref(true)
@@ -308,6 +309,8 @@ function saveFeeSetting(key: string, value: string) {
                   >{{ opt.label }}</button>
                 </div>
               </div>
+
+              <DentalBillingTab scope="clinic" />
             </TabsContent>
           </Tabs>
         </CardContent>
