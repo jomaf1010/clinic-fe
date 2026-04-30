@@ -5,6 +5,7 @@ import type {
   CreatePatientResponse,
   CreateProblemPayload,
   PatientDetailResponse,
+  PatientAttentionSummaryResponse,
   PatientListFilters,
   PatientListResponse,
   PatientSearchResponse,
@@ -123,6 +124,10 @@ export const patientApi = {
     if (filters?.sort_by) params.set('sort_by', filters.sort_by)
     if (filters?.sort_dir) params.set('sort_dir', filters.sort_dir)
     return http.get<PatientListResponse>(`/patients?${params.toString()}`)
+  },
+
+  attentionSummary(limit = 6): Promise<PatientAttentionSummaryResponse> {
+    return http.get<PatientAttentionSummaryResponse>(`/patients/attention-summary?limit=${limit}`)
   },
 
   get(uuid: string): Promise<PatientDetailResponse> {
