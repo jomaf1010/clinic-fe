@@ -56,8 +56,8 @@ export function useClinicalSummary(
 
     // Latest screening
     const screenings = p.screenings
-    if (screenings?.length) {
-      const latest = screenings[0]
+    const latest = screenings?.[0]
+    if (latest) {
       const typeLabel = latest.type.replace(/_/g, ' ')
       lines.push(`Last screening: ${b(typeLabel)} on ${b(formatDate(latest.date))}${latest.result ? ` — ${b(latest.result)}` : ''}.`)
     }

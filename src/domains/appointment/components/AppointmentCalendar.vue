@@ -136,7 +136,7 @@ async function eventSourceFn(
 
     // Appointment events
     for (const appt of apptRes.data) {
-      const statusColors = STATUS_COLORS[appt.status] ?? STATUS_COLORS.scheduled
+      const statusColors = STATUS_COLORS[appt.status] ?? STATUS_COLORS.scheduled!
       const doctorBorder = getDoctorColor(appt.doctor_id)
       const startDate = new Date(appt.scheduled_at)
       const endDate = new Date(startDate.getTime() + appt.duration * 60000)
@@ -246,9 +246,8 @@ async function handleEventDrop(info: EventDropArg) {
     calendarRef.value?.getApi()?.refetchEvents()
   } catch (err) {
     info.revert()
-    const msg = err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0]
-      ? (err.data as { errors: Record<string, string[]> }).errors.scheduled_at[0]
-      : 'Failed to reschedule — slot may not be available'
+    const msg = (err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0])
+      || 'Failed to reschedule — slot may not be available'
     toast.error(msg)
   }
 }
@@ -274,9 +273,8 @@ async function handleEventResize(info: EventResizeDoneArg) {
     calendarRef.value?.getApi()?.refetchEvents()
   } catch (err) {
     info.revert()
-    const msg = err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.duration?.[0]
-      ? (err.data as { errors: Record<string, string[]> }).errors.duration[0]
-      : 'Failed to resize — slots may not be available'
+    const msg = (err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.duration?.[0])
+      || 'Failed to resize — slots may not be available'
     toast.error(msg)
   }
 }

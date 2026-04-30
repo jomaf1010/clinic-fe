@@ -23,7 +23,7 @@ import PrenatalTrendCharts from './PrenatalTrendCharts.vue'
 import PrenatalCareChecklist from './PrenatalCareChecklist.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
-import type { Pregnancy } from '../types/obgyn.types'
+import type { Pregnancy, PrenatalVisit } from '../types/obgyn.types'
 
 const props = defineProps<{
   patientId: string
@@ -127,6 +127,7 @@ const statusConfig = computed(() => {
 
 // Timeline visits from dashboard data
 const visitSummary = computed(() => pdStore.pregnancyDashboard?.visit_summary ?? { count: 0, first_date: null, last_date: null })
+const visitTimeline = computed<PrenatalVisit[]>(() => [])
 
 // ── Postpartum ────────────────────────────────────────────────────
 const isPostpartum = computed(() =>
@@ -173,7 +174,7 @@ function deliveryModeShort(mode: string | null | undefined): string {
 const ppNextVisit = computed(() => {
   const visits = dashboardData.value?.postpartum_visits ?? []
   for (let i = visits.length - 1; i >= 0; i--) {
-    if (visits[i].next_visit_date) return visits[i].next_visit_date
+    if (visits[i]?.next_visit_date) return visits[i]!.next_visit_date
   }
   return null
 })
@@ -608,14 +609,14 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       </Card>
 
       <!-- D. Visit Timeline ───────────────────────────────────────────── -->
-      <Card v-if="visitSummary.length > 0">
+      <Card v-if="visitTimeline.length > 0">
         <CardHeader class="pb-2 pt-3">
           <CardTitle class="text-sm font-semibold">Visit Timeline</CardTitle>
         </CardHeader>
         <CardContent class="pb-4">
           <div class="flex flex-col gap-2">
             <div
-              v-for="v in visitSummary"
+              v-for="v in visitTimeline"
               :key="v.id"
               class="flex flex-col gap-1.5 rounded-md border px-3 py-2.5"
               :class="v.danger_signs.length > 0 ? 'border-l-2 border-l-red-400 bg-red-50/40 dark:bg-red-950/20' : 'bg-card'"

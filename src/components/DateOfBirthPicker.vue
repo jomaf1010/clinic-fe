@@ -96,7 +96,7 @@ watch(
     if (!val) return
     // Handle full ISO datetime strings (e.g. "2000-05-15T00:00:00.000Z")
     const dateOnly = val.includes('T') ? val.split('T')[0] : val
-    const parts = dateOnly.split('-')
+    const parts = (dateOnly ?? '').split('-')
     if (parts.length === 3) {
       const y = String(Number(parts[0]))
       const m = String(Number(parts[1]))

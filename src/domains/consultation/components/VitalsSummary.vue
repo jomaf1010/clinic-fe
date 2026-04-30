@@ -507,13 +507,13 @@ const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value |
               </button>
             </div>
             <iframe
-              v-if="labPreviewFiles[labPreviewIndex].type === 'pdf'"
-              :src="labPreviewFiles[labPreviewIndex].url"
+              v-if="labPreviewFiles[labPreviewIndex]?.type === 'pdf'"
+              :src="labPreviewFiles[labPreviewIndex]?.url"
               class="h-[70vh] w-full rounded border"
             />
             <img
               v-else
-              :src="labPreviewFiles[labPreviewIndex].url"
+              :src="labPreviewFiles[labPreviewIndex]?.url"
               :alt="labPreviewTitle"
               class="w-full rounded"
             />

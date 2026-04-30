@@ -101,7 +101,7 @@ export function buildNarrative(input: NarrativeInput): string {
 
   // Complaint
   if (input.complaint) {
-    const fn = complaintPhrases[stableIndex(id, complaintPhrases.length)]
+    const fn = complaintPhrases[stableIndex(id, complaintPhrases.length)]!
     parts.push(fn(input.complaint.toLowerCase()))
   }
 
@@ -109,13 +109,13 @@ export function buildNarrative(input: NarrativeInput): string {
   const diagnoses = (input.diagnoses ?? []).filter(Boolean)
   if (diagnoses.length) {
     const joined = joinList(diagnoses.map(d => `<strong>${d}</strong>`))
-    const fn = diagnosisPhrases[stableIndex(id + 'd', diagnosisPhrases.length)]
+    const fn = diagnosisPhrases[stableIndex(id + 'd', diagnosisPhrases.length)]!
     parts.push(fn(joined))
   }
 
   // Advice
   if (input.advice) {
-    const fn = advicePhrases[stableIndex(id + 'a', advicePhrases.length)]
+    const fn = advicePhrases[stableIndex(id + 'a', advicePhrases.length)]!
     parts.push(fn(input.advice.toLowerCase()))
   }
 
@@ -123,7 +123,7 @@ export function buildNarrative(input: NarrativeInput): string {
   const rxItems = input.prescriptionItems ?? []
   if (rxItems.length) {
     const rxText = buildRxNarrative(rxItems)
-    const fn = prescriptionIntroPhrases[stableIndex(id + 'rx', prescriptionIntroPhrases.length)]
+    const fn = prescriptionIntroPhrases[stableIndex(id + 'rx', prescriptionIntroPhrases.length)]!
     parts.push(fn(rxText))
   }
 
@@ -295,17 +295,17 @@ export function buildVitalsNarrative(id: string, current: ConsultationTriage, pr
     let sentence: string
 
     if (change.extra) {
-      const fn = sameCategoryPhrases[stableIndex(id + change.label, sameCategoryPhrases.length)]
+      const fn = sameCategoryPhrases[stableIndex(id + change.label, sameCategoryPhrases.length)]!
       sentence = fn(change.label, change.prev, change.curr, change.extra)
     } else if (change.direction === 'worsened') {
-      const fn = worsenedPhrases[stableIndex(id + change.label, worsenedPhrases.length)]
+      const fn = worsenedPhrases[stableIndex(id + change.label, worsenedPhrases.length)]!
       sentence = fn(change.label, change.prev, change.curr)
     } else if (change.direction === 'improved') {
-      const fn = improvedPhrases[stableIndex(id + change.label, improvedPhrases.length)]
+      const fn = improvedPhrases[stableIndex(id + change.label, improvedPhrases.length)]!
       sentence = fn(change.label, change.prev, change.curr)
     } else {
       const phrases = change.direction === 'up' ? increasePhrases : decreasePhrases
-      const fn = phrases[stableIndex(id + change.label, phrases.length)]
+      const fn = phrases[stableIndex(id + change.label, phrases.length)]!
       sentence = fn(change.label, change.prev, change.curr)
     }
 
@@ -331,7 +331,7 @@ export function buildVitalsNarrative(id: string, current: ConsultationTriage, pr
 
   if (unchanged.length) {
     const joined = joinList(unchanged)
-    const fn = unchangedPhrases[stableIndex(id + 'u', unchangedPhrases.length)]
+    const fn = unchangedPhrases[stableIndex(id + 'u', unchangedPhrases.length)]!
     result += (result ? ' ' : '') + fn(joined) + '.'
   }
 

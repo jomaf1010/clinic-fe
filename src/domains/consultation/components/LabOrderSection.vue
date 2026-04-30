@@ -233,7 +233,7 @@ const groupedSuggestions = computed(() => {
   const groups: Record<string, SystemLabItem[]> = {}
   for (const item of suggestions.value) {
     if (!groups[item.category]) groups[item.category] = []
-    groups[item.category].push(item)
+    groups[item.category]!.push(item)
   }
   return groups
 })
@@ -1052,13 +1052,13 @@ function cancelAddForm() {
           </div>
           <template v-else-if="previewFiles.length">
             <iframe
-              v-if="previewFiles[previewIndex].type === 'pdf'"
-              :src="previewFiles[previewIndex].url"
+              v-if="previewFiles[previewIndex]?.type === 'pdf'"
+              :src="previewFiles[previewIndex]?.url"
               class="h-[80vh] w-full rounded border"
             />
             <img
               v-else
-              :src="previewFiles[previewIndex].url"
+              :src="previewFiles[previewIndex]?.url"
               :alt="`${previewTitle} - ${previewIndex + 1} of ${previewFiles.length}`"
               class="w-full rounded"
             />

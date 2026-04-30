@@ -152,7 +152,7 @@ async function save() {
                 <Label>Font Size (px)</Label>
                 <span class="text-xs tabular-nums text-muted-foreground">{{ template.fontSize }}</span>
               </div>
-              <Slider :model-value="[template.fontSize]" :min="8" :max="16" :step="1" @update:model-value="template.fontSize = $event[0]" />
+              <Slider :model-value="[template.fontSize]" :min="8" :max="16" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.fontSize = e[0] }" />
             </div>
             <div class="col-span-full flex flex-col gap-3">
               <Label>Margins (mm)</Label>
@@ -162,7 +162,7 @@ async function save() {
                     <span class="text-xs capitalize text-muted-foreground">{{ side }}</span>
                     <span class="text-xs tabular-nums text-muted-foreground">{{ template.margins[side] }}</span>
                   </div>
-                  <Slider :model-value="[template.margins[side]]" :min="0" :max="50" :step="1" @update:model-value="template.margins[side] = $event[0]" />
+                  <Slider :model-value="[template.margins[side]]" :min="0" :max="50" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.margins[side] = e[0] }" />
                 </div>
               </div>
             </div>
@@ -182,7 +182,7 @@ async function save() {
               </div>
               <div v-if="template.header.showLogo" class="flex items-center gap-3 pl-6">
                 <Label class="shrink-0 text-xs text-muted-foreground">Logo size</Label>
-                <Slider :model-value="[template.header.logoSize ?? 40]" :min="20" :max="100" :step="5" class="w-32" @update:model-value="template.header.logoSize = $event[0]" />
+                <Slider :model-value="[template.header.logoSize ?? 40]" :min="20" :max="100" :step="5" class="w-32" @update:model-value="(e) => { if (e?.[0] != null) template.header.logoSize = e[0] }" />
                 <span class="w-6 text-center text-xs tabular-nums text-muted-foreground">{{ template.header.logoSize ?? 40 }}</span>
               </div>
               <div class="flex items-center gap-2">

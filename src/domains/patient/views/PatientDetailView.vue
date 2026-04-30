@@ -336,7 +336,7 @@ watch(sentinel, (el) => {
   if (!el) return
   observer = new IntersectionObserver(
     (entries) => {
-      if (entries[0].isIntersecting && patient.value) {
+      if (entries[0]?.isIntersecting && patient.value) {
         encounterStore.loadMoreForPatient(patient.value.id)
       }
     },

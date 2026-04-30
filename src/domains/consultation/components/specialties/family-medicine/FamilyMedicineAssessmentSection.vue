@@ -382,12 +382,12 @@ const ascvdSmokingStatus = ref<string | null>(null)
               <div class="flex flex-col gap-1.5">
                 <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">S — Subjective</Label>
                 <Textarea
-                  :model-value="soapNotes[p.uuid].subjective ?? undefined"
+                  :model-value="soapNotes[p.uuid]!.subjective ?? undefined"
                   placeholder="Patient's symptoms, concerns, history..."
                   :disabled="disabled"
                   :rows="3"
                   class="text-sm"
-                  @update:model-value="(v) => soapNotes[p.uuid].subjective = String(v) || null"
+                  @update:model-value="(v) => soapNotes[p.uuid]!.subjective = String(v) || null"
                   @blur="saveSoapNote(p.uuid)"
                 />
               </div>
@@ -395,12 +395,12 @@ const ascvdSmokingStatus = ref<string | null>(null)
               <div class="flex flex-col gap-1.5">
                 <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">O — Objective</Label>
                 <Textarea
-                  :model-value="soapNotes[p.uuid].objective ?? undefined"
+                  :model-value="soapNotes[p.uuid]!.objective ?? undefined"
                   placeholder="Exam findings, lab results, vitals..."
                   :disabled="disabled"
                   :rows="3"
                   class="text-sm"
-                  @update:model-value="(v) => soapNotes[p.uuid].objective = String(v) || null"
+                  @update:model-value="(v) => soapNotes[p.uuid]!.objective = String(v) || null"
                   @blur="saveSoapNote(p.uuid)"
                 />
               </div>
@@ -408,12 +408,12 @@ const ascvdSmokingStatus = ref<string | null>(null)
               <div class="flex flex-col gap-1.5">
                 <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">A — Assessment</Label>
                 <Textarea
-                  :model-value="soapNotes[p.uuid].assessment ?? undefined"
+                  :model-value="soapNotes[p.uuid]!.assessment ?? undefined"
                   placeholder="Clinical impression, diagnosis status..."
                   :disabled="disabled"
                   :rows="3"
                   class="text-sm"
-                  @update:model-value="(v) => soapNotes[p.uuid].assessment = String(v) || null"
+                  @update:model-value="(v) => soapNotes[p.uuid]!.assessment = String(v) || null"
                   @blur="saveSoapNote(p.uuid)"
                 />
               </div>
@@ -421,12 +421,12 @@ const ascvdSmokingStatus = ref<string | null>(null)
               <div class="flex flex-col gap-1.5">
                 <Label class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">P — Plan</Label>
                 <Textarea
-                  :model-value="soapNotes[p.uuid].plan ?? undefined"
+                  :model-value="soapNotes[p.uuid]!.plan ?? undefined"
                   placeholder="Treatment plan, medications, follow-up..."
                   :disabled="disabled"
                   :rows="3"
                   class="text-sm"
-                  @update:model-value="(v) => soapNotes[p.uuid].plan = String(v) || null"
+                  @update:model-value="(v) => soapNotes[p.uuid]!.plan = String(v) || null"
                   @blur="saveSoapNote(p.uuid)"
                 />
               </div>

@@ -87,7 +87,7 @@ async function loadMore() {
 
 // Only scroll to bottom when a NEW message is appended at the end (last message changed)
 watch(messages, (msgs) => {
-  const newLastId = msgs.length > 0 ? msgs[msgs.length - 1].id : null
+  const newLastId = msgs.length > 0 ? msgs[msgs.length - 1]!.id : null
 
   if (newLastId && newLastId !== lastMessageId.value) {
     lastMessageId.value = newLastId
@@ -101,7 +101,7 @@ watch(conversationId, async (id) => {
     await messageStore.fetchMessages(id)
     await messageStore.markAsRead(id)
     const msgs = messageStore.activeMessages
-    lastMessageId.value = msgs.length > 0 ? msgs[msgs.length - 1].id : null
+    lastMessageId.value = msgs.length > 0 ? msgs[msgs.length - 1]!.id : null
     scrollToBottom()
   }
 })
@@ -111,7 +111,7 @@ onMounted(async () => {
     await messageStore.fetchMessages(conversationId.value)
     await messageStore.markAsRead(conversationId.value)
     const msgs = messageStore.activeMessages
-    lastMessageId.value = msgs.length > 0 ? msgs[msgs.length - 1].id : null
+    lastMessageId.value = msgs.length > 0 ? msgs[msgs.length - 1]!.id : null
     scrollToBottom()
   }
 })

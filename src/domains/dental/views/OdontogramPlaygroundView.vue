@@ -419,8 +419,8 @@ function normaliseSvg(root: SVGSVGElement) {
 
 function wrapWithTransform(root: SVGSVGElement, rot: 0 | 180, mirror: boolean) {
   const vb = (root.getAttribute('viewBox') ?? '0 0 40.6 64').trim().split(/\s+/).map(Number)
-  const cx = vb[0] + vb[2] / 2
-  const cy = vb[1] + vb[3] / 2
+  const cx = (vb[0] ?? 0) + (vb[2] ?? 0) / 2
+  const cy = (vb[1] ?? 0) + (vb[3] ?? 0) / 2
   const transforms: string[] = []
   if (rot === 180) transforms.push(`rotate(180 ${cx} ${cy})`)
   if (mirror) transforms.push(`scale(-1 1) translate(${-2 * cx} 0)`)
@@ -1270,7 +1270,7 @@ function onDocMouseDown(e: MouseEvent) {
                   class="chip chip-sm flex-1"
                   :aria-pressed="activeState?.fillings.get(surf) === mat"
                   @click="toggleFilling(surf, mat)"
-                >{{ mat[0].toUpperCase() }}</button>
+                >{{ mat[0]?.toUpperCase() }}</button>
               </div>
             </div>
             <p class="pt-1 text-[10px] text-slate-400">A=Amalgam · C=Composite · G=GIC · T=Temporary</p>
