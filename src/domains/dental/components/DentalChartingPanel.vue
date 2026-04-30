@@ -453,6 +453,7 @@ const SURFACE_INITIAL: Record<ToothSurface, string> = {
   mesial: 'M',
   distal: 'D',
   occlusal: 'O',
+  incisal: 'I',
   buccal: 'B',
   lingual: 'L',
 }

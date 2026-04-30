@@ -477,7 +477,7 @@ function proceedAfterFeeWarning() {
             {{ store.current.patient_name }}
           </Button>
           <Badge
-            v-if="store.current.type === 'follow_up'"
+            v-if="store.current.consultation?.type === 'follow_up'"
             variant="secondary"
           >
             Follow-up

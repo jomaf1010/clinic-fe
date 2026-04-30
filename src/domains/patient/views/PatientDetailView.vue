@@ -652,7 +652,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Skeleton loading state -->
-      <div v-if="encounterStore.isLoadingConsultations" class="mt-4">
+      <div v-if="encounterStore.isLoadingEncounters" class="mt-4">
         <div
           v-for="n in 5"
           :key="n"
@@ -717,7 +717,7 @@ onUnmounted(() => {
               @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
             />
             <VitalsComparisonCard
-              v-if="showVitalsComparison"
+              v-if="showVitalsComparison && consultation.triage"
               :current="consultation.triage"
               :previous="previousTriage!"
               :encounter-id="consultation.id"

@@ -144,7 +144,7 @@ const gynProfile = computed(() => pdStore.gynProfile)
 const bpTrend = computed(() => pdStore.pregnancyDashboard?.bp_trend ?? [])
 const fhrTrend = computed(() => pdStore.pregnancyDashboard?.fhr_trend ?? [])
 const previousVisitData = computed(() => {
-  const visits = pdStore.pregnancyDashboard?.visit_summary
+  const visits = pdStore.pregnancyVisits
   if (!visits || visits.length < 2) return null
   const prev = visits[visits.length - 2]
   if (!prev) return null
@@ -872,7 +872,7 @@ function clearFollowUp(): void {
 // ── Smart follow-up recommendation ──────────────────────────────────
 const recommendedDate = computed(() => {
   const w = gaWeeks.value ?? 0
-  const visitDate = store.current?.visit_date ? new Date(store.current.visit_date) : new Date()
+  const visitDate = store.current?.prenatal_visit?.visit_date ? new Date(store.current.prenatal_visit.visit_date) : new Date()
   let daysToAdd = 28
   if (w >= 36) daysToAdd = 7
   else if (w >= 28) daysToAdd = 14

@@ -561,7 +561,7 @@ async function handleSubmit(): Promise<void> {
             <Switch
               id="ipv_screened"
               :checked="form.ipv_screened"
-              @update:checked="(v) => (form.ipv_screened = v)"
+              @update:checked="(v: boolean) => (form.ipv_screened = v)"
             />
             <Label for="ipv_screened" class="cursor-pointer text-sm">
               {{ form.ipv_screened ? 'Yes' : 'No' }}

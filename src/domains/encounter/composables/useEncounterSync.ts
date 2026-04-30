@@ -43,7 +43,7 @@ export function useEncounterSync(encounterId: Ref<string | undefined>, clinicId:
       }
     } else if (event.type.startsWith('document.')) {
       // Document events should be received by the same user (no self-echo prevention)
-      documentUpdate.value = event.data as GeneratedDocumentResponse
+      documentUpdate.value = event.data as unknown as GeneratedDocumentResponse
     }
   }
 

@@ -52,7 +52,7 @@ function start() {
   // Subscribe to Centrifugo dashboard channel for real-time online status
   const { subscribe, isConnected } = useCentrifugo()
   const authStore = useAuthStore()
-  const clinicId = authStore.currentClinic?.clinic_id
+  const clinicId = authStore.currentClinic?.id
 
   if (clinicId) {
     subscribe(`clinic:${clinicId}:dashboard`, (ctx) => {

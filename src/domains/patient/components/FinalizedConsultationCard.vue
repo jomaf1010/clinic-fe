@@ -14,14 +14,14 @@ import {
 import { RouteNames } from '@/router/routeNames'
 import { HttpError } from '@/lib/http'
 import { openNewTab, timeAgo } from '@/lib/utils'
-import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
 import { consultationApi } from '@/domains/consultation/api/consultationApi'
 import { documentApi } from '@/domains/consultation/api/documentApi'
 import EncounterSummaryDetail from './EncounterSummaryDetail.vue'
-import type { DisplaySummaryVitals } from '@/domains/encounter/types/encounter.types'
+import type { DisplaySummaryVitals, EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
 
 const props = defineProps<{
-  consultation: ConsultationResponse
+  consultation: EncounterTimelineItem
   patientId: string
   latest?: boolean
   previousVitals?: DisplaySummaryVitals | null
@@ -175,7 +175,7 @@ async function requestMedCert() {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <span v-if="consultation.type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+      <span v-if="consultation.consultation_type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
       <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
         &middot; Dr. {{ consultation.doctor_name }}
       </span>

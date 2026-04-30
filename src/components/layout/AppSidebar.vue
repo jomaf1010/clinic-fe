@@ -125,7 +125,7 @@ const navMain = computed(() =>
     })),
 )
 
-const navSecondary: { title: string; url: string; icon: typeof LifeBuoy }[] = []
+const navSecondary: { title: string; url: string; icon: typeof Stethoscope }[] = []
 
 const userData = computed(() => ({
   name: authStore.user?.name ?? authStore.user?.email ?? 'User',

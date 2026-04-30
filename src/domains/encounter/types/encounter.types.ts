@@ -350,6 +350,20 @@ export interface EncounterTimelineItem {
   finalized_at: string | null
   created_at: string
   updated_at: string
+  // Optional rich fields for cards/detail panels — not always returned by
+  // the timeline endpoint but consumed by `DraftConsultationCard`,
+  // `FinalizedConsultationCard`, and the patient-detail view.
+  patient_id?: string
+  patient_name?: string | null
+  patient_sex?: string | null
+  consultation_type?: 'default' | 'follow_up'
+  triage?: ConsultationTriage
+  lab_order_summary?: LabOrderSummary | null
+  prescription_summary?: PrescriptionSummary | null
+  documents?: ConsultationDocument[]
+  medcert_requested_by?: string | null
+  medcert_requested_at?: string | null
+  chief_complaint?: string | null
 }
 
 export interface CreateEncounterPayload {

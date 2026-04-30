@@ -270,38 +270,38 @@ export const useEncounterStore = defineStore('encounter', () => {
 
       if (updated.type === 'consultation' && updated.consultation) {
         const c = { ...updated.consultation }
-        if (data.triage) c.triage = { ...c.triage, ...data.triage }
-        if (data.assessment) c.assessment = data.assessment
-        if (data.treatment_plan) c.treatment_plan = { ...c.treatment_plan, ...data.treatment_plan }
+        if (data.triage) c.triage = { ...c.triage, ...data.triage } as typeof c.triage
+        if (data.assessment) c.assessment = data.assessment as typeof c.assessment
+        if (data.treatment_plan) c.treatment_plan = { ...c.treatment_plan, ...data.treatment_plan } as typeof c.treatment_plan
         if (data.soap_note) c.soap_note = data.soap_note
         updated.consultation = c
       } else if (updated.type === 'prenatal' && updated.prenatal_visit) {
         const v = { ...updated.prenatal_visit }
         if (data.triage) v.triage = { ...v.triage, ...data.triage } as typeof v.triage
         if (data.assessment) v.assessment = { ...v.assessment, ...data.assessment } as typeof v.assessment
-        if ('plan' in data && data.plan) v.plan = { ...v.plan, ...data.plan } as typeof v.plan
+        if (data.plan) v.plan = { ...v.plan, ...data.plan } as typeof v.plan
         if (data.soap_note) v.soap_note = data.soap_note
         updated.prenatal_visit = v
       } else if (updated.type === 'delivery' && updated.delivery_record) {
         const d = { ...updated.delivery_record }
-        if (data.labor) d.labor = { ...d.labor, ...data.labor }
-        if (data.delivery) d.delivery = { ...d.delivery, ...data.delivery }
-        if (data.maternal) d.maternal = { ...d.maternal, ...data.maternal }
-        if (data.neonatal) d.neonatal = { ...d.neonatal, ...data.neonatal }
+        if (data.labor) d.labor = { ...d.labor, ...data.labor } as typeof d.labor
+        if (data.delivery) d.delivery = { ...d.delivery, ...data.delivery } as typeof d.delivery
+        if (data.maternal) d.maternal = { ...d.maternal, ...data.maternal } as typeof d.maternal
+        if (data.neonatal) d.neonatal = { ...d.neonatal, ...data.neonatal } as typeof d.neonatal
         if (data.soap_note) d.soap_note = data.soap_note
         updated.delivery_record = d
       } else if (updated.type === 'postpartum' && updated.postpartum_visit) {
         const p = { ...updated.postpartum_visit }
         if (data.triage) p.triage = { ...p.triage, ...data.triage } as typeof p.triage
         if (data.assessment) p.assessment = { ...p.assessment, ...data.assessment } as typeof p.assessment
-        if ('plan' in data && data.plan) p.plan = { ...p.plan, ...data.plan } as typeof p.plan
+        if (data.plan) p.plan = { ...p.plan, ...data.plan } as typeof p.plan
         if (data.soap_note) p.soap_note = data.soap_note
         updated.postpartum_visit = p
       } else if (updated.type === 'dental' && updated.dental_visit) {
         const d = { ...updated.dental_visit }
-        if (data.triage) d.triage = { ...(d.triage ?? {}), ...data.triage }
-        if (data.assessment) d.assessment = { ...(d.assessment ?? {}), ...data.assessment }
-        if (data.plan) d.plan = { ...(d.plan ?? {}), ...data.plan }
+        if (data.triage) d.triage = { ...(d.triage ?? {}), ...data.triage } as typeof d.triage
+        if (data.assessment) d.assessment = { ...(d.assessment ?? {}), ...data.assessment } as typeof d.assessment
+        if (data.plan) d.plan = { ...(d.plan ?? {}), ...data.plan } as typeof d.plan
         if (data.soap_note) d.soap_note = data.soap_note
         updated.dental_visit = d
       }
