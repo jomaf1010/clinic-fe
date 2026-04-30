@@ -82,6 +82,53 @@ export interface PatientListResponse {
   }
 }
 
+export type PatientAttentionType = 'pending_lab_order_today' | 'draft_encounter'
+export type PatientAttentionCategory = 'clinical' | 'documentation'
+export type PatientAttentionPriority = 'low' | 'medium' | 'high'
+
+export interface PatientAttentionPatient {
+  id: string
+  full_name: string
+  sex: string
+  date_of_birth: string | null
+  avatar_url: string | null
+}
+
+export interface PatientAttentionItem {
+  id: string
+  type: PatientAttentionType
+  category: PatientAttentionCategory
+  priority: PatientAttentionPriority
+  title: string
+  description: string
+  patient: PatientAttentionPatient
+  occurred_at: string | null
+  encounter_id: string | null
+  lab_order_id: string | null
+  meta: {
+    encounter_status?: string
+    encounter_type?: string
+    specialty?: string
+    pending_count?: number
+    total_count?: number
+  }
+}
+
+export interface PatientAttentionSummary {
+  date: string
+  timezone: string
+  counts: {
+    total: number
+    pending_lab_orders_today: number
+    draft_encounters: number
+  }
+  items: PatientAttentionItem[]
+}
+
+export interface PatientAttentionSummaryResponse {
+  data: PatientAttentionSummary
+}
+
 export interface PatientDetailResponse {
   data: PatientResponse
 }

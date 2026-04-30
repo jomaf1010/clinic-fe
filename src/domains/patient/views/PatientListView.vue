@@ -48,6 +48,8 @@ import {
   LayoutList,
   Grid3X3,
   RefreshCw,
+  FlaskConical,
+  FilePenLine,
 } from 'lucide-vue-next'
 import PatientAvatar from '@/components/PatientAvatar.vue'
 import { patientApi } from '../api/patientApi'
@@ -56,7 +58,7 @@ import PatientStatusBadge from '../components/PatientStatusBadge.vue'
 import CreatePatientDialog from '../components/CreatePatientDialog.vue'
 import PatientCompletenessRing from '../components/PatientCompletenessRing.vue'
 import { calculatePatientProfileCompleteness } from '../utils/profileCompleteness'
-import type { PatientResponse, PatientListFilters, PatientStatus, PatientSortField, SortDirection } from '../types/patient.types'
+import type { PatientResponse, PatientListFilters, PatientStatus, PatientSortField, SortDirection, PatientAttentionItem, PatientAttentionSummary } from '../types/patient.types'
 
 const router = useRouter()
 const route = useRoute()
@@ -64,6 +66,9 @@ const route = useRoute()
 const patients = ref<PatientResponse[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const attentionSummary = ref<PatientAttentionSummary | null>(null)
+const isAttentionLoading = ref(false)
+const attentionError = ref<string | null>(null)
 const pagination = ref({
   page: 1,
   per_page: 10,
@@ -141,10 +146,8 @@ const registryChecks = computed(() => [
   },
 ])
 
-const patientsForReview = computed(() => {
-  const flagged = patients.value.filter((patient) => patient.status === 'returning' || !patient.contact_number)
-  return (flagged.length ? flagged : patients.value).slice(0, 4)
-})
+const attentionItems = computed(() => attentionSummary.value?.items ?? [])
+const attentionCount = computed(() => attentionSummary.value?.counts.total ?? attentionItems.value.length)
 
 const currentDateLabel = computed(() => {
   return new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
@@ -193,7 +196,7 @@ function maskContact(value: string | null): string {
 
 function maskEmail(value: string | null): string {
   if (!value) return 'No email'
-  const [name, domain] = value.split('@')
+  const [name = '', domain] = value.split('@')
   if (!domain) return 'Email on file'
   return `${name.slice(0, 1)}•••@${domain}`
 }
@@ -202,6 +205,16 @@ function contactCompleteness(patient: PatientResponse): string {
   if (patient.contact_number && patient.email) return 'Complete'
   if (patient.contact_number || patient.email) return 'Partial'
   return 'Missing'
+}
+
+function formatAttentionTime(iso: string | null): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+function attentionTone(item: PatientAttentionItem): string {
+  if (item.type === 'pending_lab_order_today') return 'text-amber-700'
+  return 'text-blue-700'
 }
 
 function profileCompleteness(patient: PatientResponse): number {
@@ -222,6 +235,28 @@ async function fetchPatients() {
   } finally {
     isLoading.value = false
   }
+}
+
+async function fetchAttentionSummary() {
+  isAttentionLoading.value = true
+  attentionError.value = null
+
+  try {
+    const response = await patientApi.attentionSummary(6)
+    attentionSummary.value = response.data
+  } catch (err) {
+    console.error('[PatientListView] fetchAttentionSummary failed:', err)
+    attentionError.value = 'Failed to load attention items.'
+  } finally {
+    isAttentionLoading.value = false
+  }
+}
+
+async function refreshPatientData() {
+  await Promise.all([
+    fetchPatients(),
+    fetchAttentionSummary(),
+  ])
 }
 
 function buildQuery(page: number, f: PatientListFilters) {
@@ -287,10 +322,14 @@ function goToPatient(patientId: string) {
   router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: patientId } })
 }
 
+function goToAttentionItem(item: PatientAttentionItem) {
+  goToPatient(item.patient.id)
+}
+
 function onPatientCreated() {
   currentPage.value = 1
   router.replace({ query: buildQuery(1, filters.value) })
-  fetchPatients()
+  refreshPatientData()
 }
 
 watch(currentPage, () => {
@@ -308,7 +347,7 @@ watch(
 )
 
 onMounted(() => {
-  fetchPatients()
+  refreshPatientData()
   if (route.query.create === '1') {
     showCreateDialog.value = true
     router.replace({ query: { ...route.query, create: undefined } })
@@ -317,7 +356,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+  <div class="grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_320px]">
     <section class="flex min-w-0 flex-col gap-4">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
@@ -772,33 +811,70 @@ onMounted(() => {
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">Today</h2>
           <Badge variant="secondary" class="rounded-full bg-amber-100 text-amber-700">
-            {{ patientsForReview.length }}
+            {{ attentionCount }}
           </Badge>
         </div>
 
         <div class="space-y-3">
           <div class="flex items-center justify-between text-sm">
-            <p class="font-medium">Patients to review</p>
-            <Button variant="link" size="sm" class="h-auto px-0" @click="clearFilters">
-              View all
+            <p class="font-medium">Needs attention</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="h-7 px-1.5"
+              aria-label="Refresh attention items"
+              :disabled="isAttentionLoading"
+              @click="fetchAttentionSummary"
+            >
+              <RefreshCw class="size-3.5" :class="{ 'animate-spin': isAttentionLoading }" />
             </Button>
           </div>
-          <div v-if="patientsForReview.length" class="space-y-3">
+
+          <div v-if="isAttentionLoading" class="space-y-3">
+            <div v-for="i in 3" :key="i" class="flex items-start gap-3 rounded-md px-1 py-1.5">
+              <Skeleton class="mt-1 size-7 rounded-md" />
+              <div class="min-w-0 flex-1 space-y-1.5">
+                <Skeleton class="h-3.5 w-28" />
+                <Skeleton class="h-3 w-40" />
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="attentionError"
+            role="alert"
+            class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
+          >
+            {{ attentionError }}
+          </div>
+
+          <div v-else-if="attentionItems.length" class="space-y-3">
             <button
-              v-for="patient in patientsForReview"
-              :key="patient.id"
+              v-for="item in attentionItems"
+              :key="item.id"
               type="button"
-              class="flex w-full items-center justify-between gap-3 rounded-md px-1 py-1.5 text-left text-sm hover:bg-muted"
-              @click="goToPatient(patient.id)"
+              class="flex w-full items-start gap-3 rounded-md px-1 py-1.5 text-left text-sm hover:bg-muted"
+              @click="goToAttentionItem(item)"
             >
-              <span class="flex min-w-0 items-center gap-2">
-                <span class="size-1.5 shrink-0 rounded-full bg-amber-500" />
-                <span class="truncate">{{ patient.full_name }}</span>
+              <span class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                <FlaskConical v-if="item.type === 'pending_lab_order_today'" class="size-4 text-amber-700" />
+                <FilePenLine v-else class="size-4 text-blue-700" />
               </span>
-              <span class="shrink-0 text-xs text-muted-foreground">{{ patient.status }}</span>
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center justify-between gap-2">
+                  <span class="truncate font-medium">{{ item.patient.full_name }}</span>
+                  <span class="shrink-0 text-xs text-muted-foreground">{{ formatAttentionTime(item.occurred_at) }}</span>
+                </span>
+                <span class="mt-0.5 block truncate text-xs" :class="attentionTone(item)">
+                  {{ item.title }}
+                </span>
+                <span class="block truncate text-xs text-muted-foreground">
+                  {{ item.description }}
+                </span>
+              </span>
             </button>
           </div>
-          <p v-else class="text-sm text-muted-foreground">No patient review items on this page.</p>
+          <p v-else class="text-sm text-muted-foreground">No clinical attention items for today.</p>
         </div>
       </section>
 
@@ -831,7 +907,7 @@ onMounted(() => {
 
         <div class="space-y-2 border-t pt-4 text-xs text-muted-foreground">
           <p>Data as of {{ currentDateLabel }}</p>
-          <Button variant="ghost" size="sm" class="h-7 px-0 text-primary" @click="fetchPatients">
+          <Button variant="ghost" size="sm" class="h-7 px-0 text-primary" @click="refreshPatientData">
             <RefreshCw class="size-3.5" />
             Refresh
           </Button>
