@@ -228,8 +228,9 @@ watch(
   (newNotes) => {
     if (!newNotes) return
     for (const note of newNotes) {
-      if (soapNotes[note.problem_id]) {
-        Object.assign(soapNotes[note.problem_id], note)
+      const existing = soapNotes[note.problem_id]
+      if (existing) {
+        Object.assign(existing, note)
       }
     }
   },

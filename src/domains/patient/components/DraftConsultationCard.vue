@@ -9,12 +9,13 @@ import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { timeAgo } from '@/lib/utils'
 import { classifyBpString, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyPain } from '@/lib/vitals'
-import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import type { EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
 import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import EncounterSummaryDetail from './EncounterSummaryDetail.vue'
 
 const props = defineProps<{
-  consultation: ConsultationResponse
+  consultation: EncounterTimelineItem
   patientId: string
 }>()
 
@@ -116,7 +117,7 @@ const labOrderLabel = computed(() => {
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
 const currentRole = computed(() => authStore.currentClinic?.role)
 const isSecretaryOrStaff = computed(() => currentRole.value === 'secretary' || currentRole.value === 'staff')
-const isMine = computed(() => props.consultation.created_by === authStore.user?.id)
+const isMine = computed(() => props.consultation.doctor_id === authStore.user?.id)
 const canEditTriage = computed(() => authStore.hasPermission('encounters.edit-triage'))
 // Mirrors backend ensureDraftOwnership: owner OR assigned doctor OR secretary/staff with edit-triage.
 const canContinue = computed(() => isMine.value || isOwner.value || (isSecretaryOrStaff.value && canEditTriage.value))
@@ -156,7 +157,7 @@ function formatDate(iso: string): string {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <span v-if="consultation.type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+          <span v-if="consultation.consultation_type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
           <span class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
             Draft
           </span>

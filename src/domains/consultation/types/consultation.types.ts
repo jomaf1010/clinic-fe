@@ -89,6 +89,7 @@ export interface ConsultationDocument {
   id: string
   type: string
   status: string
+  download_url?: string | null
 }
 
 /**

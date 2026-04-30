@@ -79,14 +79,14 @@ const ctx = computed(() => props.summary.context)
 const bpClassColor = computed(() => {
   if (ctx.value.kind !== 'consultation') return ''
   if (ctx.value.specialty !== 'family_medicine' && ctx.value.specialty !== 'internal_medicine') return ''
-  const c = ctx.value.bp_classification
+  const c = (ctx.value as { bp_classification?: BpClassification }).bp_classification
   return c ? BP_CLASS_COLOR[c] : ''
 })
 
 const bpClassLabel = computed(() => {
   if (ctx.value.kind !== 'consultation') return null
   if (ctx.value.specialty !== 'family_medicine' && ctx.value.specialty !== 'internal_medicine') return null
-  const c = ctx.value.bp_classification
+  const c = (ctx.value as { bp_classification?: BpClassification }).bp_classification
   return c ? BP_CLASS_LABEL[c] : null
 })
 
@@ -110,8 +110,8 @@ function ageLabel(months: number): string {
 
     <!-- Specialty context line -->
     <div v-if="ctx.kind !== 'consultation' || bpClassLabel" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-      <template v-if="ctx.kind === 'consultation' && ctx.specialty === 'pediatrics' && ctx.age_months != null">
-        <span class="flex items-center gap-1"><Baby class="size-3" />{{ ageLabel(ctx.age_months) }}</span>
+      <template v-if="ctx.kind === 'consultation' && ctx.specialty === 'pediatrics' && (ctx as { age_months?: number }).age_months != null">
+        <span class="flex items-center gap-1"><Baby class="size-3" />{{ ageLabel((ctx as { age_months: number }).age_months) }}</span>
       </template>
       <template v-if="bpClassLabel">
         <span class="flex items-center gap-1" :class="bpClassColor">

@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { http } from '@/lib/http'
 import type { ConsultationTriage, ConsultationResponse, LabOrderSummary } from '../types/consultation.types'
+import type { EncounterResponse } from '@/domains/encounter/types/encounter.types'
 import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyBmi } from '@/lib/vitals'
 import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import { labOrderApi } from '../api/labOrderApi'
@@ -105,7 +106,7 @@ function onLabPreviewClose(open: boolean) {
 }
 
 const showPreview = ref(false)
-const previewConsultation = ref<ConsultationResponse | null>(null)
+const previewConsultation = ref<EncounterResponse | null>(null)
 const isLoadingPreview = ref(false)
 
 async function fetchPastDiagnoses() {
@@ -140,7 +141,7 @@ async function openConsultationPreview(encounterId: string) {
   isLoadingPreview.value = true
   showPreview.value = true
   try {
-    const res = await http.get<{ data: ConsultationResponse }>(`/consultations/${encounterId}`)
+    const res = await http.get<{ data: EncounterResponse }>(`/consultations/${encounterId}`)
     previewConsultation.value = res.data
   } catch {
     showPreview.value = false

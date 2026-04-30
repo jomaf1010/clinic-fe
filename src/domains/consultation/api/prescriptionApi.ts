@@ -38,6 +38,9 @@ export const prescriptionApi = {
       instructions?: string
       medicine_id?: string | null
       unit_price?: number | null
+      quantity?: number | null
+      is_multi_dose?: boolean
+      doses_per_unit?: number | null
     },
   ): Promise<{ data: PrescriptionResponse }> {
     return http.post<{ data: PrescriptionResponse }>(
@@ -58,6 +61,9 @@ export const prescriptionApi = {
       instructions: string | null
       medicine_id: string | null
       unit_price: number | null
+      quantity: number | null
+      is_multi_dose: boolean
+      doses_per_unit: number | null
     }>,
   ): Promise<{ data: PrescriptionResponse }> {
     return http.patch<{ data: PrescriptionResponse }>(

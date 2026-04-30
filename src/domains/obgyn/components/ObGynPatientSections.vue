@@ -43,7 +43,7 @@ import FamilyPlanningIcon from '@/components/icons/FamilyPlanningIcon.vue'
 import PatientSectionWidget from '@/domains/patient/components/specialties/PatientSectionWidget.vue'
 import ContraceptionDialog from './ContraceptionDialog.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
-import type { GynProfile, Pregnancy, ContraceptiveEntry, ScreeningEntry } from '../types/obgyn.types'
+import type { Pregnancy, ContraceptiveEntry, ScreeningEntry } from '../types/obgyn.types'
 import { contraceptionLabel, SCREENING_TYPE_OPTIONS, screeningTypeLabel } from '../types/obgyn.types'
 import type { UpsertGynProfilePayload } from '../api/obgynApi'
 import { useClinicalSummary } from '../composables/useClinicalSummary'
@@ -511,7 +511,7 @@ onMounted(async () => {
         v-if="activePregnancy.risk_level"
         variant="outline"
         class="ml-auto text-[10px]"
-        :class="activePregnancy.risk_level === 'high' ? 'border-red-200 bg-red-50 text-red-700' : activePregnancy.risk_level === 'moderate' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-green-200 bg-green-50 text-green-700'"
+        :class="activePregnancy.risk_level === 'high' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'"
       >
         {{ activePregnancy.risk_level }} risk
       </Badge>
@@ -893,7 +893,6 @@ onMounted(async () => {
                 </div>
                 <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                   <span v-if="preg.lmp">LMP: {{ formatDate(preg.lmp) }}</span>
-                  <span v-if="preg.gravidity !== null">G{{ preg.gravidity }}</span>
                 </div>
               </div>
               <Button

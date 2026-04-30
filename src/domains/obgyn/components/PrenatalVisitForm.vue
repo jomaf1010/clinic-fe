@@ -599,7 +599,7 @@ async function handleSubmit(): Promise<void> {
           <Checkbox
             id="danger_signs_reviewed"
             :checked="form.danger_signs_reviewed"
-            @update:checked="(v) => (form.danger_signs_reviewed = v)"
+            @update:checked="(v: boolean) => (form.danger_signs_reviewed = v)"
           />
           <Label for="danger_signs_reviewed" class="cursor-pointer text-sm">
             Danger signs reviewed with patient

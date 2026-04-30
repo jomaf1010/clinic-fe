@@ -33,6 +33,8 @@ export interface VitalFieldConfig {
   input_type: 'number' | 'text' | 'select' | 'paired_number' | 'paired_text'
   min: number | null
   max: number | null
+  normal_min?: number | null
+  normal_max?: number | null
   required: boolean
   order: number
   age_ranges: VitalAgeRange[] | null

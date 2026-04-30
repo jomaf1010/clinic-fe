@@ -1,8 +1,3 @@
-import type {
-  ConsultationTriage,
-  ConsultationAssessment,
-  ConsultationTreatmentPlan,
-} from '@/domains/consultation/types/consultation.types'
 import type { SoapNote } from './soapNote.types'
 import type { PrescriptionResponse } from '@/domains/consultation/types/prescription.types'
 import type { LabOrderResponse } from '@/domains/consultation/types/labOrder.types'
@@ -14,10 +9,15 @@ export interface EncounterUpdatedEvent {
   encounter_id: string
   timestamp: string
   data: {
-    sections: ('triage' | 'assessment' | 'treatment_plan' | 'soap_note')[]
-    triage?: ConsultationTriage
-    assessment?: ConsultationAssessment
-    treatment_plan?: ConsultationTreatmentPlan
+    sections: ('triage' | 'assessment' | 'treatment_plan' | 'soap_note' | 'plan' | 'labor' | 'delivery' | 'maternal' | 'neonatal')[]
+    triage?: Record<string, unknown>
+    assessment?: Record<string, unknown>
+    treatment_plan?: Record<string, unknown>
+    plan?: Record<string, unknown>
+    labor?: Record<string, unknown>
+    delivery?: Record<string, unknown>
+    maternal?: Record<string, unknown>
+    neonatal?: Record<string, unknown>
     soap_note?: SoapNote
     updated_at: string
   }

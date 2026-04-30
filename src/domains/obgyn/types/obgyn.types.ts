@@ -307,7 +307,9 @@ export interface PostpartumVisitSummary {
 }
 
 export interface PregnancyDashboard {
-  pregnancy: Pregnancy
+  pregnancy: Omit<Pregnancy, 'recommended_weight_gain'> & {
+    recommended_weight_gain: { min: number; max: number } | null
+  }
   visit_count: number
   last_visit_date: string | null
   next_visit_date: string | null
