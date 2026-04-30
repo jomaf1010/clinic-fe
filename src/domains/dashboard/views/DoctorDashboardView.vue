@@ -3,15 +3,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Stethoscope,
-  FileEdit,
   Users,
   Clock,
-  CalendarDays,
   RefreshCw,
-  UserRound,
-  Plus,
-  ListOrdered,
-  UserPlus,
   ChevronRight,
   AlertCircle,
   LoaderCircle,
@@ -39,20 +33,6 @@ const hasAppointments = computed(() => authStore.hasFeature('appointments'))
 const stats = ref<DoctorDashboardStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
-}
-
-const greeting = computed(() => {
-  const name = authStore.user?.name ?? authStore.user?.email ?? ''
-  return `${getGreeting()}, ${name}`
-})
-
-const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? '')
 
 function formatDate(dateString: string): string {
   return new Intl.DateTimeFormat('en-PH', {

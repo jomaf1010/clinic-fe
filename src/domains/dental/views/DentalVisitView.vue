@@ -495,25 +495,6 @@ watch(acFamily, (family) => {
   acMaterial.value = opts[0]?.value ?? ''
 })
 
-// Selected teeth from the chip picker, sorted in chart order so the
-// downstream payload reads top-to-bottom regardless of click sequence.
-const acParsedTeeth = computed(() => {
-  const order = (fdi: number) => {
-    const q = Math.floor(fdi / 10)
-    const t = fdi % 10
-    if (q === 1 || q === 5) return [0, q, -t] as const
-    if (q === 2 || q === 6) return [0, q, t] as const
-    if (q === 3 || q === 7) return [1, q, -t] as const
-    return [1, q, t] as const
-  }
-  return Array.from(acTeeth.value)
-    .sort((a, b) => {
-      const oa = order(a), ob = order(b)
-      return oa[0] - ob[0] || oa[1] - ob[1] || oa[2] - ob[2]
-    })
-    .map(String)
-})
-
 interface DraftLine {
   resolved: NonNullable<ReturnType<typeof resolveProcedure>>
   teeth: number[]
@@ -580,7 +561,6 @@ const acDraftLines = computed<DraftLine[]>(() => {
   return lines
 })
 
-const acResolved = computed(() => acDraftLines.value[0]?.resolved)
 const acTotal = computed(() =>
   acDraftLines.value.reduce(
     (sum, l) => sum + (l.resolved.clinic_price ?? l.resolved.default_price ?? 0),
@@ -1350,12 +1330,6 @@ function cancelEditProcedure() {
   editingProcedureDraft.value = null
   editTeeth.value = new Set()
   editSurfaces.value = new Set()
-}
-
-function toggleEditTooth(fdi: number) {
-  const next = new Set(editTeeth.value)
-  next.has(fdi) ? next.delete(fdi) : next.add(fdi)
-  editTeeth.value = next
 }
 
 function setEditTooth(v: string | null | undefined) {

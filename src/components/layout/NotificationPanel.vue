@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bell, Check, CheckCheck, FileText, FileCheck, AlertCircle, UserRound, CalendarDays, Download, Printer } from 'lucide-vue-next'
+import { Bell, CheckCheck, FileText, FileCheck, UserRound, CalendarDays, Download, Printer } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { RouteNames } from '@/router/routeNames'

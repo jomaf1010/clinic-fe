@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { X, Search, ChevronRight, LoaderCircle } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -25,12 +24,8 @@ const emit = defineEmits<{
   save: [payload: { assessment: ConsultationAssessment }]
 }>()
 
-const route = useRoute()
 const store = useEncounterStore()
 const pdStore = usePatientDetailStore()
-
-// patientId available from route param (patients/:patientId/consultations/:id)
-const patientId = computed(() => (route.params.patientId as string) || store.current?.patient_id || '')
 
 const local = reactive<ConsultationAssessment>({
   diagnoses: [...(props.assessment?.diagnoses ?? [])],

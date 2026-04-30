@@ -6,15 +6,10 @@ import {
   Stethoscope,
   Pill,
   UserCog,
-  CalendarDays,
   RefreshCw,
   ChevronRight,
-  ListOrdered,
-  Clock,
-  FileCheck,
   TrendingUp,
   AlertTriangle,
-  MapPin,
 } from 'lucide-vue-next'
 import { dashboardApi } from '@/domains/dashboard/api/dashboardApi'
 import type { OwnerDashboardStats } from '@/domains/dashboard/api/dashboardApi'
@@ -49,16 +44,6 @@ const stats = ref<OwnerDashboardStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const revenueFormatted = computed(() => {
-  if (stats.value === null) return '₱0'
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(stats.value.total_revenue_today)
-})
-
 const todayDate = new Date().toISOString().slice(0, 10)
 
 function formatDate(dateString: string): string {
@@ -67,13 +52,6 @@ function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric',
   }).format(new Date(dateString))
-}
-
-function formatShortDate(dateString: string): string {
-  return new Intl.DateTimeFormat('en-PH', {
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(dateString + 'T00:00:00'))
 }
 
 function formatMonth(dateString: string): string {

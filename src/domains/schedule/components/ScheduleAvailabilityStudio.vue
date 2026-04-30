@@ -147,10 +147,6 @@ function isSameDay(iso: string, date: string): boolean {
   return toLocalDate(new Date(iso)) === date
 }
 
-function isTerminal(status: AppointmentStatus): boolean {
-  return status === 'completed' || status === 'cancelled' || status === 'no_show'
-}
-
 function patientInitials(name: string | null): string {
   if (!name) return 'PT'
   const parts = name.split(' ').filter(Boolean)

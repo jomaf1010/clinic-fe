@@ -4,7 +4,6 @@ import { Crown, Clock, AlertTriangle } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
 import CancelSubscriptionDialog from './CancelSubscriptionDialog.vue'
 import type { SubscriptionStatus as StatusType } from '../types/subscription.types'
@@ -13,7 +12,6 @@ const props = defineProps<{
   status: StatusType
 }>()
 
-const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 
 const billingEndFormatted = computed(() => {

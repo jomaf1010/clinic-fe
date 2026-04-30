@@ -71,7 +71,6 @@ async function evaluateRisk(): Promise<void> {
 const pastDiagnoses = ref<{ description: string; code: string | null }[]>([])
 
 onMounted(async () => {
-  const fetches: Promise<void>[] = []
   // Past diagnoses already loaded in store by parent
   pastDiagnoses.value = store.pastDiagnoses
 })

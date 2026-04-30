@@ -1,6 +1,5 @@
 const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string
 
-let scriptLoaded = false
 let readyPromise: Promise<void> | null = null
 
 function loadScript(): Promise<void> {
@@ -11,7 +10,6 @@ function loadScript(): Promise<void> {
     script.src = `https://www.google.com/recaptcha/api.js?render=${SITE_KEY}`
     script.async = true
     script.onload = () => {
-      scriptLoaded = true
       window.grecaptcha.ready(() => resolve())
     }
     script.onerror = () => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { CalendarDate, type DateValue, getLocalTimeZone, today, parseDate } from '@internationalized/date'
+import { CalendarDate, type DateValue, getLocalTimeZone, today } from '@internationalized/date'
 import type { DateRange } from 'reka-ui'
 import { CalendarIcon, LoaderCircle } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'

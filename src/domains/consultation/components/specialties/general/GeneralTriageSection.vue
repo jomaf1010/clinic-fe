@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
-import { Weight, Activity, Ruler, MessageSquare } from 'lucide-vue-next'
+import { Weight, Activity, Ruler } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'

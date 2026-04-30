@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import {
   ListChecks,
@@ -52,8 +51,6 @@ import type { DiagnosisSearchResult } from '@/domains/consultation/api/consultat
 import type { StructuredAllergy, StoreAllergyPayload } from '@/domains/patient/api/patientApi'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 
-const route = useRoute()
-const patientId = computed(() => route.params.id as string)
 const pdStore = usePatientDetailStore()
 
 // ── Modal state ───────────────────────────────────────────────────────────
@@ -417,13 +414,6 @@ const problemsWidgetSubDetail = computed(() => {
 const allergiesWidgetDetail = computed(() => {
   const count = allergies.value.length
   return count > 0 ? `${count} recorded` : 'None recorded'
-})
-
-const allergiesWidgetBadgeVariant = computed((): 'destructive' | 'secondary' => {
-  const hasSevere = allergies.value.some(
-    (a) => a.severity === 'severe' || a.severity === 'anaphylaxis',
-  )
-  return hasSevere ? 'destructive' : 'secondary'
 })
 
 // Data loaded by parent via pdStore.loadCore() — no onMounted fetch needed

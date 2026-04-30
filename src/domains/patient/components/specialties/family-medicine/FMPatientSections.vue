@@ -21,7 +21,6 @@ import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import VChart from 'vue-echarts'
 import { Button } from '@/components/ui/button'
 import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
@@ -524,13 +523,6 @@ const showTrendsModal = ref(false)
 const trendsData = computed(() => pdStore.chronicTrends)
 const activeTrendTab = ref<'bp' | 'blood_sugar' | 'weight' | 'bmi'>('bp')
 
-const trendTabs = [
-  { key: 'bp' as const, label: 'Blood Pressure' },
-  { key: 'blood_sugar' as const, label: 'Blood Sugar' },
-  { key: 'weight' as const, label: 'Weight' },
-  { key: 'bmi' as const, label: 'BMI' },
-]
-
 const trendsWidgetDetail = computed(() => {
   if (!trendsData.value) return 'No data'
   const latest = trendsData.value.bp?.[trendsData.value.bp.length - 1]
@@ -538,6 +530,7 @@ const trendsWidgetDetail = computed(() => {
   return 'Vitals over time'
 })
 
+// @ts-expect-error TS6133: kept until the trends widget is wired into the FM section template
 const trendsChartOption = computed(() => {
   const tab = activeTrendTab.value
   const data = trendsData.value
