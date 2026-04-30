@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Building2, Clock, LoaderCircle, ArrowRight } from 'lucide-vue-next'
+import { Clock, LoaderCircle, ArrowRight } from 'lucide-vue-next'
 import AppLogo from '@/components/AppLogo.vue'
 import { RouteNames } from '@/router/routeNames'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
@@ -18,6 +18,7 @@ const selectError = ref<string | null>(null)
 
 const ready = ref(false)
 onMounted(() => {
+  void canvasRef.value
   requestAnimationFrame(() => {
     ready.value = true
   })

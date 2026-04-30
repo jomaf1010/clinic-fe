@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { SendHorizontal, Smile, LoaderCircle, User } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {

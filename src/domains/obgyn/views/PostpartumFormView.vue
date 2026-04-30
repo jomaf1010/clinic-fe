@@ -63,7 +63,7 @@ import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import { useEncounterSync } from '@/domains/encounter/composables/useEncounterSync'
 import { usePatientSync } from '@/domains/patient/composables/usePatientSync'
 import MFDatePicker from '@/components/shared/MFDatePicker.vue'
-import { CalendarDate, today, getLocalTimeZone, getDayOfWeek } from '@internationalized/date'
+import { CalendarDate, getDayOfWeek } from '@internationalized/date'
 import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import { scheduleApi } from '@/domains/schedule/api/scheduleApi'
 import type { DaySchedule, Slot } from '@/domains/schedule/types/schedule.types'
@@ -76,7 +76,6 @@ import type {
   PostpartumAssessment,
   PostpartumPlan,
 } from '@/domains/encounter/types/encounter.types'
-import type { ContraceptionMethod } from '@/domains/obgyn/types/obgyn.types'
 import { CONTRACEPTION_OPTIONS, contraceptionLabel } from '@/domains/obgyn/types/obgyn.types'
 
 const route = useRoute()
@@ -321,13 +320,6 @@ function isDateUnavailable(date: { year: number; month: number; day: number }): 
 }
 
 const availableFollowUpSlots = computed(() => followUpSlots.value.filter((s) => s.available))
-
-const followUpCalendarValue = computed(() => {
-  const d = followUpSelectedDate.value
-  if (!d) return undefined
-  const dt = new Date(d + 'T00:00')
-  return new CalendarDate(dt.getFullYear(), dt.getMonth() + 1, dt.getDate())
-})
 
 const followUpDisplay = computed(() => {
   if (!followUpSelectedDate.value) return null

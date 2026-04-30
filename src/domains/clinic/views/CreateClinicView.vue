@@ -93,6 +93,7 @@ const logoPreview = ref<string | null>(null)
 // Entrance animation
 const ready = ref(false)
 onMounted(() => {
+  void canvasRef.value
   requestAnimationFrame(() => {
     ready.value = true
   })

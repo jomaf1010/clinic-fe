@@ -10,8 +10,6 @@ import {
   Banknote,
   Pencil,
   LoaderCircle,
-  Check,
-  X,
   FileCheck,
   Clock,
   Download,

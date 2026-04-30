@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Centrifuge } from 'centrifuge'
 import type { PublicationContext, SubscriptionTokenContext } from 'centrifuge'
-import { Clock, Users, Stethoscope, Wifi, WifiOff } from 'lucide-vue-next'
+import { Clock, Users, Stethoscope, WifiOff } from 'lucide-vue-next'
 import { queueApi } from '@/domains/queue/api/queueApi'
 import type { QueueVisitResponse } from '@/domains/queue/types/queue.types'
 

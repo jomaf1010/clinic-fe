@@ -2,7 +2,6 @@
 import {
   Calendar,
   CalendarCheck,
-  Crown,
   LayoutDashboard,
   ListOrdered,
   MessageSquare,

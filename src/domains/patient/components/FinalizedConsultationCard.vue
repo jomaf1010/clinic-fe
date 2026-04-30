@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { RouteNames } from '@/router/routeNames'
-import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { HttpError } from '@/lib/http'
 import { openNewTab, timeAgo } from '@/lib/utils'
 import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
@@ -33,7 +32,6 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
-const authStore = useAuthStore()
 const timelineLine = computed(() => props.consultation.auto_display_line ?? props.consultation.display_line ?? null)
 const timelineSummary = computed(() => props.consultation.auto_display_summary ?? null)
 

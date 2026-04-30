@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { type Component } from 'vue'
-import { Badge } from '@/components/ui/badge'
 
 defineProps<{
   icon: Component

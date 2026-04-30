@@ -25,9 +25,7 @@ import {
   AlertTriangle,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
-import { Button } from '@/components/ui/button'
 import PatientAvatar from '@/components/PatientAvatar.vue'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,

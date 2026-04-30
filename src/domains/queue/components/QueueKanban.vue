@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   AlertTriangle,
@@ -16,7 +15,6 @@ import {
 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { RouteNames } from '@/router/routeNames'
 import PatientAvatar from '@/components/PatientAvatar.vue'
 import type { QueueVisitResponse, QueueVisitStatus } from '../types/queue.types'

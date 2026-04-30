@@ -2,7 +2,6 @@
 import { reactive, watch, computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
-import { MessageSquare, CalendarDays } from 'lucide-vue-next'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {

@@ -7,7 +7,6 @@ import {
   Heart,
   Baby,
   ShieldCheck,
-  Pill,
   LoaderCircle,
   Plus,
   Pencil,

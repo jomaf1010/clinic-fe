@@ -58,11 +58,6 @@ const xTickFormat = (i: number) => {
   return point ? formatDateLabel(point.date) : ''
 }
 
-const yTickFormat = (v: number) => {
-  if (v >= 1000) return `${(v / 1000).toFixed(0)}k`
-  return `${v}`
-}
-
 const template = componentToString(chartConfig, ChartTooltipContent, {
   labelFormatter: (value: number | Date) => {
     const point = data.value[value as number]

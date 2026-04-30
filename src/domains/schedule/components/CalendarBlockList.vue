@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { CalendarX, LoaderCircle, Pencil, Trash2 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import type { BlockType, CalendarBlock } from '../types/schedule.types'
 
 const BLOCK_TYPE_LABELS: Record<BlockType, string> = {

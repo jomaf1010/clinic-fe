@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, LoaderCircle, ArrowUp, ArrowDown } from 'lucide-vue-next'
+import { ArrowLeft, LoaderCircle, ArrowUp } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { Button } from '@/components/ui/button'

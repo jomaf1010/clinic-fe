@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,

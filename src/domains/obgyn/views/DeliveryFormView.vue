@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { HttpError } from '@/lib/http'

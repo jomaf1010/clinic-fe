@@ -2,7 +2,6 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
-import { MessageSquare } from 'lucide-vue-next'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'

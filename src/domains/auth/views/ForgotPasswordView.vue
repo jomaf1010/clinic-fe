@@ -34,6 +34,7 @@ const submitted = ref(false)
 
 const ready = ref(false)
 onMounted(() => {
+  void canvasRef.value
   requestAnimationFrame(() => {
     ready.value = true
   })

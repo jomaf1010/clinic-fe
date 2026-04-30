@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { http, getAuthToken } from '@/lib/http'
+import { getAuthToken } from '@/lib/http'
 import {
   Plus,
   Pencil,

@@ -24,6 +24,7 @@ const userEmail = ref<string | null>(null)
 
 const ready = ref(false)
 onMounted(() => {
+  void canvasRef.value
   requestAnimationFrame(() => {
     ready.value = true
   })

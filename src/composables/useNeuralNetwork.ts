@@ -206,45 +206,6 @@ function drawFlask(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
   ctx.restore()
 }
 
-function drawDoctor(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, color: string) {
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.strokeStyle = `${color} ${alpha})`
-  ctx.lineWidth = 1.2
-  ctx.lineCap = 'round'
-  const s = size
-  // outer circle
-  ctx.beginPath()
-  ctx.arc(0, 0, s, 0, Math.PI * 2)
-  ctx.stroke()
-  // head
-  ctx.beginPath()
-  ctx.arc(0, -s * 0.25, s * 0.28, 0, Math.PI * 2)
-  ctx.stroke()
-  // shoulders/body (arc from bottom)
-  ctx.beginPath()
-  ctx.arc(0, s * 0.9, s * 0.55, Math.PI * 1.2, Math.PI * 1.8)
-  ctx.stroke()
-  // head mirror (forehead circle)
-  ctx.beginPath()
-  ctx.arc(s * 0.18, -s * 0.48, s * 0.1, 0, Math.PI * 2)
-  ctx.stroke()
-  // mirror band
-  ctx.beginPath()
-  ctx.moveTo(s * 0.08, -s * 0.5)
-  ctx.quadraticCurveTo(-s * 0.15, -s * 0.6, -s * 0.25, -s * 0.45)
-  ctx.stroke()
-  // stethoscope
-  ctx.beginPath()
-  ctx.moveTo(-s * 0.15, s * 0.1)
-  ctx.quadraticCurveTo(-s * 0.3, s * 0.3, -s * 0.2, s * 0.45)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(-s * 0.2, s * 0.5, s * 0.06, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.restore()
-}
-
 export function useNeuralNetwork() {
   const canvasRef = ref<HTMLCanvasElement | null>(null)
   let animationId: number | undefined
