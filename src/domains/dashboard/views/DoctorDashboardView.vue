@@ -298,7 +298,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="item in stats.queue_list"
+              v-for="item in stats?.queue_list ?? []"
               :key="item.id"
               class="flex items-center gap-3 py-3 first:pt-0 last:pb-0 -mx-2 px-2 rounded-lg"
             >
@@ -367,7 +367,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="draft in stats.draft_consultations_list"
+              v-for="draft in stats?.draft_consultations_list ?? []"
               :key="draft.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
               @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: draft.patient_id, id: draft.id } })"
@@ -411,7 +411,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="patient in stats.recent_patients"
+              v-for="patient in stats?.recent_patients ?? []"
               :key="patient.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: patient.id } })"

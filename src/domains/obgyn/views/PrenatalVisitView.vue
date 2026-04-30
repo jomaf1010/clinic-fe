@@ -15,12 +15,12 @@ const store = usePregnancyStore()
 
 const patientId = computed(() => {
   const id = route.params.patientId
-  return typeof id === 'string' ? id : id[0] ?? ''
+  return typeof id === 'string' ? id : (id?.[0] ?? '')
 })
 
 const pregnancyId = computed(() => {
   const id = route.params.pregnancyId
-  return typeof id === 'string' ? id : id[0] ?? ''
+  return typeof id === 'string' ? id : (id?.[0] ?? '')
 })
 
 const visitId = computed(() => {

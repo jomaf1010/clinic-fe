@@ -111,6 +111,7 @@ function removeLineItem(index: number) {
 
 function onTypeChange(index: number) {
   const item = lineItems.value[index]
+  if (!item) return
   // Reset medicine fields when switching away from medicine
   if (item.type !== 'medicine') {
     item.reference_id = null
@@ -131,6 +132,7 @@ function onTypeChange(index: number) {
 function onMedicineInput(index: number, val: string) {
   medicineQueries.value[index] = val
   const item = lineItems.value[index]
+  if (!item) return
   // Clear previous selection
   item.reference_id = null
   item.description = ''
@@ -162,6 +164,7 @@ function onMedicineInput(index: number, val: string) {
 
 function selectMedicine(index: number, result: MedicineSearchResult) {
   const item = lineItems.value[index]
+  if (!item) return
   item.description = result.display_name
   item.reference_id = result.id
   item.price_per_piece = result.price_per_piece

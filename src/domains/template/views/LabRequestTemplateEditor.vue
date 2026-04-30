@@ -152,7 +152,7 @@ async function save() {
                 <Label>Font Size (px)</Label>
                 <span class="text-xs tabular-nums text-muted-foreground">{{ template.fontSize }}</span>
               </div>
-              <Slider :model-value="[template.fontSize]" :min="8" :max="16" :step="1" @update:model-value="template.fontSize = $event[0]" />
+              <Slider :model-value="[template.fontSize]" :min="8" :max="16" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.fontSize = e[0] }" />
             </div>
 
             <div class="col-span-full flex flex-col gap-3">
@@ -163,28 +163,28 @@ async function save() {
                     <span class="text-xs text-muted-foreground">Top</span>
                     <span class="text-xs tabular-nums text-muted-foreground">{{ template.margins.top }}</span>
                   </div>
-                  <Slider :model-value="[template.margins.top]" :min="0" :max="50" :step="1" @update:model-value="template.margins.top = $event[0]" />
+                  <Slider :model-value="[template.margins.top]" :min="0" :max="50" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.margins.top = e[0] }" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-center justify-between">
                     <span class="text-xs text-muted-foreground">Bottom</span>
                     <span class="text-xs tabular-nums text-muted-foreground">{{ template.margins.bottom }}</span>
                   </div>
-                  <Slider :model-value="[template.margins.bottom]" :min="0" :max="50" :step="1" @update:model-value="template.margins.bottom = $event[0]" />
+                  <Slider :model-value="[template.margins.bottom]" :min="0" :max="50" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.margins.bottom = e[0] }" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-center justify-between">
                     <span class="text-xs text-muted-foreground">Left</span>
                     <span class="text-xs tabular-nums text-muted-foreground">{{ template.margins.left }}</span>
                   </div>
-                  <Slider :model-value="[template.margins.left]" :min="0" :max="50" :step="1" @update:model-value="template.margins.left = $event[0]" />
+                  <Slider :model-value="[template.margins.left]" :min="0" :max="50" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.margins.left = e[0] }" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-center justify-between">
                     <span class="text-xs text-muted-foreground">Right</span>
                     <span class="text-xs tabular-nums text-muted-foreground">{{ template.margins.right }}</span>
                   </div>
-                  <Slider :model-value="[template.margins.right]" :min="0" :max="50" :step="1" @update:model-value="template.margins.right = $event[0]" />
+                  <Slider :model-value="[template.margins.right]" :min="0" :max="50" :step="1" @update:model-value="(e) => { if (e?.[0] != null) template.margins.right = e[0] }" />
                 </div>
               </div>
             </div>
@@ -210,7 +210,7 @@ async function save() {
                   :max="100"
                   :step="5"
                   class="w-32"
-                  @update:model-value="template.header.logoSize = $event[0]"
+                  @update:model-value="(e) => { if (e?.[0] != null) template.header.logoSize = e[0] }"
                 />
                 <span class="w-6 text-center text-xs tabular-nums text-muted-foreground">{{ template.header.logoSize ?? 40 }}</span>
               </div>

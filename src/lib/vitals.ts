@@ -99,7 +99,7 @@ export function classifyBp(reading: BpReading, config: VitalsConfig = DEFAULT_VI
 
   // Take the higher category
   const severity = Math.max(sysSeverity, diaSeverity)
-  const match = BP_CATEGORIES.find(c => c.severity === severity) ?? BP_CATEGORIES[BP_CATEGORIES.length - 1]
+  const match = BP_CATEGORIES.find(c => c.severity === severity) ?? BP_CATEGORIES[BP_CATEGORIES.length - 1]!
 
   return {
     reading,

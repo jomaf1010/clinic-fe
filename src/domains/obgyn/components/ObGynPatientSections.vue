@@ -325,6 +325,7 @@ const screeningWidgetDetail = computed(() => {
   const screenings = gynProfile.value?.screenings
   if (!screenings?.length) return 'No screenings recorded'
   const latest = screenings[screenings.length - 1]
+  if (!latest) return 'No screenings recorded'
   return `${screeningTypeLabel(latest.type)} — ${formatDate(latest.date)}`
 })
 

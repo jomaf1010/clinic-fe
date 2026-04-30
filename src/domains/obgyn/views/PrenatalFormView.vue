@@ -1128,7 +1128,7 @@ function savePlan(): void {
 onMounted(async () => {
   loadError.value = null
   try {
-    const id = typeof route.params.id === 'string' ? route.params.id : route.params.id[0] ?? ''
+    const id = typeof route.params.id === 'string' ? route.params.id : (route.params.id?.[0] ?? '')
     // Skip if EncounterFormRouter already loaded this encounter
     if (!store.current || store.current.id !== id) {
       await store.loadEncounter(id)

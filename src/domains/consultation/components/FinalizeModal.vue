@@ -233,8 +233,8 @@ const bmiCategory = computed(() => {
             <div class="rounded-md border bg-muted/30 p-3">
               <!-- Single diagnosis -->
               <div v-if="assessment.diagnoses.length === 1" class="flex items-baseline gap-2 text-sm">
-                <span class="font-medium">{{ assessment.diagnoses[0].description }}</span>
-                <span v-if="assessment.diagnoses[0].code" class="text-xs font-mono text-muted-foreground">{{ assessment.diagnoses[0].code }}</span>
+                <span class="font-medium">{{ assessment.diagnoses[0]?.description }}</span>
+                <span v-if="assessment.diagnoses[0]?.code" class="text-xs font-mono text-muted-foreground">{{ assessment.diagnoses[0]?.code }}</span>
               </div>
               <!-- Multiple diagnoses -->
               <ul v-else class="flex flex-col gap-1.5 pl-4 list-disc">

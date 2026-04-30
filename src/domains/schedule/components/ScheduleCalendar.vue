@@ -11,21 +11,21 @@ import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import type { CalendarBlock, WorkingSchedule } from '../types/schedule.types'
 import type { AppointmentResponse } from '@/domains/appointment/types/appointment.types'
 
-const APPOINTMENT_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+const APPOINTMENT_COLORS = {
   scheduled: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' },
   checked_in: { bg: '#d1fae5', border: '#10b981', text: '#065f46' },
   completed: { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
   cancelled: { bg: '#f3f4f6', border: '#9ca3af', text: '#6b7280' },
   no_show: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' },
-}
+} as const
 
-const BLOCK_TYPE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+const BLOCK_TYPE_COLORS = {
   leave: { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
   meeting: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' },
   holiday: { bg: '#dcfce7', border: '#22c55e', text: '#166534' },
   personal: { bg: '#f3e8ff', border: '#a855f7', text: '#6b21a8' },
   unavailable: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' },
-}
+} as const
 
 const BREAK_COLOR = { bg: '#fff7ed', border: '#fb923c', text: '#9a3412' }
 const WORKING_HOURS_COLOR = { bg: '#f0fdf4', border: '#86efac', text: '#166534' }
@@ -170,8 +170,8 @@ const slotMinTime = computed(() => {
   const times = props.schedule.days.filter(d => d.enabled).map(d => d.start_time)
   if (!times.length) return '06:00:00'
   times.sort()
-  const [h] = times[0].split(':').map(Number)
-  return `${String(Math.max(0, h - 1)).padStart(2, '0')}:00:00`
+  const [h] = times[0]!.split(':').map(Number)
+  return `${String(Math.max(0, (h ?? 0) - 1)).padStart(2, '0')}:00:00`
 })
 
 const slotMaxTime = computed(() => {
@@ -179,8 +179,8 @@ const slotMaxTime = computed(() => {
   const times = props.schedule.days.filter(d => d.enabled).map(d => d.end_time)
   if (!times.length) return '22:00:00'
   times.sort()
-  const [h] = times[times.length - 1].split(':').map(Number)
-  return `${String(Math.min(24, h + 1)).padStart(2, '0')}:00:00`
+  const [h] = times[times.length - 1]!.split(':').map(Number)
+  return `${String(Math.min(24, (h ?? 0) + 1)).padStart(2, '0')}:00:00`
 })
 
 const businessHours = computed(() => {
@@ -240,9 +240,8 @@ async function handleEventDrop(info: EventDropArg) {
     emit('appointment-updated')
   } catch (err) {
     info.revert()
-    const msg = err instanceof HttpError && (err.data as { errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0]
-      ? (err.data as { errors: Record<string, string[]> }).errors.scheduled_at[0]
-      : 'Failed to reschedule — slot may not be available'
+    const msg = (err instanceof HttpError && (err.data as { errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0])
+      || 'Failed to reschedule — slot may not be available'
     toast.error(msg)
   }
 }
@@ -262,9 +261,8 @@ async function handleEventResize(info: EventResizeDoneArg) {
     emit('appointment-updated')
   } catch (err) {
     info.revert()
-    const msg = err instanceof HttpError && (err.data as { errors?: Record<string, string[]> })?.errors?.duration?.[0]
-      ? (err.data as { errors: Record<string, string[]> }).errors.duration[0]
-      : 'Failed to resize — slots may not be available'
+    const msg = (err instanceof HttpError && (err.data as { errors?: Record<string, string[]> })?.errors?.duration?.[0])
+      || 'Failed to resize — slots may not be available'
     toast.error(msg)
   }
 }

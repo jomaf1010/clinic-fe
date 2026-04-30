@@ -448,7 +448,7 @@ async function handleSubmit(): Promise<void> {
           <Label class="text-xs">{{ form.fetus_count > 1 ? fetus.label + ' Sex' : 'Sex' }}</Label>
             <Select
               :model-value="fetus.sex"
-              @update:model-value="(v) => { form.fetuses[idx].sex = v as 'male' | 'female' | 'unknown' }"
+              @update:model-value="(v) => { const fet = form.fetuses[idx]; if (fet) fet.sex = v as 'male' | 'female' | 'unknown' }"
             >
               <SelectTrigger class="h-8 text-sm">
                 <SelectValue />

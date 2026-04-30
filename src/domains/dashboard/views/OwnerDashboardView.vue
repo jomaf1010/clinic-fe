@@ -325,7 +325,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overflow-x-hidden">
             <li
-              v-for="appt in stats.my_upcoming_appointments"
+              v-for="appt in stats?.my_upcoming_appointments ?? []"
               :key="appt.id"
               class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: appt.patient_id } })"
@@ -383,7 +383,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overflow-x-hidden">
             <li
-              v-for="appt in stats.todays_appointments"
+              v-for="appt in stats?.todays_appointments ?? []"
               :key="appt.id"
               class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: appt.patient_id } })"
@@ -439,7 +439,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="item in stats.queue_list"
+              v-for="item in stats?.queue_list ?? []"
               :key="item.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: item.patient_id } })"
@@ -483,7 +483,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="consultation in stats.recent_consultations"
+              v-for="consultation in stats?.recent_consultations ?? []"
               :key="consultation.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: consultation.patient_id, id: consultation.id } })"
