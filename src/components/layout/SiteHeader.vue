@@ -2,7 +2,6 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { MessageSquare, SearchIcon, LoaderCircle, MapPin, UserPlus, Wifi, WifiOff, Bell } from 'lucide-vue-next'
-import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import {
   Tooltip,
@@ -130,43 +129,43 @@ function onFocus() {
 
 <template>
   <header
-    class="surface-panel sticky top-0 z-50 flex w-full items-center border-b"
-    style="height: var(--header-height)"
+    class="glass-topbar-shell sticky top-2 z-50 mx-2 mb-2 flex w-[calc(100%-1rem)] items-center overflow-hidden rounded-2xl"
+    style="height: calc(var(--header-height) + 0.5rem)"
   >
-    <div class="flex h-full w-full items-center gap-2 px-4">
-      <SidebarTrigger class="-ml-1" />
-      <Separator orientation="vertical" class="mr-2 h-4" />
-      <div class="relative w-full max-w-sm min-w-0">
-        <SearchIcon class="text-muted-foreground absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+    <div class="flex h-full w-full items-center gap-3 p-3">
+      <SidebarTrigger class="glass-topbar-icon -ml-1" />
+
+      <div class="relative min-w-0 flex-1 sm:max-w-xl">
+        <SearchIcon class="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           v-model="query"
           type="text"
           placeholder="Search patients..."
           aria-label="Search patients"
-          class="clinical-solid placeholder:text-muted-foreground h-9 w-full rounded-md border pl-8 pr-8 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          class="h-10 w-full rounded-2xl border border-white/55 bg-white/[0.58] pl-10 pr-10 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.07)] outline-none backdrop-blur-xl placeholder:text-muted-foreground transition-[border-color,box-shadow,background] focus-visible:border-white/70 focus-visible:bg-white/[0.72] focus-visible:ring-2 focus-visible:ring-blue-500/20 dark:border-white/[0.12] dark:bg-slate-950/48 dark:focus-visible:bg-slate-950/62"
           @blur="onBlur"
           @focus="onFocus"
           @keydown="onKeydown"
         />
         <LoaderCircle
           v-if="isSearching"
-          class="text-muted-foreground absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin"
+          class="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
         />
 
         <div
           v-if="showDropdown && query.trim().length >= 2"
-          class="surface-floating absolute left-0 top-full z-50 mt-1 w-full rounded-md border p-1 text-popover-foreground"
+          class="surface-floating absolute left-0 top-full z-50 mt-2 w-full rounded-2xl border border-white/50 p-1.5 text-popover-foreground dark:border-white/10"
         >
           <template v-if="results.length > 0">
             <button
               v-for="(patient, index) in results"
               :key="patient.id"
               type="button"
-              class="flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
-              :class="{ 'bg-primary/10': index === activeIndex }"
+              class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white/55 hover:text-accent-foreground dark:hover:bg-white/10"
+              :class="{ 'bg-white/62 text-blue-600 shadow-[0_10px_24px_rgba(37,99,235,0.1)] dark:bg-white/10 dark:text-blue-300': index === activeIndex }"
               @mousedown.prevent="selectPatient(patient)"
             >
-              <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+              <div class="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/50 bg-white/62 text-xs font-semibold text-blue-600 shadow-[0_8px_20px_rgba(37,99,235,0.1)] dark:border-white/10 dark:bg-white/10 dark:text-blue-300">
                 {{ patient.full_name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() }}
               </div>
               <div class="min-w-0">
@@ -183,7 +182,7 @@ function onFocus() {
             <p class="text-sm text-muted-foreground">No patients found.</p>
             <button
               type="button"
-              class="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+              class="mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold text-blue-600 hover:bg-white/55 dark:text-blue-300 dark:hover:bg-white/10"
               @mousedown.prevent="goToCreatePatient"
             >
               <UserPlus class="size-3.5" />
@@ -199,7 +198,7 @@ function onFocus() {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="relative flex items-center justify-center rounded-md p-1.5 hover:bg-accent"
+              class="glass-topbar-icon relative"
               @click="messageSheetOpen = true"
             >
               <MessageSquare class="size-4 text-muted-foreground" />
@@ -221,7 +220,7 @@ function onFocus() {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="relative flex items-center justify-center rounded-md p-1.5 hover:bg-accent"
+              class="glass-topbar-icon relative"
               @click="notificationSheetOpen = true"
             >
               <Bell class="size-4 text-muted-foreground" />
@@ -242,10 +241,10 @@ function onFocus() {
         <Tooltip>
           <TooltipTrigger as-child>
             <div
-              class="flex items-center gap-1.5 rounded-full border px-2 py-1 cursor-default"
+              class="flex h-9 cursor-default items-center gap-1.5 rounded-full border px-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.06)] backdrop-blur-md"
               :class="isConnected
-                ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950'
-                : 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950'"
+                ? 'border-emerald-300/70 bg-emerald-50/70 dark:border-emerald-700/60 dark:bg-emerald-950/70'
+                : 'border-red-300/70 bg-red-50/70 dark:border-red-700/60 dark:bg-red-950/70'"
             >
               <span
                 class="size-2 rounded-full"
@@ -288,3 +287,65 @@ function onFocus() {
     </SheetContent>
   </Sheet>
 </template>
+
+<style scoped>
+.glass-topbar-shell {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.32), rgb(255 255 255 / 0.1) 52%, rgb(255 255 255 / 0.2)),
+    rgb(255 255 255 / 0.04);
+  box-shadow: 0 22px 65px -36px rgb(15 23 42 / 0.55), 0 18px 45px rgb(15 23 42 / 0.1);
+  backdrop-filter: blur(30px) saturate(1.35);
+  -webkit-backdrop-filter: blur(30px) saturate(1.35);
+}
+
+.glass-topbar-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+
+.glass-topbar-icon {
+  display: inline-flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.46);
+  background: rgb(255 255 255 / 0.42);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.glass-topbar-icon:hover {
+  transform: translateY(-1px);
+  background: rgb(255 255 255 / 0.58);
+  box-shadow: 0 14px 30px rgb(15 23 42 / 0.1);
+}
+
+.glass-topbar-icon:active {
+  transform: translateY(0);
+}
+
+.dark .glass-topbar-icon {
+  border-color: rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.24);
+}
+
+.dark .glass-topbar-icon:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.dark .glass-topbar-shell {
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.38), rgb(15 23 42 / 0.16) 52%, rgb(15 23 42 / 0.28)),
+    rgb(15 23 42 / 0.08);
+  box-shadow: 0 18px 50px -30px rgb(0 0 0 / 0.72), 0 18px 45px rgb(0 0 0 / 0.28);
+}
+</style>

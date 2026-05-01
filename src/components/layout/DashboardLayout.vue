@@ -59,7 +59,7 @@ onUnmounted(() => {
       <AnnouncementBanners />
       <TrialBanner />
       <GracePeriodBanner />
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4">
+      <div class="-mt-[calc(var(--header-height)+1rem)] flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4 pt-[calc(var(--header-height)+1.75rem)]">
         <RouterView />
       </div>
     </SidebarInset>
