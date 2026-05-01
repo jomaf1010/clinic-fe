@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { markRaw } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-
-const RawRouterLink = markRaw(RouterLink)
+import { useRoute, useRouter } from 'vue-router'
 import { ChevronRight, Crown } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 
@@ -16,6 +13,13 @@ const { isMobile, setOpenMobile } = useSidebar()
 function closeMobileSidebar() {
   if (isMobile.value) {
     setOpenMobile(false)
+  }
+}
+
+function navigateTo(url: string) {
+  closeMobileSidebar()
+  if (route.path !== url) {
+    router.push(url)
   }
 }
 
@@ -84,7 +88,7 @@ const emit = defineEmits<{
             <CollapsibleContent>
               <SidebarMenuSub class="px-2">
                 <SidebarMenuSubItem v-for="subItem in item.items" :key="subItem.title">
-                  <SidebarMenuSubButton :as="RawRouterLink" :to="subItem.url" :is-active="isActive(subItem.url)" @click="closeMobileSidebar">
+                  <SidebarMenuSubButton as="a" :href="subItem.url" :is-active="isActive(subItem.url)" @click.prevent="navigateTo(subItem.url)">
                     <span>{{ subItem.title }}</span>
                   </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
@@ -113,7 +117,7 @@ const emit = defineEmits<{
 
         <!-- Items without sub-items: direct link -->
         <SidebarMenuItem v-else>
-          <SidebarMenuButton :as="RawRouterLink" :to="item.url" :tooltip="item.title" :is-active="isActive(item.url)" class="h-10" @click="closeMobileSidebar">
+          <SidebarMenuButton as="a" :href="item.url" :tooltip="item.title" :is-active="isActive(item.url)" class="h-10" @click.prevent="navigateTo(item.url)">
             <component :is="item.icon" />
             <span>{{ item.title }}</span>
             <Badge
