@@ -72,7 +72,7 @@ provideSidebarContext({
         '--sidebar-width': SIDEBAR_WIDTH,
         '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
       }"
-      :class="cn('group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex h-svh w-full overflow-hidden', props.class)"
+      :class="cn('app-shell group/sidebar-wrapper flex h-svh w-full overflow-hidden', props.class)"
       v-bind="$attrs"
     >
       <slot />

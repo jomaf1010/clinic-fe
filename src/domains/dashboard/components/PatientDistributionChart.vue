@@ -100,7 +100,7 @@ const localCount = computed(() => total.value - other.value)
 </script>
 
 <template>
-  <div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+  <div class="surface-card rounded-xl border p-6 text-card-foreground">
     <div class="mb-4">
       <h2 class="text-sm font-semibold">Patient Distribution</h2>
       <p v-if="city && !loading" class="text-xs text-muted-foreground">

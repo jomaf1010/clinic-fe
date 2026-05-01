@@ -52,7 +52,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <SidebarProvider style="--header-height: 3.5rem">
+  <SidebarProvider class="app-shell" style="--header-height: 3.5rem">
     <AppSidebar />
     <SidebarInset>
       <SiteHeader />

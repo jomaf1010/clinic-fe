@@ -54,7 +54,7 @@ async function handleSelectClinic(clinicId: string) {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
+  <div class="auth-shell relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
     <canvas ref="canvasRef" class="pointer-events-none absolute inset-0" />
 
     <div
@@ -97,7 +97,7 @@ async function handleSelectClinic(clinicId: string) {
         <button
           v-for="(membership, i) in authStore.memberships"
           :key="membership.id"
-          class="group relative flex items-center gap-4 rounded-xl border bg-card/90 p-4 backdrop-blur-sm transition-all duration-500 ease-out hover:shadow-lg hover:border-primary/30 hover:-translate-y-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
+          class="surface-card group relative flex items-center gap-4 rounded-xl border p-4 transition-all duration-500 ease-out hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
           :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
           :style="{ transitionDelay: `${300 + i * 100}ms` }"
           :disabled="isLoading !== null"

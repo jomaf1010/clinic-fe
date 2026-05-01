@@ -93,7 +93,7 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+  <div class="auth-shell relative flex min-h-screen items-center justify-center overflow-hidden px-4">
     <canvas ref="canvasRef" class="pointer-events-none absolute inset-0" />
 
     <div
@@ -112,7 +112,7 @@ const onSubmit = handleSubmit(async (values) => {
         :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
       >
         <!-- Invalid params state -->
-        <Card v-if="!hasValidParams" class="backdrop-blur-sm bg-card/90">
+        <Card v-if="!hasValidParams" class="border-primary/20 shadow-[0_28px_90px_-42px_oklch(0.28_0.09_245_/_0.65)]">
           <CardHeader class="text-center">
             <div class="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-destructive/10">
               <CircleX class="size-6 text-destructive" />
@@ -132,7 +132,7 @@ const onSubmit = handleSubmit(async (values) => {
         </Card>
 
         <!-- Success state -->
-        <Card v-else-if="succeeded" class="backdrop-blur-sm bg-card/90">
+        <Card v-else-if="succeeded" class="border-primary/20 shadow-[0_28px_90px_-42px_oklch(0.28_0.09_245_/_0.65)]">
           <CardHeader class="text-center">
             <div class="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-green-500/10">
               <CircleCheck class="size-6 text-green-600 dark:text-green-400" />
@@ -153,7 +153,7 @@ const onSubmit = handleSubmit(async (values) => {
         </Card>
 
         <!-- Form state -->
-        <Card v-else class="backdrop-blur-sm bg-card/90">
+        <Card v-else class="border-primary/20 shadow-[0_28px_90px_-42px_oklch(0.28_0.09_245_/_0.65)]">
           <CardHeader class="text-center">
             <CardTitle class="text-xl">Set new password</CardTitle>
             <CardDescription>Enter your new password below</CardDescription>

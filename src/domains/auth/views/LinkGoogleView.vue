@@ -54,13 +54,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-background px-4">
+  <div class="auth-shell flex min-h-screen items-center justify-center px-4">
     <div class="w-full max-w-sm">
       <div class="mb-4 flex justify-center">
         <AppLogo class="h-24 w-auto" />
       </div>
 
-      <Card class="backdrop-blur-sm bg-card/90">
+      <Card class="border-primary/20 shadow-[0_28px_90px_-42px_oklch(0.28_0.09_245_/_0.65)]">
         <CardHeader class="text-center">
           <div class="mb-2 flex justify-center">
             <LoaderCircle v-if="isLoading" class="size-8 animate-spin text-primary" />
