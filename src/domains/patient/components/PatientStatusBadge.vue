@@ -10,13 +10,13 @@ const props = defineProps<{
 const config = computed(() => {
   switch (props.status) {
     case 'new':
-      return { label: 'New', class: 'border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-400' }
+      return { label: 'New', class: 'bg-blue-600/12 text-blue-700 dark:bg-blue-400/14 dark:text-blue-300' }
     case 'active':
-      return { label: 'Active', class: 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400' }
+      return { label: 'Active', class: 'bg-teal-500/14 text-teal-700 dark:bg-teal-400/14 dark:text-teal-300' }
     case 'inactive':
-      return { label: 'Inactive', class: 'border-gray-300 bg-gray-100 text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400' }
+      return { label: 'Inactive', class: 'bg-slate-500/12 text-slate-600 dark:bg-slate-300/12 dark:text-slate-300' }
     case 'returning':
-      return { label: 'Returning', class: 'border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400' }
+      return { label: 'Returning', class: 'bg-amber-500/16 text-amber-700 dark:bg-amber-400/16 dark:text-amber-300' }
     default:
       return { label: props.status, class: '' }
   }
@@ -24,7 +24,10 @@ const config = computed(() => {
 </script>
 
 <template>
-  <Badge variant="outline" :class="config.class">
+  <Badge
+    class="min-h-6 rounded-full border border-white/50 px-2.5 text-xs font-bold shadow-none backdrop-blur-md dark:border-white/10"
+    :class="config.class"
+  >
     {{ config.label }}
   </Badge>
 </template>

@@ -19,5 +19,5 @@ const narrative = computed(() =>
 
 <template>
   <!-- eslint-disable-next-line vue/no-v-html -->
-  <p v-if="narrative" class="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 px-3 py-2 text-xs text-muted-foreground leading-relaxed" v-html="narrative" />
+  <p v-if="narrative" class="surface-muted rounded-lg border border-dashed border-muted-foreground/25 px-3 py-2 text-xs text-muted-foreground leading-relaxed" v-html="narrative" />
 </template>

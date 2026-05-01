@@ -106,10 +106,10 @@ async function requestMedCert() {
 
 <template>
   <div
-    class="group relative min-w-0 flex-1 cursor-pointer rounded-lg border p-3 transition-colors"
+    class="surface-card group relative min-w-0 flex-1 cursor-pointer rounded-lg border p-3 transition-colors"
     :class="latest
-      ? 'bg-card border-primary/30 shadow-sm hover:bg-primary/5 hover:border-primary/40'
-      : 'bg-card/60 border-border/60 opacity-75 hover:opacity-100 hover:bg-card'"
+      ? 'border-primary/30 hover:bg-primary/5 hover:border-primary/40'
+      : 'border-border/60 opacity-75 hover:opacity-100'"
     @click="openConsultation"
   >
     <!-- 3-dot menu -->
@@ -175,7 +175,7 @@ async function requestMedCert() {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <span v-if="consultation.consultation_type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+      <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded border px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
       <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
         &middot; Dr. {{ consultation.doctor_name }}
       </span>

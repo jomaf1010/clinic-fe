@@ -50,6 +50,14 @@ import {
   RefreshCw,
   FlaskConical,
   FilePenLine,
+  ClipboardCheck,
+  ClipboardList,
+  CalendarClock,
+  Droplet,
+  MapPinned,
+  PhoneOff,
+  Stethoscope,
+  UserRoundPlus,
 } from 'lucide-vue-next'
 import PatientAvatar from '@/components/PatientAvatar.vue'
 import { patientApi } from '../api/patientApi'
@@ -356,7 +364,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+  <div class="grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_340px]">
     <section class="flex min-w-0 flex-col gap-4">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
@@ -487,7 +495,7 @@ onMounted(() => {
             </SelectContent>
           </Select>
 
-          <div class="hidden items-center rounded-md border p-1 sm:flex">
+          <div class="surface-muted hidden items-center rounded-md border p-1 sm:flex">
             <Button
               :variant="viewMode === 'list' ? 'secondary' : 'ghost'"
               type="button"
@@ -532,10 +540,10 @@ onMounted(() => {
         </Button>
       </div>
 
-      <div class="hidden rounded-md border bg-background md:grid md:grid-cols-2 xl:grid-cols-4">
-        <div class="flex items-center gap-4 border-b p-4 md:border-r xl:border-b-0">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">
-            <Users class="size-6" />
+      <div class="surface-card hidden overflow-hidden rounded-xl md:grid md:grid-cols-2 xl:grid-cols-4">
+        <div class="flex items-center gap-4 p-4">
+          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)]">
+            <ClipboardList class="size-5" />
           </span>
           <div>
             <p class="text-xs text-muted-foreground">Total patients</p>
@@ -543,9 +551,9 @@ onMounted(() => {
             <p class="text-xs text-muted-foreground">Across all statuses</p>
           </div>
         </div>
-        <div class="flex items-center gap-4 border-b p-4 xl:border-b-0 xl:border-r">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
-            <UserPlus class="size-6" />
+        <div class="flex items-center gap-4 p-4">
+          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_12px_28px_rgba(16,185,129,0.24)]">
+            <UserRoundPlus class="size-5" />
           </span>
           <div>
             <p class="text-xs text-muted-foreground">New patients</p>
@@ -553,9 +561,9 @@ onMounted(() => {
             <p class="text-xs text-green-700">Status: new</p>
           </div>
         </div>
-        <div class="flex items-center gap-4 border-b p-4 md:border-r xl:border-b-0">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-sm">
-            <Phone class="size-6" />
+        <div class="flex items-center gap-4 p-4">
+          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_12px_28px_rgba(245,158,11,0.24)]">
+            <PhoneOff class="size-5" />
           </span>
           <div>
             <p class="text-xs text-muted-foreground">Missing contact</p>
@@ -564,8 +572,8 @@ onMounted(() => {
           </div>
         </div>
         <div class="flex items-center gap-4 p-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-sm">
-            <CalendarDays class="size-6" />
+          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-[0_12px_28px_rgba(139,92,246,0.24)]">
+            <CalendarClock class="size-5" />
           </span>
           <div>
             <p class="text-xs text-muted-foreground">Returning</p>
@@ -576,21 +584,21 @@ onMounted(() => {
       </div>
 
       <!-- Loading skeleton -->
-      <div v-if="isLoading" class="rounded-md border">
-        <Table>
+      <div v-if="isLoading" class="surface-card overflow-hidden rounded-xl">
+        <Table class="min-w-[42rem] border-collapse">
           <TableHeader>
-            <TableRow>
-              <TableHead>Patient</TableHead>
-              <TableHead class="hidden lg:table-cell">Age / Sex / DOB</TableHead>
-              <TableHead class="hidden xl:table-cell">Location</TableHead>
-              <TableHead class="hidden md:table-cell">Contact</TableHead>
-              <TableHead class="hidden lg:table-cell">Last activity</TableHead>
-              <TableHead>Status</TableHead>
+            <TableRow class="border-white/40 bg-white/40 hover:bg-white/40">
+              <TableHead class="px-4 py-3.5 text-muted-foreground">Patient</TableHead>
+              <TableHead class="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">Age / Sex / DOB</TableHead>
+              <TableHead class="hidden px-4 py-3.5 text-muted-foreground xl:table-cell">Location</TableHead>
+              <TableHead class="hidden px-4 py-3.5 text-muted-foreground md:table-cell">Contact</TableHead>
+              <TableHead class="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">Last activity</TableHead>
+              <TableHead class="px-4 py-3.5 text-muted-foreground">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="i in 8" :key="i">
-              <TableCell>
+            <TableRow v-for="i in 8" :key="i" class="border-white/40">
+              <TableCell class="px-4 py-4">
                 <div class="flex items-center gap-3">
                   <Skeleton class="size-14 shrink-0 rounded-full" />
                   <div class="flex-1 space-y-1.5">
@@ -599,11 +607,11 @@ onMounted(() => {
                   </div>
                 </div>
               </TableCell>
-              <TableCell class="hidden lg:table-cell"><Skeleton class="h-4 w-24" /></TableCell>
-              <TableCell class="hidden xl:table-cell"><Skeleton class="h-4 w-32" /></TableCell>
-              <TableCell class="hidden md:table-cell"><Skeleton class="h-4 w-28" /></TableCell>
-              <TableCell class="hidden lg:table-cell"><Skeleton class="h-4 w-28" /></TableCell>
-              <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
+              <TableCell class="hidden px-4 py-4 lg:table-cell"><Skeleton class="h-4 w-24" /></TableCell>
+              <TableCell class="hidden px-4 py-4 xl:table-cell"><Skeleton class="h-4 w-32" /></TableCell>
+              <TableCell class="hidden px-4 py-4 md:table-cell"><Skeleton class="h-4 w-28" /></TableCell>
+              <TableCell class="hidden px-4 py-4 lg:table-cell"><Skeleton class="h-4 w-28" /></TableCell>
+              <TableCell class="px-4 py-4"><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
             </TableRow>
           </TableBody>
         </Table>
@@ -613,7 +621,7 @@ onMounted(() => {
       <div
         v-else-if="error"
         role="alert"
-        class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+        class="surface-card rounded-xl bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
       >
         {{ error }}
         <Button variant="outline" size="sm" class="mt-2" @click="fetchPatients()">Try again</Button>
@@ -622,7 +630,7 @@ onMounted(() => {
       <!-- Empty -->
       <div
         v-else-if="patients.length === 0 && !hasActiveFilters && !filters.search"
-        class="flex flex-1 flex-col items-center justify-center rounded-md border py-14 text-muted-foreground"
+        class="surface-card flex flex-1 flex-col items-center justify-center rounded-xl py-14 text-muted-foreground"
       >
         <Users class="mb-3 size-10 opacity-50" />
         <p>No patients yet.</p>
@@ -634,7 +642,7 @@ onMounted(() => {
       <!-- No results (with filters) -->
       <div
         v-else-if="patients.length === 0"
-        class="flex flex-1 flex-col items-center justify-center rounded-md border py-14 text-muted-foreground"
+        class="surface-card flex flex-1 flex-col items-center justify-center rounded-xl py-14 text-muted-foreground"
       >
         <Search class="mb-3 size-10 opacity-50" />
         <p>No patients match your filters.</p>
@@ -645,26 +653,26 @@ onMounted(() => {
 
       <!-- Data table -->
       <template v-else>
-        <div v-if="viewMode === 'list'" class="overflow-hidden rounded-md border bg-background">
-          <Table>
+        <div v-if="viewMode === 'list'" class="surface-card overflow-hidden rounded-xl">
+          <Table class="min-w-[42rem] border-collapse">
             <TableHeader>
-              <TableRow>
-                <TableHead>Patient</TableHead>
-                <TableHead class="hidden lg:table-cell">Age / Sex / DOB</TableHead>
-                <TableHead class="hidden xl:table-cell">Location</TableHead>
-                <TableHead class="hidden md:table-cell">Contact</TableHead>
-                <TableHead class="hidden lg:table-cell">Last activity</TableHead>
-                <TableHead>Status</TableHead>
+              <TableRow class="border-white/40 bg-white/40 hover:bg-white/40">
+                <TableHead class="px-4 py-3.5 text-muted-foreground">Patient</TableHead>
+                <TableHead class="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">Age / Sex / DOB</TableHead>
+                <TableHead class="hidden px-4 py-3.5 text-muted-foreground xl:table-cell">Location</TableHead>
+                <TableHead class="hidden px-4 py-3.5 text-muted-foreground md:table-cell">Contact</TableHead>
+                <TableHead class="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">Last activity</TableHead>
+                <TableHead class="px-4 py-3.5 text-muted-foreground">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow
                 v-for="patient in patients"
                 :key="patient.id"
-                class="cursor-pointer hover:bg-muted/50"
+                class="cursor-pointer border-white/40 transition-colors hover:bg-white/35"
                 @click="goToPatient(patient.id)"
               >
-                <TableCell>
+                <TableCell class="px-4 py-4">
                   <div class="flex items-center gap-3">
                     <PatientCompletenessRing :completeness="profileCompleteness(patient)">
                       <PatientAvatar
@@ -683,19 +691,19 @@ onMounted(() => {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell class="hidden lg:table-cell">
+                <TableCell class="hidden px-4 py-4 lg:table-cell">
                   <div class="text-sm">
                     <p>{{ formatAge(patient.date_of_birth) }} · {{ formatSex(patient.sex) }}</p>
                     <p class="text-xs text-muted-foreground">{{ formatDateOnly(patient.date_of_birth) }}</p>
                   </div>
                 </TableCell>
-                <TableCell class="hidden xl:table-cell">
+                <TableCell class="hidden px-4 py-4 xl:table-cell">
                   <div class="max-w-44 text-sm">
                     <p class="truncate">{{ patient.address?.barangay_name || 'No barangay' }}</p>
                     <p class="truncate text-xs text-muted-foreground">{{ patient.address?.city_name || patient.formatted_address || 'No city' }}</p>
                   </div>
                 </TableCell>
-                <TableCell class="hidden md:table-cell">
+                <TableCell class="hidden px-4 py-4 md:table-cell">
                   <div class="space-y-1 text-sm">
                     <p class="flex items-center gap-2">
                       <Phone class="size-3.5 text-muted-foreground" />
@@ -714,12 +722,12 @@ onMounted(() => {
                     </p>
                   </div>
                 </TableCell>
-                <TableCell class="hidden lg:table-cell">
+                <TableCell class="hidden px-4 py-4 lg:table-cell">
                   <div class="text-sm">
                     <p>{{ formatDateOnly(patient.updated_at) }}</p>
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell class="px-4 py-4">
                   <PatientStatusBadge :status="patient.status" />
                 </TableCell>
               </TableRow>
@@ -732,7 +740,7 @@ onMounted(() => {
             v-for="patient in patients"
             :key="patient.id"
             type="button"
-            class="rounded-md border bg-background p-4 text-left transition-colors hover:bg-muted/50"
+            class="surface-card rounded-xl p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
             @click="goToPatient(patient.id)"
           >
             <div class="flex items-start justify-between gap-3">
@@ -806,10 +814,13 @@ onMounted(() => {
       </template>
     </section>
 
-    <aside class="flex flex-col gap-6 border-t pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-8">
-      <section class="space-y-4">
+    <aside class="flex flex-col gap-4 xl:pt-1">
+      <section class="surface-card space-y-4 rounded-xl p-5">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Today</h2>
+          <h2 class="flex items-center gap-2 text-lg font-semibold">
+            <Stethoscope class="size-4 text-primary" />
+            Today
+          </h2>
           <Badge variant="secondary" class="rounded-full bg-amber-100 text-amber-700">
             {{ attentionCount }}
           </Badge>
@@ -843,7 +854,7 @@ onMounted(() => {
           <div
             v-else-if="attentionError"
             role="alert"
-            class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
+            class="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
           >
             {{ attentionError }}
           </div>
@@ -853,10 +864,10 @@ onMounted(() => {
               v-for="item in attentionItems"
               :key="item.id"
               type="button"
-              class="flex w-full items-start gap-3 rounded-md px-1 py-1.5 text-left text-sm hover:bg-muted"
+              class="surface-interactive flex w-full items-start gap-3 rounded-lg border border-transparent px-2 py-2 text-left text-sm hover:bg-muted/60"
               @click="goToAttentionItem(item)"
             >
-              <span class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+              <span class="surface-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border">
                 <FlaskConical v-if="item.type === 'pending_lab_order_today'" class="size-4 text-amber-700" />
                 <FilePenLine v-else class="size-4 text-blue-700" />
               </span>
@@ -878,8 +889,11 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="space-y-4 border-t pt-6">
-        <h2 class="text-sm font-semibold">Registration quality</h2>
+      <section class="surface-card space-y-4 rounded-xl p-5">
+        <h2 class="flex items-center gap-2 text-sm font-semibold">
+          <ClipboardCheck class="size-4 text-primary" />
+          Registration quality
+        </h2>
         <div class="flex items-center gap-3">
           <div class="grid size-14 place-items-center rounded-full border-4 border-green-600 text-sm font-semibold text-green-700">
             {{ registrationQuality }}%
@@ -897,7 +911,14 @@ onMounted(() => {
             class="flex items-center justify-between gap-3 text-sm"
           >
             <span class="flex min-w-0 items-center gap-2">
-              <CheckCircle2 v-if="check.tone === 'good'" class="size-4 shrink-0 text-green-600" />
+              <Phone v-if="check.label === 'Complete contact info' && check.tone === 'good'" class="size-4 shrink-0 text-green-600" />
+              <PhoneOff v-else-if="check.label === 'Complete contact info'" class="size-4 shrink-0 text-amber-600" />
+              <Mail v-else-if="check.label === 'Email on file'" class="size-4 shrink-0 text-green-600" />
+              <CalendarDays v-else-if="check.label === 'Date of birth'" class="size-4 shrink-0 text-green-600" />
+              <MapPinned v-else-if="check.label === 'Address on file'" class="size-4 shrink-0 text-green-600" />
+              <Droplet v-else-if="check.label === 'Blood type' && check.tone === 'good'" class="size-4 shrink-0 text-green-600" />
+              <Droplet v-else-if="check.label === 'Blood type'" class="size-4 shrink-0 text-amber-600" />
+              <CheckCircle2 v-else-if="check.tone === 'good'" class="size-4 shrink-0 text-green-600" />
               <AlertTriangle v-else class="size-4 shrink-0 text-amber-600" />
               <span class="truncate text-muted-foreground">{{ check.label }}</span>
             </span>
@@ -905,7 +926,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="space-y-2 border-t pt-4 text-xs text-muted-foreground">
+        <div class="space-y-2 pt-2 text-xs text-muted-foreground">
           <p>Data as of {{ currentDateLabel }}</p>
           <Button variant="ghost" size="sm" class="h-7 px-0 text-primary" @click="refreshPatientData">
             <RefreshCw class="size-3.5" />

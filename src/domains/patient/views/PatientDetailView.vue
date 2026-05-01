@@ -361,7 +361,7 @@ onUnmounted(() => {
   <div
     v-else-if="error"
     role="alert"
-    class="mx-auto max-w-md rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+    class="surface-card mx-auto max-w-md rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
   >
     {{ error }}
   </div>
@@ -399,7 +399,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Profile card -->
-      <div class="rounded-3xl border shadow-sm bg-card overflow-hidden">
+      <div class="surface-card overflow-hidden rounded-3xl border">
         <!-- Inset banner -->
         <div class="relative m-2 rounded-2xl bg-gradient-to-br from-blue-400/30 to-blue-500/30 h-[120px] sm:h-[140px]">
           <button
@@ -471,7 +471,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Stats row -->
-        <div class="mx-3 my-3 bg-muted/50 rounded-2xl py-3 px-2">
+        <div class="surface-muted mx-3 my-3 rounded-2xl border px-2 py-3">
           <div class="grid grid-cols-3 divide-x divide-border">
             <!-- Visits -->
             <div class="flex flex-col items-center gap-0.5 px-2">
@@ -497,7 +497,7 @@ onUnmounted(() => {
           <template v-if="draftConsultation">
             <button
               type="button"
-              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
               @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
             >
               <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
@@ -508,7 +508,7 @@ onUnmounted(() => {
             <button
               v-if="authStore.hasPermission('encounters.delete')"
               type="button"
-              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
               @click="requestDiscardDraft(draftConsultation)"
             >
               <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-rose-400 flex items-center justify-center text-white">
@@ -523,7 +523,7 @@ onUnmounted(() => {
             <button
               v-if="authStore.hasPermission('encounters.create')"
               type="button"
-              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
               @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
             >
               <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
@@ -534,7 +534,7 @@ onUnmounted(() => {
             <button
               v-if="authStore.hasPermission('encounters.create')"
               type="button"
-              class="flex flex-col items-center gap-1.5 rounded-2xl border py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
               @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id } })"
             >
               <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
@@ -549,7 +549,7 @@ onUnmounted(() => {
         <div class="flex justify-center pb-3 md:hidden">
           <button
             type="button"
-            class="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground transition-colors hover:bg-muted/80"
+            class="surface-muted flex h-7 w-7 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted/80"
             :aria-label="mobileCardExpanded ? 'Collapse details' : 'Expand details'"
             @click="mobileCardExpanded = !mobileCardExpanded"
           >
@@ -614,7 +614,7 @@ onUnmounted(() => {
           <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Consultations
           </h3>
-          <span class="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          <span class="surface-muted rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">
             {{ visibleConsultations.length }}
           </span>
         </div>
@@ -663,7 +663,7 @@ onUnmounted(() => {
             <div v-if="n < 5" class="mt-1 flex-1 w-[2px] bg-foreground/15" />
           </div>
           <div
-            class="min-w-0 flex-1 rounded-lg border bg-card p-3"
+            class="surface-card min-w-0 flex-1 rounded-lg border p-3"
             :class="n < 5 ? 'mb-3' : ''"
           >
             <Skeleton class="h-3 w-20 mb-2" />
@@ -747,7 +747,7 @@ onUnmounted(() => {
           <div class="flex flex-col items-center">
             <Skeleton class="mt-3.5 size-2 shrink-0 rounded-full" />
           </div>
-          <div class="mt-3 min-w-0 flex-1 rounded-lg border bg-card p-3">
+          <div class="surface-card mt-3 min-w-0 flex-1 rounded-lg border p-3">
             <Skeleton class="h-3 w-24 mb-2" />
             <Skeleton class="h-4 w-3/4 mb-2" />
             <Skeleton class="h-3 w-1/2 mb-3" />
