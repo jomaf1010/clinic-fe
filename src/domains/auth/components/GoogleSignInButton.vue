@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   disabled?: boolean
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
   text?: 'signin_with' | 'signup_with' | 'continue_with'
+  width?: number
 }>(), {
   disabled: false,
+  shape: 'rectangular',
   text: 'continue_with',
+  width: 400,
 })
 
 const emit = defineEmits<{
@@ -14,10 +18,12 @@ const emit = defineEmits<{
 }>()
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
+const containerRef = ref<HTMLElement | null>(null)
 const buttonRef = ref<HTMLElement | null>(null)
 const ready = ref(false)
 
 let scriptPromise: Promise<void> | null = null
+let resizeObserver: ResizeObserver | null = null
 
 function loadGoogleIdentityScript(): Promise<void> {
   if (window.google?.accounts?.id) {
@@ -74,8 +80,8 @@ async function renderButton(): Promise<void> {
     size: 'large',
     type: 'standard',
     text: props.text,
-    shape: 'rectangular',
-    width: 320,
+    shape: props.shape,
+    width: props.width ?? Math.floor(containerRef.value?.clientWidth ?? 320),
   })
   ready.value = true
 }
@@ -84,11 +90,38 @@ onMounted(() => {
   renderButton().catch(() => {
     ready.value = false
   })
+
+  if (containerRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      renderButton().catch(() => {
+        ready.value = false
+      })
+    })
+    resizeObserver.observe(containerRef.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+})
+
+watch(() => [props.disabled, props.shape, props.text, props.width], () => {
+  renderButton().catch(() => {
+    ready.value = false
+  })
 })
 </script>
 
 <template>
-  <div v-if="clientId" class="flex min-h-11 justify-center">
-    <div ref="buttonRef" :class="{ 'pointer-events-none opacity-60': disabled || !ready }" />
+  <div v-if="clientId" ref="containerRef" class="flex min-h-10 w-full justify-center">
+    <div ref="buttonRef" class="google-button-frame" :class="{ 'pointer-events-none opacity-60': disabled || !ready }" />
   </div>
 </template>
+
+<style scoped>
+.google-button-frame {
+  overflow: hidden;
+  border-radius: 9999px;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.05);
+}
+</style>
