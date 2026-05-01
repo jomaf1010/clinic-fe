@@ -139,7 +139,7 @@ function formatDate(iso: string): string {
 
 <template>
   <div
-    class="rounded-lg border border-dashed border-amber-300 bg-amber-50/50 p-3 dark:border-amber-700 dark:bg-amber-950/30"
+    class="surface-card rounded-lg border border-dashed border-amber-300 bg-amber-50/50 p-3 dark:border-amber-700 dark:bg-amber-950/30"
   >
     <div class="flex flex-col gap-3 sm:flex-row">
       <!-- Left (66% on sm+) -->
@@ -157,7 +157,7 @@ function formatDate(iso: string): string {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <span v-if="consultation.consultation_type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+          <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded border px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
           <span class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
             Draft
           </span>
@@ -223,7 +223,7 @@ function formatDate(iso: string): string {
             :key="doc.id"
             :href="doc.download_url!"
             target="_blank"
-            class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
+            class="surface-muted inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900"
             @click.stop
           >
             <FileDown class="size-3" />

@@ -65,7 +65,12 @@
   --stat-orange: oklch(0.705 0.213 47.604);
 
   /* Clinical glass surfaces */
-  --app-background: linear-gradient(135deg, oklch(0.985 0.026 205) 0%, oklch(0.965 0.04 250) 48%, oklch(0.982 0.03 165) 100%);
+  --app-background:
+    linear-gradient(135deg, oklch(0.62 0.18 260 / 0.14), transparent 32%),
+    linear-gradient(215deg, oklch(0.72 0.14 185 / 0.14), transparent 36%),
+    linear-gradient(180deg, oklch(0.986 0.024 205 / 0.94), oklch(0.946 0.035 235 / 0.78));
+  --app-grid-line: oklch(1 0 0 / 0.3);
+  --app-grid-line-soft: oklch(1 0 0 / 0.22);
   --auth-background: linear-gradient(120deg, oklch(0.985 0.026 205) 0%, oklch(0.968 0.055 250) 42%, oklch(0.984 0.04 170) 100%);
   --surface-panel: oklch(1 0 0 / 0.62);
   --surface-panel-strong: oklch(1 0 0 / 0.68);
@@ -120,7 +125,12 @@
   --sidebar-border: oklch(0.278 0 0);
   --sidebar-ring: oklch(0.45 0.090 253.827);
 
-  --app-background: linear-gradient(135deg, oklch(0.16 0.035 245) 0%, oklch(0.12 0.028 268) 52%, oklch(0.17 0.032 185) 100%);
+  --app-background:
+    linear-gradient(135deg, oklch(0.42 0.12 255 / 0.18), transparent 34%),
+    linear-gradient(215deg, oklch(0.52 0.11 185 / 0.16), transparent 38%),
+    linear-gradient(180deg, oklch(0.16 0.035 245), oklch(0.11 0.03 268));
+  --app-grid-line: oklch(1 0 0 / 0.08);
+  --app-grid-line-soft: oklch(1 0 0 / 0.05);
   --auth-background: linear-gradient(120deg, oklch(0.16 0.035 245) 0%, oklch(0.125 0.035 268) 46%, oklch(0.17 0.035 185) 100%);
   --surface-panel: oklch(0.21 0.022 245 / 0.64);
   --surface-panel-strong: oklch(0.2 0.02 245 / 0.72);
@@ -209,7 +219,27 @@
 
 @layer utilities {
   .app-shell {
+    position: relative;
+    isolation: isolate;
     background: var(--app-background);
+  }
+
+  .app-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--app-grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--app-grid-line-soft) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(to bottom, oklch(0 0 0 / 0.65), transparent 72%);
+  }
+
+  .app-shell > * {
+    position: relative;
+    z-index: 1;
   }
 
   .auth-shell {

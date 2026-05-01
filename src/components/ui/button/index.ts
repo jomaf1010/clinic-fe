@@ -9,13 +9,13 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/90",
+          "rounded-full border border-white/45 bg-[linear-gradient(135deg,rgb(37,99,235),rgb(20,184,166))] text-white shadow-[0_12px_28px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_16px_34px_rgba(15,23,42,0.12)] active:translate-y-0 dark:border-white/10 dark:shadow-[0_14px_34px_rgba(0,0,0,0.28)]",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
-          "surface-muted border hover:bg-accent hover:text-accent-foreground dark:hover:bg-input/50",
+          "surface-muted rounded-full border border-white/50 text-foreground shadow-[0_12px_28px_rgba(15,23,42,0.06)] backdrop-blur-md hover:-translate-y-0.5 hover:bg-white/60 hover:text-accent-foreground hover:shadow-[0_16px_34px_rgba(15,23,42,0.1)] active:translate-y-0 dark:border-white/10 dark:hover:bg-white/10",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "rounded-full border border-white/50 bg-white/60 text-primary shadow-[0_10px_26px_rgba(37,99,235,0.1)] backdrop-blur-md hover:-translate-y-0.5 hover:bg-white/75 hover:shadow-[0_14px_32px_rgba(37,99,235,0.14)] active:translate-y-0 dark:border-white/10 dark:bg-white/10 dark:text-blue-300 dark:hover:bg-white/15",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
