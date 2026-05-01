@@ -28,7 +28,7 @@ export const RouteNames = {
   ROLES: 'roles',
   MESSAGES: 'messages',
   ACCOUNT: 'account',
-  COMPONENTS: 'components',
+  DESIGN_SYSTEM: 'design-system',
   QUEUE_DISPLAY: 'queue-display',
   BILLING: 'billing',
   SUBSCRIPTION: 'subscription',

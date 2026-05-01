@@ -7,6 +7,7 @@ declare module 'vue-router' {
     requiresGuest?: boolean
     requiredPermission?: string
     requiredFeature?: string
+    devOnly?: boolean
   }
 }
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
@@ -183,9 +184,10 @@ const router = createRouter({
           component: () => import('@/domains/auth/views/AccountView.vue'),
         },
         {
-          path: 'components',
-          name: RouteNames.COMPONENTS,
+          path: 'design-system',
+          name: RouteNames.DESIGN_SYSTEM,
           component: () => import('@/views/ComponentsView.vue'),
+          meta: { devOnly: true },
         },
         {
           path: 'logs/:id',
@@ -288,6 +290,10 @@ router.onError((error) => {
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+
+  if (to.meta.devOnly && !import.meta.env.DEV) {
+    return { name: RouteNames.HOME }
+  }
 
   // Page refresh: token exists but user not yet loaded
   if (authStore.isAuthenticated && !authStore.user) {
