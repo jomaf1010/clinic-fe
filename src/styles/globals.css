@@ -312,14 +312,16 @@
 
   [data-sidebar='menu-button'][data-active='true'],
   [data-sidebar='menu-sub-button'][data-active='true'] {
-    background: var(--surface-muted);
-    border-color: var(--surface-border-strong);
-    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.38), 0 10px 28px -24px oklch(0.22 0.045 245 / 0.4);
+    background: oklch(1 0 0 / 0.62);
+    border-color: oklch(1 0 0 / 0.55);
+    box-shadow: 0 14px 32px rgb(37 99 235 / 0.12);
   }
 
   .dark [data-sidebar='menu-button'][data-active='true'],
   .dark [data-sidebar='menu-sub-button'][data-active='true'] {
-    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.08), 0 10px 30px -24px oklch(0 0 0 / 0.75);
+    background: oklch(1 0 0 / 0.1);
+    border-color: oklch(1 0 0 / 0.12);
+    box-shadow: 0 14px 32px rgb(59 130 246 / 0.18);
   }
 }
 

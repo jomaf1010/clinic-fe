@@ -24,7 +24,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
   <div
     v-if="collapsible === 'none'"
     data-slot="sidebar"
-    :class="cn('surface-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col border-r', props.class)"
+    :class="cn('surface-sidebar text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col overflow-hidden', props.class)"
     v-bind="$attrs"
   >
     <slot />
@@ -87,7 +87,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
     >
       <div
         data-sidebar="sidebar"
-        class="surface-sidebar flex h-full w-full flex-col border group-data-[variant=floating]:rounded-lg group-data-[variant=inset]:rounded-xl"
+        class="surface-sidebar flex h-full w-full flex-col overflow-hidden group-data-[variant=floating]:rounded-2xl group-data-[variant=inset]:rounded-2xl"
       >
         <slot />
       </div>

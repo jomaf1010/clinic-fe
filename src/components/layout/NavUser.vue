@@ -72,9 +72,9 @@ const initials = computed(() => {
         <DropdownMenuTrigger as-child>
           <SidebarMenuButton
             size="lg"
-            class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            class="rounded-2xl data-[state=open]:border-white/55 data-[state=open]:bg-white/62 data-[state=open]:text-sidebar-accent-foreground data-[state=open]:shadow-[0_14px_32px_rgba(37,99,235,0.12)]"
           >
-            <Avatar class="h-8 w-8 rounded-full">
+            <Avatar class="h-9 w-9 rounded-full shadow-[0_10px_24px_rgba(15,23,42,0.1)] group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
               <AvatarImage v-if="user.avatarUrl" :src="user.avatarUrl" :alt="user.name" class="rounded-full object-cover" />
               <AvatarFallback class="rounded-full">
                 {{ initials }}
