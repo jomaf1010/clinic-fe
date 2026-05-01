@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   ListOrdered,
   MessageSquare,
+  Palette,
   Receipt,
   Stethoscope,
   Users,
@@ -108,11 +109,19 @@ const allNavItems = [
     badge: () => messageStore.totalUnread,
     separator: true,
   },
+  {
+    title: 'Design System',
+    url: '/design-system',
+    icon: Palette,
+    permission: 'dashboard.view',
+    devOnly: true,
+  },
 ]
 
 const navMain = computed(() =>
   allNavItems
     .filter((item) => {
+      if (item.devOnly && !import.meta.env.DEV) return false
       if (!item.permission) return true
       if (Array.isArray(item.permission)) {
         return item.permission.some((p) => authStore.hasPermission(p))
