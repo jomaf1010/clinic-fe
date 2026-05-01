@@ -41,6 +41,8 @@ export interface MockCentrifugo {
   setConnected(connected: boolean): void
   /** Return the channels currently subscribed by the consumer. */
   channels(): string[]
+  /** Reset all handlers and spies — call from beforeEach when sharing across tests. */
+  reset(): void
 }
 
 export function createMockCentrifugo(): MockCentrifugo {
@@ -76,6 +78,14 @@ export function createMockCentrifugo(): MockCentrifugo {
     },
     channels() {
       return Array.from(handlers.keys())
+    },
+    reset() {
+      handlers.clear()
+      isConnected.value = true
+      subscribe.mockClear()
+      unsubscribe.mockClear()
+      connect.mockClear()
+      disconnect.mockClear()
     },
   }
 }

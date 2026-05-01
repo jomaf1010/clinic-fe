@@ -62,11 +62,10 @@ jobs:
     name: TypeScript build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Informational only for now — pre-existing strict-mode type errors in
-    # src/lib/vitals.ts and similar surface here but don't block PRs while
-    # a follow-up cleans them up. Flip continue-on-error off once the
-    # source tree is clean under vue-tsc.
-    continue-on-error: true
+    # Required check — source tree is clean under vue-tsc as of the
+    # PR-A/B/C/D series. Reviewers: if this fails on a future PR,
+    # treat the new errors as a regression to fix, not a baseline to
+    # ignore.
 
     steps:
       - name: Checkout
