@@ -82,7 +82,7 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+  <div class="surface-card rounded-xl border p-6 text-card-foreground">
     <div class="mb-4 flex items-center justify-between">
       <div>
         <h2 class="text-sm font-semibold">Clinic Revenue</h2>

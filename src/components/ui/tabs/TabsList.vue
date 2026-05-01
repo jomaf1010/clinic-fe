@@ -25,7 +25,7 @@ const sizeClasses: Record<string, string> = {
     data-slot="tabs-list"
     v-bind="delegatedProps"
     :class="cn(
-      'bg-muted text-muted-foreground inline-flex w-fit items-center justify-center rounded-lg',
+      'surface-muted text-muted-foreground inline-flex w-fit items-center justify-center rounded-lg border',
       sizeClasses[size],
       props.class,
     )"

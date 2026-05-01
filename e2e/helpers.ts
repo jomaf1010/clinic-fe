@@ -11,7 +11,7 @@ export async function login(page: Page) {
   await page.getByRole('textbox', { name: 'Email' }).fill(EMAIL)
   await page.locator('input[type="password"]').fill(PASSWORD)
   await page.getByRole('checkbox', { name: 'Remember me' }).check()
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 
   // Wait for app to be ready (sidebar visible = logged in + clinic selected)
   await expect(page.getByRole('link', { name: /patient/i }).first()).toBeVisible({ timeout: 15000 })

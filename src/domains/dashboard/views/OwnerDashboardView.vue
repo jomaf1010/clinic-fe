@@ -216,7 +216,7 @@ onUnmounted(() => {
       <!-- Stat cards -->
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button class="text-left h-full" @click="router.push({ name: RouteNames.PATIENT_LIST })">
-          <div class="h-full rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+          <div class="surface-card h-full rounded-xl border p-6 text-card-foreground">
             <div class="flex items-start justify-between">
               <div class="flex flex-col gap-1">
                 <span class="text-sm font-medium text-muted-foreground">Total Patients</span>
@@ -246,7 +246,7 @@ onUnmounted(() => {
           />
         </button>
         <button class="text-left h-full" @click="router.push({ name: RouteNames.TEAM })">
-          <div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+          <div class="surface-card rounded-xl border p-6 text-card-foreground">
             <div class="flex items-start justify-between">
               <div class="flex flex-col gap-3">
                 <span class="text-sm font-medium text-muted-foreground">Team Members</span>
@@ -300,7 +300,7 @@ onUnmounted(() => {
         <OwnerRevenueChart />
 
         <!-- Your Upcoming Appointments -->
-        <div v-if="hasAppointments && (loading || stats?.my_upcoming_appointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+        <div v-if="hasAppointments && (loading || stats?.my_upcoming_appointments.length)" class="surface-card overflow-hidden rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">
               Your Upcoming Appointments
@@ -361,7 +361,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Today's Clinic Appointments -->
-        <div v-if="hasAppointments && (loading || stats?.todays_appointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+        <div v-if="hasAppointments && (loading || stats?.todays_appointments.length)" class="surface-card overflow-hidden rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Today's Clinic Appointments</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.APPOINTMENT_LIST })">
@@ -413,7 +413,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Queue -->
-        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
               Queue
@@ -468,7 +468,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Recent Consultations -->
-        <div v-if="loading || stats?.recent_consultations.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.recent_consultations.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <h2 class="mb-4 text-sm font-semibold">Recent Consultations</h2>
 
           <div v-if="loading" class="flex flex-col gap-3">
@@ -504,7 +504,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Medicines Widget -->
-        <div v-if="loading || stats?.top_medicines.length || stats?.low_stock_medicines.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.top_medicines.length || stats?.low_stock_medicines.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Medicines</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.CLINIC_MEDICINES })">

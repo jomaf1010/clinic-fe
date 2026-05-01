@@ -216,7 +216,7 @@ onUnmounted(() => {
       <!-- Widgets grid -->
       <div class="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <!-- Upcoming Schedule -->
-        <div v-if="hasAppointments && (loading || groupedAppointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+        <div v-if="hasAppointments && (loading || groupedAppointments.length)" class="surface-card overflow-hidden rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Upcoming Schedule</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.APPOINTMENT_LIST })">
@@ -277,7 +277,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Queue Preview -->
-        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Queue</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.QUEUE })">
@@ -341,7 +341,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Draft Consultations -->
-        <div v-if="loading || stats?.draft_consultations_list.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.draft_consultations_list.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <h2 class="text-sm font-semibold">Draft Consultations</h2>
@@ -396,7 +396,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Recent Patients -->
-        <div v-if="loading || stats?.recent_patients.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.recent_patients.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <h2 class="mb-4 text-sm font-semibold">Recent Patients</h2>
 
           <div v-if="loading" class="flex flex-col gap-3">

@@ -58,7 +58,7 @@ async function resend() {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+  <div class="auth-shell relative flex min-h-screen items-center justify-center overflow-hidden px-4">
     <canvas ref="canvasRef" class="pointer-events-none absolute inset-0" />
 
     <div
@@ -76,7 +76,7 @@ async function resend() {
         class="transition-all delay-200 duration-700 ease-out"
         :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
       >
-        <Card class="backdrop-blur-sm bg-card/90">
+        <Card class="border-primary/20 shadow-[0_28px_90px_-42px_oklch(0.28_0.09_245_/_0.65)]">
           <CardHeader class="text-center">
             <div class="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-primary/10">
               <MailCheck class="size-6 text-primary" />

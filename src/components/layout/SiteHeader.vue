@@ -130,7 +130,7 @@ function onFocus() {
 
 <template>
   <header
-    class="bg-background sticky top-0 z-50 flex w-full items-center border-b"
+    class="surface-panel sticky top-0 z-50 flex w-full items-center border-b"
     style="height: var(--header-height)"
   >
     <div class="flex h-full w-full items-center gap-2 px-4">
@@ -143,7 +143,7 @@ function onFocus() {
           type="text"
           placeholder="Search patients..."
           aria-label="Search patients"
-          class="bg-muted/50 border-input placeholder:text-muted-foreground h-9 w-full rounded-md border pl-8 pr-8 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          class="clinical-solid placeholder:text-muted-foreground h-9 w-full rounded-md border pl-8 pr-8 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           @blur="onBlur"
           @focus="onFocus"
           @keydown="onKeydown"
@@ -155,7 +155,7 @@ function onFocus() {
 
         <div
           v-if="showDropdown && query.trim().length >= 2"
-          class="absolute left-0 top-full z-50 mt-1 w-full rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          class="surface-floating absolute left-0 top-full z-50 mt-1 w-full rounded-md border p-1 text-popover-foreground"
         >
           <template v-if="results.length > 0">
             <button

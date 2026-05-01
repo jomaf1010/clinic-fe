@@ -26,7 +26,7 @@ const iconColorClass: Record<typeof props.colorClass, string> = {
 </script>
 
 <template>
-  <div class="h-full rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+  <div class="surface-card h-full rounded-xl border p-6 text-card-foreground">
     <div class="flex items-start justify-between">
       <div class="flex flex-col gap-3">
         <span class="text-sm font-medium text-muted-foreground">{{ label }}</span>
