@@ -168,10 +168,10 @@ onMounted(async () => {
     <SidebarHeader>
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton size="lg" as="a" href="/">
-            <Avatar class="size-8 rounded-lg">
-              <AvatarImage v-if="authStore.currentClinic?.logo_url" :src="authStore.currentClinic.logo_url" alt="Clinic logo" class="rounded-lg object-cover" />
-              <AvatarFallback class="bg-sidebar-primary text-sidebar-primary-foreground rounded-lg text-xs">
+          <SidebarMenuButton size="lg" as="a" href="/" class="rounded-2xl">
+            <Avatar class="size-10 rounded-2xl shadow-[0_12px_28px_rgba(0,41,84,0.18)] group-data-[collapsible=icon]:size-8">
+              <AvatarImage v-if="authStore.currentClinic?.logo_url" :src="authStore.currentClinic.logo_url" alt="Clinic logo" class="rounded-2xl object-cover" />
+              <AvatarFallback class="rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground text-xs">
                 <Stethoscope class="size-4" />
               </AvatarFallback>
             </Avatar>
@@ -195,7 +195,7 @@ onMounted(async () => {
         @logout="handleLogout"
         @switch-clinic="openSwitchDialog"
       />
-      <p class="truncate text-xs tabular-nums text-muted-foreground/50 group-data-[collapsible=icon]:hidden">
+      <p class="px-2 text-[10px] tabular-nums text-muted-foreground/45 group-data-[collapsible=icon]:hidden">
         {{ feVersion }}|{{ apiVersion }}
       </p>
     </SidebarFooter>

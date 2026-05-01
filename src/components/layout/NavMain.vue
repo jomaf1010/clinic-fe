@@ -79,7 +79,7 @@ const emit = defineEmits<{
         >
           <SidebarMenuItem>
             <CollapsibleTrigger as-child>
-              <SidebarMenuButton :tooltip="item.title" :is-active="item.items.some(sub => isActive(sub.url))" class="h-10" @click="item.url !== '#' && router.push(item.url)">
+              <SidebarMenuButton :tooltip="item.title" :is-active="item.items.some(sub => isActive(sub.url))" @click="item.url !== '#' && router.push(item.url)">
                 <component :is="item.icon" />
                 <span>{{ item.title }}</span>
                 <ChevronRight class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
@@ -99,7 +99,7 @@ const emit = defineEmits<{
 
         <!-- Coming soon items: disabled appearance -->
         <SidebarMenuItem v-else-if="item.comingSoon">
-          <SidebarMenuButton :tooltip="`${item.title} — Coming soon`" class="h-10 pointer-events-none opacity-50">
+          <SidebarMenuButton :tooltip="`${item.title} — Coming soon`" class="pointer-events-none opacity-50">
             <component :is="item.icon" />
             <span>{{ item.title }}</span>
             <Badge variant="outline" class="ml-auto text-[10px] px-1.5 py-0">Soon</Badge>
@@ -108,7 +108,7 @@ const emit = defineEmits<{
 
         <!-- Locked (Pro) items -->
         <SidebarMenuItem v-else-if="item.locked">
-          <SidebarMenuButton :tooltip="`${item.title} — Pro`" class="h-10 opacity-60 hover:opacity-80" @click="emit('locked-click', item.title)">
+          <SidebarMenuButton :tooltip="`${item.title} — Pro`" class="opacity-60 hover:opacity-80" @click="emit('locked-click', item.title)">
             <component :is="item.icon" />
             <span>{{ item.title }}</span>
             <Crown class="ml-auto size-3.5 text-amber-500" />
@@ -117,7 +117,7 @@ const emit = defineEmits<{
 
         <!-- Items without sub-items: direct link -->
         <SidebarMenuItem v-else>
-          <SidebarMenuButton as="a" :href="item.url" :tooltip="item.title" :is-active="isActive(item.url)" class="h-10" @click.prevent="navigateTo(item.url)">
+          <SidebarMenuButton as="a" :href="item.url" :tooltip="item.title" :is-active="isActive(item.url)" @click.prevent="navigateTo(item.url)">
             <component :is="item.icon" />
             <span>{{ item.title }}</span>
             <Badge
