@@ -18,11 +18,6 @@ export const scheduleApi = {
     return http.put<WorkingScheduleResponse>(`/schedules/${userUuid}`, payload)
   },
 
-  listBlocks(userId: string, start: string, end: string): Promise<CalendarBlockListResponse> {
-    const params = new URLSearchParams({ user_id: userId, start, end })
-    return http.get<CalendarBlockListResponse>(`/calendar-blocks?${params}`)
-  },
-
   listAllBlocks(start: string, end: string): Promise<CalendarBlockListResponse> {
     const params = new URLSearchParams({ start, end })
     return http.get<CalendarBlockListResponse>(`/calendar-blocks?${params}`)
@@ -34,10 +29,6 @@ export const scheduleApi = {
 
   updateBlock(uuid: string, payload: UpdateCalendarBlockPayload): Promise<CalendarBlockResponse> {
     return http.patch<CalendarBlockResponse>(`/calendar-blocks/${uuid}`, payload)
-  },
-
-  deleteBlock(uuid: string): Promise<void> {
-    return http.delete<void>(`/calendar-blocks/${uuid}`)
   },
 
   getAvailability(userId: string, date: string): Promise<AvailabilityResponse> {

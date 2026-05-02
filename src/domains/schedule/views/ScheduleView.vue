@@ -13,17 +13,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { useAppointmentStore } from '@/domains/appointment/stores/appointmentStore'
 import { useScheduleStore } from '../stores/scheduleStore'
 import ScheduleAvailabilityStudio from '../components/ScheduleAvailabilityStudio.vue'
 import WeeklyScheduleEditor from '../components/WeeklyScheduleEditor.vue'
 import CalendarBlockForm from '../components/CalendarBlockForm.vue'
 import type { CalendarBlock, StoreCalendarBlockPayload, UpsertWorkingSchedulePayload, UpdateCalendarBlockPayload } from '../types/schedule.types'
-import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
 import AppointmentDetailSheet from '@/domains/appointment/components/AppointmentDetailSheet.vue'
 import type { AppointmentResponse } from '@/domains/appointment/types/appointment.types'
 
 const authStore = useAuthStore()
 const store = useScheduleStore()
+const appointmentStore = useAppointmentStore()
 
 const scheduleTimezone = computed(() => store.schedule?.timezone ?? 'Asia/Manila')
 
@@ -46,20 +47,33 @@ const selectedAppointment = ref<AppointmentResponse | null>(null)
 const cancelTargetId = ref<string | null>(null)
 const showCancelDialog = ref(false)
 const isCancelling = ref(false)
-const scrollContainerRef = ref<HTMLElement | null>(null)
+const scheduleShellRef = ref<HTMLElement | null>(null)
 let savedContainerScroll = 0
 let savedWindowScroll = 0
 
+function scrollParent(element: HTMLElement | null): HTMLElement | null {
+  let parent = element?.parentElement ?? null
+  while (parent) {
+    const overflowY = window.getComputedStyle(parent).overflowY
+    if ((overflowY === 'auto' || overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight) {
+      return parent
+    }
+    parent = parent.parentElement
+  }
+  return null
+}
+
 function saveScroll() {
-  savedContainerScroll = scrollContainerRef.value?.scrollTop ?? 0
+  savedContainerScroll = scrollParent(scheduleShellRef.value)?.scrollTop ?? 0
   savedWindowScroll = window.scrollY
 }
 
 function restoreScroll() {
   // Delay to ensure dialog fully unmounts and body scroll lock is released
   setTimeout(() => {
-    if (scrollContainerRef.value) {
-      scrollContainerRef.value.scrollTop = savedContainerScroll
+    const container = scrollParent(scheduleShellRef.value)
+    if (container) {
+      container.scrollTop = savedContainerScroll
     }
     window.scrollTo(0, savedWindowScroll)
   }, 50)
@@ -79,8 +93,8 @@ watch(showBlockForm, (open) => { if (!open) restoreScroll() })
 async function handleAppointmentClick(id: string) {
   saveScroll()
   try {
-    const res = await appointmentApi.get(id)
-    selectedAppointment.value = res.data
+    await appointmentStore.fetchAppointment(id)
+    selectedAppointment.value = appointmentStore.current
     showDetailSheet.value = true
   } catch {
     toast.error('Failed to load appointment')
@@ -89,11 +103,10 @@ async function handleAppointmentClick(id: string) {
 
 async function handleCheckIn(id: string) {
   try {
-    await appointmentApi.checkIn(id)
+    await appointmentStore.checkInAppointment(id)
     toast.success('Patient checked in')
     if (selectedAppointment.value?.id === id) {
-      const res = await appointmentApi.get(id)
-      selectedAppointment.value = res.data
+      selectedAppointment.value = appointmentStore.current
     }
     studioRefreshKey.value += 1
   } catch {
@@ -103,11 +116,10 @@ async function handleCheckIn(id: string) {
 
 async function handleNoShow(id: string) {
   try {
-    await appointmentApi.noShow(id)
+    await appointmentStore.markNoShow(id)
     toast.success('Appointment marked as no-show')
     if (selectedAppointment.value?.id === id) {
-      const res = await appointmentApi.get(id)
-      selectedAppointment.value = res.data
+      selectedAppointment.value = appointmentStore.current
     }
     studioRefreshKey.value += 1
   } catch {
@@ -124,11 +136,10 @@ async function confirmCancel() {
   if (!cancelTargetId.value) return
   isCancelling.value = true
   try {
-    await appointmentApi.cancel(cancelTargetId.value)
+    await appointmentStore.cancelAppointment(cancelTargetId.value)
     toast.success('Appointment cancelled')
     if (selectedAppointment.value?.id === cancelTargetId.value) {
-      const res = await appointmentApi.get(cancelTargetId.value)
-      selectedAppointment.value = res.data
+      selectedAppointment.value = appointmentStore.current
     }
     showCancelDialog.value = false
     studioRefreshKey.value += 1
@@ -189,8 +200,7 @@ async function handleBlockSave(payload: StoreCalendarBlockPayload | UpdateCalend
 
 <template>
   <FeatureGate feature="schedule" label="Schedule">
-  <div class="-mx-4 -mb-4 flex min-h-0 flex-1 flex-col gap-0">
-    <div ref="scrollContainerRef" class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
+    <div ref="scheduleShellRef" class="schedule-view-shell -mx-4 -mb-4 flex flex-1 flex-col px-4 pb-4 pt-6 md:px-6 md:pb-6 md:pt-8">
       <ScheduleAvailabilityStudio
         :user-id="userId"
         :refresh-key="studioRefreshKey"
@@ -202,7 +212,6 @@ async function handleBlockSave(payload: StoreCalendarBlockPayload | UpdateCalend
         @working-hours="openWorkingHours"
       />
     </div>
-  </div>
 
   <Dialog v-model:open="showWorkingHoursDialog">
     <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
@@ -218,7 +227,7 @@ async function handleBlockSave(payload: StoreCalendarBlockPayload | UpdateCalend
       <div
         v-else-if="scheduleError"
         role="alert"
-        class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+        class="surface-card rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         {{ scheduleError }}
         <Button variant="outline" size="sm" class="mt-2" @click="loadSchedule">
