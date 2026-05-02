@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { CalendarDate, type DateValue } from '@internationalized/date'
 import {
   Activity,
@@ -14,9 +15,11 @@ import {
   Clock,
   Coffee,
   LogIn,
-  LoaderCircle,
+  Moon,
   MoreVertical,
   RefreshCw,
+  Sun,
+  Sunrise,
   UserRound,
   UserX,
   X,
@@ -32,9 +35,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { AppointmentResponse, AppointmentStatus } from '@/domains/appointment/types/appointment.types'
-import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
-import { scheduleApi } from '../api/scheduleApi'
 import type { CalendarBlock, Slot } from '../types/schedule.types'
+import { useScheduleStore } from '../stores/scheduleStore'
 
 const props = defineProps<{
   userId: string
@@ -51,24 +53,24 @@ const emit = defineEmits<{
 }>()
 
 type Period = 'morning' | 'afternoon' | 'evening'
-const periods: Period[] = ['morning', 'afternoon', 'evening']
-type MapViewMode = 'day' | 'week' | 'list'
 type StatusFilter = 'all' | AppointmentStatus
+const periods: Period[] = ['morning', 'afternoon', 'evening']
 
+const scheduleStore = useScheduleStore()
+const {
+  studioAppointments: appointments,
+  studioMonthAppointments: monthAppointments,
+  studioSlots: slots,
+  studioDayBlocks: dayBlocks,
+  studioUpcomingBlocks: upcomingBlocks,
+  isLoadingStudio: isLoading,
+  studioError: error,
+} = storeToRefs(scheduleStore)
 const selectedDate = ref(toLocalDate(new Date()))
 const currentTime = ref(new Date())
-const appointments = ref<AppointmentResponse[]>([])
-const weekAppointments = ref<AppointmentResponse[]>([])
-const slots = ref<Slot[]>([])
-const weekBlocks = ref<CalendarBlock[]>([])
-const upcomingBlocks = ref<CalendarBlock[]>([])
-const mapViewMode = ref<MapViewMode>('day')
+const monthRailRef = ref<HTMLElement | null>(null)
 const statusFilter = ref<StatusFilter>('all')
-const isLoading = ref(false)
-const error = ref<string | null>(null)
 let currentTimeTimer: ReturnType<typeof setInterval> | null = null
-let latestLoadKey = ''
-let inFlightLoadKey = ''
 
 function toLocalDate(date: Date): string {
   const year = date.getFullYear()
@@ -96,30 +98,53 @@ function addDays(value: string, amount: number): string {
   return toLocalDate(date)
 }
 
-function startOfWeek(value: string): string {
+function addMonths(value: string, amount: number): string {
   const date = parseLocalDate(value)
-  date.setDate(date.getDate() - date.getDay())
+  const originalDay = date.getDate()
+  date.setDate(1)
+  date.setMonth(date.getMonth() + amount)
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  date.setDate(Math.min(originalDay, lastDay))
   return toLocalDate(date)
 }
 
-function endOfWeek(value: string): string {
-  return addDays(startOfWeek(value), 6)
+function startOfMonth(value: string): string {
+  const date = parseLocalDate(value)
+  date.setDate(1)
+  return toLocalDate(date)
+}
+
+function endOfMonth(value: string): string {
+  return addDays(startOfMonth(value), daysInMonth(value) - 1)
+}
+
+function daysInMonth(value: string): number {
+  const date = parseLocalDate(value)
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
 }
 
 function formatDate(value: string): string {
   return parseLocalDate(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatMonthLabel(value: string): string {
+  return parseLocalDate(value).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
 function formatShortDate(value: string): string {
   return parseLocalDate(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function formatNumericDate(value: string): string {
-  return parseLocalDate(value).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+function formatDayNumber(value: string): string {
+  return parseLocalDate(value).toLocaleDateString('en-US', { day: 'numeric' })
 }
 
 function formatWeekday(value: string): string {
   return parseLocalDate(value).toLocaleDateString('en-US', { weekday: 'short' })
+}
+
+function formatFullWeekday(value: string): string {
+  return parseLocalDate(value).toLocaleDateString('en-US', { weekday: 'long' })
 }
 
 function formatTime(value: string | Date): string {
@@ -177,12 +202,25 @@ function statusDotClass(status: AppointmentStatus): string {
   return 'bg-blue-500 ring-blue-100'
 }
 
+const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'checked_in', label: 'Checked in' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'no_show', label: 'No show' },
+]
+
+function setStatusFilter(value: StatusFilter) {
+  statusFilter.value = value
+}
+
 function blockClass(type: CalendarBlock['type']): string {
-  if (type === 'meeting') return 'border-blue-200 bg-blue-50 text-blue-800'
-  if (type === 'holiday') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
-  if (type === 'personal') return 'border-violet-200 bg-violet-50 text-violet-800'
-  if (type === 'unavailable') return 'border-red-200 bg-red-50 text-red-800'
-  return 'border-amber-200 bg-amber-50 text-amber-800'
+  if (type === 'meeting') return 'schedule-block-card--meeting'
+  if (type === 'holiday') return 'schedule-block-card--holiday'
+  if (type === 'personal') return 'schedule-block-card--personal'
+  if (type === 'unavailable') return 'schedule-block-card--unavailable'
+  return 'schedule-block-card--break'
 }
 
 const todayDate = computed(() => toLocalDate(currentTime.value))
@@ -193,19 +231,14 @@ const selectedDateValue = computed<DateValue>({
     selectedDate.value = calendarDateToIso(value)
   },
 })
-const weekDays = computed(() => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(selectedDate.value), index)))
-const weekLabel = computed(() => {
-  const firstDay = weekDays.value[0] ?? selectedDate.value
-  const lastDay = weekDays.value[6] ?? selectedDate.value
-  return `${formatShortDate(firstDay)} - ${formatShortDate(lastDay)}`
+const monthDays = computed(() => Array.from({ length: daysInMonth(selectedDate.value) }, (_, index) => addDays(startOfMonth(selectedDate.value), index)))
+const selectedMonthLabel = computed(() => formatMonthLabel(selectedDate.value))
+const scheduleTitle = computed(() => {
+  if (isSelectedToday.value) return 'Today\'s Schedule'
+  return `${formatShortDate(selectedDate.value)}, ${formatFullWeekday(selectedDate.value)}'s Schedule`
 })
 
 const visibleAppointments = computed(() => appointments.value
-  .filter((appointment) => statusFilter.value === 'all' || appointment.status === statusFilter.value)
-  .slice()
-  .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()))
-
-const visibleWeekAppointments = computed(() => weekAppointments.value
   .filter((appointment) => statusFilter.value === 'all' || appointment.status === statusFilter.value)
   .slice()
   .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()))
@@ -218,16 +251,18 @@ const upcomingScheduledAppointments = computed(() => scheduledAppointments.value
 
 const nextUp = computed(() => upcomingScheduledAppointments.value[0] ?? scheduledAppointments.value[0] ?? null)
 const availableSlots = computed(() => slots.value.filter((slot) => slot.available))
-const selectedDayBlocks = computed(() => weekBlocks.value
+const selectedDayBlocks = computed(() => dayBlocks.value
   .filter((block) => isSameDay(block.start, selectedDate.value) || isSameDay(block.end, selectedDate.value))
   .sort((a, b) => blockStartMinutes(a) - blockStartMinutes(b)))
 
 const upcomingBlockRangeLabel = computed(() => `${formatShortDate(selectedDate.value)} - ${formatShortDate(addDays(selectedDate.value, 30))}`)
 
-const weekCounts = computed(() => {
+const monthScheduledCounts = computed(() => {
   const counts: Record<string, number> = {}
-  for (const day of weekDays.value) counts[day] = 0
-  for (const appointment of weekAppointments.value) {
+  for (const day of monthDays.value) counts[day] = 0
+  for (const appointment of monthAppointments.value) {
+    if (appointment.status !== 'scheduled') continue
+
     const key = toLocalDate(new Date(appointment.scheduled_at))
     if (key in counts) counts[key] = (counts[key] ?? 0) + 1
   }
@@ -243,15 +278,6 @@ const slotStats = computed(() => {
 })
 
 const currentTimeLabel = computed(() => formatTime(currentTime.value))
-
-const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'checked_in', label: 'Checked in' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'no_show', label: 'No show' },
-]
 
 function periodSlots(period: Period): Slot[] {
   return availableSlots.value.filter((slot) => periodForIso(slot.start) === period)
@@ -276,9 +302,15 @@ function periodLabel(period: Period): string {
 }
 
 function periodIcon(period: Period) {
-  if (period === 'morning') return CalendarDays
-  if (period === 'afternoon') return Activity
-  return Clock
+  if (period === 'morning') return Sunrise
+  if (period === 'afternoon') return Sun
+  return Moon
+}
+
+function periodIconClass(period: Period): string {
+  if (period === 'morning') return 'schedule-period-icon--morning'
+  if (period === 'afternoon') return 'schedule-period-icon--afternoon'
+  return 'schedule-period-icon--evening'
 }
 
 function appointmentEnd(appointment: AppointmentResponse): string {
@@ -286,26 +318,47 @@ function appointmentEnd(appointment: AppointmentResponse): string {
   return new Date(start.getTime() + appointment.duration * 60_000).toISOString()
 }
 
-function weekHeatBars(day: string): number[] {
-  const count = weekCounts.value[day] ?? 0
-  const intensity = count > 0 ? Math.min(0.95, 0.35 + count * 0.13) : 0.16
-  return Array.from({ length: 4 }, (_, index) => Math.max(0.14, intensity - (3 - index) * 0.08))
+function dayLoadCount(day: string): number {
+  return monthScheduledCounts.value[day] ?? 0
 }
 
-function appointmentsForDay(day: string): AppointmentResponse[] {
-  return visibleWeekAppointments.value.filter((appointment) => toLocalDate(new Date(appointment.scheduled_at)) === day)
-}
+function dayLoadDotStyle(day: string): Record<string, string> {
+  const count = monthScheduledCounts.value[day] ?? 0
+  if (count <= 0) {
+    return {
+      background: 'rgb(148 163 184 / 0.46)',
+      boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.24)',
+    }
+  }
 
-function setMapViewMode(mode: MapViewMode) {
-  mapViewMode.value = mode
-}
-
-function setStatusFilter(value: StatusFilter) {
-  statusFilter.value = value
+  return {
+    background: 'rgb(57 255 20)',
+    boxShadow: '0 0 8px rgb(57 255 20 / 0.7), 0 0 18px rgb(57 255 20 / 0.34), inset 0 0 0 1px rgb(255 255 255 / 0.42)',
+  }
 }
 
 function selectDate(date: string) {
   selectedDate.value = date
+}
+
+function scrollMonthRail(direction: -1 | 1) {
+  const rail = monthRailRef.value
+  if (!rail) return
+
+  rail.scrollBy({
+    left: direction * Math.max(160, rail.clientWidth * 0.72),
+    behavior: 'smooth',
+  })
+}
+
+function scrollSelectedMonthDay() {
+  void nextTick(() => {
+    monthRailRef.value?.querySelector('.schedule-month-day.is-selected')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    })
+  })
 }
 
 function goToPreviousDay() {
@@ -316,46 +369,31 @@ function goToNextDay() {
   selectedDate.value = addDays(selectedDate.value, 1)
 }
 
+function goToPreviousMonth() {
+  selectedDate.value = addMonths(selectedDate.value, -1)
+}
+
+function goToNextMonth() {
+  selectedDate.value = addMonths(selectedDate.value, 1)
+}
+
 async function loadStudioData() {
   if (!props.userId) return
-  const start = startOfWeek(selectedDate.value)
-  const end = endOfWeek(selectedDate.value)
+  const start = startOfMonth(selectedDate.value)
+  const end = endOfMonth(selectedDate.value)
   const blockRangeEnd = addDays(selectedDate.value, 30)
-  const loadKey = `${props.userId}:${selectedDate.value}:${start}:${end}:${blockRangeEnd}:${props.refreshKey ?? 0}`
-  if (inFlightLoadKey === loadKey) return
-  latestLoadKey = loadKey
-  inFlightLoadKey = loadKey
-  isLoading.value = true
-  error.value = null
-
-  try {
-    const [weekAppointmentList, availability, upcomingBlockList] = await Promise.all([
-      appointmentApi.list(1, 300, { doctor_id: props.userId, start_date: start, end_date: end }),
-      scheduleApi.getAvailability(props.userId, selectedDate.value),
-      scheduleApi.listAllBlocks(selectedDate.value, blockRangeEnd),
-    ])
-
-    if (latestLoadKey !== loadKey) return
-
-    weekAppointments.value = weekAppointmentList.data
-    appointments.value = weekAppointmentList.data.filter((appointment) => isSameDay(appointment.scheduled_at, selectedDate.value))
-    slots.value = availability.data.slots
-    weekBlocks.value = availability.data.blocks
-    upcomingBlocks.value = upcomingBlockList.data
-  } catch {
-    if (latestLoadKey !== loadKey) return
-    error.value = 'Failed to load schedule view.'
-  } finally {
-    if (inFlightLoadKey === loadKey) {
-      inFlightLoadKey = ''
-    }
-    if (latestLoadKey === loadKey) {
-      isLoading.value = false
-    }
-  }
+  await scheduleStore.fetchStudioData({
+    userId: props.userId,
+    date: selectedDate.value,
+    start,
+    end,
+    blockRangeEnd,
+    refreshKey: props.refreshKey,
+  })
 }
 
 watch(() => [props.userId, selectedDate.value, props.refreshKey], () => {
+  scrollSelectedMonthDay()
   loadStudioData()
 }, { immediate: true })
 
@@ -371,79 +409,88 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="schedule-studio space-y-4">
     <div class="space-y-3">
-      <div class="flex flex-wrap items-center gap-2 sm:justify-end">
-        <Button variant="outline" size="icon" class="size-9" @click="goToPreviousDay">
-          <ChevronLeft class="size-4" />
-        </Button>
-        <Popover>
-          <PopoverTrigger as-child>
-            <Button variant="outline" class="h-9 min-w-40 justify-start">
-              <CalendarDays class="size-4 text-muted-foreground" />
-              {{ formatDate(selectedDate) }}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent class="w-auto p-0" align="end">
-            <ShadcnCalendar v-model="selectedDateValue" />
-          </PopoverContent>
-        </Popover>
-        <Button variant="outline" size="icon" class="size-9" @click="goToNextDay">
-          <ChevronRight class="size-4" />
-        </Button>
-        <Button variant="outline" class="h-9" @click="emit('working-hours')">
-          <Clock class="size-4" />
-          Working hours
-        </Button>
-        <Button class="h-9" @click="emit('add-block', null)">
-          <CalendarPlus class="size-4" />
-          Add block
-        </Button>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 class="text-2xl font-semibold tracking-normal">
+          {{ scheduleTitle }}
+        </h1>
+        <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Button variant="outline" size="icon" class="schedule-control-button size-9" @click="goToPreviousDay">
+            <ChevronLeft class="size-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger as-child>
+              <Button variant="outline" class="schedule-date-trigger h-9 min-w-40 justify-start">
+                <CalendarDays class="size-4 text-muted-foreground" />
+                {{ formatDate(selectedDate) }}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-auto p-0" align="end">
+              <ShadcnCalendar v-model="selectedDateValue" />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" class="schedule-control-button size-9" @click="goToNextDay">
+            <ChevronRight class="size-4" />
+          </Button>
+          <Button variant="outline" class="schedule-action-button h-9" @click="emit('working-hours')">
+            <Clock class="size-4" />
+            Working hours
+          </Button>
+          <Button class="h-9" @click="emit('add-block', null)">
+            <CalendarPlus class="size-4" />
+            Add block
+          </Button>
+        </div>
       </div>
     </div>
 
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="rounded-lg border bg-card p-4 shadow-sm">
+      <div class="schedule-stat-card surface-card rounded-2xl p-4">
         <div class="flex items-center gap-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">
+          <span class="schedule-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-[0_16px_32px_rgba(37,99,235,0.24)]">
             <CalendarCheck class="size-6" />
           </span>
           <div class="min-w-0">
             <p class="text-sm text-muted-foreground">Appointments today</p>
-            <p class="text-2xl font-semibold">{{ appointments.length }}</p>
+            <p v-if="!isLoading" class="text-2xl font-semibold">{{ appointments.length }}</p>
+            <span v-else class="schedule-skeleton mt-1 block h-7 w-10 rounded-full" />
           </div>
         </div>
       </div>
-      <div class="rounded-lg border bg-card p-4 shadow-sm">
+      <div class="schedule-stat-card surface-card rounded-2xl p-4">
         <div class="flex items-center gap-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
+          <span class="schedule-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)]">
             <CheckCircle2 class="size-6" />
           </span>
           <div class="min-w-0">
             <p class="text-sm text-muted-foreground">Booked</p>
-            <p class="text-2xl font-semibold">{{ slotStats.booked }}</p>
+            <p v-if="!isLoading" class="text-2xl font-semibold">{{ slotStats.booked }}</p>
+            <span v-else class="schedule-skeleton mt-1 block h-7 w-10 rounded-full" />
           </div>
         </div>
       </div>
-      <div class="rounded-lg border bg-card p-4 shadow-sm">
+      <div class="schedule-stat-card surface-card rounded-2xl p-4">
         <div class="flex items-center gap-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-sm">
+          <span class="schedule-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_16px_32px_rgba(245,158,11,0.24)]">
             <Clock class="size-6" />
           </span>
           <div class="min-w-0">
             <p class="text-sm text-muted-foreground">Next appointment</p>
-            <p class="truncate text-2xl font-semibold">{{ nextUp ? formatTime(nextUp.scheduled_at) : '—' }}</p>
+            <p v-if="!isLoading" class="truncate text-2xl font-semibold">{{ nextUp ? formatTime(nextUp.scheduled_at) : '—' }}</p>
+            <span v-else class="schedule-skeleton mt-1 block h-7 w-24 rounded-full" />
           </div>
         </div>
       </div>
-      <div class="rounded-lg border bg-card p-4 shadow-sm">
+      <div class="schedule-stat-card surface-card rounded-2xl p-4">
         <div class="flex items-center gap-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-sm">
+          <span class="schedule-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-[0_16px_32px_rgba(139,92,246,0.24)]">
             <Activity class="size-6" />
           </span>
           <div class="min-w-0">
             <p class="text-sm text-muted-foreground">Open slots</p>
-            <p class="text-2xl font-semibold">{{ slotStats.available }}</p>
+            <p v-if="!isLoading" class="text-2xl font-semibold">{{ slotStats.available }}</p>
+            <span v-else class="schedule-skeleton mt-1 block h-7 w-10 rounded-full" />
           </div>
         </div>
       </div>
@@ -452,97 +499,111 @@ onUnmounted(() => {
     <div
       v-if="error"
       role="alert"
-      class="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      class="surface-card rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
     >
       {{ error }}
     </div>
 
-    <div v-if="isLoading" class="flex items-center justify-center rounded-lg border bg-card py-16">
-      <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
-    </div>
-
-    <div v-else class="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-      <section class="overflow-hidden rounded-lg border bg-card shadow-sm">
-        <div class="flex flex-col gap-3 border-b p-4">
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+      <section class="schedule-map-panel surface-card overflow-hidden rounded-2xl">
+        <div class="schedule-panel-header flex flex-col gap-3 p-4">
           <div>
             <h2 class="text-lg font-semibold">Availability map</h2>
             <p class="text-sm text-muted-foreground">Single-doctor view of appointments, blocks, and open gaps.</p>
           </div>
-          <div class="grid gap-2 min-[1100px]:grid-cols-[auto_minmax(0,1fr)] min-[1100px]:items-start">
-            <div class="inline-flex w-fit rounded-lg border bg-background p-1">
-              <button
-                class="rounded-md px-3 py-1.5 text-sm font-medium"
-                :class="mapViewMode === 'day' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
-                @click="setMapViewMode('day')"
-              >
-                Day
-              </button>
-              <button
-                class="rounded-md px-3 py-1.5 text-sm font-medium"
-                :class="mapViewMode === 'week' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
-                @click="setMapViewMode('week')"
-              >
-                Week
-              </button>
-              <button
-                class="rounded-md px-3 py-1.5 text-sm font-medium"
-                :class="mapViewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground'"
-                @click="setMapViewMode('list')"
-              >
-                List
-              </button>
-            </div>
-
-            <div class="flex min-w-0 flex-wrap gap-1 min-[1100px]:justify-end">
-              <button
-                v-for="option in statusFilterOptions"
-                :key="option.value"
-                class="whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
-                :class="statusFilter === option.value ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-accent'"
-                @click="setStatusFilter(option.value)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="mapViewMode !== 'list'" class="border-b px-4 py-3">
-          <div class="grid grid-cols-7 gap-2">
+          <div class="flex min-w-0 flex-wrap gap-1">
             <button
-              v-for="day in weekDays"
-              :key="day"
-              class="rounded-lg border px-2 py-2 text-center transition-colors hover:bg-accent"
-              :class="day === selectedDate ? 'border-teal-500 bg-teal-50 text-teal-900 shadow-sm' : 'bg-background'"
-              @click="selectDate(day)"
+              v-for="option in statusFilterOptions"
+              :key="option.value"
+              class="schedule-filter-chip whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium transition-all"
+              :class="statusFilter === option.value ? 'is-active' : 'text-muted-foreground hover:text-foreground'"
+              @click="setStatusFilter(option.value)"
             >
-              <p class="text-xs font-medium">{{ formatWeekday(day) }}</p>
-              <p class="text-sm">{{ formatNumericDate(day) }}</p>
-              <span
-                v-if="day === todayDate"
-                class="mt-1 inline-flex rounded-full bg-teal-500 px-2 py-0.5 text-[10px] font-semibold text-white"
-              >
-                Today
-              </span>
-              <div class="mt-2 flex justify-center gap-1">
-                <span
-                  v-for="(opacity, index) in weekHeatBars(day)"
-                  :key="index"
-                  class="h-1.5 w-5 rounded-full bg-teal-500"
-                  :style="{ opacity }"
-                />
-              </div>
+              {{ option.label }}
             </button>
           </div>
         </div>
 
-        <div v-if="mapViewMode === 'day'" class="relative px-4 py-5">
+        <div class="schedule-month-strip px-4 py-4">
+          <div class="mb-3 flex items-center justify-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="schedule-month-nav size-8 rounded-full"
+              aria-label="Previous month"
+              @click="goToPreviousMonth"
+            >
+              <ChevronLeft class="size-4" />
+            </Button>
+            <p class="min-w-44 text-center text-sm font-semibold text-foreground">
+              {{ selectedMonthLabel }}
+            </p>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="schedule-month-nav size-8 rounded-full"
+              aria-label="Next month"
+              @click="goToNextMonth"
+            >
+              <ChevronRight class="size-4" />
+            </Button>
+          </div>
+          <div class="schedule-month-rail-shell grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="schedule-rail-scroll-button size-8 rounded-full"
+              aria-label="Scroll dates left"
+              @click="scrollMonthRail(-1)"
+            >
+              <ChevronLeft class="size-4" />
+            </Button>
+            <div
+              ref="monthRailRef"
+              class="schedule-month-rail flex gap-3 overflow-x-auto pb-1"
+            >
+              <button
+                v-for="day in monthDays"
+                :key="day"
+                class="schedule-month-day flex min-w-[64px] snap-center flex-col items-center justify-between rounded-full px-2 py-2 text-center transition-all"
+                :class="[
+                  day === selectedDate ? 'is-selected' : 'hover:bg-white/42 dark:hover:bg-white/5',
+                  day === todayDate ? 'is-today' : '',
+                ]"
+                @click="selectDate(day)"
+              >
+                <p class="text-xs font-medium">{{ formatWeekday(day) }}</p>
+                <span class="schedule-month-day-number mt-1 flex size-9 items-center justify-center rounded-full text-sm font-semibold">
+                  {{ formatDayNumber(day) }}
+                </span>
+                <div class="mt-2 flex justify-center">
+                  <span
+                    class="schedule-load-dot"
+                    :aria-label="`${dayLoadCount(day)} appointments`"
+                    :style="dayLoadDotStyle(day)"
+                  />
+                </div>
+              </button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="schedule-rail-scroll-button size-8 rounded-full"
+              aria-label="Scroll dates right"
+              @click="scrollMonthRail(1)"
+            >
+              <ChevronRight class="size-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div class="relative px-4 py-5">
           <div
             v-if="isSelectedToday"
             class="mb-5 grid grid-cols-[72px_24px_minmax(0,1fr)] items-center gap-3"
           >
             <div class="flex justify-end">
-              <span class="whitespace-nowrap rounded-md border border-teal-400 bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700">
+              <span class="schedule-now-pill whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold text-teal-700">
                 {{ currentTimeLabel }}
               </span>
             </div>
@@ -552,16 +613,34 @@ onUnmounted(() => {
             <div class="border-t border-dashed border-teal-500" />
           </div>
 
-          <div class="space-y-6">
+          <div v-if="isLoading" class="space-y-5">
+            <div v-for="index in 3" :key="index" class="grid grid-cols-[72px_24px_minmax(0,1fr)] gap-3">
+              <div class="pt-4">
+                <span class="schedule-skeleton ml-auto block h-4 w-14 rounded-full" />
+              </div>
+              <div class="relative flex justify-center">
+                <div class="schedule-timeline-line absolute top-7 h-[calc(100%+1.5rem)] w-px" />
+                <span class="schedule-skeleton relative z-10 mt-4 block size-3 rounded-full" />
+              </div>
+              <div class="space-y-3">
+                <span class="schedule-skeleton block h-5 w-44 rounded-full" />
+                <div class="schedule-skeleton h-24 rounded-2xl" />
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="space-y-6">
             <template v-for="period in periods" :key="period">
               <section v-if="periodHasContent(period)" class="grid grid-cols-[72px_24px_minmax(0,1fr)] gap-3">
                 <div />
                 <div class="relative flex justify-center">
-                  <div class="absolute top-7 h-[calc(100%+1.5rem)] w-px bg-border" />
+                  <div class="schedule-timeline-line absolute top-7 h-[calc(100%+1.5rem)] w-px" />
                 </div>
                 <div>
                   <div class="mb-3 flex items-center gap-2">
-                    <component :is="periodIcon(period)" class="size-4 text-amber-500" />
+                    <span class="schedule-period-icon flex size-8 items-center justify-center rounded-xl text-white" :class="periodIconClass(period)">
+                      <component :is="periodIcon(period)" class="size-4" />
+                    </span>
                     <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {{ periodLabel(period) }}
                     </p>
@@ -571,14 +650,14 @@ onUnmounted(() => {
                     <button
                       v-for="slot in periodSlots(period).slice(0, 10)"
                       :key="slot.start"
-                      class="rounded-md border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700"
+                      class="schedule-slot-chip rounded-full px-2.5 py-1 text-xs font-medium text-teal-700"
                       @click="emit('add-block', slot.start)"
                     >
                       {{ formatTime(slot.start) }}
                     </button>
                     <span
                       v-if="periodSlots(period).length > 10"
-                      class="rounded-md border bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                      class="surface-muted rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground"
                     >
                       +{{ periodSlots(period).length - 10 }} more
                     </span>
@@ -588,7 +667,7 @@ onUnmounted(() => {
                     <div
                       v-for="block in periodBlocks(period)"
                       :key="block.id"
-                      class="rounded-lg border px-4 py-3"
+                      class="schedule-block-card rounded-2xl px-4 py-3"
                       :class="blockClass(block.type)"
                     >
                       <div class="flex items-center gap-3">
@@ -616,8 +695,8 @@ onUnmounted(() => {
                         :class="statusDotClass(appointment.status)"
                       />
                       <button
-                        class="w-full rounded-lg border bg-background p-4 text-left shadow-sm transition hover:border-primary/40"
-                        :class="appointment.status === 'checked_in' ? 'border-emerald-300' : appointment.status === 'cancelled' ? 'opacity-60' : ''"
+                        class="schedule-appointment-card w-full rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5"
+                        :class="appointment.status === 'checked_in' ? 'is-checked-in' : appointment.status === 'cancelled' ? 'opacity-60' : ''"
                         @click="emit('appointment-click', appointment.id)"
                       >
                         <div class="grid gap-3 sm:grid-cols-[48px_minmax(0,1fr)_auto] sm:items-center">
@@ -654,102 +733,17 @@ onUnmounted(() => {
 
             <div
               v-if="!appointments.length && !availableSlots.length && !selectedDayBlocks.length"
-              class="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground"
+              class="surface-muted rounded-2xl py-10 text-center text-sm text-muted-foreground"
             >
-              No appointments, slots, or blocks for this date.
+              This day is clear. A good chance to catch up, plan ahead, or open slots when ready.
             </div>
           </div>
         </div>
 
-        <div v-else-if="mapViewMode === 'week'" class="p-4">
-          <div class="grid gap-3 lg:grid-cols-7">
-            <div
-              v-for="day in weekDays"
-              :key="day"
-              class="min-h-40 rounded-lg border bg-background p-3"
-              :class="day === todayDate ? 'border-teal-400 bg-teal-50/50' : ''"
-            >
-              <div class="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <p class="text-xs font-semibold text-muted-foreground">{{ formatWeekday(day) }}</p>
-                  <p class="text-sm font-semibold">{{ formatNumericDate(day) }}</p>
-                </div>
-                <span
-                  v-if="day === todayDate"
-                  class="rounded-full bg-teal-500 px-2 py-0.5 text-[10px] font-semibold text-white"
-                >
-                  Today
-                </span>
-              </div>
-              <div class="space-y-2">
-                <button
-                  v-for="appointment in appointmentsForDay(day).slice(0, 4)"
-                  :key="appointment.id"
-                  class="w-full rounded-md border bg-card px-2 py-2 text-left text-xs shadow-sm"
-                  :class="appointment.status === 'checked_in' ? 'border-emerald-300' : ''"
-                  @click="emit('appointment-click', appointment.id)"
-                >
-                  <p class="truncate font-semibold">{{ formatTime(appointment.scheduled_at) }}</p>
-                  <p class="truncate text-muted-foreground">{{ appointment.patient_name ?? 'Patient' }}</p>
-                </button>
-                <p
-                  v-if="appointmentsForDay(day).length === 0"
-                  class="rounded-md border border-dashed px-2 py-6 text-center text-xs text-muted-foreground"
-                >
-                  {{ statusFilter === 'all' ? 'No appointments' : 'No matches' }}
-                </p>
-                <p
-                  v-if="appointmentsForDay(day).length > 4"
-                  class="text-xs font-medium text-muted-foreground"
-                >
-                  +{{ appointmentsForDay(day).length - 4 }} more
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="p-4">
-          <div class="space-y-3">
-            <button
-              v-for="appointment in visibleAppointments"
-              :key="appointment.id"
-              class="w-full rounded-lg border bg-background p-4 text-left shadow-sm transition hover:border-primary/40"
-              @click="emit('appointment-click', appointment.id)"
-            >
-              <div class="grid gap-3 sm:grid-cols-[48px_minmax(0,1fr)_auto] sm:items-center">
-                <div class="size-12 overflow-hidden rounded-full bg-violet-100">
-                  <img
-                    v-if="appointment.patient_avatar_url"
-                    :src="appointment.patient_avatar_url"
-                    :alt="appointment.patient_name ?? 'Patient'"
-                    class="size-full object-cover"
-                  >
-                  <div v-else class="flex size-full items-center justify-center text-sm font-semibold text-violet-700">
-                    {{ patientInitials(appointment.patient_name) }}
-                  </div>
-                </div>
-                <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold">{{ appointment.patient_name ?? 'Patient' }}</p>
-                  <p class="text-xs text-muted-foreground">{{ formatTime(appointment.scheduled_at) }} - {{ formatTime(appointmentEnd(appointment)) }} · {{ appointment.reason || 'Consultation' }}</p>
-                </div>
-                <span class="w-fit rounded-full border px-2.5 py-1 text-xs font-semibold" :class="statusClass(appointment.status)">
-                  {{ statusLabel(appointment.status) }}
-                </span>
-              </div>
-            </button>
-            <div
-              v-if="!visibleAppointments.length"
-              class="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground"
-            >
-              {{ statusFilter === 'all' ? 'No appointments for this date.' : 'No appointments match this filter.' }}
-            </div>
-          </div>
-        </div>
       </section>
 
       <aside class="space-y-4">
-        <section class="rounded-lg border bg-card p-4 shadow-sm">
+        <section class="schedule-side-card surface-card rounded-2xl p-4">
           <div class="mb-4 flex items-center justify-between">
             <div>
               <h2 class="text-lg font-semibold">Next up</h2>
@@ -760,7 +754,18 @@ onUnmounted(() => {
             </span>
           </div>
 
-          <div v-if="nextUp" class="grid gap-4 sm:grid-cols-[48px_minmax(0,1fr)]">
+          <div v-if="isLoading" class="grid gap-4 sm:grid-cols-[48px_minmax(0,1fr)]">
+            <span class="schedule-skeleton block size-12 rounded-full" />
+            <div class="space-y-3">
+              <span class="schedule-skeleton block h-5 w-44 rounded-full" />
+              <span class="schedule-skeleton block h-4 w-28 rounded-full" />
+              <div class="grid gap-2 sm:grid-cols-2">
+                <span class="schedule-skeleton block h-12 rounded-xl" />
+                <span class="schedule-skeleton block h-12 rounded-xl" />
+              </div>
+            </div>
+          </div>
+          <div v-else-if="nextUp" class="grid gap-4 sm:grid-cols-[48px_minmax(0,1fr)]">
             <div class="size-12 overflow-hidden rounded-full bg-orange-100">
               <img
                 v-if="nextUp.patient_avatar_url"
@@ -833,13 +838,13 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <div v-else class="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-            No upcoming appointment.
+          <div v-else class="surface-muted rounded-2xl py-8 text-center text-sm text-muted-foreground">
+            Nothing urgent next. The schedule is calm for now.
           </div>
         </section>
 
         <div class="space-y-4">
-          <section class="rounded-lg border bg-card p-4 shadow-sm">
+          <section class="schedule-side-card surface-card rounded-2xl p-4">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h2 class="text-lg font-semibold">Availability</h2>
@@ -851,69 +856,46 @@ onUnmounted(() => {
             </div>
             <div class="mb-3 grid grid-cols-3 gap-2 text-sm">
               <div>
-                <p class="text-xl font-semibold">{{ slotStats.total }}</p>
+                <p v-if="!isLoading" class="text-xl font-semibold">{{ slotStats.total }}</p>
+                <span v-else class="schedule-skeleton mb-1 block h-6 w-9 rounded-full" />
                 <p class="text-xs text-muted-foreground">Total</p>
               </div>
               <div>
-                <p class="text-xl font-semibold">{{ slotStats.available }}</p>
+                <p v-if="!isLoading" class="text-xl font-semibold">{{ slotStats.available }}</p>
+                <span v-else class="schedule-skeleton mb-1 block h-6 w-9 rounded-full" />
                 <p class="text-xs text-muted-foreground">Open</p>
               </div>
               <div>
-                <p class="text-xl font-semibold">{{ slotStats.booked }}</p>
+                <p v-if="!isLoading" class="text-xl font-semibold">{{ slotStats.booked }}</p>
+                <span v-else class="schedule-skeleton mb-1 block h-6 w-9 rounded-full" />
                 <p class="text-xs text-muted-foreground">Booked</p>
               </div>
             </div>
-            <div v-if="availableSlots.length" class="flex flex-wrap gap-1.5">
+            <div v-if="isLoading" class="flex flex-wrap gap-1.5">
+              <span v-for="index in 6" :key="index" class="schedule-skeleton block h-7 w-20 rounded-full" />
+            </div>
+            <div v-else-if="availableSlots.length" class="flex flex-wrap gap-1.5">
               <button
                 v-for="slot in availableSlots.slice(0, 8)"
                 :key="slot.start"
-                class="rounded-md border border-teal-300 bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700"
+                class="schedule-slot-chip rounded-full px-2 py-1 text-xs font-medium text-teal-700"
                 @click="emit('add-block', slot.start)"
               >
                 {{ formatTime(slot.start) }}
               </button>
               <span
                 v-if="availableSlots.length > 8"
-                class="rounded-md border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
+                class="surface-muted rounded-full px-2 py-1 text-xs font-medium text-muted-foreground"
               >
                 +{{ availableSlots.length - 8 }} more
               </span>
             </div>
-            <div v-else class="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
-              No open slots for this date.
+            <div v-else class="surface-muted rounded-2xl py-6 text-center text-sm text-muted-foreground">
+              No open slots are showing yet. Add availability when you are ready to receive patients.
             </div>
           </section>
 
-          <section class="rounded-lg border bg-card p-4 shadow-sm">
-            <div class="mb-3">
-              <h2 class="text-lg font-semibold">Week load</h2>
-              <p class="text-xs text-muted-foreground">{{ weekLabel }}</p>
-            </div>
-            <div class="grid grid-cols-7 gap-2">
-              <div v-for="day in weekDays" :key="day" class="text-center">
-                <p class="text-xs font-medium">{{ formatWeekday(day) }}</p>
-                <p class="text-xs text-muted-foreground">{{ formatNumericDate(day) }}</p>
-                <div class="mt-2 space-y-1">
-                  <span
-                    v-for="(opacity, index) in weekHeatBars(day)"
-                    :key="index"
-                    class="mx-auto block h-1.5 w-8 rounded-full bg-teal-500"
-                    :style="{ opacity }"
-                  />
-                </div>
-              </div>
-            </div>
-            <div class="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Low</span>
-              <span class="size-2 rounded-full bg-teal-200" />
-              <span class="size-2 rounded-full bg-teal-300" />
-              <span class="size-2 rounded-full bg-teal-500" />
-              <span class="size-2 rounded-full bg-teal-700" />
-              <span>High</span>
-            </div>
-          </section>
-
-          <section class="rounded-lg border bg-card p-4 shadow-sm">
+          <section class="schedule-side-card surface-card rounded-2xl p-4">
             <div class="mb-3 flex items-center justify-between">
               <div>
                 <h2 class="text-lg font-semibold">Upcoming blocks</h2>
@@ -921,11 +903,17 @@ onUnmounted(() => {
               </div>
               <span class="text-xs text-muted-foreground">{{ upcomingBlocks.length }}</span>
             </div>
-            <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
+            <div v-if="isLoading" class="space-y-2">
+              <div v-for="index in 3" :key="index" class="schedule-block-card rounded-2xl px-3 py-2">
+                <span class="schedule-skeleton block h-4 w-32 rounded-full" />
+                <span class="schedule-skeleton mt-2 block h-3 w-44 rounded-full" />
+              </div>
+            </div>
+            <div v-else class="max-h-72 space-y-2 overflow-y-auto pr-1">
               <div
                 v-for="block in upcomingBlocks.slice(0, 8)"
                 :key="block.id"
-                class="rounded-lg border px-3 py-2"
+                class="schedule-block-card rounded-2xl px-3 py-2"
                 :class="blockClass(block.type)"
               >
                 <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
@@ -938,33 +926,37 @@ onUnmounted(() => {
                   <p class="min-w-0 truncate text-xs font-medium opacity-80 sm:max-w-40 sm:text-right">{{ block.user_name ?? 'Clinic' }}</p>
                 </div>
               </div>
-              <div v-if="!upcomingBlocks.length" class="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
-                No blocks in the next 30 days.
+              <div v-if="!upcomingBlocks.length" class="surface-muted rounded-2xl py-6 text-center text-sm text-muted-foreground">
+                No blocked time ahead. Your calendar is open to shape as needed.
               </div>
             </div>
           </section>
         </div>
 
-        <section class="rounded-lg border bg-card p-4 shadow-sm">
+        <section class="schedule-side-card surface-card rounded-2xl p-4">
           <div class="mb-3 flex items-center gap-2">
             <AlertTriangle class="size-4 text-amber-500" />
             <h2 class="text-lg font-semibold">Slot health</h2>
           </div>
           <div class="grid grid-cols-4 gap-3">
             <div>
-              <p class="text-2xl font-semibold">{{ slotStats.total }}</p>
+              <p v-if="!isLoading" class="text-2xl font-semibold">{{ slotStats.total }}</p>
+              <span v-else class="schedule-skeleton mb-1 block h-7 w-10 rounded-full" />
               <p class="text-xs text-muted-foreground">Total</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold">{{ slotStats.booked }}</p>
+              <p v-if="!isLoading" class="text-2xl font-semibold">{{ slotStats.booked }}</p>
+              <span v-else class="schedule-skeleton mb-1 block h-7 w-10 rounded-full" />
               <p class="text-xs text-muted-foreground">Booked</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold">{{ slotStats.available }}</p>
+              <p v-if="!isLoading" class="text-2xl font-semibold">{{ slotStats.available }}</p>
+              <span v-else class="schedule-skeleton mb-1 block h-7 w-10 rounded-full" />
               <p class="text-xs text-muted-foreground">Available</p>
             </div>
             <div>
-              <p class="text-2xl font-semibold">{{ slotStats.utilization }}%</p>
+              <p v-if="!isLoading" class="text-2xl font-semibold">{{ slotStats.utilization }}%</p>
+              <span v-else class="schedule-skeleton mb-1 block h-7 w-12 rounded-full" />
               <p class="text-xs text-muted-foreground">Utilized</p>
             </div>
           </div>
@@ -976,3 +968,439 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.schedule-stat-card,
+.schedule-map-panel,
+.schedule-side-card,
+.schedule-appointment-card,
+.schedule-block-card {
+  position: relative;
+}
+
+.schedule-stat-card,
+.schedule-map-panel,
+.schedule-side-card {
+  border: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    var(--surface-panel-strong);
+}
+
+.schedule-appointment-card {
+  border: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.1), transparent 34%),
+    radial-gradient(circle at 82% 24%, rgb(20 184 166 / 0.1), transparent 32%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.42) 56%, rgb(255 255 255 / 0.58)),
+    rgb(255 255 255 / 0.28);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    0 20px 58px -40px rgb(15 23 42 / 0.62);
+}
+
+.schedule-panel-header,
+.schedule-month-strip {
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.32);
+}
+
+.schedule-stat-icon {
+  transform: translateZ(0);
+}
+
+.schedule-period-icon {
+  transform: translateZ(0);
+  box-shadow:
+    0 14px 28px rgb(15 23 42 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+.schedule-period-icon--morning {
+  background: linear-gradient(135deg, rgb(245 158 11), rgb(20 184 166));
+  box-shadow:
+    0 14px 30px rgb(245 158 11 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.schedule-period-icon--afternoon {
+  background: linear-gradient(135deg, rgb(249 115 22), rgb(245 158 11));
+  box-shadow:
+    0 14px 30px rgb(249 115 22 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.schedule-period-icon--evening {
+  background: linear-gradient(135deg, rgb(99 102 241), rgb(139 92 246));
+  box-shadow:
+    0 14px 30px rgb(99 102 241 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.schedule-control-button,
+.schedule-date-trigger,
+.schedule-action-button {
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.schedule-filter-chip.is-active {
+  color: white;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 12px 26px rgb(37 99 235 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+.schedule-filter-chip {
+  background: rgb(255 255 255 / 0.42);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.34);
+}
+
+.schedule-month-rail {
+  margin: -0.75rem -0.5rem -1rem;
+  padding: 0.75rem 0.5rem 1.35rem;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-month-rail::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.schedule-rail-scroll-button {
+  position: relative;
+  z-index: 2;
+  background: rgb(255 255 255 / 0.5);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.54),
+    0 12px 28px rgb(15 23 42 / 0.08);
+}
+
+.schedule-month-nav {
+  background: rgb(255 255 255 / 0.42);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.42),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.schedule-month-day {
+  color: rgb(71 85 105);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 255 255 / 0.78), transparent 58%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.38)),
+    rgb(255 255 255 / 0.36);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.64),
+    inset 0 0 0 1px rgb(255 255 255 / 0.44),
+    0 14px 30px rgb(15 23 42 / 0.08);
+}
+
+.schedule-month-day-number {
+  background: rgb(255 255 255 / 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.5),
+    0 10px 22px rgb(15 23 42 / 0.08);
+}
+
+.schedule-month-day.is-today:not(.is-selected) .schedule-month-day-number {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.42),
+    0 14px 30px rgb(37 99 235 / 0.18),
+    0 12px 26px rgb(20 184 166 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.24);
+}
+
+.schedule-month-day.is-selected {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.46),
+    0 22px 52px rgb(37 99 235 / 0.26),
+    0 18px 42px rgb(20 184 166 / 0.24),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.schedule-month-day.is-selected .schedule-month-day-number {
+  background: rgb(255 255 255 / 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.24),
+    0 8px 18px rgb(15 23 42 / 0.12);
+}
+
+.schedule-load-dot {
+  display: inline-flex;
+  height: 0.45rem;
+  width: 0.45rem;
+  border-radius: 9999px;
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.schedule-skeleton {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgb(248 253 255 / 0.9), rgb(203 232 242 / 0.52)),
+    rgb(214 237 246 / 0.48);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    inset 0 0 0 1px rgb(125 211 252 / 0.14),
+    0 10px 26px rgb(15 23 42 / 0.04);
+}
+
+.schedule-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.58), transparent);
+  animation: schedule-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.schedule-now-pill,
+.schedule-slot-chip {
+  border: 1px solid rgb(94 234 212 / 0.42);
+  background: rgb(240 253 250 / 0.72);
+  box-shadow: 0 10px 24px rgb(15 118 110 / 0.1);
+}
+
+.schedule-timeline-line {
+  background: rgb(148 163 184 / 0.28);
+}
+
+.schedule-block-card {
+  --schedule-block-accent: 245 158 11;
+  --schedule-block-text: 146 64 14;
+  color: rgb(var(--schedule-block-text));
+  background:
+    radial-gradient(circle at 4% 24%, rgb(var(--schedule-block-accent) / 0.16), transparent 34%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.68), rgb(255 255 255 / 0.42)),
+    rgb(var(--schedule-block-accent) / 0.06);
+  box-shadow:
+    inset 3px 0 0 rgb(var(--schedule-block-accent) / 0.52),
+    inset 0 1px 0 rgb(255 255 255 / 0.44),
+    0 18px 46px -36px rgb(15 23 42 / 0.42);
+}
+
+.schedule-block-card--meeting {
+  --schedule-block-accent: 59 130 246;
+  --schedule-block-text: 30 64 175;
+}
+
+.schedule-block-card--holiday {
+  --schedule-block-accent: 16 185 129;
+  --schedule-block-text: 4 120 87;
+}
+
+.schedule-block-card--personal {
+  --schedule-block-accent: 139 92 246;
+  --schedule-block-text: 91 33 182;
+}
+
+.schedule-block-card--unavailable {
+  --schedule-block-accent: 244 63 94;
+  --schedule-block-text: 190 18 60;
+}
+
+.schedule-block-card--break {
+  --schedule-block-accent: 245 158 11;
+  --schedule-block-text: 180 83 9;
+}
+
+.schedule-appointment-card:hover,
+.schedule-side-card:hover {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.schedule-appointment-card.is-checked-in {
+  background:
+    linear-gradient(135deg, rgb(16 185 129 / 0.1), rgb(255 255 255 / 0.38)),
+    var(--surface-panel-strong);
+}
+
+:global(.dark .schedule-stat-card),
+:global(.dark .schedule-map-panel),
+:global(.dark .schedule-side-card),
+:global(.dark .schedule-appointment-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .schedule-appointment-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.14), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.14), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.62), rgb(15 23 42 / 0.34) 54%, rgb(15 23 42 / 0.48)),
+    rgb(15 23 42 / 0.18);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .schedule-panel-header),
+:global(.dark .schedule-month-strip) {
+  box-shadow:
+    inset 0 -1px 0 rgb(148 163 184 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+:global(.dark .schedule-month-nav),
+:global(.dark .schedule-rail-scroll-button) {
+  background: rgb(15 23 42 / 0.44);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 14px 30px rgb(0 0 0 / 0.24);
+}
+
+:global(.dark .schedule-month-day) {
+  color: rgb(203 213 225 / 0.82);
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.56), rgb(15 23 42 / 0.28)),
+    rgb(15 23 42 / 0.18);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+:global(.dark .schedule-month-day-number) {
+  background: rgb(255 255 255 / 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    0 10px 22px rgb(0 0 0 / 0.16);
+}
+
+:global(.dark .schedule-month-day.is-today:not(.is-selected) .schedule-month-day-number) {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.18),
+    0 14px 34px rgb(56 189 248 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .schedule-month-day.is-selected) {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.22),
+    0 18px 42px rgb(37 99 235 / 0.22),
+    0 16px 36px rgb(20 184 166 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.22);
+}
+
+:global(.dark .schedule-skeleton) {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.035)),
+    rgb(15 23 42 / 0.28);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+:global(.dark .schedule-skeleton::after) {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.09), transparent);
+}
+
+:global(.dark .schedule-period-icon) {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    0 16px 34px rgb(0 0 0 / 0.28),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .schedule-period-icon--morning) {
+  box-shadow:
+    0 0 0 1px rgb(253 186 116 / 0.16),
+    0 16px 34px rgb(245 158 11 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .schedule-period-icon--afternoon) {
+  box-shadow:
+    0 0 0 1px rgb(251 146 60 / 0.16),
+    0 16px 34px rgb(249 115 22 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .schedule-period-icon--evening) {
+  box-shadow:
+    0 0 0 1px rgb(167 139 250 / 0.16),
+    0 16px 34px rgb(99 102 241 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .schedule-filter-chip.is-active) {
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.14),
+    0 14px 34px rgb(56 189 248 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .schedule-filter-chip) {
+  background: rgb(15 23 42 / 0.46);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+:global(.dark .schedule-now-pill),
+:global(.dark .schedule-slot-chip) {
+  color: rgb(94 234 212);
+  border-color: rgb(94 234 212 / 0.22);
+  background: rgb(20 184 166 / 0.12);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.22);
+}
+
+:global(.dark .schedule-timeline-line) {
+  background: rgb(148 163 184 / 0.14);
+}
+
+:global(.dark .schedule-appointment-card:hover) {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.12), rgb(20 184 166 / 0.08)),
+    rgb(15 23 42 / 0.38);
+  box-shadow:
+    inset 3px 0 0 rgb(56 189 248 / 0.42),
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .schedule-block-card) {
+  color: rgb(var(--schedule-block-accent));
+  background:
+    radial-gradient(circle at 4% 24%, rgb(var(--schedule-block-accent) / 0.16), transparent 34%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.56), rgb(15 23 42 / 0.26)),
+    rgb(15 23 42 / 0.14);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 3px 0 0 rgb(var(--schedule-block-accent) / 0.52),
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 22px 70px -42px rgb(0 0 0 / 0.78);
+}
+
+@keyframes schedule-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>

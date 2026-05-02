@@ -443,7 +443,7 @@ onUnmounted(() => {
 
 <template>
   <FeatureGate feature="appointments" label="Appointments">
-  <div class="appointment-list-shell flex flex-1 flex-col gap-4 pt-4">
+  <div class="appointment-list-shell flex flex-1 flex-col gap-4 pt-6 md:pt-8">
     <!-- Header -->
     <div class="flex flex-col gap-3">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
