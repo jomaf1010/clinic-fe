@@ -350,7 +350,8 @@
   .dark .auth-side-panel,
   .dark .auth-login-card,
   .dark .auth-signup-card,
-  .dark .auth-recovery-card {
+  .dark .auth-recovery-card,
+  .dark .auth-onboarding-card {
     color: rgb(248 250 252 / 0.96);
     box-shadow: 0 32px 90px -42px rgb(0 0 0 / 0.86) !important;
   }
@@ -366,7 +367,8 @@
 
   .dark .auth-login-card,
   .dark .auth-signup-card,
-  .dark .auth-recovery-card {
+  .dark .auth-recovery-card,
+  .dark .auth-onboarding-card {
     background:
       radial-gradient(circle at 50% 0%, rgb(59 130 246 / 0.12), transparent 34%),
       linear-gradient(145deg, rgb(15 23 42 / 0.88), rgb(2 6 23 / 0.74) 58%, rgb(15 23 42 / 0.82)),
@@ -376,7 +378,8 @@
   .dark .auth-side-panel .text-muted-foreground,
   .dark .auth-login-card .text-muted-foreground,
   .dark .auth-signup-card .text-muted-foreground,
-  .dark .auth-recovery-card .text-muted-foreground {
+  .dark .auth-recovery-card .text-muted-foreground,
+  .dark .auth-onboarding-card .text-muted-foreground {
     color: rgb(203 213 225 / 0.78) !important;
   }
 
