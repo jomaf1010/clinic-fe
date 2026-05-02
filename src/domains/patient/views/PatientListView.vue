@@ -364,7 +364,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+  <div class="patient-list-shell grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_340px]">
     <section class="flex min-w-0 flex-col gap-4">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
@@ -376,7 +376,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <Button class="w-full shrink-0 sm:w-auto" @click="showCreateDialog = true">
+        <Button class="h-10 w-full shrink-0 px-5 text-sm sm:w-auto" @click="showCreateDialog = true">
           <UserPlus class="size-4" />
           Add Patient
         </Button>
@@ -387,9 +387,9 @@ onMounted(() => {
           <Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             :model-value="searchQuery"
-            aria-label="Find patients by name, phone, or barangay"
-            placeholder="Find by name, phone, barangay..."
-            class="h-10 pl-9"
+            aria-label="Search patients by name"
+            placeholder="Search patients by name..."
+            class="patient-search-input h-11 pl-10"
             @update:model-value="onSearchInput"
           />
         </div>
@@ -397,7 +397,7 @@ onMounted(() => {
         <div class="flex items-center gap-2">
           <Popover>
             <PopoverTrigger as-child>
-              <Button variant="outline" class="relative h-10 shrink-0" aria-label="Filter patients">
+              <Button variant="outline" class="relative h-10 shrink-0 px-4" aria-label="Filter patients">
                 <Filter class="size-4" />
                 Filters
                 <span
@@ -406,7 +406,7 @@ onMounted(() => {
                 />
               </Button>
             </PopoverTrigger>
-            <PopoverContent class="w-56" align="end">
+            <PopoverContent class="patient-filter-popover w-60" align="end">
               <div class="flex flex-col gap-3">
                 <div class="flex items-center justify-between">
                   <p class="text-sm font-medium">Filters</p>
@@ -484,7 +484,7 @@ onMounted(() => {
           </Popover>
 
           <Select :model-value="filters.sort_by ?? 'updated_at'" @update:model-value="setSortField">
-            <SelectTrigger class="h-10 w-[132px]">
+            <SelectTrigger class="patient-select-trigger h-10 w-[136px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -495,7 +495,7 @@ onMounted(() => {
             </SelectContent>
           </Select>
 
-          <div class="surface-muted hidden items-center rounded-md border p-1 sm:flex">
+          <div class="patient-view-toggle surface-muted hidden items-center rounded-full p-1 sm:flex">
             <Button
               :variant="viewMode === 'list' ? 'secondary' : 'ghost'"
               type="button"
@@ -540,9 +540,9 @@ onMounted(() => {
         </Button>
       </div>
 
-      <div class="surface-card hidden overflow-hidden rounded-xl md:grid md:grid-cols-2 xl:grid-cols-4">
-        <div class="flex items-center gap-4 p-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)]">
+      <div class="patient-stat-strip surface-card hidden overflow-hidden rounded-2xl md:grid md:grid-cols-2 xl:grid-cols-4">
+        <div class="patient-stat-item flex items-center gap-4 p-5">
+          <span class="patient-stat-icon flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-[0_16px_32px_rgba(37,99,235,0.24)]">
             <ClipboardList class="size-5" />
           </span>
           <div>
@@ -551,28 +551,28 @@ onMounted(() => {
             <p class="text-xs text-muted-foreground">Across all statuses</p>
           </div>
         </div>
-        <div class="flex items-center gap-4 p-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_12px_28px_rgba(16,185,129,0.24)]">
+        <div class="patient-stat-item flex items-center gap-4 p-5">
+          <span class="patient-stat-icon flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)]">
             <UserRoundPlus class="size-5" />
           </span>
           <div>
             <p class="text-xs text-muted-foreground">New patients</p>
             <p class="text-2xl font-semibold tabular-nums">{{ newPatientCount }}</p>
-            <p class="text-xs text-green-700">Status: new</p>
+            <p class="text-xs text-green-700 dark:text-emerald-300">Status: new</p>
           </div>
         </div>
-        <div class="flex items-center gap-4 p-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_12px_28px_rgba(245,158,11,0.24)]">
+        <div class="patient-stat-item flex items-center gap-4 p-5">
+          <span class="patient-stat-icon flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_16px_32px_rgba(245,158,11,0.24)]">
             <PhoneOff class="size-5" />
           </span>
           <div>
             <p class="text-xs text-muted-foreground">Missing contact</p>
             <p class="text-2xl font-semibold tabular-nums">{{ missingContactCount }}</p>
-            <p class="text-xs text-amber-700">Current page</p>
+            <p class="text-xs text-amber-700 dark:text-amber-300">Current page</p>
           </div>
         </div>
-        <div class="flex items-center gap-4 p-4">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-[0_12px_28px_rgba(139,92,246,0.24)]">
+        <div class="patient-stat-item flex items-center gap-4 p-5">
+          <span class="patient-stat-icon flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-[0_16px_32px_rgba(139,92,246,0.24)]">
             <CalendarClock class="size-5" />
           </span>
           <div>
@@ -584,10 +584,10 @@ onMounted(() => {
       </div>
 
       <!-- Loading skeleton -->
-      <div v-if="isLoading" class="surface-card overflow-hidden rounded-xl">
+      <div v-if="isLoading" class="patient-table-card surface-card overflow-hidden rounded-2xl">
         <Table class="min-w-[42rem] border-collapse">
           <TableHeader>
-            <TableRow class="border-white/40 bg-white/40 hover:bg-white/40">
+            <TableRow class="patient-table-header hover:bg-transparent">
               <TableHead class="px-4 py-3.5 text-muted-foreground">Patient</TableHead>
               <TableHead class="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">Age / Sex / DOB</TableHead>
               <TableHead class="hidden px-4 py-3.5 text-muted-foreground xl:table-cell">Location</TableHead>
@@ -597,7 +597,7 @@ onMounted(() => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="i in 8" :key="i" class="border-white/40">
+            <TableRow v-for="i in 8" :key="i" class="patient-table-row">
               <TableCell class="px-4 py-4">
                 <div class="flex items-center gap-3">
                   <Skeleton class="size-14 shrink-0 rounded-full" />
@@ -621,7 +621,7 @@ onMounted(() => {
       <div
         v-else-if="error"
         role="alert"
-        class="surface-card rounded-xl bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+        class="surface-card rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         {{ error }}
         <Button variant="outline" size="sm" class="mt-2" @click="fetchPatients()">Try again</Button>
@@ -630,7 +630,7 @@ onMounted(() => {
       <!-- Empty -->
       <div
         v-else-if="patients.length === 0 && !hasActiveFilters && !filters.search"
-        class="surface-card flex flex-1 flex-col items-center justify-center rounded-xl py-14 text-muted-foreground"
+        class="surface-card flex flex-1 flex-col items-center justify-center rounded-2xl py-14 text-muted-foreground"
       >
         <Users class="mb-3 size-10 opacity-50" />
         <p>No patients yet.</p>
@@ -642,7 +642,7 @@ onMounted(() => {
       <!-- No results (with filters) -->
       <div
         v-else-if="patients.length === 0"
-        class="surface-card flex flex-1 flex-col items-center justify-center rounded-xl py-14 text-muted-foreground"
+        class="surface-card flex flex-1 flex-col items-center justify-center rounded-2xl py-14 text-muted-foreground"
       >
         <Search class="mb-3 size-10 opacity-50" />
         <p>No patients match your filters.</p>
@@ -653,10 +653,10 @@ onMounted(() => {
 
       <!-- Data table -->
       <template v-else>
-        <div v-if="viewMode === 'list'" class="surface-card overflow-hidden rounded-xl">
+        <div v-if="viewMode === 'list'" class="patient-table-card surface-card overflow-hidden rounded-2xl">
           <Table class="min-w-[42rem] border-collapse">
             <TableHeader>
-              <TableRow class="border-white/40 bg-white/40 hover:bg-white/40">
+              <TableRow class="patient-table-header hover:bg-transparent">
                 <TableHead class="px-4 py-3.5 text-muted-foreground">Patient</TableHead>
                 <TableHead class="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">Age / Sex / DOB</TableHead>
                 <TableHead class="hidden px-4 py-3.5 text-muted-foreground xl:table-cell">Location</TableHead>
@@ -669,7 +669,7 @@ onMounted(() => {
               <TableRow
                 v-for="patient in patients"
                 :key="patient.id"
-                class="cursor-pointer border-white/40 transition-colors hover:bg-white/35"
+                class="patient-table-row cursor-pointer transition-colors"
                 @click="goToPatient(patient.id)"
               >
                 <TableCell class="px-4 py-4">
@@ -711,7 +711,7 @@ onMounted(() => {
                     </p>
                     <p
                       class="flex items-center gap-2 text-xs"
-                      :class="contactCompleteness(patient) === 'Missing' ? 'text-amber-700' : 'text-green-700'"
+                      :class="contactCompleteness(patient) === 'Missing' ? 'text-amber-700 dark:text-amber-300' : 'text-green-700 dark:text-emerald-300'"
                     >
                       <span class="size-1.5 rounded-full" :class="contactCompleteness(patient) === 'Missing' ? 'bg-amber-500' : 'bg-green-600'" />
                       {{ contactCompleteness(patient) }}
@@ -740,7 +740,7 @@ onMounted(() => {
             v-for="patient in patients"
             :key="patient.id"
             type="button"
-            class="surface-card rounded-xl p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+            class="patient-grid-card surface-card rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5"
             @click="goToPatient(patient.id)"
           >
             <div class="flex items-start justify-between gap-3">
@@ -815,13 +815,13 @@ onMounted(() => {
     </section>
 
     <aside class="flex flex-col gap-4 xl:pt-1">
-      <section class="surface-card space-y-4 rounded-xl p-5">
+      <section class="patient-sidebar-card surface-card space-y-4 rounded-2xl p-5">
         <div class="flex items-center justify-between">
           <h2 class="flex items-center gap-2 text-lg font-semibold">
             <Stethoscope class="size-4 text-primary" />
             Today
           </h2>
-          <Badge variant="secondary" class="rounded-full bg-amber-100 text-amber-700">
+          <Badge variant="secondary" class="rounded-full bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
             {{ attentionCount }}
           </Badge>
         </div>
@@ -864,12 +864,12 @@ onMounted(() => {
               v-for="item in attentionItems"
               :key="item.id"
               type="button"
-              class="surface-interactive flex w-full items-start gap-3 rounded-lg border border-transparent px-2 py-2 text-left text-sm hover:bg-muted/60"
+              class="patient-attention-item surface-interactive flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left text-sm"
               @click="goToAttentionItem(item)"
             >
-              <span class="surface-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border">
-                <FlaskConical v-if="item.type === 'pending_lab_order_today'" class="size-4 text-amber-700" />
-                <FilePenLine v-else class="size-4 text-blue-700" />
+              <span class="patient-attention-icon surface-muted mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl">
+                <FlaskConical v-if="item.type === 'pending_lab_order_today'" class="size-4 text-amber-700 dark:text-amber-300" />
+                <FilePenLine v-else class="size-4 text-blue-700 dark:text-blue-300" />
               </span>
               <span class="min-w-0 flex-1">
                 <span class="flex items-center justify-between gap-2">
@@ -889,13 +889,13 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="surface-card space-y-4 rounded-xl p-5">
+      <section class="patient-sidebar-card surface-card space-y-4 rounded-2xl p-5">
         <h2 class="flex items-center gap-2 text-sm font-semibold">
           <ClipboardCheck class="size-4 text-primary" />
           Registration quality
         </h2>
         <div class="flex items-center gap-3">
-          <div class="grid size-14 place-items-center rounded-full border-4 border-green-600 text-sm font-semibold text-green-700">
+          <div class="patient-quality-ring grid size-14 place-items-center rounded-full text-sm font-semibold text-green-700 dark:text-emerald-300">
             {{ registrationQuality }}%
           </div>
           <div>
@@ -944,3 +944,171 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.patient-search-input {
+  border-radius: 9999px;
+  border-color: rgb(255 255 255 / 0.52);
+  background: rgb(255 255 255 / 0.68);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.07);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.patient-filter-popover {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.patient-view-toggle {
+  border: 0;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.patient-stat-strip,
+.patient-table-card,
+.patient-sidebar-card,
+.patient-grid-card {
+  position: relative;
+}
+
+.patient-stat-item + .patient-stat-item {
+  box-shadow: inset 1px 0 0 rgb(255 255 255 / 0.32);
+}
+
+.patient-stat-icon {
+  transform: translateZ(0);
+}
+
+.patient-table-card {
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    var(--surface-panel-strong);
+}
+
+.patient-table-header {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.34);
+}
+
+.patient-table-row {
+  border-color: rgb(255 255 255 / 0.32);
+}
+
+.patient-table-row:hover {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.1), rgb(20 184 166 / 0.07)),
+    rgb(255 255 255 / 0.2);
+}
+
+.patient-grid-card:hover,
+.patient-attention-item:hover {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.patient-attention-item {
+  border: 0;
+}
+
+.patient-attention-icon,
+.patient-quality-ring {
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.08);
+}
+
+.patient-quality-ring {
+  border: 4px solid rgb(22 163 74 / 0.82);
+  background: rgb(255 255 255 / 0.42);
+}
+
+:global(.dark .patient-search-input) {
+  border-color: rgb(148 163 184 / 0.14) !important;
+  background:
+    linear-gradient(145deg, rgb(15 23 42 / 0.78), rgb(2 6 23 / 0.58)),
+    rgb(15 23 42 / 0.72) !important;
+  color: rgb(248 250 252 / 0.92) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 14px 32px rgb(0 0 0 / 0.22) !important;
+}
+
+:global(.dark .patient-search-input::placeholder) {
+  color: rgb(148 163 184 / 0.78) !important;
+}
+
+:global(.dark .patient-search-input:focus-visible) {
+  border-color: rgb(125 211 252 / 0.34) !important;
+  background:
+    linear-gradient(145deg, rgb(15 23 42 / 0.86), rgb(2 6 23 / 0.66)),
+    rgb(15 23 42 / 0.82) !important;
+  box-shadow:
+    0 0 0 3px rgb(56 189 248 / 0.14),
+    0 16px 36px rgb(0 0 0 / 0.26) !important;
+}
+
+:global(.dark .patient-stat-strip),
+:global(.dark .patient-table-card),
+:global(.dark .patient-sidebar-card),
+:global(.dark .patient-grid-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .patient-stat-item + .patient-stat-item) {
+  box-shadow: inset 1px 0 0 rgb(255 255 255 / 0.08);
+}
+
+:global(.dark .patient-table-header) {
+  border-color: transparent;
+  background: transparent !important;
+  box-shadow:
+    inset 0 -1px 0 rgb(148 163 184 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+:global(.dark .patient-table-header:hover) {
+  background: transparent !important;
+}
+
+:global(.dark .patient-table-header th) {
+  color: rgb(203 213 225 / 0.74);
+}
+
+:global(.dark .patient-table-row) {
+  border-color: rgb(148 163 184 / 0.1);
+}
+
+:global(.dark .patient-table-row:hover) {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.12), rgb(20 184 166 / 0.08)),
+    rgb(15 23 42 / 0.38);
+  box-shadow:
+    inset 3px 0 0 rgb(56 189 248 / 0.42),
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04);
+}
+
+:global(.dark .patient-attention-item:hover) {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.1), rgb(20 184 166 / 0.07)),
+    rgb(15 23 42 / 0.42);
+}
+
+:global(.dark .patient-attention-icon),
+:global(.dark .patient-quality-ring) {
+  border-color: rgb(148 163 184 / 0.14);
+  background: rgb(15 23 42 / 0.58);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.24);
+}
+
+:global(.dark .patient-quality-ring) {
+  border-color: rgb(52 211 153 / 0.72);
+}
+</style>
