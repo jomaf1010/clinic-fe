@@ -81,7 +81,7 @@ async function renderButton(): Promise<void> {
     type: 'standard',
     text: props.text,
     shape: props.shape,
-    width: props.width ?? Math.floor(containerRef.value?.clientWidth ?? 320),
+    width: Math.floor(containerRef.value?.clientWidth ?? props.width ?? 320),
   })
   ready.value = true
 }

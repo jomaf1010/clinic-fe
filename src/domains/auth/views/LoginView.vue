@@ -33,6 +33,7 @@ import { RouteNames } from '@/router/routeNames'
 import { useTheme } from '@/composables/useTheme'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
 import GoogleSignInButton from '../components/GoogleSignInButton.vue'
+import AuthFeedbackAlert from '../components/AuthFeedbackAlert.vue'
 import type { GoogleLinkRequiredResponse, ValidationError } from '../types/auth.types'
 
 const router = useRouter()
@@ -166,7 +167,7 @@ async function requestGoogleLink(): Promise<void> {
 </script>
 
 <template>
-  <div class="auth-shell relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-6 sm:px-6">
+  <div class="auth-shell relative flex min-h-dvh items-start justify-center overflow-x-hidden overflow-y-auto px-4 pb-5 pt-16 sm:items-center sm:px-6 sm:py-6">
     <canvas ref="canvasRef" class="pointer-events-none absolute inset-0 opacity-55" />
     <button
       type="button"
@@ -179,7 +180,7 @@ async function requestGoogleLink(): Promise<void> {
     </button>
 
     <div
-      class="relative z-10 grid w-full max-w-5xl items-stretch gap-6 transition-all duration-700 ease-out lg:grid-cols-[0.92fr_1fr]"
+      class="relative z-10 grid w-full max-w-5xl items-stretch gap-4 transition-all duration-700 ease-out sm:gap-6 lg:grid-cols-[0.92fr_1fr]"
       :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'"
     >
       <section
@@ -239,8 +240,8 @@ async function requestGoogleLink(): Promise<void> {
         class="flex transition-all delay-200 duration-700 ease-out"
         :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
       >
-        <Card class="auth-login-card mx-auto flex min-h-[520px] w-full max-w-lg justify-center rounded-3xl border-0 py-8 shadow-[0_32px_90px_-42px_oklch(0.22_0.08_245_/_0.62)] lg:h-full">
-          <CardHeader class="px-6 text-center sm:px-10">
+        <Card class="auth-login-card mx-auto flex w-full min-w-0 max-w-lg justify-center rounded-2xl border-0 py-5 shadow-[0_32px_90px_-42px_oklch(0.22_0.08_245_/_0.62)] sm:min-h-[520px] sm:rounded-3xl sm:py-8 lg:h-full">
+          <CardHeader class="px-4 pb-4 text-center sm:px-10 sm:pb-6">
             <div
               class="mb-2 flex justify-center transition-all delay-100 duration-700 ease-out lg:hidden"
               :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'"
@@ -249,34 +250,34 @@ async function requestGoogleLink(): Promise<void> {
                 <AppLogo class="h-11 w-auto" />
               </div>
             </div>
-            <CardTitle class="text-2xl">Welcome back</CardTitle>
+            <CardTitle class="text-xl sm:text-2xl">Welcome back</CardTitle>
             <CardDescription>Sign in to your MediFlow account</CardDescription>
           </CardHeader>
 
-          <CardContent class="px-6 sm:px-10">
-            <form class="mx-auto flex w-full max-w-[400px] flex-col gap-5" novalidate @submit.prevent="onSubmit">
-              <div
+          <CardContent class="min-w-0 px-4 sm:px-10">
+            <form class="mx-auto flex w-full max-w-[400px] flex-col gap-4 sm:gap-5" novalidate @submit.prevent="onSubmit">
+              <AuthFeedbackAlert
                 v-if="generalError"
+                variant="danger"
                 role="alert"
-                class="rounded-2xl border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-sm text-destructive backdrop-blur-md"
               >
                 {{ generalError }}
                 <RouterLink
                   v-if="showResendLink"
                   :to="{ name: RouteNames.VERIFY_EMAIL_NOTICE, query: { email: email } }"
-                  class="mt-1 block font-medium underline underline-offset-4 hover:text-destructive/80"
+                  class="mt-1 block"
                 >
                   Resend verification email
                 </RouterLink>
-              </div>
+              </AuthFeedbackAlert>
 
-              <div
+              <AuthFeedbackAlert
                 v-if="generalNotice"
+                variant="success"
                 role="status"
-                class="rounded-2xl border border-emerald-600/30 bg-emerald-50/80 px-3.5 py-3 text-sm text-emerald-700 backdrop-blur-md dark:bg-emerald-950/40 dark:text-emerald-300"
               >
                 {{ generalNotice }}
-              </div>
+              </AuthFeedbackAlert>
 
               <div
                 v-if="hasGoogleSignIn"
@@ -352,10 +353,10 @@ async function requestGoogleLink(): Promise<void> {
                 class="transition-all delay-[400ms] duration-500 ease-out"
                 :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
               >
-                <div class="flex justify-end">
+                <div class="flex justify-end overflow-hidden">
                   <RouterLink
                     :to="{ name: RouteNames.FORGOT_PASSWORD }"
-                    class="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                    class="max-w-full truncate text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
                   >
                     Forgot password?
                   </RouterLink>
@@ -440,12 +441,12 @@ async function requestGoogleLink(): Promise<void> {
 
 .auth-theme-toggle {
   position: absolute;
-  right: 1.5rem;
-  top: 1.5rem;
+  right: 0.875rem;
+  top: 0.875rem;
   z-index: 20;
   display: inline-flex;
-  height: 2.5rem;
-  width: 2.5rem;
+  height: 2.25rem;
+  width: 2.25rem;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
@@ -475,8 +476,8 @@ async function requestGoogleLink(): Promise<void> {
 
 .auth-logo-mark {
   display: inline-flex;
-  min-height: 4rem;
-  min-width: 4rem;
+  min-height: 3.25rem;
+  min-width: 3.25rem;
   align-items: center;
   justify-content: center;
   border-radius: 1.5rem;
@@ -485,6 +486,20 @@ async function requestGoogleLink(): Promise<void> {
   box-shadow: 0 18px 45px rgb(37 99 235 / 0.12);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+@media (min-width: 640px) {
+  .auth-theme-toggle {
+    right: 1.5rem;
+    top: 1.5rem;
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+
+  .auth-logo-mark {
+    min-height: 4rem;
+    min-width: 4rem;
+  }
 }
 
 .auth-status-row {
@@ -528,7 +543,7 @@ async function requestGoogleLink(): Promise<void> {
   background: rgb(255 255 255 / 0.75);
 }
 
-.dark .auth-side-panel {
+:global(.dark) .auth-side-panel {
   background:
     linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
     rgb(15 23 42 / 0.12);
@@ -536,37 +551,37 @@ async function requestGoogleLink(): Promise<void> {
   box-shadow: 0 24px 80px -38px rgb(0 0 0 / 0.82);
 }
 
-.dark .auth-login-card {
+:global(.dark) .auth-login-card {
   background:
     linear-gradient(145deg, rgb(15 23 42 / 0.66), rgb(15 23 42 / 0.42) 58%, rgb(15 23 42 / 0.52)),
     rgb(15 23 42 / 0.16);
 }
 
-.dark .auth-theme-toggle {
+:global(.dark) .auth-theme-toggle {
   border-color: rgb(255 255 255 / 0.1);
   background: rgb(255 255 255 / 0.08);
   color: rgb(226 232 240 / 0.86);
   box-shadow: 0 16px 38px rgb(0 0 0 / 0.28);
 }
 
-.dark .auth-theme-toggle:hover {
+:global(.dark) .auth-theme-toggle:hover {
   background: rgb(255 255 255 / 0.12);
 }
 
-.dark .auth-logo-mark,
-.dark .auth-status-row,
-.dark .auth-status-icon {
+:global(.dark) .auth-logo-mark,
+:global(.dark) .auth-status-row,
+:global(.dark) .auth-status-icon {
   border-color: rgb(255 255 255 / 0.1);
   background: rgb(255 255 255 / 0.08);
 }
 
-.dark :deep(.auth-form-input) {
+:global(.dark) :deep(.auth-form-input) {
   border-color: rgb(255 255 255 / 0.12);
   background: rgb(15 23 42 / 0.52);
   box-shadow: 0 12px 28px rgb(0 0 0 / 0.24);
 }
 
-.dark :deep(.auth-form-input:focus-visible) {
+:global(.dark) :deep(.auth-form-input:focus-visible) {
   background: rgb(15 23 42 / 0.66);
 }
 </style>
