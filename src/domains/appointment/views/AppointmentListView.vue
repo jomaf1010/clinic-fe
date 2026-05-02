@@ -35,7 +35,6 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
-import { appointmentApi } from '../api/appointmentApi'
 import { useAppointmentStore } from '../stores/appointmentStore'
 import AppointmentBookingWizard from '../components/AppointmentBookingWizard.vue'
 import AppointmentBoard from '../components/AppointmentBoard.vue'
@@ -64,8 +63,8 @@ const selectedAppointment = ref<AppointmentResponse | null>(null)
 const currentPage = ref(Number(route.query.page) || 1)
 const error = ref<string | null>(null)
 const boardTotal = ref(0)
-const doctors = ref<ClinicDoctor[]>([])
 const isLoadingDoctors = ref(false)
+const doctors = computed<ClinicDoctor[]>(() => store.boardDoctors)
 
 const calendarRef = ref<InstanceType<typeof AppointmentCalendar> | null>(null)
 const boardRef = ref<InstanceType<typeof AppointmentBoard> | null>(null)
@@ -119,8 +118,8 @@ function clearBookingPrefill() {
 async function onCalendarAppointmentClick(id: string) {
   savedScrollY = window.scrollY
   try {
-    const res = await appointmentApi.get(id)
-    selectedAppointment.value = res.data
+    await store.fetchAppointment(id)
+    selectedAppointment.value = store.current
     showDetailSheet.value = true
   } catch {
     // Fallback to cached data
@@ -243,12 +242,11 @@ async function fetchData() {
 }
 
 async function loadDoctors() {
-  if (doctors.value.length > 0 || isLoadingDoctors.value) return
+  if (store.boardDoctors.length > 0 || isLoadingDoctors.value) return
 
   isLoadingDoctors.value = true
   try {
-    const response = await appointmentApi.getDoctors()
-    doctors.value = response.data
+    await store.fetchDoctors()
   } catch {
     toast.error('Failed to load doctors')
   } finally {
@@ -287,8 +285,8 @@ async function openDetail(id: string) {
   }
 
   try {
-    const res = await appointmentApi.get(id)
-    selectedAppointment.value = res.data
+    await store.fetchAppointment(id)
+    selectedAppointment.value = store.current
     showDetailSheet.value = true
   } catch {
     toast.error('Failed to load appointment')

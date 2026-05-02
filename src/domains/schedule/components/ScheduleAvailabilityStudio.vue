@@ -69,6 +69,7 @@ const {
 const selectedDate = ref(toLocalDate(new Date()))
 const currentTime = ref(new Date())
 const monthRailRef = ref<HTMLElement | null>(null)
+const isMonthPickerOpen = ref(false)
 const statusFilter = ref<StatusFilter>('all')
 let currentTimeTimer: ReturnType<typeof setInterval> | null = null
 
@@ -229,6 +230,7 @@ const selectedDateValue = computed<DateValue>({
   get: () => isoToCalendarDate(selectedDate.value),
   set: (value) => {
     selectedDate.value = calendarDateToIso(value)
+    isMonthPickerOpen.value = false
   },
 })
 const monthDays = computed(() => Array.from({ length: daysInMonth(selectedDate.value) }, (_, index) => addDays(startOfMonth(selectedDate.value), index)))
@@ -361,14 +363,6 @@ function scrollSelectedMonthDay() {
   })
 }
 
-function goToPreviousDay() {
-  selectedDate.value = addDays(selectedDate.value, -1)
-}
-
-function goToNextDay() {
-  selectedDate.value = addDays(selectedDate.value, 1)
-}
-
 function goToPreviousMonth() {
   selectedDate.value = addMonths(selectedDate.value, -1)
 }
@@ -416,23 +410,6 @@ onUnmounted(() => {
           {{ scheduleTitle }}
         </h1>
         <div class="flex flex-wrap items-center gap-2 sm:justify-end">
-          <Button variant="outline" size="icon" class="schedule-control-button size-9" @click="goToPreviousDay">
-            <ChevronLeft class="size-4" />
-          </Button>
-          <Popover>
-            <PopoverTrigger as-child>
-              <Button variant="outline" class="schedule-date-trigger h-9 min-w-40 justify-start">
-                <CalendarDays class="size-4 text-muted-foreground" />
-                {{ formatDate(selectedDate) }}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent class="w-auto p-0" align="end">
-              <ShadcnCalendar v-model="selectedDateValue" />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="icon" class="schedule-control-button size-9" @click="goToNextDay">
-            <ChevronRight class="size-4" />
-          </Button>
           <Button variant="outline" class="schedule-action-button h-9" @click="emit('working-hours')">
             <Clock class="size-4" />
             Working hours
@@ -535,9 +512,20 @@ onUnmounted(() => {
             >
               <ChevronLeft class="size-4" />
             </Button>
-            <p class="min-w-44 text-center text-sm font-semibold text-foreground">
-              {{ selectedMonthLabel }}
-            </p>
+            <Popover v-model:open="isMonthPickerOpen">
+              <PopoverTrigger as-child>
+                <Button
+                  variant="ghost"
+                  class="schedule-month-picker h-8 min-w-44 rounded-full px-4 text-sm font-semibold text-foreground"
+                >
+                  <CalendarDays class="mr-2 size-4 text-muted-foreground" />
+                  {{ selectedMonthLabel }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="center">
+                <ShadcnCalendar v-model="selectedDateValue" />
+              </PopoverContent>
+            </Popover>
             <Button
               variant="ghost"
               size="icon"
@@ -1037,8 +1025,6 @@ onUnmounted(() => {
     inset 0 1px 0 rgb(255 255 255 / 0.28);
 }
 
-.schedule-control-button,
-.schedule-date-trigger,
 .schedule-action-button {
   box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
 }
@@ -1071,7 +1057,8 @@ onUnmounted(() => {
   width: 0;
 }
 
-.schedule-rail-scroll-button {
+.schedule-rail-scroll-button,
+.schedule-month-picker {
   position: relative;
   z-index: 2;
   background: rgb(255 255 255 / 0.5);
@@ -1264,7 +1251,8 @@ onUnmounted(() => {
 }
 
 :global(.dark .schedule-month-nav),
-:global(.dark .schedule-rail-scroll-button) {
+:global(.dark .schedule-rail-scroll-button),
+:global(.dark .schedule-month-picker) {
   background: rgb(15 23 42 / 0.44);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.06),

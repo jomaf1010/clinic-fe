@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { CalendarDate, type DateValue } from '@internationalized/date'
 import {
   Ban,
   CalendarDays,
   CalendarPlus,
+  ChevronLeft,
   ChevronRight,
   CheckCircle2,
   Clock,
@@ -16,6 +19,7 @@ import {
   X,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Calendar as ShadcnCalendar } from '@/components/ui/calendar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,10 +27,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { appointmentApi } from '../api/appointmentApi'
-import { scheduleApi } from '@/domains/schedule/api/scheduleApi'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useAppointmentStore } from '../stores/appointmentStore'
 import type { AppointmentResponse, AppointmentStatus, ClinicDoctor } from '../types/appointment.types'
-import type { BlockType, CalendarBlock, Slot } from '@/domains/schedule/types/schedule.types'
+import type { BlockType, CalendarBlock } from '@/domains/schedule/types/schedule.types'
 
 const props = defineProps<{
   doctorFilter: string
@@ -78,19 +82,22 @@ type TimelineItem =
 
 type TimelineMarker = Exclude<TimelineItem, { type: 'section' }>
 
+const appointmentStore = useAppointmentStore()
+const {
+  boardAppointments: appointments,
+  boardMonthAppointments: monthAppointments,
+  boardDoctors: doctors,
+  boardAvailabilityByDoctor: availabilityByDoctor,
+  boardCalendarBlocks: calendarBlocks,
+  isLoadingBoard: isLoading,
+  boardError: error,
+} = storeToRefs(appointmentStore)
 const selectedDate = ref(toLocalDate(new Date()))
-const appointments = ref<AppointmentResponse[]>([])
-const weekAppointments = ref<AppointmentResponse[]>([])
-const doctors = ref<ClinicDoctor[]>([])
-const availabilityByDoctor = ref<Record<string, Slot[]>>({})
-const calendarBlocks = ref<CalendarBlock[]>([])
-const isLoading = ref(false)
-const error = ref<string | null>(null)
 const hasAutoSelectedNextAppointmentDate = ref(false)
 const currentTime = ref(new Date())
+const monthRailRef = ref<HTMLElement | null>(null)
+const isMonthPickerOpen = ref(false)
 let currentTimeTimer: ReturnType<typeof setInterval> | null = null
-let latestFetchKey = ''
-let inFlightFetchKey = ''
 
 function toLocalDate(date: Date): string {
   const year = date.getFullYear()
@@ -103,20 +110,44 @@ function parseLocalDate(value: string): Date {
   return new Date(`${value}T00:00:00`)
 }
 
+function isoToCalendarDate(value: string): CalendarDate {
+  const [year, month, day] = value.split('-').map(Number)
+  return new CalendarDate(year!, month!, day!)
+}
+
+function calendarDateToIso(value: DateValue): string {
+  return `${value.year}-${String(value.month).padStart(2, '0')}-${String(value.day).padStart(2, '0')}`
+}
+
 function addDays(value: string, amount: number): string {
   const date = parseLocalDate(value)
   date.setDate(date.getDate() + amount)
   return toLocalDate(date)
 }
 
-function startOfWeek(value: string): string {
+function addMonths(value: string, amount: number): string {
   const date = parseLocalDate(value)
-  date.setDate(date.getDate() - date.getDay())
+  const originalDay = date.getDate()
+  date.setDate(1)
+  date.setMonth(date.getMonth() + amount)
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  date.setDate(Math.min(originalDay, lastDay))
   return toLocalDate(date)
 }
 
-function endOfWeek(value: string): string {
-  return addDays(startOfWeek(value), 6)
+function startOfMonth(value: string): string {
+  const date = parseLocalDate(value)
+  date.setDate(1)
+  return toLocalDate(date)
+}
+
+function endOfMonth(value: string): string {
+  return addDays(startOfMonth(value), daysInMonth(value) - 1)
+}
+
+function daysInMonth(value: string): number {
+  const date = parseLocalDate(value)
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
 }
 
 function formatDay(value: string): string {
@@ -135,8 +166,12 @@ function formatShortDate(value: string): string {
   return parseLocalDate(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function formatNumericDate(value: string): string {
-  return parseLocalDate(value).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+function formatMonthLabel(value: string): string {
+  return parseLocalDate(value).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+function formatDayNumber(value: string): string {
+  return parseLocalDate(value).toLocaleDateString('en-US', { day: 'numeric' })
 }
 
 function isTerminal(status: AppointmentStatus): boolean {
@@ -175,8 +210,16 @@ function minutesForIso(value: string): number {
   return date.getHours() * 60 + date.getMinutes()
 }
 
-const weekDays = computed(() => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(selectedDate.value), index)))
+const monthDays = computed(() => Array.from({ length: daysInMonth(selectedDate.value) }, (_, index) => addDays(startOfMonth(selectedDate.value), index)))
 const todayDate = computed(() => toLocalDate(currentTime.value))
+const selectedMonthLabel = computed(() => formatMonthLabel(selectedDate.value))
+const selectedDateValue = computed<DateValue>({
+  get: () => isoToCalendarDate(selectedDate.value),
+  set: (value) => {
+    selectedDate.value = calendarDateToIso(value)
+    isMonthPickerOpen.value = false
+  },
+})
 
 const selectedDayLabel = computed(() => {
   if (selectedDate.value === todayDate.value) return 'Today'
@@ -192,34 +235,33 @@ const selectedFlowTitle = computed(() => {
   return `${selectedDayLabel.value} flow`
 })
 
-const weekCounts = computed(() => {
+const monthCounts = computed(() => {
   const counts: Record<string, number> = {}
-  for (const day of weekDays.value) counts[day] = 0
-  for (const appointment of weekAppointments.value) {
+  for (const day of monthDays.value) counts[day] = 0
+  for (const appointment of monthAppointments.value) {
     const key = toLocalDate(new Date(appointment.scheduled_at))
     if (key in counts) counts[key] = (counts[key] ?? 0) + 1
   }
   return counts
 })
 
-const weekStartLabel = computed(() => {
-  const firstDay = weekDays.value[0]
-  return firstDay ? formatShortDate(firstDay) : ''
-})
-
-const weekEndLabel = computed(() => {
-  const lastDay = weekDays.value[6]
-  return lastDay ? formatShortDate(lastDay) : ''
-})
-
-function getWeekCount(day: string): number {
-  return weekCounts.value[day] ?? 0
+function dayLoadCount(day: string): number {
+  return monthCounts.value[day] ?? 0
 }
 
-function weekHeatBars(day: string): number[] {
-  const count = getWeekCount(day)
-  const intensity = count > 0 ? Math.min(0.95, 0.42 + count * 0.12) : 0.18
-  return Array.from({ length: 4 }, (_, index) => Math.max(0.18, intensity - (3 - index) * 0.08))
+function dayLoadDotStyle(day: string): Record<string, string> {
+  const count = dayLoadCount(day)
+  if (count <= 0) {
+    return {
+      background: 'rgb(148 163 184 / 0.46)',
+      boxShadow: 'inset 0 0 0 1px rgb(255 255 255 / 0.24)',
+    }
+  }
+
+  return {
+    background: 'rgb(57 255 20)',
+    boxShadow: '0 0 8px rgb(57 255 20 / 0.7), 0 0 18px rgb(57 255 20 / 0.34), inset 0 0 0 1px rgb(255 255 255 / 0.42)',
+  }
 }
 
 const totalOpenSlots = computed(() => Object.values(availabilityByDoctor.value)
@@ -265,11 +307,15 @@ const timelineAppointments = computed(() => appointments.value
 
 const timelineItems = computed<TimelineItem[]>(() => {
   const now = currentTime.value
-  const markers: TimelineMarker[] = [{
-    type: 'now',
-    key: 'current-time',
-    sortMinutes: now.getHours() * 60 + now.getMinutes(),
-  }]
+  const markers: TimelineMarker[] = []
+
+  if (selectedDate.value === todayDate.value) {
+    markers.push({
+      type: 'now',
+      key: 'current-time',
+      sortMinutes: now.getHours() * 60 + now.getMinutes(),
+    })
+  }
 
   for (const appointment of timelineAppointments.value) {
     const scheduledAt = new Date(appointment.scheduled_at)
@@ -404,72 +450,58 @@ function blockTimeRange(block: CalendarBlock): string {
 }
 
 async function fetchBoard(): Promise<void> {
-  const doctorId = props.doctorFilter !== 'all' ? props.doctorFilter : undefined
-  const status = props.statusFilter !== 'all' ? props.statusFilter as AppointmentStatus : undefined
-  const start = startOfWeek(selectedDate.value)
-  const end = endOfWeek(selectedDate.value)
-  const fetchKey = `${selectedDate.value}:${start}:${end}:${doctorId ?? 'all'}:${status ?? 'all'}`
-  if (inFlightFetchKey === fetchKey) return
-  latestFetchKey = fetchKey
-  inFlightFetchKey = fetchKey
-  isLoading.value = true
-  error.value = null
+  const start = startOfMonth(selectedDate.value)
+  const end = endOfMonth(selectedDate.value)
+  await appointmentStore.fetchBoardData({
+    date: selectedDate.value,
+    start,
+    end,
+    doctorFilter: props.doctorFilter,
+    statusFilter: props.statusFilter,
+  })
 
-  try {
-    const [weekResult, doctorsResult] = await Promise.all([
-      appointmentApi.list(1, 500, { start_date: start, end_date: end, ...(doctorId ? { doctor_id: doctorId } : {}), ...(status ? { status } : {}) }),
-      doctors.value.length > 0 ? Promise.resolve(null) : appointmentApi.getDoctors(),
-    ])
-    if (latestFetchKey !== fetchKey) return
-
-    const dayAppointments = weekResult.data.filter((appointment) => isSameDay(appointment.scheduled_at, selectedDate.value))
-    appointments.value = dayAppointments
-    weekAppointments.value = weekResult.data
-    if (doctorsResult) {
-      doctors.value = doctorsResult.data
-    }
-
-    const nextVisibleAppointment = getNextVisibleAppointment(weekResult.data)
-    if (
-      !hasAutoSelectedNextAppointmentDate.value
-      && dayAppointments.length === 0
-      && selectedDate.value === toLocalDate(new Date())
-      && nextVisibleAppointment
-    ) {
-      hasAutoSelectedNextAppointmentDate.value = true
-      selectedDate.value = toLocalDate(new Date(nextVisibleAppointment.scheduled_at))
-      return
-    }
-
-    const availabilityEntries = await Promise.all(visibleDoctors.value.map(async (doctor) => {
-      try {
-        const response = await scheduleApi.getAvailability(doctor.id, selectedDate.value)
-        return [doctor.id, response.data.slots, response.data.blocks] as const
-      } catch {
-        return [doctor.id, [] as Slot[], [] as CalendarBlock[]] as const
-      }
-    }))
-
-    if (latestFetchKey !== fetchKey) return
-    availabilityByDoctor.value = Object.fromEntries(availabilityEntries.map(([doctorId, slots]) => [doctorId, slots]))
-    calendarBlocks.value = Array.from(new Map(availabilityEntries
-      .flatMap(([, , blocks]) => blocks)
-      .map((block) => [block.id, block])).values())
-  } catch {
-    if (latestFetchKey !== fetchKey) return
-    error.value = 'Failed to load appointment board.'
-  } finally {
-    if (inFlightFetchKey === fetchKey) {
-      inFlightFetchKey = ''
-    }
-    if (latestFetchKey === fetchKey) {
-      isLoading.value = false
-    }
+  const nextVisibleAppointment = getNextVisibleAppointment(monthAppointments.value)
+  if (
+    !hasAutoSelectedNextAppointmentDate.value
+    && appointments.value.length === 0
+    && selectedDate.value === toLocalDate(new Date())
+    && nextVisibleAppointment
+  ) {
+    hasAutoSelectedNextAppointmentDate.value = true
+    selectedDate.value = toLocalDate(new Date(nextVisibleAppointment.scheduled_at))
   }
 }
 
 function selectDate(date: string): void {
   selectedDate.value = date
+}
+
+function scrollMonthRail(direction: -1 | 1) {
+  const rail = monthRailRef.value
+  if (!rail) return
+
+  rail.scrollBy({
+    left: direction * Math.max(160, rail.clientWidth * 0.72),
+    behavior: 'smooth',
+  })
+}
+
+function scrollSelectedMonthDay() {
+  void nextTick(() => {
+    monthRailRef.value?.querySelector('.appointment-month-day.is-selected')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    })
+  })
+}
+
+function goToPreviousMonth() {
+  selectedDate.value = addMonths(selectedDate.value, -1)
+}
+
+function goToNextMonth() {
+  selectedDate.value = addMonths(selectedDate.value, 1)
 }
 
 function bookAt(slotStart: string | null, doctorId: string | null = null, doctorName: string | null = null): void {
@@ -490,6 +522,7 @@ watch(() => props.doctorFilter, () => {
 })
 
 watch(selectedDate, () => {
+  scrollSelectedMonthDay()
   void fetchBoard()
 })
 
@@ -573,10 +606,95 @@ defineExpose({ refetch: fetchBoard })
       <Button variant="outline" size="sm" class="mt-2" @click="fetchBoard">Try again</Button>
     </div>
 
-    <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(430px,0.86fr)]">
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
       <section class="appointment-board-panel surface-card overflow-hidden rounded-2xl">
         <div class="appointment-board-panel-header flex items-center justify-between px-4 py-3">
           <h2 class="text-base font-semibold">{{ selectedFlowTitle }}</h2>
+        </div>
+
+        <div class="appointment-month-strip px-4 py-4">
+          <div class="mb-3 flex items-center justify-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="appointment-month-nav size-8 rounded-full"
+              aria-label="Previous month"
+              @click="goToPreviousMonth"
+            >
+              <ChevronLeft class="size-4" />
+            </Button>
+            <Popover v-model:open="isMonthPickerOpen">
+              <PopoverTrigger as-child>
+                <Button
+                  variant="ghost"
+                  class="appointment-month-picker h-8 min-w-44 rounded-full px-4 text-sm font-semibold text-foreground"
+                >
+                  <CalendarDays class="mr-2 size-4 text-muted-foreground" />
+                  {{ selectedMonthLabel }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-auto p-0" align="center">
+                <ShadcnCalendar v-model="selectedDateValue" />
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="appointment-month-nav size-8 rounded-full"
+              aria-label="Next month"
+              @click="goToNextMonth"
+            >
+              <ChevronRight class="size-4" />
+            </Button>
+          </div>
+
+          <div class="appointment-month-rail-shell grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="appointment-rail-scroll-button size-8 rounded-full"
+              aria-label="Scroll dates left"
+              @click="scrollMonthRail(-1)"
+            >
+              <ChevronLeft class="size-4" />
+            </Button>
+            <div
+              ref="monthRailRef"
+              class="appointment-month-rail flex gap-3 overflow-x-auto pb-1"
+            >
+              <button
+                v-for="day in monthDays"
+                :key="day"
+                class="appointment-month-day flex min-w-[64px] snap-center flex-col items-center justify-between rounded-full px-2 py-2 text-center transition-all"
+                :class="[
+                  day === selectedDate ? 'is-selected' : 'hover:bg-white/42 dark:hover:bg-white/5',
+                  day === todayDate ? 'is-today' : '',
+                ]"
+                @click="selectDate(day)"
+              >
+                <p class="text-xs font-medium">{{ formatDay(day) }}</p>
+                <span class="appointment-month-day-number mt-1 flex size-9 items-center justify-center rounded-full text-sm font-semibold">
+                  {{ formatDayNumber(day) }}
+                </span>
+                <div class="mt-2 flex justify-center">
+                  <span
+                    class="appointment-load-dot"
+                    :aria-label="`${dayLoadCount(day)} appointments`"
+                    :style="dayLoadDotStyle(day)"
+                  />
+                </div>
+              </button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="appointment-rail-scroll-button size-8 rounded-full"
+              aria-label="Scroll dates right"
+              @click="scrollMonthRail(1)"
+            >
+              <ChevronRight class="size-4" />
+            </Button>
+          </div>
         </div>
 
         <div v-if="isLoading" class="surface-muted m-5 flex items-center justify-center rounded-2xl py-16">
@@ -806,54 +924,67 @@ defineExpose({ refetch: fetchBoard })
         <section class="appointment-board-side-card surface-card rounded-2xl p-4">
           <div class="mb-3 flex items-center justify-between">
             <div>
-              <h2 class="text-base font-semibold">Week at a glance</h2>
-              <p class="text-xs text-muted-foreground">{{ weekStartLabel }} - {{ weekEndLabel }}</p>
+              <h2 class="text-base font-semibold">Next up</h2>
+              <p class="text-xs text-muted-foreground">{{ selectedDate === todayDate ? 'Today' : formatShortDate(selectedDate) }}</p>
+            </div>
+            <span
+              v-if="nextAppointment"
+              class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
+            >
+              {{ formatStatus(nextAppointment.status) }}
+            </span>
+          </div>
+
+          <div v-if="isLoading" class="grid gap-4 sm:grid-cols-[48px_minmax(0,1fr)]">
+            <span class="appointment-skeleton block size-12 rounded-full" />
+            <div class="space-y-3">
+              <span class="appointment-skeleton block h-5 w-44 rounded-full" />
+              <span class="appointment-skeleton block h-4 w-28 rounded-full" />
+              <div class="grid gap-2 sm:grid-cols-2">
+                <span class="appointment-skeleton block h-12 rounded-xl" />
+                <span class="appointment-skeleton block h-12 rounded-xl" />
+              </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-7 gap-2">
-            <button
-              v-for="day in weekDays"
-              :key="day"
-              :class="[
-                'appointment-week-day rounded-2xl p-2 text-center transition-all',
-                day === todayDate
-                  ? 'is-today text-teal-950 dark:text-teal-100'
-                  : day === selectedDate
-                    ? 'is-selected text-foreground'
-                    : 'hover:bg-white/40 dark:hover:bg-white/5',
-              ]"
-              @click="selectDate(day)"
+          <div v-else-if="nextAppointment" class="grid gap-4 sm:grid-cols-[48px_minmax(0,1fr)]">
+            <img
+              v-if="patientAvatar(nextAppointment)"
+              :src="patientAvatar(nextAppointment) ?? undefined"
+              alt=""
+              class="size-12 rounded-full object-cover"
             >
-              <span class="block text-[10px] font-medium">{{ formatDay(day) }}</span>
-              <span class="mt-0.5 block text-xs">{{ formatNumericDate(day) }}</span>
-              <span
-                v-if="day === todayDate"
-                class="mt-1 inline-flex rounded-full bg-teal-500 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white"
-              >
-                Today
-              </span>
-              <span class="mt-3 block space-y-1">
-                <span
-                  v-for="(opacity, index) in weekHeatBars(day)"
-                  :key="index"
-                  class="mx-auto block h-1 w-8 rounded-full bg-teal-500"
-                  :style="{ opacity }"
-                />
-              </span>
-            </button>
-          </div>
-          <div class="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
-            <div class="flex items-center gap-1.5">
-              <span>Low</span>
-              <span class="size-2 rounded-sm bg-teal-100" />
-              <span class="size-2 rounded-sm bg-teal-200" />
-              <span class="size-2 rounded-sm bg-teal-400" />
-              <span class="size-2 rounded-sm bg-teal-600" />
-              <span class="size-2 rounded-sm bg-teal-800" />
-              <span>High</span>
+            <div v-else class="flex size-12 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-200">
+              {{ patientInitials(nextAppointment.patient_name) }}
             </div>
-            <span>More appointments = darker</span>
+            <div class="min-w-0">
+              <p class="truncate font-semibold">{{ nextAppointment.patient_name ?? 'Patient' }}</p>
+              <p class="text-sm text-muted-foreground">{{ nextAppointment.reason || 'Consultation' }}</p>
+              <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                <div class="surface-muted rounded-xl px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Scheduled time</p>
+                  <p class="text-sm font-semibold">{{ formatTime(nextAppointment.scheduled_at) }}</p>
+                </div>
+                <div class="surface-muted rounded-xl px-3 py-2">
+                  <p class="text-xs text-muted-foreground">Duration</p>
+                  <p class="text-sm font-semibold">{{ nextAppointment.duration }} min</p>
+                </div>
+              </div>
+              <div v-if="canManage && nextAppointment.status === 'scheduled'" class="mt-4 flex flex-wrap gap-2">
+                <Button size="sm" class="h-9 gap-1.5" @click="emit('check-in', nextAppointment.id)">
+                  <LogIn class="size-3.5" />
+                  Check In
+                </Button>
+                <Button variant="outline" size="sm" class="h-9 gap-1.5" @click="emit('reschedule', nextAppointment)">
+                  <CalendarDays class="size-3.5" />
+                  Reschedule
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="surface-muted rounded-2xl py-8 text-center text-sm text-muted-foreground">
+            Nothing urgent next. The appointment flow is calm for now.
           </div>
         </section>
 
@@ -925,7 +1056,8 @@ defineExpose({ refetch: fetchBoard })
     var(--surface-panel-strong);
 }
 
-.appointment-board-panel-header {
+.appointment-board-panel-header,
+.appointment-month-strip {
   box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.32);
 }
 
@@ -942,6 +1074,111 @@ defineExpose({ refetch: fetchBoard })
   border: 1px solid rgb(94 234 212 / 0.42);
   background: rgb(240 253 250 / 0.72);
   box-shadow: 0 10px 24px rgb(15 118 110 / 0.1);
+}
+
+.appointment-month-rail {
+  margin: -0.75rem -0.5rem -1rem;
+  padding: 0.75rem 0.5rem 1.35rem;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.appointment-month-rail::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.appointment-rail-scroll-button,
+.appointment-month-nav,
+.appointment-month-picker {
+  position: relative;
+  z-index: 2;
+  background: rgb(255 255 255 / 0.5);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.54),
+    0 12px 28px rgb(15 23 42 / 0.08);
+}
+
+.appointment-month-day {
+  color: rgb(71 85 105);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 255 255 / 0.78), transparent 58%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.38)),
+    rgb(255 255 255 / 0.36);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.64),
+    inset 0 0 0 1px rgb(255 255 255 / 0.44),
+    0 14px 30px rgb(15 23 42 / 0.08);
+}
+
+.appointment-month-day-number {
+  background: rgb(255 255 255 / 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.5),
+    0 10px 22px rgb(15 23 42 / 0.08);
+}
+
+.appointment-month-day.is-today:not(.is-selected) .appointment-month-day-number {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.42),
+    0 14px 30px rgb(37 99 235 / 0.18),
+    0 12px 26px rgb(20 184 166 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.24);
+}
+
+.appointment-month-day.is-selected {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.46),
+    0 22px 52px rgb(37 99 235 / 0.26),
+    0 18px 42px rgb(20 184 166 / 0.24),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.appointment-month-day.is-selected .appointment-month-day-number {
+  background: rgb(255 255 255 / 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.24),
+    0 8px 18px rgb(15 23 42 / 0.12);
+}
+
+.appointment-load-dot {
+  display: inline-flex;
+  height: 0.45rem;
+  width: 0.45rem;
+  border-radius: 9999px;
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.appointment-skeleton {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgb(248 253 255 / 0.9), rgb(203 232 242 / 0.52)),
+    rgb(214 237 246 / 0.48);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    inset 0 0 0 1px rgb(125 211 252 / 0.14),
+    0 10px 26px rgb(15 23 42 / 0.04);
+}
+
+.appointment-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.58), transparent);
+  animation: appointment-skeleton-shimmer 1.2s ease-in-out infinite;
 }
 
 .appointment-timeline-card:hover,
@@ -962,22 +1199,6 @@ defineExpose({ refetch: fetchBoard })
 
 .appointment-block-card--quiet {
   border: 1px dashed rgb(148 163 184 / 0.28);
-}
-
-.appointment-week-day {
-  border: 0;
-}
-
-.appointment-week-day.is-today {
-  background: rgb(204 251 241 / 0.78);
-  box-shadow:
-    0 12px 26px rgb(15 118 110 / 0.12),
-    inset 0 0 0 1px rgb(45 212 191 / 0.46);
-}
-
-.appointment-week-day.is-selected {
-  background: rgb(219 234 254 / 0.72);
-  box-shadow: inset 0 0 0 1px rgb(96 165 250 / 0.34);
 }
 
 .appointment-doctor-lanes {
@@ -1001,7 +1222,8 @@ defineExpose({ refetch: fetchBoard })
     0 24px 80px -38px rgb(0 0 0 / 0.82);
 }
 
-:global(.dark .appointment-board-panel-header) {
+:global(.dark .appointment-board-panel-header),
+:global(.dark .appointment-month-strip) {
   box-shadow:
     inset 0 -1px 0 rgb(148 163 184 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.03);
@@ -1018,6 +1240,66 @@ defineExpose({ refetch: fetchBoard })
   box-shadow: 0 14px 34px rgb(0 0 0 / 0.22);
 }
 
+:global(.dark .appointment-month-nav),
+:global(.dark .appointment-rail-scroll-button),
+:global(.dark .appointment-month-picker) {
+  background: rgb(15 23 42 / 0.44);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 14px 30px rgb(0 0 0 / 0.24);
+}
+
+:global(.dark .appointment-month-day) {
+  color: rgb(203 213 225 / 0.82);
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.56), rgb(15 23 42 / 0.28)),
+    rgb(15 23 42 / 0.18);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+:global(.dark .appointment-month-day-number) {
+  background: rgb(255 255 255 / 0.06);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    0 10px 22px rgb(0 0 0 / 0.16);
+}
+
+:global(.dark .appointment-month-day.is-today:not(.is-selected) .appointment-month-day-number) {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.18),
+    0 14px 34px rgb(56 189 248 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .appointment-month-day.is-selected) {
+  color: white;
+  background:
+    linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)),
+    rgb(20 184 166);
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.22),
+    0 18px 42px rgb(37 99 235 / 0.22),
+    0 16px 36px rgb(20 184 166 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.22);
+}
+
+:global(.dark .appointment-skeleton) {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.035)),
+    rgb(15 23 42 / 0.28);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+:global(.dark .appointment-skeleton::after) {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.09), transparent);
+}
+
 :global(.dark .appointment-timeline-card:hover),
 :global(.dark .appointment-block-card:hover) {
   background:
@@ -1030,19 +1312,13 @@ defineExpose({ refetch: fetchBoard })
     0 24px 80px -38px rgb(0 0 0 / 0.82);
 }
 
-:global(.dark .appointment-week-day.is-today) {
-  background: rgb(20 184 166 / 0.14);
-  box-shadow:
-    0 0 0 1px rgb(94 234 212 / 0.22),
-    0 14px 34px rgb(20 184 166 / 0.1);
-}
-
-:global(.dark .appointment-week-day.is-selected) {
-  background: rgb(59 130 246 / 0.14);
-  box-shadow: inset 0 0 0 1px rgb(96 165 250 / 0.2);
-}
-
 :global(.dark .appointment-doctor-lanes) {
   border-color: rgb(148 163 184 / 0.1);
+}
+
+@keyframes appointment-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }
 </style>
