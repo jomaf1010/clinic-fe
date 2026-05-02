@@ -167,7 +167,7 @@ async function requestGoogleLink(): Promise<void> {
 </script>
 
 <template>
-  <div class="auth-shell relative flex min-h-dvh items-start justify-center overflow-x-hidden overflow-y-auto px-4 pb-5 pt-16 sm:items-center sm:px-6 sm:py-6">
+  <div class="auth-shell relative flex min-h-dvh items-center justify-center overflow-x-hidden overflow-y-auto px-4 py-16 sm:px-6 sm:py-6">
     <canvas ref="canvasRef" class="pointer-events-none absolute inset-0 opacity-55" />
     <button
       type="button"
