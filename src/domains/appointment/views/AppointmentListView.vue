@@ -443,16 +443,16 @@ onUnmounted(() => {
 
 <template>
   <FeatureGate feature="appointments" label="Appointments">
-  <div class="flex flex-1 flex-col gap-4 pt-4">
+  <div class="appointment-list-shell flex flex-1 flex-col gap-4 pt-4">
     <!-- Header -->
     <div class="flex flex-col gap-3">
-      <div class="flex items-center gap-3">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div class="flex min-w-0 flex-1 items-center gap-3">
-          <h1 class="text-2xl font-semibold">Appointments</h1>
-          <Badge variant="secondary" class="rounded-full text-xs">{{ appointmentTotal }}</Badge>
+          <h1 class="text-2xl font-semibold tracking-normal">Appointments</h1>
+          <Badge variant="secondary" class="rounded-full px-2.5 text-sm tabular-nums">{{ appointmentTotal }}</Badge>
         </div>
 
-        <Button class="h-10 gap-2 px-4" @click="openBookingWizard()">
+        <Button class="h-10 w-full gap-2 px-5 text-sm sm:w-auto" @click="openBookingWizard()">
           <Plus class="size-4" />
           <span>Book appointment</span>
         </Button>
@@ -460,23 +460,23 @@ onUnmounted(() => {
 
       <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <!-- View toggle -->
-        <div class="flex h-10 w-fit items-center rounded-md border bg-background">
+        <div class="appointment-view-tabs surface-muted flex h-10 w-full items-center rounded-full p-1 sm:w-fit">
           <button
-            :class="['flex h-full items-center gap-2 rounded-l-md px-4 text-sm font-medium transition-colors', viewMode === 'board' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
+            :class="['appointment-view-tab flex h-full flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-all sm:flex-none', viewMode === 'board' ? 'is-active' : 'text-muted-foreground hover:text-foreground']"
             @click="viewMode = 'board'"
           >
             <LayoutDashboard class="size-4" />
-            Today Board
+            <span><span class="hidden sm:inline">Today </span>Board</span>
           </button>
           <button
-            :class="['flex h-full items-center gap-2 border-l px-4 text-sm font-medium transition-colors', viewMode === 'calendar' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
+            :class="['appointment-view-tab flex h-full flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-all sm:flex-none', viewMode === 'calendar' ? 'is-active' : 'text-muted-foreground hover:text-foreground']"
             @click="viewMode = 'calendar'"
           >
             <CalendarCheck class="size-4" />
             Calendar
           </button>
           <button
-            :class="['flex h-full items-center gap-2 rounded-r-md border-l px-4 text-sm font-medium transition-colors', viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
+            :class="['appointment-view-tab flex h-full flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-all sm:flex-none', viewMode === 'list' ? 'is-active' : 'text-muted-foreground hover:text-foreground']"
             @click="viewMode = 'list'"
           >
             <List class="size-4" />
@@ -486,7 +486,7 @@ onUnmounted(() => {
 
         <div class="flex flex-wrap items-center gap-2 lg:justify-end">
           <Select v-model="doctorFilter" @update:model-value="onFilterChange">
-            <SelectTrigger class="h-10 w-[170px]">
+            <SelectTrigger class="appointment-select-trigger h-10 w-full sm:w-[170px]">
               <span class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                 <UserRound class="size-4 shrink-0" />
                 <SelectValue class="min-w-0 flex-1 truncate" placeholder="All doctors" />
@@ -506,7 +506,7 @@ onUnmounted(() => {
 
           <!-- Status filter -->
           <Select v-model="statusFilter" @update:model-value="onFilterChange">
-            <SelectTrigger class="h-10 w-[170px]">
+            <SelectTrigger class="appointment-select-trigger h-10 w-full sm:w-[170px]">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
@@ -523,7 +523,7 @@ onUnmounted(() => {
 
       <div v-if="viewMode === 'list'" class="flex flex-wrap items-center gap-2">
         <!-- Range quick filters (list view only) -->
-        <div class="flex h-8 items-center rounded-md border text-xs">
+        <div class="appointment-range-tabs surface-muted flex h-9 w-full items-center overflow-x-auto rounded-full p-1 text-xs sm:w-fit">
           <button
             v-for="opt in [
               { value: 'today', label: 'Today' },
@@ -535,9 +535,9 @@ onUnmounted(() => {
             ]"
             :key="opt.value"
             :class="[
-              'h-full px-2.5 font-medium transition-colors first:rounded-l-md last:rounded-r-md',
+              'h-full shrink-0 rounded-full px-3 font-medium transition-all',
               activeRange === opt.value
-                ? 'bg-primary text-primary-foreground'
+                ? 'is-active'
                 : 'text-muted-foreground hover:text-foreground',
             ]"
             @click="onRangeChange(opt.value)"
@@ -553,7 +553,7 @@ onUnmounted(() => {
               <Button
                 variant="outline"
                 size="sm"
-                class="h-8 w-[160px] justify-start text-left font-normal"
+                class="appointment-date-trigger h-9 w-[160px] justify-start text-left font-normal"
                 :class="{ 'text-muted-foreground': !dateFilter }"
               >
                 <CalendarIcon class="mr-1.5 size-3.5" />
@@ -620,7 +620,7 @@ onUnmounted(() => {
       <div
         v-else-if="error"
         role="alert"
-        class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+        class="surface-card rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         {{ error }}
         <Button variant="outline" size="sm" class="mt-2" @click="fetchData">
@@ -631,9 +631,9 @@ onUnmounted(() => {
       <!-- Empty state -->
       <div
         v-else-if="store.appointments.length === 0"
-        class="flex flex-col items-center justify-center py-16 text-center"
+        class="surface-card flex flex-col items-center justify-center rounded-2xl py-16 text-center"
       >
-        <div class="mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
+        <div class="appointment-empty-icon mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
           <CalendarCheck class="size-6 text-primary" />
         </div>
         <p class="text-sm font-medium">No appointments found</p>
@@ -647,7 +647,7 @@ onUnmounted(() => {
       </div>
 
       <!-- List -->
-      <div v-else class="flex flex-col gap-2">
+      <div v-else class="appointment-list-stack flex flex-col gap-3">
         <AppointmentCard
           v-for="appt in store.appointments"
           :key="appt.id"
@@ -787,3 +787,48 @@ onUnmounted(() => {
   </div>
   </FeatureGate>
 </template>
+
+<style scoped>
+.appointment-view-tabs,
+.appointment-range-tabs {
+  border: 0;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.appointment-view-tab.is-active,
+.appointment-range-tabs .is-active {
+  color: white;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 12px 26px rgb(37 99 235 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+.appointment-select-trigger,
+.appointment-date-trigger {
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.appointment-empty-icon {
+  box-shadow: 0 14px 34px rgb(37 99 235 / 0.12);
+}
+
+:global(.dark .appointment-view-tabs),
+:global(.dark .appointment-range-tabs) {
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.62), rgb(15 23 42 / 0.28)),
+    rgb(15 23 42 / 0.2);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 16px 38px rgb(0 0 0 / 0.26);
+}
+
+:global(.dark .appointment-view-tab.is-active),
+:global(.dark .appointment-range-tabs .is-active) {
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.14),
+    0 14px 34px rgb(56 189 248 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+</style>

@@ -345,9 +345,9 @@ const doctorLanes = computed<DoctorLane[]>(() => visibleDoctors.value.map((docto
 }))
 
 function appointmentCardClasses(status: AppointmentStatus): string {
-  if (status === 'checked_in') return 'border-emerald-200 bg-white shadow-sm shadow-emerald-950/5 dark:border-emerald-900 dark:bg-background'
-  if (status === 'cancelled' || status === 'no_show') return 'border-muted bg-muted/40 text-muted-foreground opacity-75'
-  return 'border-border bg-white shadow-sm dark:bg-background'
+  if (status === 'checked_in') return 'appointment-timeline-card--checked-in'
+  if (status === 'cancelled' || status === 'no_show') return 'appointment-timeline-card--quiet text-muted-foreground opacity-75'
+  return 'appointment-timeline-card--scheduled'
 }
 
 function formatStatus(status: AppointmentStatus): string {
@@ -510,9 +510,9 @@ defineExpose({ refetch: fetchBoard })
 <template>
   <div class="space-y-4">
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <div class="rounded-lg border bg-background p-4 shadow-sm">
+      <div class="appointment-board-stat surface-card rounded-2xl p-4">
         <div class="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">
+          <span class="appointment-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-[0_16px_32px_rgba(37,99,235,0.24)]">
             <CalendarDays class="size-6" />
           </span>
           <div>
@@ -523,9 +523,9 @@ defineExpose({ refetch: fetchBoard })
         </div>
         <p class="mt-3 text-sm text-muted-foreground">{{ stats.scheduled }} appointments</p>
       </div>
-      <div class="rounded-lg border bg-background p-4 shadow-sm">
+      <div class="appointment-board-stat surface-card rounded-2xl p-4">
         <div class="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
+          <span class="appointment-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_16px_32px_rgba(16,185,129,0.24)]">
             <CheckCircle2 class="size-6" />
           </span>
           <div>
@@ -536,9 +536,9 @@ defineExpose({ refetch: fetchBoard })
         </div>
         <p class="mt-3 text-sm text-muted-foreground">0 waiting</p>
       </div>
-      <div class="rounded-lg border bg-background p-4 shadow-sm">
+      <div class="appointment-board-stat surface-card rounded-2xl p-4">
         <div class="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-sm">
+          <span class="appointment-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_16px_32px_rgba(245,158,11,0.24)]">
             <Clock class="size-6" />
           </span>
           <div class="min-w-0">
@@ -553,9 +553,9 @@ defineExpose({ refetch: fetchBoard })
           {{ nextAppointment?.patient_name ?? 'No more scheduled visits' }}
         </p>
       </div>
-      <div class="rounded-lg border bg-background p-4 shadow-sm">
+      <div class="appointment-board-stat surface-card rounded-2xl p-4">
         <div class="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3">
-          <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-sm">
+          <span class="appointment-stat-icon flex size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-[0_16px_32px_rgba(139,92,246,0.24)]">
             <CalendarPlus class="size-6" />
           </span>
           <div>
@@ -568,23 +568,23 @@ defineExpose({ refetch: fetchBoard })
       </div>
     </div>
 
-    <div v-if="error" role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+    <div v-if="error" role="alert" class="surface-card rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
       {{ error }}
       <Button variant="outline" size="sm" class="mt-2" @click="fetchBoard">Try again</Button>
     </div>
 
     <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(430px,0.86fr)]">
-      <section class="overflow-hidden rounded-lg border bg-background shadow-sm">
-        <div class="flex items-center justify-between border-b px-4 py-3">
+      <section class="appointment-board-panel surface-card overflow-hidden rounded-2xl">
+        <div class="appointment-board-panel-header flex items-center justify-between px-4 py-3">
           <h2 class="text-base font-semibold">{{ selectedFlowTitle }}</h2>
         </div>
 
-        <div v-if="isLoading" class="m-5 flex items-center justify-center rounded-lg border py-16">
+        <div v-if="isLoading" class="surface-muted m-5 flex items-center justify-center rounded-2xl py-16">
           <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
         </div>
 
-        <div v-else-if="appointments.length === 0 && selectedDayBlocks.length === 0" class="m-5 flex flex-col items-center justify-center rounded-lg border py-16 text-center">
-          <div class="mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
+        <div v-else-if="appointments.length === 0 && selectedDayBlocks.length === 0" class="surface-muted m-5 flex flex-col items-center justify-center rounded-2xl py-16 text-center">
+          <div class="appointment-empty-icon mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
             <CalendarDays class="size-6 text-primary" />
           </div>
           <p class="text-sm font-medium">No appointments for this day</p>
@@ -596,7 +596,7 @@ defineExpose({ refetch: fetchBoard })
         </div>
 
         <div v-else class="relative px-4 py-5">
-          <div class="absolute bottom-9 left-[102px] top-14 w-px bg-border" />
+          <div class="appointment-timeline-line absolute bottom-9 left-[102px] top-14 w-px" />
 
           <div class="space-y-4">
             <div
@@ -620,7 +620,7 @@ defineExpose({ refetch: fetchBoard })
 
               <template v-else-if="item.type === 'now'">
                 <div class="flex justify-end">
-                  <span class="whitespace-nowrap rounded-md border border-teal-300 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-700">
+                  <span class="appointment-now-pill whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-teal-700">
                     {{ currentTimeLabel }}
                   </span>
                 </div>
@@ -647,7 +647,7 @@ defineExpose({ refetch: fetchBoard })
                 <div
                   role="button"
                   tabindex="0"
-                  :class="['relative min-h-24 rounded-lg border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md', appointmentCardClasses(item.appointment.status)]"
+                  :class="['appointment-timeline-card relative min-h-24 rounded-2xl p-3 text-left transition-all hover:-translate-y-0.5', appointmentCardClasses(item.appointment.status)]"
                   @click="emit('appointment-click', item.appointment.id)"
                   @keydown.enter.space.prevent="emit('appointment-click', item.appointment.id)"
                 >
@@ -753,10 +753,10 @@ defineExpose({ refetch: fetchBoard })
 
                 <div
                   :class="[
-                    'relative rounded-lg border p-3 text-left',
+                    'appointment-block-card relative rounded-2xl p-3 text-left',
                     item.block.type === 'leave' || item.block.type === 'unavailable'
-                      ? 'border-dashed bg-muted/30'
-                      : 'bg-background',
+                      ? 'appointment-block-card--quiet'
+                      : '',
                   ]"
                 >
                   <div class="grid gap-3 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:items-center">
@@ -803,7 +803,7 @@ defineExpose({ refetch: fetchBoard })
       </section>
 
       <aside class="space-y-3">
-        <section class="rounded-lg border bg-background p-4 shadow-sm">
+        <section class="appointment-board-side-card surface-card rounded-2xl p-4">
           <div class="mb-3 flex items-center justify-between">
             <div>
               <h2 class="text-base font-semibold">Week at a glance</h2>
@@ -816,12 +816,12 @@ defineExpose({ refetch: fetchBoard })
               v-for="day in weekDays"
               :key="day"
               :class="[
-                'rounded-lg border p-2 text-center transition-colors',
+                'appointment-week-day rounded-2xl p-2 text-center transition-all',
                 day === todayDate
-                  ? 'border-teal-300 bg-teal-50 text-teal-950 shadow-sm shadow-teal-950/10 ring-1 ring-teal-300 dark:border-teal-700 dark:bg-teal-950/30 dark:text-teal-100'
+                  ? 'is-today text-teal-950 dark:text-teal-100'
                   : day === selectedDate
-                    ? 'border-transparent bg-blue-50 text-foreground dark:bg-blue-950/30'
-                    : 'border-transparent hover:bg-muted/60',
+                    ? 'is-selected text-foreground'
+                    : 'hover:bg-white/40 dark:hover:bg-white/5',
               ]"
               @click="selectDate(day)"
             >
@@ -857,12 +857,12 @@ defineExpose({ refetch: fetchBoard })
           </div>
         </section>
 
-        <section class="rounded-lg border bg-background p-4 shadow-sm">
+        <section class="appointment-board-side-card surface-card rounded-2xl p-4">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="text-base font-semibold">Doctor lanes</h2>
             <Button variant="link" size="sm" class="h-auto p-0 text-xs">View all</Button>
           </div>
-          <div class="divide-y">
+          <div class="appointment-doctor-lanes divide-y">
             <div v-for="lane in doctorLanes.slice(0, 3)" :key="lane.doctor.id" class="py-3 first:pt-0 last:pb-0">
               <div class="grid grid-cols-[44px_minmax(0,1fr)_92px_120px] items-center gap-3">
                 <img
@@ -903,3 +903,146 @@ defineExpose({ refetch: fetchBoard })
     </div>
   </div>
 </template>
+
+<style scoped>
+.appointment-board-stat,
+.appointment-board-panel,
+.appointment-board-side-card,
+.appointment-timeline-card,
+.appointment-block-card {
+  position: relative;
+}
+
+.appointment-board-stat,
+.appointment-board-panel,
+.appointment-board-side-card,
+.appointment-timeline-card,
+.appointment-block-card {
+  border: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    var(--surface-panel-strong);
+}
+
+.appointment-board-panel-header {
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.32);
+}
+
+.appointment-stat-icon,
+.appointment-empty-icon {
+  transform: translateZ(0);
+}
+
+.appointment-timeline-line {
+  background: rgb(148 163 184 / 0.28);
+}
+
+.appointment-now-pill {
+  border: 1px solid rgb(94 234 212 / 0.42);
+  background: rgb(240 253 250 / 0.72);
+  box-shadow: 0 10px 24px rgb(15 118 110 / 0.1);
+}
+
+.appointment-timeline-card:hover,
+.appointment-block-card:hover,
+.appointment-board-side-card:hover {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.appointment-timeline-card--checked-in {
+  background:
+    linear-gradient(135deg, rgb(16 185 129 / 0.1), rgb(255 255 255 / 0.38)),
+    var(--surface-panel-strong);
+}
+
+.appointment-timeline-card--quiet {
+  background: rgb(148 163 184 / 0.12);
+}
+
+.appointment-block-card--quiet {
+  border: 1px dashed rgb(148 163 184 / 0.28);
+}
+
+.appointment-week-day {
+  border: 0;
+}
+
+.appointment-week-day.is-today {
+  background: rgb(204 251 241 / 0.78);
+  box-shadow:
+    0 12px 26px rgb(15 118 110 / 0.12),
+    inset 0 0 0 1px rgb(45 212 191 / 0.46);
+}
+
+.appointment-week-day.is-selected {
+  background: rgb(219 234 254 / 0.72);
+  box-shadow: inset 0 0 0 1px rgb(96 165 250 / 0.34);
+}
+
+.appointment-doctor-lanes {
+  border-color: rgb(255 255 255 / 0.28);
+}
+
+:global(.dark .appointment-board-stat),
+:global(.dark .appointment-board-panel),
+:global(.dark .appointment-board-side-card),
+:global(.dark .appointment-timeline-card),
+:global(.dark .appointment-block-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .appointment-board-panel-header) {
+  box-shadow:
+    inset 0 -1px 0 rgb(148 163 184 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+:global(.dark .appointment-timeline-line) {
+  background: rgb(148 163 184 / 0.14);
+}
+
+:global(.dark .appointment-now-pill) {
+  color: rgb(94 234 212);
+  border-color: rgb(94 234 212 / 0.22);
+  background: rgb(20 184 166 / 0.12);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.22);
+}
+
+:global(.dark .appointment-timeline-card:hover),
+:global(.dark .appointment-block-card:hover) {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.12), rgb(20 184 166 / 0.08)),
+    rgb(15 23 42 / 0.38);
+  box-shadow:
+    inset 3px 0 0 rgb(56 189 248 / 0.42),
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .appointment-week-day.is-today) {
+  background: rgb(20 184 166 / 0.14);
+  box-shadow:
+    0 0 0 1px rgb(94 234 212 / 0.22),
+    0 14px 34px rgb(20 184 166 / 0.1);
+}
+
+:global(.dark .appointment-week-day.is-selected) {
+  background: rgb(59 130 246 / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(96 165 250 / 0.2);
+}
+
+:global(.dark .appointment-doctor-lanes) {
+  border-color: rgb(148 163 184 / 0.1);
+}
+</style>
