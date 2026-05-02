@@ -85,6 +85,18 @@
   --surface-blur: blur(22px) saturate(1.18);
   --surface-blur-strong: blur(30px) saturate(1.22);
   --surface-overlay: oklch(0.18 0.035 245 / 0.42);
+
+  /* Feedback states */
+  --feedback-info-bg: rgb(59 130 246 / 0.14);
+  --feedback-info-fg: rgb(37 99 235);
+  --feedback-success-bg: rgb(20 184 166 / 0.16);
+  --feedback-success-fg: rgb(15 118 110);
+  --feedback-warning-bg: rgb(245 158 11 / 0.16);
+  --feedback-warning-fg: rgb(146 64 14);
+  --feedback-danger-bg: rgb(244 63 94 / 0.14);
+  --feedback-danger-fg: rgb(190 18 60);
+  --feedback-loading-bg: rgb(99 102 241 / 0.14);
+  --feedback-loading-fg: rgb(79 70 229);
 }
 
 .dark {
@@ -143,6 +155,17 @@
   --surface-shadow: 0 18px 50px -30px oklch(0 0 0 / 0.72);
   --surface-shadow-strong: 0 24px 80px -38px oklch(0 0 0 / 0.82);
   --surface-overlay: oklch(0 0 0 / 0.58);
+
+  --feedback-info-bg: rgb(59 130 246 / 0.16);
+  --feedback-info-fg: rgb(147 197 253);
+  --feedback-success-bg: rgb(20 184 166 / 0.16);
+  --feedback-success-fg: rgb(94 234 212);
+  --feedback-warning-bg: rgb(245 158 11 / 0.16);
+  --feedback-warning-fg: rgb(251 191 36);
+  --feedback-danger-bg: rgb(244 63 94 / 0.16);
+  --feedback-danger-fg: rgb(251 113 133);
+  --feedback-loading-bg: rgb(99 102 241 / 0.16);
+  --feedback-loading-fg: rgb(165 180 252);
 }
 
 @theme inline {

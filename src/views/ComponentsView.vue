@@ -808,24 +808,109 @@ const { isDark } = useTheme()
               <h4 class="font-semibold">Alerts and Toasts</h4>
               <p class="text-sm text-muted-foreground">Feedback surfaces stay more solid because status should be obvious.</p>
             </div>
-            <div class="space-y-3">
-              <div class="glass-alert glass-alert-success">
-                <CheckCircle2 class="size-5" />
-                <div>
-                  <strong>Visit saved</strong>
-                  <p>Clinical note was added to the encounter.</p>
+
+            <div class="space-y-5">
+              <div>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h5 class="text-sm font-semibold">Inline Alerts</h5>
+                  <span class="glass-chip">persistent feedback</span>
+                </div>
+                <div class="glass-alert-grid">
+                  <div class="glass-alert glass-alert-info">
+                    <Info class="size-5" />
+                    <div>
+                      <strong>Patient profile updated</strong>
+                      <p>Use for neutral context, state changes, or helpful system notes.</p>
+                      <span class="glass-alert-meta">Info / context</span>
+                    </div>
+                  </div>
+                  <div class="glass-alert glass-alert-success">
+                    <CheckCircle2 class="size-5" />
+                    <div>
+                      <strong>Visit saved</strong>
+                      <p>Use when the user action completed and no follow-up is required.</p>
+                      <span class="glass-alert-meta">Success / complete</span>
+                    </div>
+                  </div>
+                  <div class="glass-alert glass-alert-warning">
+                    <AlertTriangle class="size-5" />
+                    <div>
+                      <strong>Payment pending</strong>
+                      <p>Use for recoverable issues that need attention before moving on.</p>
+                      <span class="glass-alert-meta">Warning / attention</span>
+                    </div>
+                  </div>
+                  <div class="glass-alert glass-alert-danger">
+                    <AlertTriangle class="size-5" />
+                    <div>
+                      <strong>Unable to finalize encounter</strong>
+                      <p>Use for blocked workflows, destructive outcomes, or failed requests.</p>
+                      <span class="glass-alert-meta">Error / blocked</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="glass-alert glass-alert-warning">
-                <AlertTriangle class="size-5" />
-                <div>
-                  <strong>Payment pending</strong>
-                  <p>Collect balance before closing the billing tab.</p>
+
+              <div>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h5 class="text-sm font-semibold">Compact Form Alerts</h5>
+                  <span class="glass-chip">near-field feedback</span>
+                </div>
+                <div class="space-y-2">
+                  <div class="glass-alert-compact glass-alert-info">
+                    <Info class="size-4" />
+                    <span>Email verification is required before clinic access.</span>
+                  </div>
+                  <div class="glass-alert-compact glass-alert-danger">
+                    <AlertTriangle class="size-4" />
+                    <span>Password must contain at least 8 characters.</span>
+                  </div>
                 </div>
               </div>
-              <div class="glass-toast">
-                <Bell class="size-4" />
-                <span>Reminder queued for 4:00 PM</span>
+
+              <div>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h5 class="text-sm font-semibold">Toast Variants</h5>
+                  <span class="glass-chip">temporary feedback</span>
+                </div>
+                <div class="glass-toast-guide">
+                  <div class="glass-toast-stack">
+                    <div class="glass-toast glass-toast-success">
+                      <CheckCircle2 class="size-4" />
+                      <span>Invoice created</span>
+                    </div>
+                    <div class="glass-toast glass-toast-info">
+                      <Bell class="size-4" />
+                      <span>Reminder queued for 4:00 PM</span>
+                    </div>
+                    <div class="glass-toast glass-toast-warning">
+                      <AlertTriangle class="size-4" />
+                      <span>Queue display is reconnecting</span>
+                    </div>
+                    <div class="glass-toast glass-toast-danger">
+                      <AlertTriangle class="size-4" />
+                      <span>Failed to download PDF</span>
+                    </div>
+                    <div class="glass-toast glass-toast-loading">
+                      <LoaderCircle class="size-4 animate-spin" />
+                      <span>Generating billing report</span>
+                    </div>
+                  </div>
+                  <div class="glass-toast-rules">
+                    <div>
+                      <strong>Toast</strong>
+                      <p>Short-lived confirmation after a completed action.</p>
+                    </div>
+                    <div>
+                      <strong>Inline alert</strong>
+                      <p>Persistent message when the user must read or act.</p>
+                    </div>
+                    <div>
+                      <strong>Danger</strong>
+                      <p>Reserve red for failure, blocking, or destructive states.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2111,6 +2196,11 @@ const { isDark } = useTheme()
   border: 1px solid rgba(255, 255, 255, 0.42);
 }
 
+.glass-alert-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .glass-alert {
   display: flex;
   gap: 0.85rem;
@@ -2118,6 +2208,11 @@ const { isDark } = useTheme()
   border: 1px solid rgba(255, 255, 255, 0.48);
   padding: 1rem;
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.glass-alert > svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
 }
 
 .glass-alert strong {
@@ -2131,14 +2226,61 @@ const { isDark } = useTheme()
   color: rgb(71, 85, 105);
 }
 
+.glass-alert-meta {
+  display: inline-flex;
+  margin-top: 0.65rem;
+  border-radius: 9999px;
+  padding: 0.18rem 0.55rem;
+  background: rgba(255, 255, 255, 0.45);
+  color: currentColor;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.glass-alert-compact {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.65rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  padding: 0.65rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.glass-alert-info {
+  background: var(--feedback-info-bg);
+  color: var(--feedback-info-fg);
+}
+
 .glass-alert-success {
-  background: rgba(20, 184, 166, 0.16);
-  color: rgb(15, 118, 110);
+  background: var(--feedback-success-bg);
+  color: var(--feedback-success-fg);
 }
 
 .glass-alert-warning {
-  background: rgba(245, 158, 11, 0.18);
-  color: rgb(146, 64, 14);
+  background: var(--feedback-warning-bg);
+  color: var(--feedback-warning-fg);
+}
+
+.glass-alert-danger {
+  background: var(--feedback-danger-bg);
+  color: var(--feedback-danger-fg);
+}
+
+.glass-toast-guide {
+  display: grid;
+  gap: 1rem;
+}
+
+.glass-toast-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .glass-toast {
@@ -2156,6 +2298,51 @@ const { isDark } = useTheme()
   font-weight: 700;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+.glass-toast-success {
+  color: var(--feedback-success-fg);
+}
+
+.glass-toast-info {
+  color: var(--feedback-info-fg);
+}
+
+.glass-toast-warning {
+  color: var(--feedback-warning-fg);
+}
+
+.glass-toast-danger {
+  color: var(--feedback-danger-fg);
+}
+
+.glass-toast-loading {
+  color: var(--feedback-loading-fg);
+}
+
+.glass-toast-rules {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.glass-toast-rules > div {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.glass-toast-rules strong {
+  display: block;
+  font-size: 0.84rem;
+}
+
+.glass-toast-rules p {
+  margin-top: 0.2rem;
+  color: rgb(71, 85, 105);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .glass-tabs-preview {
@@ -2774,19 +2961,19 @@ const { isDark } = useTheme()
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
 }
 
+.glass-lab-dark .glass-alert-compact {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
 .glass-lab-dark .glass-alert p,
-.glass-lab-dark .glass-empty-state p {
+.glass-lab-dark .glass-empty-state p,
+.glass-lab-dark .glass-toast-rules p {
   color: rgb(148, 163, 184);
 }
 
-.glass-lab-dark .glass-alert-success {
-  background: rgba(20, 184, 166, 0.16);
-  color: rgb(94, 234, 212);
-}
-
-.glass-lab-dark .glass-alert-warning {
-  background: rgba(245, 158, 11, 0.16);
-  color: rgb(251, 191, 36);
+.glass-lab-dark .glass-alert-meta {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .glass-lab-dark .glass-toast {
@@ -2794,6 +2981,12 @@ const { isDark } = useTheme()
   background: rgba(30, 41, 59, 0.78);
   color: rgb(226, 232, 240);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.3);
+}
+
+.glass-lab-dark .glass-toast-rules > div {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.42);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
 .glass-lab-dark .glass-tabs-list {
