@@ -109,24 +109,25 @@ function saveFeeSetting(key: string, value: string) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div class="clinic-settings-view flex flex-col gap-5">
     <div v-if="isFetching" class="flex items-center justify-center py-12">
       <LoaderCircle class="size-5 animate-spin text-muted-foreground" />
     </div>
 
     <template v-else>
-      <!-- Billing Settings -->
-      <Card>
-        <CardHeader>
+      <Card class="clinic-card overflow-hidden rounded-2xl border-0 py-0">
+        <CardHeader class="px-5 pt-5 sm:px-6 sm:pt-6">
           <div class="flex items-center gap-2">
-            <Receipt class="size-4 text-muted-foreground" />
+            <span class="clinic-section-icon flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+              <Receipt class="size-4" />
+            </span>
             <CardTitle class="text-base">Billing & Revenue</CardTitle>
           </div>
           <CardDescription>Configure how revenue is attributed between the clinic and doctors</CardDescription>
         </CardHeader>
 
-        <CardContent class="flex flex-col gap-6">
-          <div class="flex items-start gap-4">
+        <CardContent class="flex flex-col gap-6 px-5 pb-5 sm:px-6 sm:pb-6">
+          <div class="clinic-setting-row surface-muted flex items-start gap-4 rounded-2xl p-4">
             <Switch
               :model-value="suppliesAsClinicRevenue"
               :disabled="isSaving"
@@ -138,7 +139,7 @@ function saveFeeSetting(key: string, value: string) {
               <p class="mt-0.5 text-xs text-muted-foreground">
                 When enabled, revenue from medicines, consumables, and lab services is attributed to the clinic. Only the consultation fee counts as doctor revenue. When disabled, all line items (including medicines, consumables, and lab services) are attributed to the doctor who created the consultation.
               </p>
-              <div class="mt-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <div class="surface-card mt-3 rounded-2xl px-3 py-2 text-xs text-muted-foreground">
                 <p class="font-medium">How this affects the doctor's billing view:</p>
                 <ul class="mt-1 list-disc pl-4 space-y-0.5">
                   <li><strong>ON:</strong> Doctor's revenue stats show only consultation fees. Invoices are still fully visible with all line items.</li>
@@ -147,9 +148,8 @@ function saveFeeSetting(key: string, value: string) {
               </div>
             </div>
           </div>
-          <Separator />
+          <Separator class="opacity-40" />
 
-          <!-- Default fees -->
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <Banknote class="size-3.5 text-muted-foreground" />
@@ -166,6 +166,7 @@ function saveFeeSetting(key: string, value: string) {
               <Input
                 id="default-consultation-fee"
                 v-model="defaultConsultationFee"
+                class="h-11 rounded-full px-4"
                 type="number"
                 placeholder="0.00"
                 min="0"
@@ -178,6 +179,7 @@ function saveFeeSetting(key: string, value: string) {
               <Input
                 id="default-followup-fee"
                 v-model="defaultFollowUpFee"
+                class="h-11 rounded-full px-4"
                 type="number"
                 placeholder="0.00"
                 min="0"
@@ -189,19 +191,19 @@ function saveFeeSetting(key: string, value: string) {
         </CardContent>
       </Card>
 
-      <!-- Consultation Settings -->
-      <Card>
-        <CardHeader>
+      <Card class="clinic-card overflow-hidden rounded-2xl border-0 py-0">
+        <CardHeader class="px-5 pt-5 sm:px-6 sm:pt-6">
           <div class="flex items-center gap-2">
-            <FileText class="size-4 text-muted-foreground" />
+            <span class="clinic-section-icon clinic-section-icon--blue flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+              <FileText class="size-4" />
+            </span>
             <CardTitle class="text-base">Prescription Generation</CardTitle>
           </div>
           <CardDescription>Settings for prescription PDF generation and quantity handling</CardDescription>
         </CardHeader>
 
-        <CardContent class="flex flex-col gap-6">
-          <!-- Auto-generate prescription PDF -->
-          <div class="flex items-start gap-4">
+        <CardContent class="flex flex-col gap-6 px-5 pb-5 sm:px-6 sm:pb-6">
+          <div class="clinic-setting-row surface-muted flex items-start gap-4 rounded-2xl p-4">
             <Switch
               :model-value="autoGeneratePdf"
               :disabled="isSaving"
@@ -216,9 +218,8 @@ function saveFeeSetting(key: string, value: string) {
             </div>
           </div>
 
-          <!-- Prescription quantity mode -->
           <div class="flex flex-col gap-4">
-            <div class="flex items-start gap-4">
+            <div class="clinic-setting-row surface-muted flex items-start gap-4 rounded-2xl p-4">
               <Switch
                 :model-value="prescriptionQtyMode === 'adjusted'"
                 :disabled="isSaving"
@@ -233,8 +234,7 @@ function saveFeeSetting(key: string, value: string) {
               </div>
             </div>
 
-            <!-- Sub-setting: Auto-regenerate on quantity change -->
-            <div v-if="prescriptionQtyMode === 'adjusted'" class="ml-12 flex items-start gap-4 border-l-2 border-border pl-4">
+            <div v-if="prescriptionQtyMode === 'adjusted'" class="clinic-setting-row surface-muted ml-0 flex items-start gap-4 rounded-2xl p-4 sm:ml-12">
               <Switch
                 :model-value="autoRegenOnQtyChange"
                 :disabled="isSaving"
@@ -252,13 +252,12 @@ function saveFeeSetting(key: string, value: string) {
         </CardContent>
       </Card>
 
-      <!-- Specialties — tab per specialty so each one can grow its own
-           settings cleanly without crowding the main settings page. Only
-           specialties with at least one wired setting appear as tabs. -->
-      <Card>
-        <CardHeader>
+      <Card class="clinic-card overflow-hidden rounded-2xl border-0 py-0">
+        <CardHeader class="px-5 pt-5 sm:px-6 sm:pt-6">
           <div class="flex items-center gap-2">
-            <Stethoscope class="size-4 text-muted-foreground" />
+            <span class="clinic-section-icon clinic-section-icon--violet flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 text-white">
+              <Stethoscope class="size-4" />
+            </span>
             <CardTitle class="text-base">Specialties</CardTitle>
           </div>
           <CardDescription>
@@ -267,19 +266,19 @@ function saveFeeSetting(key: string, value: string) {
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
+        <CardContent class="px-5 pb-5 sm:px-6 sm:pb-6">
           <Tabs v-model="specialtyTab" class="w-full">
-            <TabsList>
+            <TabsList class="clinic-specialty-tabs rounded-full">
               <TabsTrigger
                 v-for="s in availableSpecialties"
                 :key="s.value"
                 :value="s.value"
+                class="rounded-full"
               >{{ s.label }}</TabsTrigger>
             </TabsList>
 
-            <!-- Dental -->
             <TabsContent value="dental" class="mt-4 flex flex-col gap-6">
-              <div class="flex flex-col gap-2">
+              <div class="clinic-setting-row surface-muted flex flex-col gap-2 rounded-2xl p-4">
                 <Label class="text-sm font-medium">Tooth numbering system</Label>
                 <p class="text-xs text-muted-foreground">
                   Display-only — odontogram data is always stored in FDI / ISO-3950
@@ -290,7 +289,7 @@ function saveFeeSetting(key: string, value: string) {
                 <div
                   role="group"
                   aria-label="Tooth numbering system"
-                  class="mt-1 inline-flex w-fit items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5 text-[12px] font-semibold"
+                  class="surface-card mt-1 inline-flex w-fit items-center gap-0.5 rounded-full p-1 text-[12px] font-semibold"
                 >
                   <button
                     v-for="opt in toothNumberingOptions"
@@ -300,9 +299,9 @@ function saveFeeSetting(key: string, value: string) {
                     :title="opt.full"
                     :disabled="isSaving"
                     :class="[
-                      'rounded px-3 py-1.5 transition focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-wait',
+                      'rounded-full px-3 py-1.5 transition focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-wait',
                       dentalToothNumbering === opt.value
-                        ? 'bg-card text-foreground shadow-sm'
+                        ? 'bg-gradient-to-br from-blue-600 to-teal-500 text-white shadow-[0_12px_26px_rgba(37,99,235,0.18)]'
                         : 'text-muted-foreground hover:text-foreground',
                     ]"
                     @click="setToothNumbering(opt.value)"
@@ -318,3 +317,59 @@ function saveFeeSetting(key: string, value: string) {
     </template>
   </div>
 </template>
+
+<style scoped>
+.clinic-card {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    0 24px 70px -42px rgb(15 23 42 / 0.42);
+}
+
+.clinic-section-icon {
+  box-shadow:
+    0 16px 32px rgb(16 185 129 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.clinic-section-icon--blue {
+  box-shadow:
+    0 16px 32px rgb(37 99 235 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.clinic-section-icon--violet {
+  box-shadow:
+    0 16px 32px rgb(139 92 246 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.clinic-setting-row {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.36);
+}
+
+.clinic-specialty-tabs {
+  border: 0;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    0 14px 32px rgb(15 23 42 / 0.08);
+}
+
+.clinic-specialty-tabs :deep([data-slot='tabs-trigger'][data-state='active']) {
+  color: white;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 14px 30px rgb(37 99 235 / 0.18),
+    0 12px 26px rgb(20 184 166 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.24);
+}
+
+:global(.dark .clinic-card) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 28px 78px -44px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .clinic-setting-row) {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+</style>
