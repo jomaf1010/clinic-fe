@@ -118,16 +118,14 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Logo + Name Card -->
-    <Card>
-      <CardContent class="pt-6">
+  <div class="clinic-profile-view flex flex-col gap-5">
+    <Card class="clinic-card clinic-identity-card overflow-hidden rounded-2xl border-0 py-0">
+      <CardContent class="p-5 sm:p-6">
         <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6">
-          <!-- Logo upload zone -->
           <div class="group relative shrink-0">
-            <Avatar class="size-20 rounded-lg ring-2 ring-border ring-offset-2 ring-offset-background">
-              <AvatarImage v-if="displayLogoUrl" :src="displayLogoUrl" alt="Clinic logo" class="rounded-lg object-cover" />
-              <AvatarFallback class="rounded-lg bg-primary/10 text-xl font-semibold text-primary">
+            <Avatar class="clinic-logo size-24 rounded-3xl">
+              <AvatarImage v-if="displayLogoUrl" :src="displayLogoUrl" alt="Clinic logo" class="rounded-3xl object-cover" />
+              <AvatarFallback class="rounded-3xl bg-gradient-to-br from-blue-500 to-teal-500 text-2xl font-semibold text-white">
                 {{ clinicInitials }}
               </AvatarFallback>
             </Avatar>
@@ -135,7 +133,7 @@ const onSubmit = handleSubmit(async (values) => {
             <button
               v-if="canManage"
               type="button"
-              class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-3xl bg-slate-950/55 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               :disabled="isUploadingLogo"
               aria-label="Upload clinic logo"
               @click="cropDialogOpen = true"
@@ -145,15 +143,14 @@ const onSubmit = handleSubmit(async (values) => {
             </button>
           </div>
 
-          <!-- Clinic identity text -->
-          <div class="flex flex-col items-center gap-1.5 text-center sm:items-start sm:text-left">
-            <span class="text-lg font-semibold leading-tight">
+          <div class="flex min-w-0 flex-col items-center gap-2 text-center sm:items-start sm:text-left">
+            <span class="truncate text-2xl font-semibold leading-tight">
               {{ authStore.currentClinic?.clinic_name ?? 'Clinic' }}
             </span>
-            <span v-if="authStore.currentClinic?.formatted_address" class="text-sm text-muted-foreground">
+            <span v-if="authStore.currentClinic?.formatted_address" class="max-w-2xl text-sm text-muted-foreground">
               {{ authStore.currentClinic.formatted_address }}
             </span>
-            <p v-if="canManage" class="mt-0.5 text-xs text-muted-foreground">
+            <p v-if="canManage" class="surface-muted mt-2 rounded-full px-3 py-1.5 text-xs text-muted-foreground">
               Click the logo to upload a new image. JPG, PNG, or WebP up to 2 MB.
             </p>
           </div>
@@ -161,17 +158,18 @@ const onSubmit = handleSubmit(async (values) => {
       </CardContent>
     </Card>
 
-    <!-- Clinic Details Form -->
-    <Card>
-      <CardHeader>
+    <Card class="clinic-card overflow-hidden rounded-2xl border-0 py-0">
+      <CardHeader class="px-5 pt-5 sm:px-6 sm:pt-6">
         <div class="flex items-center gap-2">
-          <Building2 class="size-4 text-muted-foreground" />
+          <span class="clinic-section-icon flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+            <Building2 class="size-4" />
+          </span>
           <CardTitle class="text-base">Clinic Information</CardTitle>
         </div>
         <CardDescription>Manage your clinic's name, address, and contact details</CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent class="px-5 pb-5 sm:px-6 sm:pb-6">
         <div v-if="isFetching" class="flex items-center justify-center py-8">
           <LoaderCircle class="size-5 animate-spin text-muted-foreground" />
         </div>
@@ -187,7 +185,7 @@ const onSubmit = handleSubmit(async (values) => {
                 <Building2 class="size-3.5 text-muted-foreground" />
                 Clinic name
               </Label>
-              <Input id="clinic-name" v-model="clinicName" type="text" placeholder="My Clinic" :disabled="isLoading || !canManage" :aria-invalid="!!clinicNameError" />
+              <Input id="clinic-name" v-model="clinicName" class="h-11 rounded-full px-4" type="text" placeholder="My Clinic" :disabled="isLoading || !canManage" :aria-invalid="!!clinicNameError" />
               <p v-if="clinicNameError" class="text-xs text-destructive">{{ clinicNameError }}</p>
             </div>
 
@@ -197,7 +195,7 @@ const onSubmit = handleSubmit(async (values) => {
                 Email
                 <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
               </Label>
-              <Input id="clinic-email" v-model="email" type="email" placeholder="clinic@example.com" :disabled="isLoading || !canManage" :aria-invalid="!!emailError" />
+              <Input id="clinic-email" v-model="email" class="h-11 rounded-full px-4" type="email" placeholder="clinic@example.com" :disabled="isLoading || !canManage" :aria-invalid="!!emailError" />
               <p v-if="emailError" class="text-xs text-destructive">{{ emailError }}</p>
             </div>
           </div>
@@ -217,18 +215,18 @@ const onSubmit = handleSubmit(async (values) => {
               Contact number
               <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
             </Label>
-            <Input id="clinic-contact" v-model="contactNumber" type="tel" placeholder="(02) 123-4567" :disabled="isLoading || !canManage" :aria-invalid="!!contactNumberError" />
+            <Input id="clinic-contact" v-model="contactNumber" class="h-11 rounded-full px-4" type="tel" placeholder="(02) 123-4567" :disabled="isLoading || !canManage" :aria-invalid="!!contactNumberError" />
             <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
           </div>
         </form>
       </CardContent>
 
       <template v-if="canManage">
-        <Separator />
+        <Separator class="opacity-40" />
 
         <CardFooter class="flex flex-col items-stretch gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-center text-xs text-muted-foreground sm:text-left">Changes are saved to your clinic immediately.</p>
-          <Button type="submit" form="clinic-profile-form" size="sm" class="w-full sm:w-auto" :disabled="isLoading || isFetching">
+          <Button type="submit" form="clinic-profile-form" size="sm" class="h-10 w-full rounded-full px-5 sm:w-auto" :disabled="isLoading || isFetching">
             <LoaderCircle v-if="isLoading" class="mr-2 size-3.5 animate-spin" />
             {{ isLoading ? 'Saving...' : 'Save changes' }}
           </Button>
@@ -245,3 +243,37 @@ const onSubmit = handleSubmit(async (values) => {
     />
   </div>
 </template>
+
+<style scoped>
+.clinic-card {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    0 24px 70px -42px rgb(15 23 42 / 0.42);
+}
+
+.clinic-identity-card {
+  background:
+    radial-gradient(circle at 18% 18%, rgb(37 99 235 / 0.14), transparent 34%),
+    radial-gradient(circle at 88% 18%, rgb(20 184 166 / 0.13), transparent 34%),
+    var(--surface-panel-strong);
+}
+
+.clinic-logo {
+  box-shadow:
+    0 18px 42px rgb(37 99 235 / 0.18),
+    0 16px 34px rgb(20 184 166 / 0.13),
+    inset 0 1px 0 rgb(255 255 255 / 0.42);
+}
+
+.clinic-section-icon {
+  box-shadow:
+    0 16px 32px rgb(37 99 235 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+:global(.dark .clinic-card) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 28px 78px -44px rgb(0 0 0 / 0.82);
+}
+</style>
