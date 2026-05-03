@@ -125,40 +125,40 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="rounded-md border">
-    <Table>
+  <div class="billing-table-card surface-card overflow-hidden rounded-2xl">
+    <Table class="min-w-[46rem] border-collapse">
       <TableHeader>
-        <TableRow>
-          <TableHead>Invoice #</TableHead>
-          <TableHead>Patient</TableHead>
-          <TableHead class="hidden md:table-cell">Date</TableHead>
-          <TableHead class="text-right">Total</TableHead>
-          <TableHead class="hidden text-right md:table-cell">Paid</TableHead>
-          <TableHead class="hidden text-right md:table-cell">Balance</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead class="w-10" />
+        <TableRow class="billing-table-header hover:bg-transparent">
+          <TableHead class="px-4 py-3.5 text-muted-foreground">Invoice #</TableHead>
+          <TableHead class="px-4 py-3.5 text-muted-foreground">Patient</TableHead>
+          <TableHead class="hidden px-4 py-3.5 text-muted-foreground md:table-cell">Date</TableHead>
+          <TableHead class="px-4 py-3.5 text-right text-muted-foreground">Total</TableHead>
+          <TableHead class="hidden px-4 py-3.5 text-right text-muted-foreground md:table-cell">Paid</TableHead>
+          <TableHead class="hidden px-4 py-3.5 text-right text-muted-foreground md:table-cell">Balance</TableHead>
+          <TableHead class="px-4 py-3.5 text-muted-foreground">Status</TableHead>
+          <TableHead class="w-10 px-4 py-3.5" />
         </TableRow>
       </TableHeader>
       <TableBody>
         <!-- Loading skeleton -->
         <template v-if="loading">
-          <TableRow v-for="i in 5" :key="i">
-            <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-            <TableCell><Skeleton class="h-4 w-32" /></TableCell>
-            <TableCell class="hidden md:table-cell"><Skeleton class="h-4 w-24" /></TableCell>
-            <TableCell><Skeleton class="ml-auto h-4 w-20" /></TableCell>
-            <TableCell class="hidden md:table-cell"><Skeleton class="ml-auto h-4 w-20" /></TableCell>
-            <TableCell class="hidden md:table-cell"><Skeleton class="ml-auto h-4 w-20" /></TableCell>
-            <TableCell><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
-            <TableCell><Skeleton class="size-4" /></TableCell>
+          <TableRow v-for="i in 5" :key="i" class="billing-table-row">
+            <TableCell class="px-4 py-4"><Skeleton class="h-4 w-24" /></TableCell>
+            <TableCell class="px-4 py-4"><Skeleton class="h-4 w-32" /></TableCell>
+            <TableCell class="hidden px-4 py-4 md:table-cell"><Skeleton class="h-4 w-24" /></TableCell>
+            <TableCell class="px-4 py-4"><Skeleton class="ml-auto h-4 w-20" /></TableCell>
+            <TableCell class="hidden px-4 py-4 md:table-cell"><Skeleton class="ml-auto h-4 w-20" /></TableCell>
+            <TableCell class="hidden px-4 py-4 md:table-cell"><Skeleton class="ml-auto h-4 w-20" /></TableCell>
+            <TableCell class="px-4 py-4"><Skeleton class="h-5 w-16 rounded-full" /></TableCell>
+            <TableCell class="px-4 py-4"><Skeleton class="size-4" /></TableCell>
           </TableRow>
         </template>
 
         <!-- Empty state -->
         <template v-else-if="invoices.length === 0">
           <TableRow>
-            <TableCell colspan="8" class="py-12 text-center text-sm text-muted-foreground">
-              No invoices found
+            <TableCell colspan="8" class="px-4 py-14 text-center text-sm text-muted-foreground">
+              No invoices found. New invoices will show here once billing starts moving.
             </TableCell>
           </TableRow>
         </template>
@@ -168,27 +168,27 @@ function formatDate(iso: string): string {
           <TableRow
             v-for="invoice in invoices"
             :key="invoice.id"
-            class="cursor-pointer hover:bg-muted/50"
+            class="billing-table-row cursor-pointer transition-colors"
             @click="emit('select', invoice)"
           >
-            <TableCell class="font-medium">{{ invoice.invoice_number }}</TableCell>
-            <TableCell>{{ invoice.patient_name ?? '—' }}</TableCell>
-            <TableCell class="hidden text-sm text-muted-foreground md:table-cell">
+            <TableCell class="px-4 py-4 font-medium">{{ invoice.invoice_number }}</TableCell>
+            <TableCell class="px-4 py-4">{{ invoice.patient_name ?? '—' }}</TableCell>
+            <TableCell class="hidden px-4 py-4 text-sm text-muted-foreground md:table-cell">
               {{ formatDate(invoice.created_at) }}
             </TableCell>
-            <TableCell class="text-right tabular-nums">{{ formatCurrency(invoice.total) }}</TableCell>
-            <TableCell class="hidden text-right tabular-nums md:table-cell">{{ formatCurrency(invoice.amount_paid) }}</TableCell>
-            <TableCell class="hidden text-right tabular-nums md:table-cell">{{ formatCurrency(invoice.balance) }}</TableCell>
-            <TableCell>
+            <TableCell class="px-4 py-4 text-right font-medium tabular-nums">{{ formatCurrency(invoice.total) }}</TableCell>
+            <TableCell class="hidden px-4 py-4 text-right tabular-nums text-muted-foreground md:table-cell">{{ formatCurrency(invoice.amount_paid) }}</TableCell>
+            <TableCell class="hidden px-4 py-4 text-right tabular-nums md:table-cell">{{ formatCurrency(invoice.balance) }}</TableCell>
+            <TableCell class="px-4 py-4">
               <InvoiceStatusBadge :status="invoice.status" />
             </TableCell>
-            <TableCell>
+            <TableCell class="px-4 py-4">
               <Tooltip v-if="invoice.status !== 'void'">
                 <TooltipTrigger as-child>
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="size-7"
+                    class="size-8 rounded-full"
                     :disabled="generatingIds.has(invoice.id)"
                     @click="handlePdfClick($event, invoice)"
                   >
@@ -210,3 +210,71 @@ function formatDate(iso: string): string {
     </Table>
   </div>
 </template>
+
+<style scoped>
+.billing-table-card {
+  position: relative;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    var(--surface-panel-strong);
+}
+
+.billing-table-header {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.34);
+}
+
+.billing-table-row {
+  border-color: rgb(255 255 255 / 0.32);
+}
+
+.billing-table-row:hover {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.1), rgb(20 184 166 / 0.07)),
+    rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .billing-table-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .billing-table-header) {
+  border-color: transparent;
+  background: transparent !important;
+  box-shadow:
+    inset 0 -1px 0 rgb(148 163 184 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+
+:global(.dark .billing-table-header:hover) {
+  background: transparent !important;
+}
+
+:global(.dark .billing-table-header th) {
+  color: rgb(203 213 225 / 0.74);
+}
+
+:global(.dark .billing-table-row) {
+  border-color: rgb(148 163 184 / 0.1);
+}
+
+:global(.dark .billing-table-row:hover) {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.12), rgb(20 184 166 / 0.08)),
+    rgb(15 23 42 / 0.38);
+  box-shadow:
+    inset 3px 0 0 rgb(56 189 248 / 0.42),
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04);
+}
+</style>
