@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import type { CalendarRootEmits, CalendarRootProps, DateValue } from "reka-ui"
 import type { HTMLAttributes, Ref } from "vue"
-import type { LayoutTypes } from "."
 import { getLocalTimeZone, today } from "@internationalized/date"
 import { createReusableTemplate, reactiveOmit, useVModel } from "@vueuse/core"
 import { CalendarRoot, useDateFormatter, useForwardPropsEmits } from "reka-ui"
@@ -9,7 +8,19 @@ import { createYear, createYearRange, toDate } from "reka-ui/date"
 import { computed, toRaw } from "vue"
 import { cn } from "@/lib/utils"
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { CalendarCell, CalendarCellTrigger, CalendarGrid, CalendarGridBody, CalendarGridHead, CalendarGridRow, CalendarHeadCell, CalendarHeader, CalendarHeading, CalendarNextButton, CalendarPrevButton } from "."
+import CalendarCell from "./CalendarCell.vue"
+import CalendarCellTrigger from "./CalendarCellTrigger.vue"
+import CalendarGrid from "./CalendarGrid.vue"
+import CalendarGridBody from "./CalendarGridBody.vue"
+import CalendarGridHead from "./CalendarGridHead.vue"
+import CalendarGridRow from "./CalendarGridRow.vue"
+import CalendarHeadCell from "./CalendarHeadCell.vue"
+import CalendarHeader from "./CalendarHeader.vue"
+import CalendarHeading from "./CalendarHeading.vue"
+import CalendarNextButton from "./CalendarNextButton.vue"
+import CalendarPrevButton from "./CalendarPrevButton.vue"
+
+type LayoutTypes = "month-and-year" | "month-only" | "year-only" | undefined
 
 const props = withDefaults(defineProps<CalendarRootProps & { class?: HTMLAttributes["class"], layout?: LayoutTypes, yearRange?: DateValue[] }>(), {
   modelValue: undefined,
@@ -44,13 +55,14 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <DefineMonthTemplate v-slot="{ date }">
-    <div class="**:data-[slot=native-select-icon]:right-1">
-      <div class="relative">
-        <div class="absolute inset-0 flex h-full items-center text-sm pl-2 pointer-events-none">
+    <div class="calendar-heading-select **:data-[slot=native-select-icon]:right-2 **:data-[slot=native-select-icon]:text-foreground **:data-[slot=native-select-icon]:opacity-70">
+      <div class="calendar-heading-control relative rounded-xl border border-white/65 bg-white/72 shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-[0_14px_30px_rgba(0,0,0,0.24)]">
+        <div class="pointer-events-none absolute inset-0 z-10 flex h-full items-center pl-3 pr-7 text-sm font-semibold text-foreground">
           {{ formatter.custom(toDate(date), { month: 'short' }) }}
         </div>
         <NativeSelect
-          class="text-xs h-8 pr-6 pl-2 text-transparent relative"
+          wrapper-class="w-fit"
+          class="relative z-20 h-8 border-transparent bg-transparent pl-3 pr-7 text-xs text-transparent shadow-none hover:bg-transparent focus-visible:bg-transparent dark:border-transparent dark:bg-transparent dark:focus-visible:bg-transparent"
           @change="(e: Event) => {
             placeholder = placeholder.set({
               month: Number((e?.target as any)?.value),
@@ -66,13 +78,14 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
   </DefineMonthTemplate>
 
   <DefineYearTemplate v-slot="{ date }">
-    <div class="**:data-[slot=native-select-icon]:right-1">
-      <div class="relative">
-        <div class="absolute inset-0 flex h-full items-center text-sm pl-2 pointer-events-none">
+    <div class="calendar-heading-select **:data-[slot=native-select-icon]:right-2 **:data-[slot=native-select-icon]:text-foreground **:data-[slot=native-select-icon]:opacity-70">
+      <div class="calendar-heading-control relative rounded-xl border border-white/65 bg-white/72 shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:shadow-[0_14px_30px_rgba(0,0,0,0.24)]">
+        <div class="pointer-events-none absolute inset-0 z-10 flex h-full items-center pl-3 pr-7 text-sm font-semibold text-foreground">
           {{ formatter.custom(toDate(date), { year: 'numeric' }) }}
         </div>
         <NativeSelect
-          class="text-xs h-8 pr-6 pl-2 text-transparent relative"
+          wrapper-class="w-fit"
+          class="relative z-20 h-8 border-transparent bg-transparent pl-3 pr-7 text-xs text-transparent shadow-none hover:bg-transparent focus-visible:bg-transparent dark:border-transparent dark:bg-transparent dark:focus-visible:bg-transparent"
           @change="(e: Event) => {
             placeholder = placeholder.set({
               year: Number((e?.target as any)?.value),
@@ -92,7 +105,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     v-bind="forwarded"
     v-model:placeholder="placeholder"
     data-slot="calendar"
-    :class="cn('p-3', props.class)"
+    :class="cn('calendar-glass rounded-[1.4rem] p-4 text-foreground', props.class)"
   >
     <CalendarHeader class="pt-0">
       <nav class="flex items-center gap-1 absolute top-0 inset-x-0 justify-between">
@@ -158,3 +171,72 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     </div>
   </CalendarRoot>
 </template>
+
+<style scoped>
+:deep([data-slot='calendar-prev-button']),
+:deep([data-slot='calendar-next-button']) {
+  border-color: var(--surface-border);
+  background: color-mix(in oklch, var(--surface-floating) 74%, transparent);
+  color: var(--foreground);
+  box-shadow: 0 10px 24px oklch(0.24 0.06 245 / 0.09);
+  opacity: 0.92;
+}
+
+:deep([data-slot='calendar-head-cell']) {
+  color: color-mix(in oklch, var(--foreground) 72%, transparent);
+  font-weight: 600;
+}
+
+:deep([data-slot='calendar-cell-trigger']) {
+  color: color-mix(in oklch, var(--foreground) 86%, transparent);
+  border-radius: 0.85rem;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+:deep([data-slot='calendar-cell-trigger']:hover:not([data-disabled]):not([data-unavailable])) {
+  background: color-mix(in oklch, var(--surface-floating) 72%, transparent);
+  box-shadow: 0 10px 22px oklch(0.24 0.06 245 / 0.08);
+}
+
+:deep([data-slot='calendar-cell-trigger'][data-outside-view]) {
+  color: color-mix(in oklch, var(--foreground) 52%, transparent);
+}
+
+:deep([data-slot='calendar-cell-trigger'][data-disabled]),
+:deep([data-slot='calendar-cell-trigger'][data-unavailable]) {
+  color: color-mix(in oklch, var(--foreground) 38%, transparent);
+  opacity: 1;
+}
+
+:deep([data-slot='calendar-cell-trigger'][data-today]:not([data-selected])) {
+  color: var(--foreground);
+  background: color-mix(in oklch, var(--surface-floating) 88%, transparent);
+  box-shadow:
+    0 10px 22px oklch(0.24 0.06 245 / 0.1),
+    inset 0 0 0 1px color-mix(in oklch, var(--ring) 36%, transparent);
+}
+
+:deep([data-slot='calendar-cell-trigger'][data-selected]) {
+  color: white;
+  background: linear-gradient(135deg, oklch(0.61 0.2 260), oklch(0.68 0.15 190));
+  box-shadow:
+    0 16px 34px oklch(0.55 0.18 255 / 0.22),
+    0 12px 28px oklch(0.68 0.14 190 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.24);
+}
+
+:global(.dark) :deep([data-slot='calendar-cell-trigger'][data-today]:not([data-selected])) {
+  background: color-mix(in oklch, var(--surface-floating) 68%, transparent);
+  box-shadow:
+    0 14px 30px oklch(0 0 0 / 0.24),
+    inset 0 0 0 1px color-mix(in oklch, var(--ring) 42%, transparent);
+}
+
+:global(.dark) :deep([data-slot='calendar-cell-trigger'][data-selected]) {
+  color: white;
+}
+</style>

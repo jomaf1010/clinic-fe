@@ -1235,7 +1235,7 @@ async function handleFinalizeAndBilling(): Promise<void> {
                   </div>
                   <Combobox v-model="localPlan.contraception_methods" multiple :disabled="store.isFinalized" @update:model-value="savePlanSection">
                     <ComboboxAnchor as-child>
-                      <div class="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs">
+                      <div class="flex h-9 w-full items-center gap-2 rounded-xl border border-white/55 bg-white/60 px-3 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/10 dark:bg-slate-950/50 dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
                         <ComboboxInput
                           placeholder="Search methods..."
                           class="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"

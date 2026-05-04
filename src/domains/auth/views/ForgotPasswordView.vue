@@ -210,7 +210,6 @@ const onSubmit = handleSubmit(async (values) => {
                   autocomplete="email"
                   :disabled="isLoading"
                   :aria-invalid="!!emailError"
-                  class="auth-form-input"
                   required
                 />
                 <p v-if="emailError" class="text-xs text-destructive">
@@ -357,21 +356,6 @@ const onSubmit = handleSubmit(async (values) => {
   box-shadow: 0 10px 24px rgb(15 23 42 / 0.06);
 }
 
-:deep(.auth-form-input) {
-  height: 2.75rem;
-  border-radius: 1rem;
-  border-color: rgb(255 255 255 / 0.55);
-  background: rgb(255 255 255 / 0.62);
-  box-shadow: 0 10px 26px rgb(15 23 42 / 0.06);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-:deep(.auth-form-input:focus-visible) {
-  border-color: rgb(255 255 255 / 0.75);
-  background: rgb(255 255 255 / 0.75);
-}
-
 :global(.dark) .auth-side-panel {
   background:
     linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
@@ -402,15 +386,5 @@ const onSubmit = handleSubmit(async (values) => {
 :global(.dark) .auth-status-icon {
   border-color: rgb(255 255 255 / 0.1);
   background: rgb(255 255 255 / 0.08);
-}
-
-:global(.dark) :deep(.auth-form-input) {
-  border-color: rgb(255 255 255 / 0.12);
-  background: rgb(15 23 42 / 0.52);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 0.24);
-}
-
-:global(.dark) :deep(.auth-form-input:focus-visible) {
-  background: rgb(15 23 42 / 0.66);
 }
 </style>

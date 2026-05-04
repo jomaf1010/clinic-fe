@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import GACalculator from './GACalculator.vue'
 import DangerSignsChecklist from './DangerSignsChecklist.vue'
 import { usePregnancyStore } from '../stores/pregnancyStore'
@@ -212,11 +213,11 @@ async function handleSubmit(): Promise<void> {
     <!-- Visit Date -->
     <div class="flex flex-col gap-1.5">
       <Label for="visit_date" class="text-xs">Visit Date <span class="text-destructive">*</span></Label>
-      <Input
-        id="visit_date"
-        v-model="form.visit_date"
-        type="date"
+      <MFDatePicker
+        :model-value="form.visit_date"
+        disable-future
         class="h-8 w-48 text-sm"
+        @update:model-value="(value) => form.visit_date = value ?? ''"
       />
     </div>
 
@@ -567,11 +568,10 @@ async function handleSubmit(): Promise<void> {
 
         <div class="flex flex-col gap-1.5">
           <Label for="next_visit" class="text-xs">Next Visit Date</Label>
-          <Input
-            id="next_visit"
-            v-model="form.next_visit_date"
-            type="date"
+          <MFDatePicker
+            :model-value="form.next_visit_date"
             class="h-8 text-sm"
+            @update:model-value="(value) => form.next_visit_date = value ?? ''"
           />
         </div>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { UPPER_FDI, LOWER_FDI } from '../composables/useToothSvg'
 import { useToothNumbering } from '../composables/useToothNumbering'
 import type { PerioChart, PerioToothRecord, PerioPoint, StampedOdontogram } from '../types/dental.types'
@@ -304,17 +305,17 @@ function onHover(fdi: number | null) {
           @mouseenter="onHover(fdi)"
           @mouseleave="onHover(null)"
         >
-          <select
-            class="mobility-select"
-            :value="getTooth(fdi).mobility"
+          <NativeSelect
+            :model-value="getTooth(fdi).mobility"
+            class="h-7 rounded-lg px-1 pr-6 text-center text-[11px] font-bold"
             :disabled="isInputDisabled(fdi)"
-            @change="(ev) => setMobility(fdi, parseInt((ev.target as HTMLSelectElement).value))"
+            @update:model-value="(value) => setMobility(fdi, parseInt(String(value)))"
           >
-            <option :value="0">—</option>
-            <option :value="1">I</option>
-            <option :value="2">II</option>
-            <option :value="3">III</option>
-          </select>
+            <NativeSelectOption :value="0">—</NativeSelectOption>
+            <NativeSelectOption :value="1">I</NativeSelectOption>
+            <NativeSelectOption :value="2">II</NativeSelectOption>
+            <NativeSelectOption :value="3">III</NativeSelectOption>
+          </NativeSelect>
         </div>
       </div>
 
@@ -332,17 +333,17 @@ function onHover(fdi: number | null) {
           @mouseenter="onHover(fdi)"
           @mouseleave="onHover(null)"
         >
-          <select
-            class="mobility-select"
-            :value="getTooth(fdi).mobility"
+          <NativeSelect
+            :model-value="getTooth(fdi).mobility"
+            class="h-7 rounded-lg px-1 pr-6 text-center text-[11px] font-bold"
             :disabled="isInputDisabled(fdi)"
-            @change="(ev) => setMobility(fdi, parseInt((ev.target as HTMLSelectElement).value))"
+            @update:model-value="(value) => setMobility(fdi, parseInt(String(value)))"
           >
-            <option :value="0">—</option>
-            <option :value="1">I</option>
-            <option :value="2">II</option>
-            <option :value="3">III</option>
-          </select>
+            <NativeSelectOption :value="0">—</NativeSelectOption>
+            <NativeSelectOption :value="1">I</NativeSelectOption>
+            <NativeSelectOption :value="2">II</NativeSelectOption>
+            <NativeSelectOption :value="3">III</NativeSelectOption>
+          </NativeSelect>
         </div>
 
         <div class="perio-label-col">BOP</div>
@@ -536,17 +537,6 @@ function onHover(fdi: number | null) {
   border-color: #b91c1c;
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
 }
-.mobility-select {
-  width: 100%;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
-  background: #fff;
-  padding: 1px 2px;
-  text-align: center;
-}
-.mobility-select:disabled { opacity: 0.6; cursor: not-allowed; }
 .perio-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent, #cbd5e1, transparent);

@@ -252,41 +252,6 @@ async function handleAvatarCrop(blob: Blob) {
   padding-bottom: 1rem;
 }
 
-:global(.account-shell [data-slot='input']) {
-  height: 2.75rem;
-  border-radius: 1rem;
-  border-color: rgb(255 255 255 / 0.55);
-  background: rgb(255 255 255 / 0.62);
-  box-shadow: 0 10px 26px rgb(15 23 42 / 0.06);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-:global(.account-shell [data-slot='input']:focus-visible) {
-  border-color: rgb(255 255 255 / 0.75);
-  background: rgb(255 255 255 / 0.75);
-}
-
-:global(.account-shell [data-slot='select-trigger']) {
-  min-height: 2.75rem;
-  border-radius: 1rem;
-  border-color: rgb(255 255 255 / 0.55);
-  background: rgb(255 255 255 / 0.62);
-  box-shadow: 0 10px 26px rgb(15 23 42 / 0.06);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-:global(.account-shell [data-slot='select-trigger']:focus-visible) {
-  border-color: rgb(255 255 255 / 0.75);
-  background: rgb(255 255 255 / 0.75);
-}
-
-:global(.account-shell [data-slot='button'][data-variant='outline']) {
-  min-height: 2.75rem;
-  border-radius: 1rem;
-}
-
 :global(.dark .account-card),
 :global(.dark .account-shell [data-slot='card']) {
   box-shadow:
@@ -324,23 +289,4 @@ async function handleAvatarCrop(blob: Blob) {
     var(--surface-panel-strong);
 }
 
-:global(.dark .account-shell [data-slot='input']) {
-  border-color: rgb(255 255 255 / 0.12);
-  background: rgb(15 23 42 / 0.52);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 0.24);
-}
-
-:global(.dark .account-shell [data-slot='input']:focus-visible) {
-  background: rgb(15 23 42 / 0.66);
-}
-
-:global(.dark .account-shell [data-slot='select-trigger']) {
-  border-color: rgb(255 255 255 / 0.12);
-  background: rgb(15 23 42 / 0.52);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 0.24);
-}
-
-:global(.dark .account-shell [data-slot='select-trigger']:focus-visible) {
-  background: rgb(15 23 42 / 0.66);
-}
 </style>

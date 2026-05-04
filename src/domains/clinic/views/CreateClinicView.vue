@@ -379,7 +379,6 @@ const onSubmit = handleSubmit(async (values) => {
                       placeholder="My Clinic"
                       :disabled="isLoading"
                       :aria-invalid="!!clinicNameError"
-                      class="auth-form-input"
                       required
                     />
                     <p v-if="clinicNameError" class="text-xs text-destructive">
@@ -425,7 +424,6 @@ const onSubmit = handleSubmit(async (values) => {
                       placeholder="clinic@example.com"
                       :disabled="isLoading"
                       :aria-invalid="!!emailError"
-                      class="auth-form-input"
                     />
                     <p v-if="emailError" class="text-xs text-destructive">
                       {{ emailError }}
@@ -725,23 +723,6 @@ const onSubmit = handleSubmit(async (values) => {
 .auth-clinic-logo {
   border: 1px solid rgb(255 255 255 / 0.5);
   box-shadow: 0 18px 45px rgb(37 99 235 / 0.12);
-}
-
-:deep(.auth-form-input),
-:deep(input[data-slot='input']) {
-  height: 2.75rem;
-  border-radius: 1rem;
-  border-color: rgb(255 255 255 / 0.55);
-  background: rgb(255 255 255 / 0.62);
-  box-shadow: 0 10px 26px rgb(15 23 42 / 0.06);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-:deep(.auth-form-input:focus-visible),
-:deep(input[data-slot='input']:focus-visible) {
-  border-color: rgb(255 255 255 / 0.75);
-  background: rgb(255 255 255 / 0.75);
 }
 
 .progress-fill {

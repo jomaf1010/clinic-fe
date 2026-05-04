@@ -19,6 +19,8 @@ import {
   Circle,
   Activity,
 } from 'lucide-vue-next'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Textarea } from '@/components/ui/textarea'
 
 import type { TreatmentStatus } from '../types/dental.types'
 import tooth11Raw from '../assets/teeth-svgs/11.svg?raw'
@@ -1118,16 +1120,16 @@ function onDocMouseDown(e: MouseEvent) {
             <!-- Mobility per tooth -->
             <div class="perio-label-col">Mobility</div>
             <div v-for="fdi in UPPER" :key="`mobu-${fdi}`" :class="['perio-mobility', { 'perio-hovered': hoveredTooth === fdi, 'perio-active': activeTooth === fdi, 'perio-selected': selected.has(fdi) }]" :data-fdi="fdi">
-              <select
-                class="mobility-select"
-                :value="getPerio(fdi).mobilityGrade"
-                @change="(ev) => setMobilityGrade(fdi, parseInt((ev.target as HTMLSelectElement).value) as 0|1|2|3)"
+              <NativeSelect
+                :model-value="getPerio(fdi).mobilityGrade"
+                class="h-7 rounded-lg px-1 pr-6 text-center text-[11px] font-bold"
+                @update:model-value="(value) => setMobilityGrade(fdi, parseInt(String(value)) as 0|1|2|3)"
               >
-                <option :value="0">—</option>
-                <option :value="1">I</option>
-                <option :value="2">II</option>
-                <option :value="3">III</option>
-              </select>
+                <NativeSelectOption :value="0">—</NativeSelectOption>
+                <NativeSelectOption :value="1">I</NativeSelectOption>
+                <NativeSelectOption :value="2">II</NativeSelectOption>
+                <NativeSelectOption :value="3">III</NativeSelectOption>
+              </NativeSelect>
             </div>
           </div>
 
@@ -1137,16 +1139,16 @@ function onDocMouseDown(e: MouseEvent) {
           <div class="perio-arch">
             <div class="perio-label-col">Mobility</div>
             <div v-for="fdi in LOWER" :key="`mobl-${fdi}`" :class="['perio-mobility', { 'perio-hovered': hoveredTooth === fdi, 'perio-active': activeTooth === fdi, 'perio-selected': selected.has(fdi) }]" :data-fdi="fdi">
-              <select
-                class="mobility-select"
-                :value="getPerio(fdi).mobilityGrade"
-                @change="(ev) => setMobilityGrade(fdi, parseInt((ev.target as HTMLSelectElement).value) as 0|1|2|3)"
+              <NativeSelect
+                :model-value="getPerio(fdi).mobilityGrade"
+                class="h-7 rounded-lg px-1 pr-6 text-center text-[11px] font-bold"
+                @update:model-value="(value) => setMobilityGrade(fdi, parseInt(String(value)) as 0|1|2|3)"
               >
-                <option :value="0">—</option>
-                <option :value="1">I</option>
-                <option :value="2">II</option>
-                <option :value="3">III</option>
-              </select>
+                <NativeSelectOption :value="0">—</NativeSelectOption>
+                <NativeSelectOption :value="1">I</NativeSelectOption>
+                <NativeSelectOption :value="2">II</NativeSelectOption>
+                <NativeSelectOption :value="3">III</NativeSelectOption>
+              </NativeSelect>
             </div>
 
             <div class="perio-label-col">BOP</div>
@@ -1401,12 +1403,12 @@ function onDocMouseDown(e: MouseEvent) {
         <!-- Per-tooth notes -->
         <section class="panel" :class="{ disabled: !activeState }">
           <h4 class="panel-title">Notes</h4>
-          <textarea
-            class="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm"
+          <Textarea
+            class="min-h-20 text-sm"
             rows="3"
             placeholder="Free-text notes for this tooth…"
             :value="activeState?.notes ?? ''"
-            @input="(ev) => updateNotes((ev.target as HTMLTextAreaElement).value)"
+            @input="(ev: Event) => updateNotes((ev.target as HTMLTextAreaElement).value)"
           />
         </section>
       </aside>
@@ -1927,16 +1929,6 @@ function onDocMouseDown(e: MouseEvent) {
   background: rgb(239, 68, 68);
   border-color: #b91c1c;
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
-}
-.mobility-select {
-  width: 100%;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid #e2e8f0;
-  border-radius: 3px;
-  background: #fff;
-  padding: 1px 2px;
-  text-align: center;
 }
 .perio-divider {
   height: 1px;
