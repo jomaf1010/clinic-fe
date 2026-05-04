@@ -50,6 +50,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type {
@@ -1229,7 +1230,11 @@ onMounted(async () => {
           </p>
           <div class="flex flex-col gap-1.5">
             <Label>Date Given <span class="text-destructive">*</span></Label>
-            <Input v-model="recordForm.date_given" type="date" />
+            <MFDatePicker
+              :model-value="recordForm.date_given"
+              disable-future
+              @update:model-value="(value) => recordForm.date_given = value ?? ''"
+            />
           </div>
           <div class="flex flex-col gap-1.5">
             <Label>Batch Number</Label>
@@ -1263,7 +1268,11 @@ onMounted(async () => {
           </div>
           <div class="flex flex-col gap-1.5">
             <Label>Date Given <span class="text-destructive">*</span></Label>
-            <Input v-model="adhocForm.date_given" type="date" />
+            <MFDatePicker
+              :model-value="adhocForm.date_given"
+              disable-future
+              @update:model-value="(value) => adhocForm.date_given = value ?? ''"
+            />
           </div>
           <div class="flex flex-col gap-1.5">
             <Label>Dose Number</Label>
@@ -1585,7 +1594,11 @@ onMounted(async () => {
           <!-- Date -->
           <div class="flex flex-col gap-1.5">
             <Label>Assessment Date <span class="text-destructive">*</span></Label>
-            <Input v-model="milestoneForm.assessed_at" type="date" />
+            <MFDatePicker
+              :model-value="milestoneForm.assessed_at"
+              disable-future
+              @update:model-value="(value) => milestoneForm.assessed_at = value ?? ''"
+            />
           </div>
 
           <!-- Referral warnings (reactive to form state) -->

@@ -9,10 +9,14 @@ defineOptions({
   inheritAttrs: false,
 })
 
-const props = defineProps<{ modelValue?: AcceptableValue | AcceptableValue[], class?: HTMLAttributes["class"] }>()
+const props = defineProps<{
+  modelValue?: AcceptableValue | AcceptableValue[]
+  class?: HTMLAttributes["class"]
+  wrapperClass?: HTMLAttributes["class"]
+}>()
 
 const emit = defineEmits<{
-  "update:modelValue": AcceptableValue
+  "update:modelValue": [value: AcceptableValue | AcceptableValue[]]
 }>()
 
 const modelValue = useVModel(props, "modelValue", emit, {
@@ -20,12 +24,15 @@ const modelValue = useVModel(props, "modelValue", emit, {
   defaultValue: "",
 })
 
-const delegatedProps = reactiveOmit(props, "class")
+const delegatedProps = reactiveOmit(props, "class", "wrapperClass")
 </script>
 
 <template>
   <div
-    class="group/native-select relative w-fit has-[select:disabled]:opacity-50"
+    :class="cn(
+      'group/native-select relative w-full has-[select:disabled]:opacity-50',
+      props.wrapperClass,
+    )"
     data-slot="native-select-wrapper"
   >
     <select
@@ -33,8 +40,8 @@ const delegatedProps = reactiveOmit(props, "class")
       v-model="modelValue"
       data-slot="native-select"
       :class="cn(
-        'clinical-solid selection:bg-primary selection:text-primary-foreground dark:hover:bg-input/50 h-9 w-full min-w-0 appearance-none rounded-md border px-3 py-2 pr-9 text-sm transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed',
-        'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+        'selection:bg-primary selection:text-primary-foreground h-11 w-full min-w-0 appearance-none rounded-2xl border border-white/55 bg-white/60 px-4 py-2 pr-10 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.06)] backdrop-blur-md transition-[color,box-shadow,background-color,border-color] outline-none disabled:pointer-events-none disabled:cursor-not-allowed dark:border-white/10 dark:bg-slate-950/50 dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]',
+        'focus-visible:border-white/75 focus-visible:bg-white/75 focus-visible:ring-ring/40 focus-visible:ring-[3px] dark:focus-visible:bg-slate-950/65',
         'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
         props.class,
       )"

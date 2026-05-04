@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Crown, Flame, Scissors, X, Zap } from 'lucide-vue-next'
+import { Textarea } from '@/components/ui/textarea'
 import { isAnteriorFdi } from '../composables/useToothSvg'
 import { useToothNumbering } from '../composables/useToothNumbering'
 import type {
@@ -796,10 +797,10 @@ const hoveredCtxItem = computed(() => {
           <label class="note-label" :for="`tooth-note-${fdi}`">
             Tooth #{{ toothLabel }} note
           </label>
-          <textarea
+          <Textarea
             :id="`tooth-note-${fdi}`"
             v-model="noteDraft"
-            class="note-textarea"
+            class="min-h-[110px] resize-y text-xs"
             rows="6"
             placeholder="Free-text notes for this tooth…"
             :disabled="disabled"
@@ -1206,26 +1207,6 @@ const hoveredCtxItem = computed(() => {
   letter-spacing: 0.06em;
   color: #64748b;
 }
-.note-textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  color: #1e293b;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: 12px;
-  line-height: 1.5;
-  resize: vertical;
-  min-height: 110px;
-  outline: none;
-  box-sizing: border-box;
-}
-.note-textarea:focus {
-  border-color: rgb(59, 123, 255);
-  box-shadow: 0 0 0 2px rgba(59, 123, 255, 0.2);
-}
-.note-textarea:disabled { opacity: 0.6; cursor: not-allowed; }
 .note-hint {
   font-size: 10px;
   color: #94a3b8;

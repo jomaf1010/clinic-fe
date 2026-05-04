@@ -2,10 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import { useToothNumbering } from '../composables/useToothNumbering'
 import type {
   StampedToothState,
@@ -335,14 +336,14 @@ const bridgeRoleOptions: BridgeRole[] = ['abutment', 'pontic']
             <div class="text-xs font-medium text-center">Sealant</div>
             <template v-for="surf in SURFACES" :key="surf">
               <div class="text-xs capitalize font-medium">{{ surf }}</div>
-              <select v-model="cariesBySurface[surf]" class="h-8 rounded-md border bg-background px-2 text-xs">
-                <option value="">—</option>
-                <option v-for="o in cariesOptions" :key="o" :value="o">{{ o }}</option>
-              </select>
-              <select v-model="fillingBySurface[surf]" class="h-8 rounded-md border bg-background px-2 text-xs">
-                <option value="">—</option>
-                <option v-for="o in fillingOptions" :key="o" :value="o">{{ o }}</option>
-              </select>
+              <NativeSelect v-model="cariesBySurface[surf]" class="h-8 rounded-xl px-2 text-xs">
+                <NativeSelectOption value="">—</NativeSelectOption>
+                <NativeSelectOption v-for="o in cariesOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+              </NativeSelect>
+              <NativeSelect v-model="fillingBySurface[surf]" class="h-8 rounded-xl px-2 text-xs">
+                <NativeSelectOption value="">—</NativeSelectOption>
+                <NativeSelectOption v-for="o in fillingOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+              </NativeSelect>
               <div class="flex justify-center">
                 <input type="checkbox" v-model="sealantBySurface[surf]" />
               </div>
@@ -356,50 +357,50 @@ const bridgeRoleOptions: BridgeRole[] = ['abutment', 'pontic']
         <section class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Crown</Label>
-            <select v-model="crownMat" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">None</option>
-              <option v-for="o in crownOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="crownMat" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in crownOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
 
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Endo</Label>
-            <select v-model="endoType" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">None</option>
-              <option v-for="o in endoOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="endoType" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in endoOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
 
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Post</Label>
-            <select v-model="postMat" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">None</option>
-              <option v-for="o in postOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="postMat" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in postOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
 
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Fracture</Label>
-            <select v-model="fractureVariant" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">None</option>
-              <option v-for="o in fractureOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="fractureVariant" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in fractureOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
 
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Bruxism</Label>
-            <select v-model="bruxismVariant" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">None</option>
-              <option v-for="o in bruxismOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="bruxismVariant" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in bruxismOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
 
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Implant stage</Label>
-            <select v-model="implantStage" class="h-9 rounded-md border bg-background px-2 text-sm" :disabled="base !== 'implant'">
-              <option value="">None</option>
-              <option v-for="o in implantOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="implantStage" class="h-9 rounded-xl px-3 text-sm" :disabled="base !== 'implant'">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in implantOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
         </section>
 
@@ -407,17 +408,17 @@ const bridgeRoleOptions: BridgeRole[] = ['abutment', 'pontic']
         <section class="grid grid-cols-2 gap-3">
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Bridge material</Label>
-            <select v-model="bridgeMat" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">None</option>
-              <option v-for="o in bridgeMatOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="bridgeMat" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">None</NativeSelectOption>
+              <NativeSelectOption v-for="o in bridgeMatOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
           <div class="flex flex-col gap-1">
             <Label class="text-xs">Bridge role</Label>
-            <select v-model="bridgeRole" class="h-9 rounded-md border bg-background px-2 text-sm" :disabled="!bridgeMat">
-              <option value="">—</option>
-              <option v-for="o in bridgeRoleOptions" :key="o" :value="o">{{ o }}</option>
-            </select>
+            <NativeSelect v-model="bridgeRole" class="h-9 rounded-xl px-3 text-sm" :disabled="!bridgeMat">
+              <NativeSelectOption value="">—</NativeSelectOption>
+              <NativeSelectOption v-for="o in bridgeRoleOptions" :key="o" :value="o">{{ o }}</NativeSelectOption>
+            </NativeSelect>
           </div>
         </section>
 
@@ -431,16 +432,20 @@ const bridgeRoleOptions: BridgeRole[] = ['abutment', 'pontic']
           </label>
           <div v-if="missingEnabled" class="flex flex-col gap-1">
             <Label class="text-xs">Since</Label>
-            <Input v-model="missingSince" type="date" />
+            <MFDatePicker
+              :model-value="missingSince"
+              disable-future
+              @update:model-value="(value) => missingSince = value ?? ''"
+            />
           </div>
           <div v-if="missingEnabled" class="flex flex-col gap-1">
             <Label class="text-xs">Cause</Label>
-            <select v-model="missingCause" class="h-9 rounded-md border bg-background px-2 text-sm">
-              <option value="">—</option>
-              <option value="extraction">Extraction</option>
-              <option value="congenital">Congenital</option>
-              <option value="trauma">Trauma</option>
-            </select>
+            <NativeSelect v-model="missingCause" class="h-9 rounded-xl px-3 text-sm">
+              <NativeSelectOption value="">—</NativeSelectOption>
+              <NativeSelectOption value="extraction">Extraction</NativeSelectOption>
+              <NativeSelectOption value="congenital">Congenital</NativeSelectOption>
+              <NativeSelectOption value="trauma">Trauma</NativeSelectOption>
+            </NativeSelect>
           </div>
         </section>
 

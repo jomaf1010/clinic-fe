@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { CalendarDate, type DateValue, getLocalTimeZone, today } from '@internationalized/date'
 import { CalendarIcon, X } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -40,6 +40,8 @@ const emit = defineEmits<{
   'update:modelValue': [value: string | null]
 }>()
 
+const open = ref(false)
+
 function parseToCalendarDate(dateStr: string | null): DateValue | undefined {
   if (!dateStr) return undefined
   const parts = dateStr.split('-')
@@ -67,19 +69,20 @@ const calendarValue = computed({
     const m = String(val.month).padStart(2, '0')
     const d = String(val.day).padStart(2, '0')
     emit('update:modelValue', `${y}-${m}-${d}`)
+    open.value = false
   },
 })
 </script>
 
 <template>
   <div class="relative">
-  <Popover>
+  <Popover v-model:open="open">
     <PopoverTrigger as-child>
       <Button
         variant="outline"
         :disabled="disabled"
         :class="cn(
-          'h-9 w-full justify-start text-left font-normal',
+          'h-11 w-full justify-start rounded-2xl text-left font-normal',
           !modelValue && 'text-muted-foreground',
           modelValue && !disabled && 'pr-8',
           props.class,
@@ -89,7 +92,10 @@ const calendarValue = computed({
         <span class="flex-1 truncate">{{ modelValue ? formatDisplay(modelValue) : placeholder }}</span>
       </Button>
     </PopoverTrigger>
-    <PopoverContent class="w-auto p-0" align="start">
+    <PopoverContent
+      class="w-auto overflow-hidden rounded-[1.55rem] border-[var(--surface-border)] bg-[var(--surface-floating)] p-0 shadow-[var(--surface-shadow-strong)] backdrop-blur-[26px]"
+      align="start"
+    >
       <Calendar
         v-model="calendarValue"
         :placeholder="calendarValue"

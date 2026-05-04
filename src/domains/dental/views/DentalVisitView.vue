@@ -2309,7 +2309,7 @@ function goBack() {
                   @update:model-value="(v: unknown) => setMultiTeeth(v as string[] | null)"
                 >
                   <ComboboxAnchor as-child>
-                    <div class="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs sm:max-w-md">
+                    <div class="flex h-9 w-full items-center gap-2 rounded-xl border border-white/55 bg-white/60 px-3 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.06)] backdrop-blur-md sm:max-w-md dark:border-white/10 dark:bg-slate-950/50 dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
                       <ComboboxInput
                         :placeholder="acTeeth.size > 0 ? `${acTeeth.size} selected — search teeth…` : `Search teeth (${numberingLabel})`"
                         class="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
@@ -2865,7 +2865,7 @@ function goBack() {
               @update:model-value="(v: unknown) => setEditTeethMulti(v as string[] | null)"
             >
               <ComboboxAnchor as-child>
-                <div class="flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs">
+                <div class="flex h-9 w-full items-center gap-2 rounded-xl border border-white/55 bg-white/60 px-3 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/10 dark:bg-slate-950/50 dark:shadow-[0_12px_28px_rgba(0,0,0,0.24)]">
                   <ComboboxInput
                     :placeholder="editTeeth.size > 0 ? `${editTeeth.size} selected — search teeth…` : `Search teeth (${numberingLabel})`"
                     class="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"

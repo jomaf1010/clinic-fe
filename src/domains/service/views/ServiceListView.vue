@@ -13,6 +13,7 @@ import {
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -762,12 +763,12 @@ function clearFilters() {
           <!-- Description -->
           <div class="flex flex-col gap-1.5">
             <label class="text-xs text-muted-foreground" for="svc-description">Description</label>
-            <textarea
+            <Textarea
               id="svc-description"
               v-model="form.description"
               rows="2"
               placeholder="Brief description of the service..."
-              class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+              class="min-h-[60px] resize-none text-sm"
             />
           </div>
 

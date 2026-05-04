@@ -133,10 +133,10 @@ const minDate = new CalendarDate(1900, 1, 1)
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-2">
+  <div class="dob-picker flex flex-wrap items-center gap-2">
     <div class="flex items-center gap-1.5">
       <Select v-model="selectedMonth">
-        <SelectTrigger class="w-[80px]">
+        <SelectTrigger class="h-10 w-[84px] rounded-xl px-3" size="sm">
           <SelectValue placeholder="Mon" />
         </SelectTrigger>
         <SelectContent>
@@ -147,7 +147,7 @@ const minDate = new CalendarDate(1900, 1, 1)
       </Select>
 
       <Select v-model="selectedDay">
-        <SelectTrigger class="w-[70px]">
+        <SelectTrigger class="h-10 w-[74px] rounded-xl px-3" size="sm">
           <SelectValue placeholder="Day" />
         </SelectTrigger>
         <SelectContent>
@@ -158,7 +158,7 @@ const minDate = new CalendarDate(1900, 1, 1)
       </Select>
 
       <Select v-model="selectedYear">
-        <SelectTrigger class="w-[85px]">
+        <SelectTrigger class="h-10 w-[92px] rounded-xl px-3" size="sm">
           <SelectValue placeholder="Year" />
         </SelectTrigger>
         <SelectContent>
@@ -171,11 +171,14 @@ const minDate = new CalendarDate(1900, 1, 1)
 
     <Popover v-model:open="calendarOpen">
       <PopoverTrigger as-child>
-        <Button variant="outline" size="icon" type="button" class="shrink-0">
+        <Button variant="outline" size="icon" type="button" class="size-10 shrink-0 rounded-xl">
           <CalendarIcon class="size-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent class="w-auto p-0" align="start">
+      <PopoverContent
+        class="w-auto overflow-hidden rounded-[1.55rem] border-[var(--surface-border)] bg-[var(--surface-floating)] p-0 shadow-[var(--surface-shadow-strong)] backdrop-blur-[26px]"
+        align="start"
+      >
         <Calendar
           v-model="calendarValue"
           :max-value="maxDate"
@@ -191,3 +194,18 @@ const minDate = new CalendarDate(1900, 1, 1)
     </span>
   </div>
 </template>
+
+<style scoped>
+.dob-picker {
+  --dob-control-shadow: 0 10px 24px rgb(15 23 42 / 0.055);
+}
+
+:deep([data-slot='select-trigger']),
+:deep([data-slot='button'][data-variant='outline']) {
+  box-shadow: var(--dob-control-shadow);
+}
+
+:global(.dark) .dob-picker {
+  --dob-control-shadow: 0 12px 26px rgb(0 0 0 / 0.22);
+}
+</style>
