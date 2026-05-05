@@ -139,7 +139,7 @@ function formatDate(iso: string): string {
 
 <template>
   <div
-    class="surface-card rounded-lg border border-dashed border-amber-300 bg-amber-50/50 p-3 dark:border-amber-700 dark:bg-amber-950/30"
+    class="patient-draft-card surface-card-lite rounded-2xl p-4"
   >
     <div class="flex flex-col gap-3 sm:flex-row">
       <!-- Left (66% on sm+) -->
@@ -157,8 +157,8 @@ function formatDate(iso: string): string {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded border px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
-          <span class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
+          <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded-full px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+          <span class="patient-draft-pill rounded-full px-2 py-0.5 text-[10px] font-medium">
             Draft
           </span>
         </div>
@@ -199,14 +199,14 @@ function formatDate(iso: string): string {
         </div>
 
         <!-- Continue -->
-        <Button v-if="canContinue" variant="secondary" size="sm" class="mt-3 gap-1.5" @click.stop="openDraft">
+        <Button v-if="canContinue" variant="secondary" size="sm" class="patient-draft-action mt-3 gap-1.5 rounded-full" @click.stop="openDraft">
           <PlayCircle class="size-3.5" />
           {{ isMine || isOwner ? 'Continue' : 'Edit Triage' }}
         </Button>
       </div>
 
       <!-- Right (33%) -->
-      <div v-if="consultation.lab_order_summary || consultation.documents?.length" class="flex flex-col gap-2 border-t pt-3 sm:flex-[1] sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+      <div v-if="consultation.lab_order_summary || consultation.documents?.length" class="patient-draft-side flex flex-col gap-2 border-t pt-3 sm:flex-[1] sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
         <button
           v-if="consultation.lab_order_summary"
           type="button"
@@ -223,7 +223,7 @@ function formatDate(iso: string): string {
             :key="doc.id"
             :href="doc.download_url!"
             target="_blank"
-            class="surface-muted inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900"
+            class="surface-muted inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-300"
             @click.stop
           >
             <FileDown class="size-3" />
@@ -234,3 +234,53 @@ function formatDate(iso: string): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.patient-draft-card {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 10%, rgb(245 158 11 / 0.14), transparent 32%),
+    radial-gradient(circle at 86% 16%, rgb(20 184 166 / 0.08), transparent 34%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.42) 56%, rgb(255 255 255 / 0.58)),
+    var(--surface-panel-strong);
+  box-shadow:
+    inset 0 0 0 1px rgb(245 158 11 / 0.18),
+    var(--surface-shadow);
+}
+
+.patient-draft-pill {
+  color: rgb(180 83 9);
+  background: rgb(245 158 11 / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(245 158 11 / 0.18);
+}
+
+.patient-draft-action {
+  box-shadow: 0 12px 26px rgb(245 158 11 / 0.12);
+}
+
+.patient-draft-side {
+  border-color: rgb(245 158 11 / 0.18);
+}
+
+:global(.dark .patient-draft-card) {
+  background:
+    radial-gradient(circle at 12% 10%, rgb(245 158 11 / 0.16), transparent 32%),
+    radial-gradient(circle at 86% 16%, rgb(20 184 166 / 0.1), transparent 34%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(245 158 11 / 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 22px 70px -42px rgb(0 0 0 / 0.76);
+}
+
+:global(.dark .patient-draft-pill) {
+  color: rgb(252 211 77);
+  background: rgb(245 158 11 / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(245 158 11 / 0.2);
+}
+
+:global(.dark .patient-draft-side) {
+  border-color: rgb(255 255 255 / 0.1);
+}
+</style>

@@ -2,7 +2,6 @@
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  User,
   MapPin,
   CalendarDays,
   Phone,
@@ -17,12 +16,11 @@ import {
   CheckCircle2,
   Clock,
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
   Camera,
   ArrowRight,
   Trash2,
   AlertTriangle,
+  SlidersHorizontal,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import PatientAvatar from '@/components/PatientAvatar.vue'
@@ -50,6 +48,7 @@ import ImageCropDialog from '@/components/ImageCropDialog.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
 import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import type { EncounterStatus } from '@/domains/encounter/types/encounter.types'
 import { RouteNames } from '@/router/routeNames'
 import DraftConsultationCard from '@/domains/patient/components/DraftConsultationCard.vue'
 import FinalizedConsultationCard from '@/domains/patient/components/FinalizedConsultationCard.vue'
@@ -139,6 +138,10 @@ const latestFinalizedIndex = computed(() =>
   visibleConsultations.value.findIndex(c => c.status === 'finalized'),
 )
 
+const latestFinalizedId = computed(() =>
+  visibleConsultations.value.find(c => c.status === 'finalized')?.id ?? null,
+)
+
 const showVitalsComparison = computed(() => {
   if (!draftConsultation.value?.triage) return false
   const idx = latestFinalizedIndex.value
@@ -216,7 +219,6 @@ watch(() => notificationStore.notifications[0], (newest) => {
 })
 
 const editDialogOpen = ref(false)
-const mobileCardExpanded = ref(false)
 
 // ── Discard draft ─────────────────────────────────────────────────────────
 const discardTarget = ref<typeof draftConsultation.value | null>(null)
@@ -261,15 +263,39 @@ const lastVisitDate = computed(() => {
   return new Date(finalized.created_at)
 })
 
-const lastVisitFormatted = computed(() => {
-  if (!lastVisitDate.value) return '—'
-  const now = new Date()
-  const opts: Intl.DateTimeFormatOptions =
-    lastVisitDate.value.getFullYear() === now.getFullYear()
-      ? { month: 'short', day: 'numeric' }
-      : { month: 'short', day: 'numeric', year: 'numeric' }
-  return lastVisitDate.value.toLocaleDateString('en-US', opts)
+const lastVisitFull = computed(() => {
+  if (!lastVisitDate.value) return 'No finalized visits yet'
+  return formatDate(lastVisitDate.value.toISOString())
 })
+
+const finalizedConsultations = computed(() =>
+  visibleConsultations.value.filter(c => c.status === 'finalized'),
+)
+
+const profilePercent = computed(() => Math.round(profileCompleteness.value * 100))
+
+const timelineStatusFilter = ref<'all' | EncounterStatus>('all')
+
+const timelineConsultations = computed(() => {
+  if (timelineStatusFilter.value === 'all') return visibleConsultations.value
+  return visibleConsultations.value.filter(c => c.status === timelineStatusFilter.value)
+})
+
+function openNextMove() {
+  if (!patient.value) return
+  if (draftConsultation.value) {
+    router.push({
+      name: RouteNames.ENCOUNTER_DETAIL,
+      params: { patientId: patient.value.id, id: draftConsultation.value.id },
+    })
+    return
+  }
+  router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient.value.id } })
+}
+
+function statusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
 
 const labOrderDialogOpen = ref(false)
 const labOrderDialogData = ref<LabOrderSummary | null>(null)
@@ -368,397 +394,425 @@ onUnmounted(() => {
 
   <div
     v-else-if="patient"
-    class="-mx-4 -mt-4 -mb-4 flex flex-1 flex-col gap-0 overflow-y-auto md:min-h-0 md:flex-row md:overflow-y-hidden"
+    class="patient-detail-shell grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_360px]"
   >
-    <!-- Left panel -->
-    <div class="shrink-0 border-b p-4 md:w-1/3 md:overflow-y-auto md:border-b-0 md:border-r md:p-5">
-      <!-- Advisory: pediatrician looking at an adult chart -->
-      <div
-        v-if="showPediatricAgeAdvisory"
-        role="status"
-        class="mb-3 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
-      >
-        <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <div class="text-xs leading-snug">
-          <span class="font-medium">Outside pediatric age range.</span>
-          This patient is {{ age }}; pediatric-specific tools (growth chart, milestone tracker) may not apply. No restrictions imposed.
+    <main class="patient-detail-main flex min-w-0 flex-col gap-6">
+      <div v-if="showPediatricAgeAdvisory || showObgynMaleAdvisory" class="space-y-3">
+        <!-- Advisory: pediatrician looking at an adult chart -->
+        <div
+          v-if="showPediatricAgeAdvisory"
+          role="status"
+          class="patient-advisory flex items-start gap-3 rounded-2xl px-4 py-3 text-amber-900 dark:text-amber-200"
+        >
+          <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <div class="text-sm leading-snug">
+            <span class="font-medium">Outside pediatric age range.</span>
+            This patient is {{ age }}; pediatric-specific tools may not apply. No restrictions imposed.
+          </div>
+        </div>
+
+        <!-- Advisory: OB-GYN looking at a male chart -->
+        <div
+          v-if="showObgynMaleAdvisory"
+          role="status"
+          class="patient-advisory flex items-start gap-3 rounded-2xl px-4 py-3 text-amber-900 dark:text-amber-200"
+        >
+          <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <div class="text-sm leading-snug">
+            <span class="font-medium">Outside OB-GYN patient scope.</span>
+            Pregnancy, GYN, and contraception tools won't apply. No restrictions imposed.
+          </div>
         </div>
       </div>
 
-      <!-- Advisory: OB-GYN looking at a male chart -->
-      <div
-        v-if="showObgynMaleAdvisory"
-        role="status"
-        class="mb-3 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
-      >
-        <AlertTriangle class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <div class="text-xs leading-snug">
-          <span class="font-medium">Outside OB-GYN patient scope.</span>
-          This is a male patient; pregnancy, GYN, and contraception tools won't apply. No restrictions imposed.
-        </div>
-      </div>
+      <section class="patient-timeline-card order-2 surface-card rounded-2xl p-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div>
+              <h2 class="text-lg font-bold">Encounter Timeline</h2>
+              <p class="text-sm text-muted-foreground">All encounters, drafts, and clinical documents.</p>
+            </div>
+          </div>
 
-      <!-- Profile card -->
-      <div class="surface-card overflow-hidden rounded-3xl border">
-        <!-- Inset banner -->
-        <div class="relative m-2 rounded-2xl bg-gradient-to-br from-blue-400/30 to-blue-500/30 h-[120px] sm:h-[140px]">
-          <button
-            type="button"
-            class="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-blue-900 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            aria-label="Back"
-            @click="router.back()"
-          >
-            <ArrowLeft class="size-4" />
-            Back
-          </button>
-          <button
-            type="button"
-            class="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-full bg-white/70 text-blue-900 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            aria-label="Edit profile"
-            @click="editDialogOpen = true"
-          >
-            <Pencil class="size-4" />
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="surface-muted patient-status-tabs inline-flex rounded-xl p-1">
+              <button
+                type="button"
+                class="patient-status-tab"
+                :class="{ 'is-active': timelineStatusFilter === 'all' }"
+                @click="timelineStatusFilter = 'all'"
+              >
+                All
+              </button>
+              <button
+                type="button"
+                class="patient-status-tab"
+                :class="{ 'is-active': timelineStatusFilter === 'draft' }"
+                @click="timelineStatusFilter = 'draft'"
+              >
+                Drafts
+              </button>
+              <button
+                type="button"
+                class="patient-status-tab"
+                :class="{ 'is-active': timelineStatusFilter === 'finalized' }"
+                @click="timelineStatusFilter = 'finalized'"
+              >
+                Finalized
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <Select v-model="filterMonth">
+                <SelectTrigger class="patient-filter-trigger h-10 w-[130px] rounded-xl text-sm">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="m in months" :key="m.value" :value="m.value">
+                    {{ m.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Select v-model="filterYear">
+                <SelectTrigger class="patient-filter-trigger h-10 w-[96px] rounded-xl text-sm">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="y in years" :key="y" :value="y">
+                    {{ y }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <button
+                v-if="hasActiveFilter"
+                aria-label="Clear filter"
+                class="patient-icon-button surface-muted"
+                @click="clearFilter"
+              >
+                <X class="size-4" />
+              </button>
+              <div v-else class="patient-icon-button surface-muted" aria-hidden="true">
+                <SlidersHorizontal class="size-4" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Avatar with rainbow completeness ring -->
-        <div class="-mt-12 flex justify-center relative z-10">
-          <PatientCompletenessRing
-            :completeness="profileCompleteness"
-            content-class="group relative p-[5px]"
+        <!-- Skeleton loading state -->
+        <div v-if="encounterStore.isLoadingEncounters" class="mt-6">
+          <div
+            v-for="n in 5"
+            :key="n"
+            class="patient-timeline-row flex gap-4"
           >
-            <PatientAvatar
-              :avatar-url="displayAvatarUrl"
-              :sex="patient.sex"
-              :name="patient.full_name"
-              class="size-24 ring-2 ring-card ring-offset-0"
+            <div class="patient-timeline-marker-col">
+              <Skeleton class="mt-3 size-8 shrink-0 rounded-full" />
+              <div v-if="n < 5" class="patient-timeline-line" />
+            </div>
+            <div
+              class="patient-timeline-skeleton surface-card-lite min-w-0 flex-1 rounded-2xl p-4"
+              :class="n < 5 ? 'mb-3' : ''"
+            >
+              <Skeleton class="mb-3 h-3 w-24" />
+              <Skeleton class="mb-2 h-5 w-3/4" />
+              <Skeleton class="mb-4 h-3 w-1/2" />
+              <div class="flex gap-2">
+                <Skeleton class="h-8 w-24 rounded-xl" />
+                <Skeleton class="h-8 w-20 rounded-xl" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div
+          v-else-if="timelineConsultations.length === 0"
+          class="patient-empty-state mt-6 flex flex-col items-center justify-center rounded-2xl py-14 text-center text-muted-foreground"
+        >
+          <Stethoscope class="mb-3 size-10 opacity-60" />
+          <p class="text-sm font-medium text-foreground">No encounters match this view yet</p>
+          <p class="mt-1 max-w-sm text-sm">When the patient has activity here, the clinical story will show up in the timeline.</p>
+        </div>
+
+        <!-- Timeline -->
+        <div v-else class="mt-6">
+          <div
+            v-for="(consultation, index) in timelineConsultations"
+            :key="consultation.id"
+            class="patient-timeline-row flex gap-4"
+          >
+            <div class="patient-timeline-marker-col">
+              <div
+                class="patient-timeline-marker"
+                :class="
+                  consultation.status === 'draft'
+                    ? 'patient-timeline-marker--draft'
+                    : consultation.id === latestFinalizedId
+                      ? 'patient-timeline-marker--latest'
+                      : 'patient-timeline-marker--finalized'
+                "
+              >
+                <Pencil v-if="consultation.status === 'draft'" class="size-3.5" />
+                <CheckCircle2 v-else class="size-3.5" />
+              </div>
+              <div
+                v-if="index < timelineConsultations.length - 1 || encounterStore.hasMore"
+                class="patient-timeline-line"
+                :class="{ 'patient-timeline-line--draft': consultation.status === 'draft' }"
+              />
+            </div>
+
+            <!-- Draft card + vitals comparison -->
+            <div v-if="consultation.status === 'draft'" class="min-w-0 flex-1 flex flex-col gap-3" :class="index < timelineConsultations.length - 1 ? 'mb-3' : ''">
+              <DraftConsultationCard
+                :consultation="consultation"
+                :patient-id="patient!.id"
+                @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
+              />
+              <VitalsComparisonCard
+                v-if="showVitalsComparison && consultation.triage"
+                :current="consultation.triage"
+                :previous="previousTriage!"
+                :encounter-id="consultation.id"
+              />
+            </div>
+
+            <!-- Finalized card -->
+            <FinalizedConsultationCard
+              v-else
+              :consultation="consultation"
+              :patient-id="patient!.id"
+              :latest="consultation.id === latestFinalizedId"
+              :previous-vitals="timelineConsultations[index + 1]?.display_summary?.vitals ?? null"
+              class="min-w-0 flex-1"
+              :class="index < timelineConsultations.length - 1 ? 'mb-3' : ''"
+              @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
             />
+          </div>
+
+          <!-- Infinite scroll sentinel (skeleton card) -->
+          <div
+            v-if="encounterStore.hasMore && timelineStatusFilter === 'all'"
+            ref="sentinel"
+            class="patient-timeline-row flex gap-4"
+          >
+            <div class="patient-timeline-marker-col">
+              <Skeleton class="mt-3 size-8 shrink-0 rounded-full" />
+            </div>
+            <div class="patient-timeline-skeleton surface-card-lite mt-3 min-w-0 flex-1 rounded-2xl p-4">
+              <Skeleton class="mb-2 h-3 w-24" />
+              <Skeleton class="mb-2 h-4 w-3/4" />
+              <Skeleton class="mb-3 h-3 w-1/2" />
+              <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle class="size-3.5 animate-spin" />
+                Loading more...
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="patient-modules-card order-1 surface-card rounded-2xl p-5">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div>
+              <h2 class="text-lg font-bold">Specialty Modules</h2>
+              <p class="text-sm text-muted-foreground">Clinical modules tailored to this patient’s care.</p>
+            </div>
+          </div>
+        </div>
+        <PatientSpecialtyFactory class="patient-specialty-grid" />
+      </section>
+    </main>
+
+    <aside class="patient-profile-sidebar xl:self-start">
+      <section class="patient-profile-card surface-card overflow-hidden rounded-2xl">
+        <div class="patient-profile-banner relative">
+          <div class="absolute left-4 top-4">
+            <button
+              type="button"
+              class="patient-banner-button"
+              aria-label="Back"
+              @click="router.back()"
+            >
+              <ArrowLeft class="size-4" />
+            </button>
+          </div>
+          <div class="absolute right-4 top-4">
+            <span
+              class="patient-status-pill"
+              :class="patient.status === 'active' || patient.status === 'returning'
+                ? 'patient-status-pill--active'
+                : patient.status === 'new'
+                  ? 'patient-status-pill--new'
+                  : 'patient-status-pill--muted'"
+            >
+              <span class="size-2 rounded-full bg-current" />
+              {{ statusLabel(patient.status) }}
+            </span>
+          </div>
+          <div class="absolute inset-x-0 -bottom-12 flex justify-center">
+            <PatientCompletenessRing
+              :completeness="profileCompleteness"
+              content-class="group relative p-[6px]"
+            >
+              <PatientAvatar
+                :avatar-url="displayAvatarUrl"
+                :sex="patient.sex"
+                :name="patient.full_name"
+                class="size-28 ring-4 ring-white/70 dark:ring-slate-950/50"
+              />
+              <button
+                v-if="authStore.hasPermission('patients.edit')"
+                type="button"
+                class="absolute inset-[6px] flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                :disabled="isUploadingAvatar"
+                aria-label="Upload patient photo"
+                @click="avatarCropOpen = true"
+              >
+                <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
+                <Camera v-else class="size-4 text-white" />
+              </button>
+            </PatientCompletenessRing>
+          </div>
+        </div>
+
+        <div class="px-5 pb-5 pt-16">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h1 class="text-2xl font-bold leading-tight">{{ patient.full_name }}</h1>
+              <p class="mt-3 text-sm font-medium text-muted-foreground">
+                <template v-if="age !== null">{{ age }}</template>
+                <template v-if="age !== null"> · </template>
+                {{ statusLabel(patient.sex) }}
+              </p>
+              <p class="mt-1 text-sm text-muted-foreground">Born on {{ formatDate(patient.date_of_birth) }}</p>
+            </div>
             <button
               v-if="authStore.hasPermission('patients.edit')"
               type="button"
-              class="absolute inset-[5px] flex cursor-pointer items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-              :disabled="isUploadingAvatar"
-              aria-label="Upload patient photo"
-              @click="avatarCropOpen = true"
+              class="patient-icon-button surface-muted shrink-0"
+              aria-label="Edit profile"
+              @click="editDialogOpen = true"
             >
-              <LoaderCircle v-if="isUploadingAvatar" class="size-4 animate-spin text-white" />
-              <Camera v-else class="size-4 text-white" />
+              <Pencil class="size-4" />
             </button>
-          </PatientCompletenessRing>
-        </div>
-
-        <!-- Name + meta -->
-        <div class="mt-2 px-4 text-center">
-          <h2 class="text-lg font-bold leading-tight">{{ patient.full_name }}</h2>
-          <div class="mt-1 flex items-center justify-center gap-1.5 flex-wrap">
-            <span
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-              :class="patient.status === 'active' || patient.status === 'returning'
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                : patient.status === 'new'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  : 'bg-muted text-muted-foreground'"
-            >
-              {{ patient.status.charAt(0).toUpperCase() + patient.status.slice(1) }}
-            </span>
-            <template v-if="age !== null">
-              <span class="text-muted-foreground text-xs">·</span>
-              <span class="text-xs text-muted-foreground">{{ age }}</span>
-            </template>
-            <span class="text-muted-foreground text-xs">·</span>
-            <span class="text-xs text-muted-foreground">{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
           </div>
-        </div>
 
-        <!-- Stats row -->
-        <div class="surface-muted mx-3 my-3 rounded-2xl border px-2 py-3">
-          <div class="grid grid-cols-3 divide-x divide-border">
-            <!-- Visits -->
-            <div class="flex flex-col items-center gap-0.5 px-2">
-              <span class="text-base font-bold leading-none">{{ visibleConsultations.filter(c => c.status === 'finalized').length }}</span>
-              <span class="text-[10px] text-muted-foreground mt-0.5">Visits</span>
-            </div>
-            <!-- Problems -->
-            <div class="flex flex-col items-center gap-0.5 px-2">
-              <span class="text-base font-bold leading-none">{{ activeProblemsCount }}</span>
-              <span class="text-[10px] text-muted-foreground mt-0.5">Problems</span>
-            </div>
-            <!-- Last visit -->
-            <div class="flex flex-col items-center gap-0.5 px-2">
-              <span class="text-base font-bold leading-none truncate max-w-full">{{ lastVisitFormatted }}</span>
-              <span class="text-[10px] text-muted-foreground mt-0.5">Last Visit</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Action grid -->
-        <div class="grid grid-cols-2 gap-2 mx-3 mb-3">
-          <!-- Continue Draft + Discard (only when a draft exists) -->
-          <template v-if="draftConsultation">
+          <div class="patient-profile-actions mt-5 grid gap-2">
             <button
+              v-if="draftConsultation"
               type="button"
-              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient!.id, id: draftConsultation.id } })"
+              class="patient-primary-action"
+              @click="openNextMove"
             >
-              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-orange-400 flex items-center justify-center text-white">
-                <PlayCircle class="size-4" />
-              </div>
-              <span class="text-[11px] font-medium text-center leading-tight">Continue Draft</span>
+              <PlayCircle class="size-4" />
+              Continue Encounter
             </button>
             <button
-              v-if="authStore.hasPermission('encounters.delete')"
+              v-else-if="authStore.hasPermission('encounters.create')"
               type="button"
-              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-              @click="requestDiscardDraft(draftConsultation)"
+              class="patient-primary-action"
+              @click="openNextMove"
             >
-              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-rose-400 flex items-center justify-center text-white">
-                <Trash2 class="size-4" />
-              </div>
-              <span class="text-[11px] font-medium text-center leading-tight">Discard Draft</span>
+              <Stethoscope class="size-4" />
+              New Consult
             </button>
-          </template>
-
-          <!-- No draft → Follow Up + New Consult -->
-          <template v-else>
             <button
-              v-if="authStore.hasPermission('encounters.create')"
+              v-if="!draftConsultation && authStore.hasPermission('encounters.create')"
               type="button"
-              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
+              class="patient-secondary-action surface-muted"
               @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id }, query: { type: 'follow_up' } })"
             >
-              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-400 flex items-center justify-center text-white">
-                <ArrowRight class="size-4" />
-              </div>
-              <span class="text-[11px] font-medium text-center leading-tight">Follow Up</span>
+              <ArrowRight class="size-4" />
+              Follow Up
             </button>
             <button
-              v-if="authStore.hasPermission('encounters.create')"
+              v-if="draftConsultation && authStore.hasPermission('encounters.delete')"
               type="button"
-              class="surface-interactive flex flex-col items-center gap-1.5 rounded-2xl border border-transparent py-3 px-1 transition-colors hover:bg-muted/50 active:scale-95"
-              @click="router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient!.id } })"
+              class="patient-secondary-action surface-muted text-destructive hover:text-destructive"
+              @click="requestDiscardDraft(draftConsultation)"
             >
-              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500 to-teal-400 flex items-center justify-center text-white">
-                <Stethoscope class="size-4" />
-              </div>
-              <span class="text-[11px] font-medium text-center leading-tight">New Consult</span>
+              <Trash2 class="size-4" />
+              Discard Draft
             </button>
-          </template>
-        </div>
+          </div>
 
-        <!-- Expandable details toggle (mobile only) -->
-        <div class="flex justify-center pb-3 md:hidden">
-          <button
-            type="button"
-            class="surface-muted flex h-7 w-7 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted/80"
-            :aria-label="mobileCardExpanded ? 'Collapse details' : 'Expand details'"
-            @click="mobileCardExpanded = !mobileCardExpanded"
-          >
-            <ChevronDown v-if="!mobileCardExpanded" class="size-3.5" />
-            <ChevronUp v-else class="size-3.5" />
-          </button>
-        </div>
-
-        <!-- Detail rows — always visible on desktop, toggled on mobile -->
-        <div :class="mobileCardExpanded ? 'block' : 'hidden md:block'">
-          <div class="px-4 pb-4 space-y-2.5 border-t pt-3">
-            <!-- Note -->
-            <div v-if="patient.note" class="flex items-start gap-2 text-sm">
-              <StickyNote class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <p class="whitespace-pre-wrap text-muted-foreground">{{ patient.note }}</p>
+          <div class="patient-contact-list mt-5 space-y-3">
+            <a
+              v-if="patient.email"
+              :href="`mailto:${patient.email}`"
+              class="patient-contact-row"
+            >
+              <Mail class="size-4" />
+              <span class="min-w-0 break-all">{{ patient.email }}</span>
+            </a>
+            <a
+              v-if="patient.contact_number"
+              :href="`tel:${patient.contact_number}`"
+              class="patient-contact-row"
+            >
+              <Phone class="size-4" />
+              <span>{{ patient.contact_number }}</span>
+            </a>
+            <div v-if="patient.formatted_address" class="patient-contact-row">
+              <MapPin class="size-4" />
+              <span>{{ patient.formatted_address }}</span>
             </div>
-            <!-- DOB -->
-            <div class="flex items-start gap-2 text-sm">
-              <CalendarDays class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div>
-                <span class="text-muted-foreground">Born </span>{{ formatDate(patient.date_of_birth) }}
-              </div>
-            </div>
-            <!-- Sex -->
-            <div class="flex items-start gap-2 text-sm">
-              <User class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <span>{{ patient.sex.charAt(0).toUpperCase() + patient.sex.slice(1) }}</span>
-            </div>
-            <!-- Blood Type -->
-            <div v-if="patient.blood_type" class="flex items-start gap-2 text-sm">
-              <FlaskConical class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            <div v-if="patient.blood_type" class="patient-contact-row">
+              <FlaskConical class="size-4" />
               <span>{{ patient.blood_type }}</span>
             </div>
-            <!-- Phone -->
-            <div v-if="patient.contact_number" class="flex items-start gap-2 text-sm">
-              <Phone class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <span>{{ patient.contact_number }}</span>
-            </div>
-            <!-- Email -->
-            <div v-if="patient.email" class="flex items-start gap-2 text-sm">
-              <Mail class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <span class="break-all">{{ patient.email }}</span>
-            </div>
-            <!-- Address -->
-            <div v-if="patient.formatted_address" class="flex items-start gap-2 text-sm">
-              <MapPin class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <span class="text-muted-foreground">{{ patient.formatted_address }}</span>
+            <div v-if="patient.note" class="patient-contact-row items-start">
+              <StickyNote class="mt-0.5 size-4" />
+              <span class="whitespace-pre-wrap">{{ patient.note }}</span>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Right panel -->
-    <div class="flex flex-1 flex-col overflow-y-auto p-4 md:p-6">
-      <!-- Specialty-specific patient sections (between patient info and consultation timeline) -->
-      <PatientSpecialtyFactory class="mb-6" />
-
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-          <Stethoscope class="size-4 text-muted-foreground" />
-          <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Consultations
-          </h3>
-          <span class="surface-muted rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">
-            {{ visibleConsultations.length }}
-          </span>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <Select v-model="filterMonth">
-            <SelectTrigger class="h-7 w-[120px] text-xs">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="m in months" :key="m.value" :value="m.value">
-                {{ m.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <Select v-model="filterYear">
-            <SelectTrigger class="h-7 w-[80px] text-xs">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="y in years" :key="y" :value="y">
-                {{ y }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <button
-            v-if="hasActiveFilter"
-            aria-label="Clear filter"
-            class="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            @click="clearFilter"
-          >
-            <X class="size-3" />
-          </button>
-        </div>
-      </div>
-
-      <!-- Skeleton loading state -->
-      <div v-if="encounterStore.isLoadingEncounters" class="mt-4">
-        <div
-          v-for="n in 5"
-          :key="n"
-          class="flex gap-3"
-        >
-          <div class="flex flex-col items-center">
-            <Skeleton class="mt-3.5 size-2 shrink-0 rounded-full" />
-            <div v-if="n < 5" class="mt-1 flex-1 w-[2px] bg-foreground/15" />
+          <div class="patient-profile-stats surface-muted mt-5 grid grid-cols-3 rounded-2xl p-4 text-center">
+            <div>
+              <p class="text-2xl font-bold text-primary">{{ finalizedConsultations.length }}</p>
+              <p class="mt-1 text-xs text-muted-foreground">Visits</p>
+            </div>
+            <div>
+              <p class="text-2xl font-bold text-primary">{{ activeProblemsCount }}</p>
+              <p class="mt-1 text-xs text-muted-foreground">Active Problems</p>
+            </div>
+            <div>
+              <p class="text-2xl font-bold text-primary">{{ pdStore.medications.filter(m => m.status === 'active').length }}</p>
+              <p class="mt-1 text-xs text-muted-foreground">Medications</p>
+            </div>
           </div>
-          <div
-            class="surface-card min-w-0 flex-1 rounded-lg border p-3"
-            :class="n < 5 ? 'mb-3' : ''"
-          >
-            <Skeleton class="h-3 w-20 mb-2" />
-            <Skeleton class="h-4 w-3/4 mb-2" />
-            <div class="flex gap-1.5">
-              <Skeleton class="h-5 w-20 rounded-md" />
-              <Skeleton class="h-5 w-16 rounded-md" />
+
+          <div class="patient-mini-card surface-muted mt-5 rounded-2xl p-4">
+            <div class="flex items-start gap-3">
+              <CalendarDays class="mt-0.5 size-5 text-primary" />
+              <div>
+                <p class="text-sm font-semibold">Last Visit</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ lastVisitFull }}</p>
+                <p v-if="finalizedConsultations[0]?.doctor_name" class="text-sm text-muted-foreground">Dr. {{ finalizedConsultations[0].doctor_name }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="patient-mini-card surface-muted mt-4 rounded-2xl p-4">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <p class="text-sm font-semibold">Chart Readiness</p>
+                <p class="mt-1 text-sm text-muted-foreground">Profile and core clinical fields</p>
+              </div>
+              <span class="text-sm font-bold text-emerald-600 dark:text-emerald-300">{{ profilePercent }}%</span>
+            </div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-foreground/10">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-blue-600 to-teal-500"
+                :style="{ width: `${profilePercent}%` }"
+              />
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Empty state -->
-      <div
-        v-else-if="visibleConsultations.length === 0"
-        class="flex flex-1 flex-col items-center justify-center py-12 text-muted-foreground"
-      >
-        <Stethoscope class="size-10 mb-3 opacity-50" />
-        <p class="text-sm">No consultations yet</p>
-      </div>
-
-      <!-- Timeline -->
-      <div v-else class="mt-4">
-        <div
-          v-for="(consultation, index) in visibleConsultations"
-          :key="consultation.id"
-          class="flex gap-3"
-        >
-          <div class="flex w-3 flex-col items-center">
-            <div
-              class="mt-3.5 shrink-0 rounded-full"
-              :class="
-                consultation.status === 'draft'
-                  ? 'size-3 bg-amber-400 pulse-ring-amber'
-                  : index === latestFinalizedIndex
-                    ? 'size-3 bg-primary pulse-ring-primary'
-                    : 'size-2 bg-primary'
-              "
-            />
-            <div
-              v-if="index < visibleConsultations.length - 1 || encounterStore.hasMore"
-              class="mt-1 flex-1 w-[2px]"
-              :class="consultation.status === 'draft' ? 'bg-amber-300' : 'bg-foreground/15'"
-            />
-          </div>
-          <!-- Draft card + vitals comparison -->
-          <div v-if="consultation.status === 'draft'" class="min-w-0 flex-1 flex flex-col gap-2" :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''">
-            <DraftConsultationCard
-              :consultation="consultation"
-              :patient-id="patient!.id"
-              @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
-            />
-            <VitalsComparisonCard
-              v-if="showVitalsComparison && consultation.triage"
-              :current="consultation.triage"
-              :previous="previousTriage!"
-              :encounter-id="consultation.id"
-            />
-          </div>
-
-          <!-- Finalized card -->
-          <FinalizedConsultationCard
-            v-else
-            :consultation="consultation"
-            :patient-id="patient!.id"
-            :latest="index === latestFinalizedIndex"
-            :previous-vitals="visibleConsultations[index + 1]?.display_summary?.vitals ?? null"
-            class="min-w-0 flex-1"
-            :class="index < visibleConsultations.length - 1 ? 'mb-3' : ''"
-            @show-lab-order="(summary, e) => showLabOrderDialog(summary, e)"
-          />
-        </div>
-
-        <!-- Infinite scroll sentinel -->
-        <!-- Infinite scroll sentinel (skeleton card) -->
-        <div
-          v-if="encounterStore.hasMore"
-          ref="sentinel"
-          class="flex gap-3"
-        >
-          <div class="flex flex-col items-center">
-            <Skeleton class="mt-3.5 size-2 shrink-0 rounded-full" />
-          </div>
-          <div class="surface-card mt-3 min-w-0 flex-1 rounded-lg border p-3">
-            <Skeleton class="h-3 w-24 mb-2" />
-            <Skeleton class="h-4 w-3/4 mb-2" />
-            <Skeleton class="h-3 w-1/2 mb-3" />
-            <div class="flex items-center gap-2 text-xs text-muted-foreground">
-              <LoaderCircle class="size-3.5 animate-spin" />
-              Loading more...
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </section>
+    </aside>
 
     <!-- Lab Order Summary Dialog -->
     <Dialog v-model:open="labOrderDialogOpen">
@@ -853,20 +907,342 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.pulse-ring-amber {
-  animation: pulse-amber 2s ease-out infinite;
-}
-.pulse-ring-primary {
-  animation: pulse-primary 2s ease-out infinite;
+.patient-detail-shell {
+  align-items: start;
 }
 
-@keyframes pulse-amber {
-  0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
-  100% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+.patient-timeline-card,
+.patient-modules-card,
+.patient-profile-card,
+.patient-timeline-skeleton {
+  position: relative;
+  border: 0;
+  background:
+    radial-gradient(circle at 16% 0%, rgb(59 130 246 / 0.08), transparent 34%),
+    radial-gradient(circle at 84% 18%, rgb(20 184 166 / 0.08), transparent 32%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.44) 56%, rgb(255 255 255 / 0.58)),
+    var(--surface-panel-strong);
+  overflow: hidden;
 }
+
+.patient-timeline-card::before,
+.patient-modules-card::before,
+.patient-profile-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    inset 1px 0 0 rgb(255 255 255 / 0.28);
+}
+
+.patient-advisory {
+  background:
+    radial-gradient(circle at 12% 10%, rgb(245 158 11 / 0.14), transparent 34%),
+    rgb(255 255 255 / 0.42);
+  box-shadow: inset 0 0 0 1px rgb(245 158 11 / 0.18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.patient-status-tabs {
+  border: 0;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.patient-status-tab {
+  min-width: 4.5rem;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.patient-status-tab.is-active {
+  color: white;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 12px 26px rgb(37 99 235 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+.patient-filter-trigger,
+.patient-icon-button,
+.patient-banner-button,
+.patient-secondary-action {
+  border: 0;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.patient-icon-button,
+.patient-banner-button {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: var(--foreground);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.patient-icon-button:hover,
+.patient-banner-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.patient-timeline-marker-col {
+  display: flex;
+  width: 2.25rem;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+}
+
+.patient-timeline-marker {
+  margin-top: 0.5rem;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: white;
+  box-shadow:
+    0 10px 22px rgb(15 23 42 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.patient-timeline-marker--draft {
+  background: linear-gradient(135deg, rgb(245 158 11), rgb(249 115 22));
+}
+
+.patient-timeline-marker--latest {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  animation: pulse-primary 2.2s ease-out infinite;
+}
+
+.patient-timeline-marker--finalized {
+  background: linear-gradient(135deg, rgb(20 184 166), rgb(16 185 129));
+}
+
+.patient-timeline-line {
+  margin-top: 0.5rem;
+  width: 2px;
+  flex: 1 1 auto;
+  min-height: 2rem;
+  background: linear-gradient(to bottom, rgb(37 99 235 / 0.22), rgb(20 184 166 / 0.14));
+}
+
+.patient-timeline-line--draft {
+  background: linear-gradient(to bottom, rgb(245 158 11 / 0.38), rgb(20 184 166 / 0.16));
+}
+
+.patient-empty-state {
+  background: rgb(255 255 255 / 0.28);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28);
+}
+
+.patient-profile-sidebar {
+  min-width: 0;
+}
+
+@media (max-width: 1279px) {
+  .patient-profile-sidebar {
+    order: -1;
+  }
+}
+
+.patient-profile-banner {
+  height: 11.5rem;
+  background:
+    radial-gradient(circle at 26% 24%, rgb(255 255 255 / 0.58), transparent 24%),
+    radial-gradient(circle at 88% 8%, rgb(20 184 166 / 0.22), transparent 28%),
+    linear-gradient(135deg, rgb(125 211 252 / 0.5), rgb(20 184 166 / 0.2) 48%, rgb(59 130 246 / 0.24));
+}
+
+.patient-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.7);
+  box-shadow: 0 12px 26px rgb(15 23 42 / 0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.patient-status-pill--active {
+  color: rgb(5 150 105);
+}
+
+.patient-status-pill--new {
+  color: rgb(37 99 235);
+}
+
+.patient-status-pill--muted {
+  color: var(--muted-foreground);
+}
+
+.patient-contact-list {
+  padding-top: 1rem;
+  border-top: 1px solid rgb(255 255 255 / 0.36);
+}
+
+.patient-contact-row {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.patient-contact-row svg {
+  flex: none;
+  color: rgb(100 116 139 / 0.9);
+}
+
+.patient-profile-stats {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28);
+}
+
+.patient-profile-stats > div + div {
+  box-shadow: inset 1px 0 0 rgb(255 255 255 / 0.34);
+}
+
+.patient-mini-card {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28);
+}
+
+.patient-primary-action,
+.patient-secondary-action {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.patient-primary-action {
+  color: white;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 16px 34px rgb(37 99 235 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+.patient-primary-action:hover,
+.patient-secondary-action:hover {
+  transform: translateY(-1px);
+}
+
+:global(.patient-specialty-grid > *) {
+  min-width: 0;
+}
+
+:global(.dark .patient-timeline-card),
+:global(.dark .patient-modules-card),
+:global(.dark .patient-profile-card),
+:global(.dark .patient-timeline-skeleton) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .patient-contact-list) {
+  border-color: rgb(255 255 255 / 0.1);
+}
+
+:global(.dark .patient-advisory) {
+  background:
+    radial-gradient(circle at 12% 10%, rgb(245 158 11 / 0.16), transparent 34%),
+    rgb(15 23 42 / 0.3);
+  box-shadow: inset 0 0 0 1px rgb(245 158 11 / 0.18);
+}
+
+:global(.dark .patient-status-tabs) {
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.62), rgb(15 23 42 / 0.28)),
+    rgb(15 23 42 / 0.2);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 16px 38px rgb(0 0 0 / 0.26);
+}
+
+:global(.dark .patient-status-tab.is-active) {
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.14),
+    0 14px 34px rgb(56 189 248 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+:global(.dark .patient-filter-trigger),
+:global(.dark .patient-icon-button),
+:global(.dark .patient-banner-button),
+:global(.dark .patient-secondary-action),
+:global(.dark .patient-mini-card),
+:global(.dark .patient-profile-stats) {
+  background:
+    linear-gradient(145deg, rgb(15 23 42 / 0.76), rgb(2 6 23 / 0.52)),
+    rgb(15 23 42 / 0.5) !important;
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 14px 30px rgb(0 0 0 / 0.22);
+}
+
+:global(.dark .patient-profile-banner) {
+  background:
+    radial-gradient(circle at 28% 22%, rgb(59 130 246 / 0.24), transparent 28%),
+    radial-gradient(circle at 88% 8%, rgb(20 184 166 / 0.16), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.8), rgb(2 6 23 / 0.5) 56%, rgb(15 23 42 / 0.62));
+}
+
+:global(.dark .patient-status-pill) {
+  background: rgb(15 23 42 / 0.72);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 12px 26px rgb(0 0 0 / 0.24);
+}
+
+:global(.dark .patient-profile-stats > div + div) {
+  box-shadow: inset 1px 0 0 rgb(255 255 255 / 0.08);
+}
+
 @keyframes pulse-primary {
-  0% { box-shadow: 0 0 0 0 oklch(0.283 0.090 253.827 / 0.5); }
-  100% { box-shadow: 0 0 0 10px oklch(0.283 0.090 253.827 / 0); }
+  0% {
+    box-shadow:
+      0 14px 30px rgb(37 99 235 / 0.18),
+      0 0 0 0 rgb(37 99 235 / 0.32),
+      inset 0 1px 0 rgb(255 255 255 / 0.28);
+  }
+  100% {
+    box-shadow:
+      0 14px 30px rgb(37 99 235 / 0.18),
+      0 0 0 12px rgb(37 99 235 / 0),
+      inset 0 1px 0 rgb(255 255 255 / 0.28);
+  }
 }
 
 </style>

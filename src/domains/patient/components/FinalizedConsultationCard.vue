@@ -106,10 +106,10 @@ async function requestMedCert() {
 
 <template>
   <div
-    class="surface-card group relative min-w-0 flex-1 cursor-pointer rounded-lg border p-3 transition-colors"
+    class="patient-finalized-card surface-card-lite group relative min-w-0 flex-1 cursor-pointer rounded-2xl p-4 transition-all"
     :class="latest
-      ? 'border-primary/30 hover:bg-primary/5 hover:border-primary/40'
-      : 'border-border/60 opacity-75 hover:opacity-100'"
+      ? 'patient-finalized-card--latest'
+      : 'opacity-80 hover:opacity-100'"
     @click="openConsultation"
   >
     <!-- 3-dot menu -->
@@ -118,7 +118,7 @@ async function requestMedCert() {
         <DropdownMenuTrigger as-child>
           <button
             type="button"
-            class="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            class="surface-muted flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
           >
             <Ellipsis class="size-4" />
           </button>
@@ -175,7 +175,7 @@ async function requestMedCert() {
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded border px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+      <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded-full px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
       <span v-if="consultation.doctor_name" class="text-xs text-muted-foreground">
         &middot; Dr. {{ consultation.doctor_name }}
       </span>
@@ -222,7 +222,7 @@ async function requestMedCert() {
         </Tooltip>
         <button
           type="button"
-          class="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          class="surface-muted rounded-full p-1 text-muted-foreground hover:text-foreground"
           @click.stop="emit('show-lab-order', consultation.lab_order_summary!, $event)"
         >
           <Info class="size-3.5" />
@@ -231,3 +231,43 @@ async function requestMedCert() {
     </TooltipProvider>
   </div>
 </template>
+
+<style scoped>
+.patient-finalized-card {
+  border: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.66), rgb(255 255 255 / 0.38) 56%, rgb(255 255 255 / 0.52)),
+    var(--surface-panel-strong);
+}
+
+.patient-finalized-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.patient-finalized-card--latest {
+  box-shadow:
+    inset 0 0 0 1px rgb(59 130 246 / 0.18),
+    0 18px 48px -30px rgb(37 99 235 / 0.42);
+}
+
+:global(.dark .patient-finalized-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.1), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.1), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 22px 70px -42px rgb(0 0 0 / 0.76);
+}
+
+:global(.dark .patient-finalized-card--latest) {
+  box-shadow:
+    inset 0 0 0 1px rgb(125 211 252 / 0.2),
+    0 22px 70px -42px rgb(56 189 248 / 0.38);
+}
+</style>

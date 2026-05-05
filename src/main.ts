@@ -4,8 +4,11 @@ import App from './App.vue'
 import router from './router'
 import './styles/globals.css'
 import { registerPwa } from './composables/usePwaUpdate'
+import { useSurfaceMode } from './composables/useSurfaceMode'
 
 const app = createApp(App)
+
+useSurfaceMode()
 
 app.use(createPinia())
 app.use(router)
