@@ -106,7 +106,7 @@ async function requestMedCert() {
 
 <template>
   <div
-    class="patient-finalized-card surface-card group relative min-w-0 flex-1 cursor-pointer rounded-2xl p-4 transition-all"
+    class="patient-finalized-card surface-card-lite group relative min-w-0 flex-1 cursor-pointer rounded-2xl p-4 transition-all"
     :class="latest
       ? 'patient-finalized-card--latest'
       : 'opacity-80 hover:opacity-100'"

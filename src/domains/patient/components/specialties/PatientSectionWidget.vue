@@ -18,7 +18,7 @@ defineEmits<{ click: [] }>()
 <template>
   <button
     type="button"
-    class="patient-section-widget surface-card flex items-start gap-3 rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5 active:scale-[0.98]"
+    class="patient-section-widget surface-card-lite flex items-start gap-3 rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5 active:scale-[0.98]"
     @click="$emit('click')"
   >
     <!-- Icon -->

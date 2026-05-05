@@ -2,7 +2,6 @@
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  User,
   MapPin,
   CalendarDays,
   Phone,
@@ -21,8 +20,6 @@ import {
   ArrowRight,
   Trash2,
   AlertTriangle,
-  HeartPulse,
-  CalendarCheck,
   SlidersHorizontal,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
@@ -266,16 +263,6 @@ const lastVisitDate = computed(() => {
   return new Date(finalized.created_at)
 })
 
-const lastVisitFormatted = computed(() => {
-  if (!lastVisitDate.value) return '—'
-  const now = new Date()
-  const opts: Intl.DateTimeFormatOptions =
-    lastVisitDate.value.getFullYear() === now.getFullYear()
-      ? { month: 'short', day: 'numeric' }
-      : { month: 'short', day: 'numeric', year: 'numeric' }
-  return lastVisitDate.value.toLocaleDateString('en-US', opts)
-})
-
 const lastVisitFull = computed(() => {
   if (!lastVisitDate.value) return 'No finalized visits yet'
   return formatDate(lastVisitDate.value.toISOString())
@@ -285,57 +272,7 @@ const finalizedConsultations = computed(() =>
   visibleConsultations.value.filter(c => c.status === 'finalized'),
 )
 
-const draftCount = computed(() =>
-  visibleConsultations.value.filter(c => c.status === 'draft').length,
-)
-
-const encountersLast12Months = computed(() => {
-  const cutoff = new Date()
-  cutoff.setFullYear(cutoff.getFullYear() - 1)
-  return visibleConsultations.value.filter(c => new Date(c.created_at) >= cutoff).length
-})
-
 const profilePercent = computed(() => Math.round(profileCompleteness.value * 100))
-
-const careSignal = computed(() => {
-  if (draftConsultation.value) {
-    return {
-      label: 'Draft waiting',
-      detail: 'Finish the active encounter before starting another one.',
-      tone: 'warning',
-    }
-  }
-  if (activeProblemsCount.value > 0 || pdStore.allergies.length > 0) {
-    return {
-      label: 'Moderate',
-      detail: 'Review active problems and allergy notes during the visit.',
-      tone: 'attention',
-    }
-  }
-  return {
-    label: 'Stable',
-    detail: 'No active problem alerts from the loaded chart.',
-    tone: 'stable',
-  }
-})
-
-const nextMove = computed(() => {
-  if (draftConsultation.value) {
-    return {
-      label: 'Continue draft',
-      detail: draftConsultation.value.doctor_name
-        ? `Started with Dr. ${draftConsultation.value.doctor_name}`
-        : 'Resume the encounter in progress',
-      action: 'Continue Encounter',
-    }
-  }
-
-  return {
-    label: 'Ready for consult',
-    detail: lastVisitDate.value ? `Last visit was ${lastVisitFormatted.value}` : 'Start this patient’s first encounter',
-    action: 'New Consult',
-  }
-})
 
 const timelineStatusFilter = ref<'all' | EncounterStatus>('all')
 
@@ -347,7 +284,10 @@ const timelineConsultations = computed(() => {
 function openNextMove() {
   if (!patient.value) return
   if (draftConsultation.value) {
-    router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patient.value.id, id: draftConsultation.value.id } })
+    router.push({
+      name: RouteNames.ENCOUNTER_DETAIL,
+      params: { patientId: patient.value.id, id: draftConsultation.value.id },
+    })
     return
   }
   router.push({ name: RouteNames.ENCOUNTER_NEW, params: { patientId: patient.value.id } })
@@ -457,113 +397,7 @@ onUnmounted(() => {
     class="patient-detail-shell grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_360px]"
   >
     <main class="patient-detail-main flex min-w-0 flex-col gap-6">
-      <section class="patient-summary-grid grid gap-4">
-        <button
-          type="button"
-          class="patient-summary-card surface-card rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5"
-          @click="editDialogOpen = true"
-        >
-          <div class="patient-summary-body flex items-start gap-4">
-            <div
-              class="patient-summary-icon"
-              :class="careSignal.tone === 'warning'
-                ? 'patient-summary-icon--warning'
-                : careSignal.tone === 'attention'
-                  ? 'patient-summary-icon--danger'
-                  : 'patient-summary-icon--stable'"
-            >
-              <HeartPulse class="size-5" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-muted-foreground">Care Signal</p>
-              <p
-                class="mt-2 text-2xl font-bold"
-                :class="careSignal.tone === 'warning'
-                  ? 'text-amber-500'
-                  : careSignal.tone === 'attention'
-                    ? 'text-rose-500'
-                    : 'text-emerald-500'"
-              >
-                {{ careSignal.label }}
-              </p>
-              <p class="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{{ careSignal.detail }}</p>
-            </div>
-          </div>
-          <div class="patient-summary-link mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            View details
-            <ArrowRight class="size-4" />
-          </div>
-        </button>
-
-        <div class="patient-summary-card surface-card rounded-2xl p-4">
-          <div class="patient-summary-body flex items-start gap-4">
-            <div class="patient-summary-icon patient-summary-icon--timeline">
-              <Clock class="size-5" />
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-muted-foreground">Timeline</p>
-              <p class="mt-2 text-3xl font-bold text-primary">{{ encountersLast12Months }}</p>
-              <p class="mt-1 text-sm leading-relaxed text-muted-foreground">Encounters in the last 12 months</p>
-            </div>
-          </div>
-          <div class="patient-summary-link mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            {{ draftCount }} draft{{ draftCount === 1 ? '' : 's' }} loaded
-            <ArrowRight class="size-4" />
-          </div>
-        </div>
-
-        <button
-          type="button"
-          class="patient-summary-card surface-card rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5"
-          @click="editDialogOpen = true"
-        >
-          <div class="patient-summary-body flex items-start gap-4">
-            <div class="patient-summary-icon patient-summary-icon--profile">
-              <User class="size-5" />
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold text-muted-foreground">Profile Complete</p>
-              <div class="patient-complete-row mt-2 flex items-center gap-3">
-                <PatientCompletenessRing :completeness="profileCompleteness" content-class="p-[4px]">
-                  <div class="flex size-14 items-center justify-center rounded-full bg-white/55 text-base font-bold text-primary dark:bg-white/10">
-                    {{ profilePercent }}%
-                  </div>
-                </PatientCompletenessRing>
-                <p class="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                  Chart basics ready
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="patient-summary-link mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            Complete profile
-            <ArrowRight class="size-4" />
-          </div>
-        </button>
-
-        <button
-          type="button"
-          class="patient-summary-card surface-card rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5"
-          @click="openNextMove"
-        >
-          <div class="patient-summary-body flex items-start gap-4">
-            <div class="patient-summary-icon patient-summary-icon--next">
-              <CalendarCheck class="size-5" />
-            </div>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-muted-foreground">Next Move</p>
-              <p class="mt-2 text-lg font-bold text-emerald-700 dark:text-emerald-300">{{ nextMove.label }}</p>
-              <p class="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{{ nextMove.detail }}</p>
-            </div>
-          </div>
-          <div class="patient-summary-link mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            {{ nextMove.action }}
-            <ArrowRight class="size-4" />
-          </div>
-        </button>
-      </section>
-
-      <div class="space-y-3">
+      <div v-if="showPediatricAgeAdvisory || showObgynMaleAdvisory" class="space-y-3">
         <!-- Advisory: pediatrician looking at an adult chart -->
         <div
           v-if="showPediatricAgeAdvisory"
@@ -676,7 +510,7 @@ onUnmounted(() => {
               <div v-if="n < 5" class="patient-timeline-line" />
             </div>
             <div
-              class="patient-timeline-skeleton surface-card min-w-0 flex-1 rounded-2xl p-4"
+              class="patient-timeline-skeleton surface-card-lite min-w-0 flex-1 rounded-2xl p-4"
               :class="n < 5 ? 'mb-3' : ''"
             >
               <Skeleton class="mb-3 h-3 w-24" />
@@ -765,7 +599,7 @@ onUnmounted(() => {
             <div class="patient-timeline-marker-col">
               <Skeleton class="mt-3 size-8 shrink-0 rounded-full" />
             </div>
-            <div class="patient-timeline-skeleton surface-card mt-3 min-w-0 flex-1 rounded-2xl p-4">
+            <div class="patient-timeline-skeleton surface-card-lite mt-3 min-w-0 flex-1 rounded-2xl p-4">
               <Skeleton class="mb-2 h-3 w-24" />
               <Skeleton class="mb-2 h-4 w-3/4" />
               <Skeleton class="mb-3 h-3 w-1/2" />
@@ -1077,17 +911,6 @@ onUnmounted(() => {
   align-items: start;
 }
 
-.patient-summary-grid {
-  grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
-}
-
-@media (min-width: 1536px) {
-  .patient-summary-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.patient-summary-card,
 .patient-timeline-card,
 .patient-modules-card,
 .patient-profile-card,
@@ -1102,26 +925,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.patient-summary-card {
-  display: flex;
-  min-height: 13rem;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.patient-summary-body {
-  min-height: 0;
-}
-
-.patient-complete-row {
-  min-width: 0;
-}
-
-.patient-summary-card:hover {
-  box-shadow: var(--surface-shadow-strong);
-}
-
-.patient-summary-card::before,
 .patient-timeline-card::before,
 .patient-modules-card::before,
 .patient-profile-card::before {
@@ -1133,55 +936,6 @@ onUnmounted(() => {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.55),
     inset 1px 0 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  color: white;
-  transform: translateZ(0);
-  box-shadow:
-    0 14px 30px rgb(15 23 42 / 0.12),
-    inset 0 1px 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 1.25rem;
-}
-
-.patient-summary-icon--danger {
-  background: linear-gradient(135deg, rgb(251 113 133), rgb(249 115 22));
-  box-shadow: 0 14px 30px rgb(244 63 94 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-icon--warning {
-  background: linear-gradient(135deg, rgb(245 158 11), rgb(20 184 166));
-  box-shadow: 0 14px 30px rgb(245 158 11 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-icon--stable,
-.patient-summary-icon--next {
-  background: linear-gradient(135deg, rgb(16 185 129), rgb(20 184 166));
-  box-shadow: 0 14px 30px rgb(20 184 166 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-icon--timeline {
-  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
-  box-shadow: 0 14px 30px rgb(37 99 235 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-icon--profile {
-  background: linear-gradient(135deg, rgb(96 165 250), rgb(14 165 233));
-  box-shadow: 0 14px 30px rgb(14 165 233 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.28);
-}
-
-.patient-summary-link {
-  padding-top: 0.9rem;
-  border-top: 1px solid rgb(255 255 255 / 0.36);
 }
 
 .patient-advisory {
@@ -1399,7 +1153,6 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-:global(.dark .patient-summary-card),
 :global(.dark .patient-timeline-card),
 :global(.dark .patient-modules-card),
 :global(.dark .patient-profile-card),
@@ -1416,7 +1169,6 @@ onUnmounted(() => {
     0 24px 80px -38px rgb(0 0 0 / 0.82);
 }
 
-:global(.dark .patient-summary-link),
 :global(.dark .patient-contact-list) {
   border-color: rgb(255 255 255 / 0.1);
 }

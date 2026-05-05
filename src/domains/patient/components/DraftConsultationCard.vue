@@ -139,7 +139,7 @@ function formatDate(iso: string): string {
 
 <template>
   <div
-    class="patient-draft-card surface-card rounded-2xl p-4"
+    class="patient-draft-card surface-card-lite rounded-2xl p-4"
   >
     <div class="flex flex-col gap-3 sm:flex-row">
       <!-- Left (66% on sm+) -->
