@@ -81,7 +81,7 @@ const emit = defineEmits<{
             <CollapsibleTrigger as-child>
               <SidebarMenuButton :tooltip="item.title" :is-active="item.items.some(sub => isActive(sub.url))" @click="item.url !== '#' && router.push(item.url)">
                 <component :is="item.icon" />
-                <span>{{ item.title }}</span>
+                <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
                 <ChevronRight class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
               </SidebarMenuButton>
             </CollapsibleTrigger>
@@ -101,8 +101,8 @@ const emit = defineEmits<{
         <SidebarMenuItem v-else-if="item.comingSoon">
           <SidebarMenuButton :tooltip="`${item.title} — Coming soon`" class="pointer-events-none opacity-50">
             <component :is="item.icon" />
-            <span>{{ item.title }}</span>
-            <Badge variant="outline" class="ml-auto text-[10px] px-1.5 py-0">Soon</Badge>
+            <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
+            <Badge variant="outline" class="ml-auto px-1.5 py-0 text-[10px] group-data-[collapsible=icon]:hidden">Soon</Badge>
           </SidebarMenuButton>
         </SidebarMenuItem>
 
@@ -110,7 +110,7 @@ const emit = defineEmits<{
         <SidebarMenuItem v-else-if="item.locked">
           <SidebarMenuButton :tooltip="`${item.title} — Pro`" class="opacity-60 hover:opacity-80" @click="emit('locked-click', item.title)">
             <component :is="item.icon" />
-            <span>{{ item.title }}</span>
+            <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
             <Crown class="ml-auto size-3.5 text-amber-500" />
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -119,10 +119,10 @@ const emit = defineEmits<{
         <SidebarMenuItem v-else>
           <SidebarMenuButton as="a" :href="item.url" :tooltip="item.title" :is-active="isActive(item.url)" @click.prevent="navigateTo(item.url)">
             <component :is="item.icon" />
-            <span>{{ item.title }}</span>
+            <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
             <Badge
               v-if="(typeof item.badge === 'function' ? item.badge() : item.badge ?? 0) > 0"
-              class="ml-auto px-1.5 py-0 text-[10px]"
+              class="ml-auto px-1.5 py-0 text-[10px] group-data-[collapsible=icon]:hidden"
             >
               {{ typeof item.badge === 'function' ? item.badge() : item.badge }}
             </Badge>

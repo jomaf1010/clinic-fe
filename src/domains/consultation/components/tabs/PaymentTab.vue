@@ -482,16 +482,16 @@ watch(() => props.status, (newStatus, oldStatus) => {
 
 <template>
   <!-- Documents section (always visible) -->
-  <div class="flex flex-col gap-4">
+  <div class="mb-8 flex flex-col gap-5">
     <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Documents</h3>
-    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <!-- Prescription PDF -->
       <div
         v-if="hasPrescription"
-        class="flex flex-col gap-2 rounded-lg border p-3"
+        class="surface-card-lite flex flex-col gap-4 rounded-2xl border p-4"
       >
-        <div class="flex items-center gap-2">
-          <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
+        <div class="flex items-center gap-3">
+          <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 shadow-[0_10px_24px_rgba(37,99,235,0.12)] dark:bg-blue-950">
             <Pill class="size-4 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
@@ -499,12 +499,12 @@ watch(() => props.status, (newStatus, oldStatus) => {
             <p class="text-xs text-muted-foreground">{{ prescriptionSummary?.total ?? 0 }} item(s)</p>
           </div>
         </div>
-        <div class="flex flex-wrap items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-2">
           <Button
             v-if="prescriptionReady"
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             @click.stop="printPrescription"
           >
             <Printer class="size-3" />
@@ -514,7 +514,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
             v-if="prescriptionReady"
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             @click.stop="openPrescriptionPdf"
           >
             <FileDown class="size-3" />
@@ -523,7 +523,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
           <Button
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             :disabled="isGeneratingPrescription"
             @click.stop="generatePrescription"
           >
@@ -535,9 +535,9 @@ watch(() => props.status, (newStatus, oldStatus) => {
       </div>
 
       <!-- Medical Certificate -->
-      <div class="flex flex-col gap-2 rounded-lg border p-3">
-        <div class="flex items-center gap-2">
-          <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-950">
+      <div class="surface-card-lite flex flex-col gap-4 rounded-2xl border p-4">
+        <div class="flex items-center gap-3">
+          <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-green-100 shadow-[0_10px_24px_rgba(22,163,74,0.12)] dark:bg-green-950">
             <FileCheck class="size-4 text-green-600 dark:text-green-400" />
           </div>
           <div>
@@ -547,12 +547,12 @@ watch(() => props.status, (newStatus, oldStatus) => {
             </p>
           </div>
         </div>
-        <div class="flex flex-wrap items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-2">
           <Button
             v-if="medCertReady"
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             @click="printMedCert"
           >
             <Printer class="size-3" />
@@ -562,7 +562,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
             v-if="medCertReady"
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             @click="downloadMedCert"
           >
             <FileDown class="size-3" />
@@ -572,7 +572,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
             v-if="canGenerate"
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             @click="showMedCertDialog = true"
           >
             <FileCheck class="size-3" />
@@ -582,7 +582,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
             v-else-if="!medCertReady"
             variant="outline"
             size="sm"
-            class="h-7 gap-1.5 px-2 text-xs sm:px-3"
+            class="h-8 gap-1.5 px-3 text-xs"
             disabled
           >
             <span class="text-xs text-muted-foreground">Not generated</span>
@@ -593,11 +593,11 @@ watch(() => props.status, (newStatus, oldStatus) => {
   </div>
 
   <!-- Draft state — Estimated Charges + Fee Discount -->
-  <div v-if="isDraft" class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-5 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
+  <div v-if="isDraft" class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Estimated Charges -->
     <div class="flex flex-col gap-4">
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Estimated Charges</h3>
-      <div class="flex flex-col gap-1.5 rounded-lg border p-4">
+      <div class="surface-card-lite flex flex-col gap-1.5 rounded-2xl border p-4">
         <div class="flex justify-between text-sm">
           <span class="text-muted-foreground">{{ feeLabel }}</span>
           <span class="tabular-nums">{{ formatCurrency(consultationFee) }}</span>
@@ -674,7 +674,7 @@ watch(() => props.status, (newStatus, oldStatus) => {
           {{ payment?.fee_discount_value ? 'Edit Discount' : 'Add Discount' }}
         </Button>
       </div>
-      <div v-else class="flex flex-col gap-3 rounded-lg border p-4">
+      <div v-else class="surface-card-lite flex flex-col gap-3 rounded-2xl border p-4">
         <div class="flex gap-2">
           <Button
             type="button"

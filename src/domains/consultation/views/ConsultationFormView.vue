@@ -5,7 +5,6 @@ import { HttpError } from '@/lib/http'
 import {
   Stethoscope,
   Activity,
-  ClipboardList,
   ClipboardPlus,
   DollarSign,
   Lock,
@@ -14,11 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   WifiOff,
-  Eye,
-  ArrowLeft,
   FileText,
-  FileDown,
-  Printer,
   AlertTriangle,
   Heart,
   AlertCircle,
@@ -50,6 +45,7 @@ import PaymentTab from '../components/tabs/PaymentTab.vue'
 import VitalsSummary from '../components/VitalsSummary.vue'
 import FinalizeModal from '../components/FinalizeModal.vue'
 import SoapNoteSection from '@/domains/encounter/components/SoapNoteSection.vue'
+import EncounterTopbar from '@/domains/encounter/components/topbars/EncounterTopbar.vue'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import { openNewTab, printPdf } from '@/lib/utils'
 import type { UpdateEncounterPayload } from '@/domains/encounter/types/encounter.types'
@@ -264,6 +260,29 @@ async function handleSave(payload: UpdateEncounterPayload): Promise<void> {
   await store.saveSection(payload)
 }
 
+function currentTabSavePayload(): UpdateEncounterPayload | null {
+  const consultation = store.current?.consultation
+  if (!consultation) return null
+
+  switch (activeTab.value) {
+    case 'triage':
+      return { triage: consultation.triage }
+    case 'assessment':
+      return { assessment: consultation.assessment }
+    case 'treatment-plan':
+      return { treatment_plan: consultation.treatment_plan }
+    default:
+      return null
+  }
+}
+
+async function handleTopbarSave(): Promise<void> {
+  const payload = currentTabSavePayload()
+  if (!payload) return
+
+  await store.saveSection(payload)
+}
+
 // ── Circle stepper + floating mini tabs ──────────────────────────────────
 const stepperRef = ref<HTMLElement | null>(null)
 const formScrollRef = ref<HTMLElement | null>(null)
@@ -341,6 +360,16 @@ function openEncounter(encounterId: string) {
   })
 }
 
+function goToPatientProfile() {
+  const selectedPatientId = store.current?.patient_id ?? route.params.patientId
+  if (!selectedPatientId || Array.isArray(selectedPatientId)) return
+
+  router.push({
+    name: RouteNames.PATIENT_DETAIL,
+    params: { id: selectedPatientId },
+  })
+}
+
 const clinicalSummary = computed<string | null>(() => {
   const lines: string[] = []
   const problems = pdStore.problems.filter((p) => p.status !== 'resolved')
@@ -396,8 +425,8 @@ const allTabs = ['triage', 'assessment', 'treatment-plan', 'payment'] as const
 const tabLabels: Record<string, string> = {
   'triage': 'Triage',
   'assessment': 'Assessment',
-  'treatment-plan': 'Treatment Plan',
-  'payment': 'Payment',
+  'treatment-plan': 'Plan',
+  'payment': 'Finalize',
 }
 const visibleTabs = computed(() =>
   allTabs.filter((tab) => {
@@ -452,7 +481,7 @@ function proceedAfterFeeWarning() {
   <div
     v-else-if="loadError"
     role="alert"
-    class="mx-auto max-w-md rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+    class="surface-card mx-auto max-w-md rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
   >
     {{ loadError }}
   </div>
@@ -460,117 +489,30 @@ function proceedAfterFeeWarning() {
   <Tabs
     v-else-if="store.current"
     v-model="activeTab"
-    class="-mx-4 -mb-4 flex min-h-0 flex-1 flex-col overflow-hidden"
+    class="encounter-workspace relative -mx-4 -mb-4 flex min-h-0 flex-1 flex-col overflow-hidden"
   >
-    <!-- Patient name + actions (sticky) -->
-    <div class="sticky top-0 z-10 border-b bg-background">
-      <div class="flex flex-col gap-2 px-4 pb-1 pt-2 sm:flex-row sm:items-center sm:justify-between">
-        <!-- Left: back + patient name + status badge -->
-        <div class="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            class="gap-1.5"
-            @click="router.back()"
-          >
-            <ArrowLeft class="size-3.5" />
-            {{ store.current.patient_name }}
-          </Button>
-          <Badge
-            v-if="store.current.consultation?.type === 'follow_up'"
-            variant="secondary"
-          >
-            Follow-up
-          </Badge>
-          <Badge
-            v-if="store.isDraft"
-            class="border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
-            variant="outline"
-          >
-            Draft
-          </Badge>
-          <Badge
-            v-else-if="store.isFinalized"
-            class="border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
-            variant="outline"
-          >
-            <CheckCircle2 class="size-3" />
-            Finalized
-          </Badge>
-        </div>
-
-        <!-- Right: actions (finalized) -->
-        <div v-if="store.isFinalized" class="flex items-center gap-2">
-          <Button
-            v-if="summaryReady"
-            variant="outline"
-            size="sm"
-            @click="printSummary"
-          >
-            <Printer class="size-3.5" />
-            Print
-          </Button>
-          <Button
-            v-if="summaryReady"
-            variant="outline"
-            size="sm"
-            @click="downloadSummary"
-          >
-            <FileDown class="size-3.5" />
-            Download
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="isGeneratingSummary"
-            @click="generateSummary"
-          >
-            <LoaderCircle v-if="isGeneratingSummary" class="size-3.5 animate-spin" />
-            <FileText v-else class="size-3.5" />
-            {{ isGeneratingSummary ? 'Generating...' : summaryReady ? 'Regenerate' : 'Consultation Summary' }}
-          </Button>
-        </div>
-
-        <!-- Right: actions (drafts only) -->
-        <div v-if="store.isDraft" class="flex items-center gap-2">
-          <p v-if="store.isSaving" class="text-xs text-muted-foreground">
-            Saving...
-          </p>
-          <p v-if="store.saveError" class="text-xs text-destructive">
-            {{ store.saveError }}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            @click="showPreviewModal = true"
-          >
-            <Eye class="size-3.5" />
-            Preview
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="store.isSaving"
-            @click="store.saveSection({})"
-          >
-            <LoaderCircle v-if="store.isSaving" class="size-3.5 animate-spin" />
-            <ClipboardList v-else class="size-3.5" />
-            Save
-          </Button>
-          <Button
-            v-if="canFinalize"
-            size="sm"
-            @click="handleFinalizeClick"
-          >
-            <CheckCircle2 class="size-3.5" />
-            Finalize
-          </Button>
-        </div>
-      </div>
-    </div>
+    <EncounterTopbar
+      :specialty="store.current.specialty"
+      :patient-name="store.current.patient_name"
+      :consultation-type="store.current.consultation?.type"
+      :is-draft="store.isDraft"
+      :is-finalized="store.isFinalized"
+      :is-saving="store.isSaving"
+      :save-error="store.saveError"
+      :can-finalize="canFinalize"
+      :summary-ready="summaryReady"
+      :is-generating-summary="isGeneratingSummary"
+      @back="goToPatientProfile"
+      @preview="showPreviewModal = true"
+      @save="handleTopbarSave"
+      @finalize="handleFinalizeClick"
+      @print-summary="printSummary"
+      @download-summary="downloadSummary"
+      @generate-summary="generateSummary"
+    />
 
     <!-- Two-column layout -->
-    <div class="relative flex min-h-0 flex-1 flex-col lg:flex-row">
+    <div class="relative -mt-[calc(var(--header-height)+1rem)] flex min-h-0 flex-1 flex-col gap-4 px-3 pb-4 lg:flex-row">
 
       <!-- Floating mini tabs -->
       <Transition
@@ -581,8 +523,11 @@ function proceedAfterFeeWarning() {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="showMiniTabs" class="pointer-events-none absolute inset-x-0 top-2 z-30 flex lg:pr-[25%]">
-          <div class="pointer-events-auto mx-auto flex items-center gap-1 rounded-full border bg-background/95 px-2 py-1 shadow-md backdrop-blur">
+        <div
+          v-if="showMiniTabs"
+          class="pointer-events-none absolute inset-x-0 top-[calc(var(--header-height)+1.25rem)] z-40 flex lg:pr-[20rem]"
+        >
+          <div class="encounter-mini-tabs surface-floating pointer-events-auto mx-auto flex items-center gap-1 rounded-full border px-2 py-1">
             <button
               v-for="tab in visibleTabs"
               :key="tab"
@@ -590,7 +535,7 @@ function proceedAfterFeeWarning() {
               class="flex h-7 items-center justify-center rounded-full px-2 text-[10px] font-medium uppercase tracking-wide transition-all duration-200"
               :class="activeTab === tab
                 ? 'gap-1.5 bg-primary text-primary-foreground min-w-[5rem]'
-                : 'gap-0 text-muted-foreground hover:bg-muted size-7 min-w-7 max-w-7 px-0'"
+                : 'gap-0 text-muted-foreground hover:bg-white/40 size-7 min-w-7 max-w-7 px-0 dark:hover:bg-white/10'"
               @click="activeTab = tab"
             >
               <component :is="tabIcons[tab]" class="size-3.5 shrink-0" />
@@ -604,7 +549,10 @@ function proceedAfterFeeWarning() {
       </Transition>
 
       <!-- Left: Form content -->
-      <div ref="formScrollRef" class="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 pt-0 md:px-6 md:pb-8 lg:w-3/4">
+      <div
+        ref="formScrollRef"
+        class="encounter-main-scroll min-h-0 min-w-0 flex-1 overflow-y-auto pb-4 pt-[calc(var(--header-height)+1.75rem)] md:pb-8"
+      >
 
         <!-- Hidden TabsList for reka-ui a11y -->
         <TabsList class="sr-only">
@@ -614,12 +562,12 @@ function proceedAfterFeeWarning() {
         <div>
 
           <!-- Circle stepper -->
-          <div ref="stepperRef" class="mb-5 py-3">
+          <div ref="stepperRef" class="encounter-stepper mb-5 px-4 py-5">
             <div class="relative mx-0 md:mx-8">
               <!-- Connector line -->
-              <div class="absolute top-5 right-5 left-5 h-0.5 bg-border">
+              <div class="encounter-stepper-line absolute left-5 right-5 top-5 h-0.5">
                 <div
-                  class="absolute inset-y-0 left-0 bg-primary/40 transition-all duration-500"
+                  class="absolute inset-y-0 left-0 rounded-full bg-primary/40 transition-all duration-500"
                   :style="{ width: `${visibleTabs.length > 1 ? (currentTabIndex / (visibleTabs.length - 1)) * 100 : 0}%` }"
                 />
               </div>
@@ -633,13 +581,13 @@ function proceedAfterFeeWarning() {
                   @click="activeTab = tab"
                 >
                   <div
-                    class="flex size-10 items-center justify-center rounded-full border-2 transition-all duration-300"
+                    class="encounter-stepper-dot flex size-10 items-center justify-center rounded-full border transition-all duration-300"
                     :class="
                       activeTab === tab
-                        ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/25 scale-110'
+                        ? 'is-active scale-110 border-primary bg-primary text-primary-foreground'
                         : currentTabIndex > i
-                          ? 'border-primary bg-background text-primary hover:scale-105 scale-100'
-                          : 'border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground hover:scale-105 scale-100'
+                          ? 'border-primary text-primary hover:scale-105 scale-100'
+                          : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:scale-105 scale-100'
                     "
                   >
                     <component :is="tabIcons[tab]" class="size-4" />
@@ -658,7 +606,7 @@ function proceedAfterFeeWarning() {
           <!-- Offline banner (inline) -->
           <div
             v-if="!isOnline"
-            class="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
+            class="encounter-feedback encounter-feedback--warning mb-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm"
           >
             <WifiOff class="size-3.5 shrink-0" />
             You are offline. Changes will be saved locally and synced when you reconnect.
@@ -670,14 +618,14 @@ function proceedAfterFeeWarning() {
           <!-- Read-only banner (inline) -->
           <div
             v-if="store.isFinalized"
-            class="mb-3 flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground"
+            class="surface-muted mb-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm text-muted-foreground"
           >
             <Lock class="size-3.5 shrink-0" />
             This consultation has been finalized and is read-only.
           </div>
 
           <!-- ── Triage Tab ──────────────────────────────────────────── -->
-          <TabsContent value="triage" class="mt-0 px-0 md:px-8">
+          <TabsContent value="triage" class="encounter-tab-panel mt-0 px-0 md:px-6">
             <TriageTab
               :triage="(store.current.consultation?.triage ?? { chief_complaint: null, vitals: {}, notes: null })"
               :patient-id="store.current.patient_id"
@@ -696,7 +644,7 @@ function proceedAfterFeeWarning() {
           </TabsContent>
 
           <!-- ── Assessment Tab ───────────────────────────────────────── -->
-          <TabsContent v-if="canEditAssessment" value="assessment" class="mt-0 flex flex-col divide-y divide-dashed divide-border px-0 md:px-8 [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
+          <TabsContent v-if="canEditAssessment" value="assessment" class="encounter-tab-panel mt-0 flex flex-col divide-y divide-dashed divide-border px-0 md:px-6 [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
             <!-- Lab Results + Trends (compact, no vitals panel since sidebar shows them) -->
             <div v-if="hasLabSummary || canShowTrends">
               <VitalsSummary
@@ -729,7 +677,7 @@ function proceedAfterFeeWarning() {
           </TabsContent>
 
           <!-- ── Treatment Plan Tab ───────────────────────────────────── -->
-          <TabsContent value="treatment-plan" class="mt-0 px-0 md:px-8">
+          <TabsContent value="treatment-plan" class="encounter-tab-panel mt-0 px-0 md:px-6">
             <div class="flex flex-col gap-5">
               <TreatmentPlanTab
                 :treatment-plan="store.current.consultation?.treatment_plan ?? { advice: null, follow_up: null, follow_up_appointment_id: null }"
@@ -782,7 +730,7 @@ function proceedAfterFeeWarning() {
           </TabsContent>
 
           <!-- ── Payment Tab ──────────────────────────────────────────── -->
-          <TabsContent value="payment" class="mt-0 px-0 md:px-8">
+          <TabsContent value="payment" class="encounter-tab-panel mt-0 px-0 md:px-6">
             <PaymentTab
               :disabled="store.isFinalized"
               :encounter-id="store.current.id"
@@ -813,11 +761,11 @@ function proceedAfterFeeWarning() {
       </div>
 
       <!-- Right: Summary Sidebar -->
-      <aside class="hidden min-h-0 overflow-y-auto border-l px-4 pb-4 pt-3 lg:block lg:w-1/4">
+      <aside class="encounter-sidebar hidden min-h-0 overflow-y-auto pt-[calc(var(--header-height)+1.75rem)] lg:block lg:w-80">
         <div class="flex flex-col gap-3">
 
           <!-- Patient Card -->
-          <div v-if="pdStore.patient" class="flex flex-col gap-3 rounded-xl border bg-card p-3">
+          <div v-if="pdStore.patient" class="encounter-sidebar-card surface-card-lite flex flex-col gap-3 rounded-2xl border p-3">
             <div class="flex items-center gap-3">
               <Avatar class="size-10">
                 <AvatarImage v-if="pdStore.patient.avatar_url" :src="pdStore.patient.avatar_url" :alt="pdStore.patient.full_name" />
@@ -847,7 +795,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Clinical Summary -->
-          <div class="rounded-xl border bg-card p-3">
+          <div class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-500 to-slate-600 text-white shadow-sm">
                 <FileText class="size-4" />
@@ -861,7 +809,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Recent Encounters -->
-          <div v-if="recentEncounters.length" class="rounded-xl border bg-card p-3">
+          <div v-if="recentEncounters.length" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 to-pink-500 text-white shadow-sm">
                 <Stamp class="size-4" />
@@ -873,7 +821,7 @@ function proceedAfterFeeWarning() {
                     v-for="enc in recentEncounters"
                     :key="enc.id"
                     type="button"
-                    class="flex flex-col gap-0.5 rounded-md border border-transparent bg-muted/30 px-2 py-1.5 text-left text-xs transition-colors hover:border-border hover:bg-muted"
+                    class="surface-muted flex flex-col gap-0.5 rounded-xl border border-transparent px-2 py-1.5 text-left text-xs transition-colors hover:border-[var(--surface-border-strong)]"
                     @click="openEncounter(enc.id)"
                   >
                     <p class="font-medium leading-tight">{{ enc.auto_display_line ?? enc.display_line }}</p>
@@ -885,7 +833,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Current Vitals -->
-          <div v-if="currentVitals" class="rounded-xl border bg-card p-3">
+          <div v-if="currentVitals" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm">
                 <Activity class="size-4" />
@@ -944,7 +892,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Active Problems -->
-          <div class="rounded-xl border bg-card p-3">
+          <div class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm">
                 <AlertCircle class="size-4" />
@@ -966,7 +914,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Allergies -->
-          <div class="rounded-xl border bg-card p-3">
+          <div class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm">
                 <ShieldAlert class="size-4" />
@@ -987,7 +935,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Active Medications -->
-          <div v-if="activeMedications.length" class="rounded-xl border bg-card p-3">
+          <div v-if="activeMedications.length" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-sm">
                 <Pill class="size-4" />
@@ -1015,7 +963,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Lifestyle -->
-          <div v-if="lifestyleSummary.length" class="rounded-xl border bg-card p-3">
+          <div v-if="lifestyleSummary.length" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm">
                 <Heart class="size-4" />
@@ -1033,7 +981,7 @@ function proceedAfterFeeWarning() {
           </div>
 
           <!-- Family History -->
-          <div v-if="familyHistoryEntries.length" class="rounded-xl border bg-card p-3">
+          <div v-if="familyHistoryEntries.length" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
             <div class="flex items-start gap-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 text-white shadow-sm">
                 <Users class="size-4" />
@@ -1109,3 +1057,64 @@ function proceedAfterFeeWarning() {
 
   </Tabs>
 </template>
+
+<style scoped>
+.encounter-workspace {
+  --encounter-sidebar-width: 20rem;
+}
+
+.encounter-topbar {
+  overflow: hidden;
+}
+
+.encounter-main-scroll {
+  scrollbar-gutter: stable;
+}
+
+.encounter-sidebar {
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.encounter-mini-tabs {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.encounter-stepper-line {
+  background: linear-gradient(90deg, rgb(37 99 235 / 0.16), rgb(20 184 166 / 0.18));
+  border-radius: 999px;
+}
+
+.encounter-stepper-dot {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.36)),
+    var(--surface-muted);
+  box-shadow:
+    0 12px 26px rgb(15 23 42 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.35);
+}
+
+.encounter-stepper-dot.is-active {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 18px 40px rgb(37 99 235 / 0.2),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.encounter-feedback--warning {
+  color: var(--feedback-warning-fg);
+  background: var(--feedback-warning-bg);
+  border-color: color-mix(in oklch, var(--feedback-warning-fg) 24%, transparent);
+}
+
+:global(.dark .encounter-stepper-dot) {
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.72), rgb(2 6 23 / 0.5)),
+    var(--surface-muted);
+  box-shadow:
+    0 14px 30px rgb(0 0 0 / 0.24),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+</style>

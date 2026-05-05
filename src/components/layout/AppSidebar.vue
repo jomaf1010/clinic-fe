@@ -21,6 +21,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
+  SidebarTrigger,
   useSidebar,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -166,22 +167,25 @@ onMounted(async () => {
 <template>
   <Sidebar variant="inset" collapsible="icon">
     <SidebarHeader>
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton size="lg" as="a" href="/" class="rounded-2xl">
-            <Avatar class="size-10 rounded-2xl shadow-[0_12px_28px_rgba(0,41,84,0.18)] group-data-[collapsible=icon]:size-8">
-              <AvatarImage v-if="authStore.currentClinic?.logo_url" :src="authStore.currentClinic.logo_url" alt="Clinic logo" class="rounded-2xl object-cover" />
-              <AvatarFallback class="rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground text-xs">
-                <Stethoscope class="size-4" />
-              </AvatarFallback>
-            </Avatar>
-            <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium">{{ clinicName }}</span>
-              <span class="truncate text-xs capitalize">{{ authStore.currentClinic?.role ?? 'Management' }}</span>
-            </div>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
+      <div class="flex items-start gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+        <SidebarMenu class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" as="a" href="/" class="rounded-2xl">
+              <Avatar class="size-10 rounded-2xl shadow-[0_12px_28px_rgba(0,41,84,0.18)] group-data-[collapsible=icon]:size-8">
+                <AvatarImage v-if="authStore.currentClinic?.logo_url" :src="authStore.currentClinic.logo_url" alt="Clinic logo" class="rounded-2xl object-cover" />
+                <AvatarFallback class="rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+                  <Stethoscope class="size-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div class="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                <span class="truncate font-medium">{{ clinicName }}</span>
+                <span class="truncate text-xs capitalize">{{ authStore.currentClinic?.role ?? 'Management' }}</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarTrigger class="surface-muted mt-1 size-9 shrink-0 rounded-2xl border shadow-[0_10px_24px_rgba(15,23,42,0.06)] group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:size-8" />
+      </div>
     </SidebarHeader>
     <SidebarContent>
       <NavMain :items="navMain" @locked-click="handleLockedClick" />
