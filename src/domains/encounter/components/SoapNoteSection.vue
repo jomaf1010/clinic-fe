@@ -116,7 +116,7 @@ async function handleSave(): Promise<void> {
 </script>
 
 <template>
-  <section class="rounded-lg border bg-background p-4">
+  <section class="surface-card-lite rounded-2xl border p-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
@@ -153,13 +153,13 @@ async function handleSave(): Promise<void> {
       </div>
     </div>
 
-    <div v-if="error" class="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+    <div v-if="error" class="mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
       {{ error }}
     </div>
 
     <div
       v-if="activeWarnings.length || missingInputs.length"
-      class="mt-3 flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+      class="mt-3 flex gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/50 dark:text-amber-300"
     >
       <AlertTriangle class="mt-0.5 size-4 shrink-0" />
       <div class="min-w-0 space-y-1">

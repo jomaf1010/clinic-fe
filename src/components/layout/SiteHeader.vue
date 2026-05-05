@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { MessageSquare, SearchIcon, LoaderCircle, MapPin, UserPlus, Wifi, WifiOff, Bell } from 'lucide-vue-next'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import {
   Tooltip,
   TooltipContent,
@@ -32,8 +32,13 @@ const notificationStore = useNotificationStore()
 const notificationSheetOpen = ref(false)
 
 const router = useRouter()
+const route = useRoute()
 const messageSheetOpen = ref(false)
 const hasMessagesPermission = ref(false)
+const { isMobile } = useSidebar()
+const isEncounterRoute = computed(() =>
+  route.name === RouteNames.ENCOUNTER_NEW || route.name === RouteNames.ENCOUNTER_DETAIL,
+)
 
 watch(() => authStore.user, () => {
   hasMessagesPermission.value = authStore.hasPermission('messages.view')
@@ -133,9 +138,9 @@ function onFocus() {
     style="height: calc(var(--header-height) + 0.5rem)"
   >
     <div class="flex h-full w-full items-center gap-3 p-3">
-      <SidebarTrigger class="glass-topbar-icon -ml-1" />
+      <SidebarTrigger v-if="isMobile" class="glass-topbar-icon -ml-1" />
 
-      <div class="relative min-w-0 flex-1 sm:max-w-xl">
+      <div v-if="!isEncounterRoute" class="relative min-w-0 flex-1 sm:max-w-xl">
         <SearchIcon class="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           v-model="query"

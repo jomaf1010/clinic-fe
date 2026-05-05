@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import SiteHeader from '@/components/layout/SiteHeader.vue'
@@ -14,7 +15,9 @@ import { useNotificationRealtime } from '@/domains/notification/composables/useN
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useAnnouncementStore } from '@/stores/announcementStore'
+import { RouteNames } from '@/router/routeNames'
 
+const route = useRoute()
 const authStore = useAuthStore()
 const messageStore = useMessageStore()
 const notificationStore = useNotificationStore()
@@ -22,6 +25,9 @@ const { start: startDmRealtime, stop: stopDmRealtime } = useDmRealtime()
 const { start: startNotificationRealtime, stop: stopNotificationRealtime } = useNotificationRealtime()
 useOnlineStatus()
 const announcementStore = useAnnouncementStore()
+const isEncounterRoute = computed(() =>
+  route.name === RouteNames.ENCOUNTER_NEW || route.name === RouteNames.ENCOUNTER_DETAIL,
+)
 
 let notificationPollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -55,11 +61,16 @@ onUnmounted(() => {
   <SidebarProvider class="app-shell" style="--header-height: 3.5rem">
     <AppSidebar />
     <SidebarInset>
-      <SiteHeader />
+      <SiteHeader v-if="!isEncounterRoute" />
       <AnnouncementBanners />
       <TrialBanner />
       <GracePeriodBanner />
-      <div class="-mt-[calc(var(--header-height)+1rem)] flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4 pt-[calc(var(--header-height)+1.75rem)]">
+      <div
+        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4"
+        :class="isEncounterRoute
+          ? 'pt-0'
+          : '-mt-[calc(var(--header-height)+1rem)] pt-[calc(var(--header-height)+1.75rem)]'"
+      >
         <RouterView />
       </div>
     </SidebarInset>

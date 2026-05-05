@@ -220,7 +220,7 @@ function applyPreset(days: number): void {
 </script>
 
 <template>
-  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0 [&>*:last-child]:border-t-0">
+  <div class="flex flex-col divide-y divide-dashed divide-border [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
     <!-- Prescription -->
     <div class="flex flex-col gap-4">
       <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Prescription</h3>
@@ -267,7 +267,7 @@ function applyPreset(days: number): void {
         <!-- Booked state -->
         <div
           v-if="appointmentBooked && local.follow_up"
-          class="flex items-center gap-3 rounded-md border border-green-300 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950"
+          class="flex items-center gap-3 rounded-2xl border border-green-300 bg-green-50/80 p-3 dark:border-green-700/70 dark:bg-green-950/50"
         >
           <CheckCircle2 class="size-5 shrink-0 text-green-600 dark:text-green-400" />
           <div class="flex-1">
@@ -329,7 +329,7 @@ function applyPreset(days: number): void {
               v-for="preset in followUpPresets"
               :key="preset.days"
               type="button"
-              class="rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground"
+              class="surface-muted rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:bg-primary hover:text-primary-foreground"
               @click="applyPreset(preset.days)"
             >
               {{ preset.label }}
@@ -343,7 +343,7 @@ function applyPreset(days: number): void {
               Loading available slots...
             </div>
 
-            <div v-else-if="availableSlots.length === 0" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
+            <div v-else-if="availableSlots.length === 0" class="rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-700 dark:border-amber-700/70 dark:bg-amber-950/50 dark:text-amber-400">
               No available slots on this date. Please select another day.
             </div>
 

@@ -242,10 +242,8 @@ function emitSave() {
         />
 
         <div class="flex flex-col gap-2">
-          <div class="flex h-6 items-center">
-            <Label for="blood_sugar">Blood Sugar (mg/dL)</Label>
-          </div>
-          <div class="grid grid-cols-[minmax(0,1fr)_minmax(8.5rem,0.85fr)] gap-1.5">
+          <Label for="blood_sugar">Blood Sugar (mg/dL)</Label>
+          <div class="flex items-center gap-1">
             <Input
               id="blood_sugar"
               :model-value="(allVitals['blood_sugar'] as number | null) ?? undefined"
@@ -256,6 +254,7 @@ function emitSave() {
               placeholder="70-200"
               :disabled="disabled"
               :aria-invalid="!!errors.blood_sugar"
+              class="min-w-0 flex-1"
               :class="errors.blood_sugar ? 'border-destructive focus-visible:ring-destructive' : ''"
               @update:model-value="onBloodSugarUpdate"
               @blur="onBlur"
@@ -265,7 +264,7 @@ function emitSave() {
               :disabled="disabled"
               @update:model-value="(v) => onBloodGlucoseTimingUpdate(v as BloodGlucoseTiming)"
             >
-              <SelectTrigger aria-label="Blood glucose timing">
+              <SelectTrigger class="min-w-0 flex-1" aria-label="Blood glucose timing">
                 <SelectValue placeholder="Timing" />
               </SelectTrigger>
               <SelectContent>
