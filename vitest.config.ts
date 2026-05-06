@@ -48,6 +48,9 @@ export default defineConfig({
         'src/domains/auth/components/{CredentialsForm,PasswordForm}.vue',
         'src/domains/auth/stores/**/*.ts',
         'src/domains/consultation/composables/useFeeDiscount.ts',
+        'src/domains/consumable/api/consumableApi.ts',
+        'src/domains/labService/api/labServiceApi.ts',
+        'src/domains/medicine/api/medicineApi.ts',
         'src/domains/patient/components/EditPatientDialog.vue',
         'src/domains/patient/composables/usePatientSync.ts',
         'src/domains/patient/utils/profileCompleteness.ts',
@@ -55,6 +58,7 @@ export default defineConfig({
         'src/domains/queue/stores/**/*.ts',
         'src/domains/schedule/components/{BreakEditor,DayScheduleRow}.vue',
         'src/domains/schedule/stores/**/*.ts',
+        'src/domains/service/api/serviceApi.ts',
         'src/domains/subscription/components/{PricingCard,SubscriptionStatus}.vue',
         'src/domains/subscription/stores/**/*.ts',
         'src/lib/validationRules.ts',
@@ -78,7 +82,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 78,
+        functions: 82,
         statements: 70,
       },
     },
