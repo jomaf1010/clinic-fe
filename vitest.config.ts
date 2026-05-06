@@ -47,6 +47,7 @@ export default defineConfig({
         'src/domains/appointment/stores/**/*.ts',
         'src/domains/auth/components/{CredentialsForm,PasswordForm}.vue',
         'src/domains/auth/stores/**/*.ts',
+        'src/domains/clinic/api/clinicApi.ts',
         'src/domains/consultation/composables/useFeeDiscount.ts',
         'src/domains/consumable/api/consumableApi.ts',
         'src/domains/labService/api/labServiceApi.ts',
@@ -56,11 +57,14 @@ export default defineConfig({
         'src/domains/patient/utils/profileCompleteness.ts',
         'src/domains/queue/components/{QueueCard,QueueStatusBadge}.vue',
         'src/domains/queue/stores/**/*.ts',
+        'src/domains/roles/api/roleApi.ts',
         'src/domains/schedule/components/{BreakEditor,DayScheduleRow}.vue',
         'src/domains/schedule/stores/**/*.ts',
         'src/domains/service/api/serviceApi.ts',
         'src/domains/subscription/components/{PricingCard,SubscriptionStatus}.vue',
         'src/domains/subscription/stores/**/*.ts',
+        'src/domains/team/api/teamApi.ts',
+        'src/domains/template/api/templateApi.ts',
         'src/lib/validationRules.ts',
       ],
       // Don't fail builds on tier-0 / infra files that exist mostly to
@@ -82,7 +86,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 82,
+        functions: 84,
         statements: 70,
       },
     },
