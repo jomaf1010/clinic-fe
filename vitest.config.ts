@@ -50,6 +50,8 @@ export default defineConfig({
         'src/domains/patient/components/EditPatientDialog.vue',
         'src/domains/patient/composables/usePatientSync.ts',
         'src/domains/patient/utils/profileCompleteness.ts',
+        'src/domains/queue/components/{QueueCard,QueueStatusBadge}.vue',
+        'src/domains/queue/stores/**/*.ts',
         'src/domains/schedule/components/{BreakEditor,DayScheduleRow}.vue',
         'src/domains/schedule/stores/**/*.ts',
         'src/lib/validationRules.ts',
@@ -73,7 +75,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 73,
+        functions: 76,
         statements: 70,
       },
     },
