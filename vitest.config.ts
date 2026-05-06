@@ -43,6 +43,8 @@ export default defineConfig({
       include: [
         'src/components/layout/{GracePeriodBanner,TrialBanner}.vue',
         'src/components/shared/{FeatureGate,UpgradePrompt}.vue',
+        'src/domains/appointment/components/{AppointmentCard,AppointmentStatusBadge}.vue',
+        'src/domains/appointment/stores/**/*.ts',
         'src/domains/auth/components/{CredentialsForm,PasswordForm}.vue',
         'src/domains/auth/stores/**/*.ts',
         'src/domains/patient/components/EditPatientDialog.vue',
@@ -69,7 +71,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 64,
+        functions: 70,
         statements: 70,
       },
     },
