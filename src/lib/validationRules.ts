@@ -68,6 +68,45 @@ export function maxLength(label: string, max: number) {
   }
 }
 
+type ValidationRule = (value: unknown) => true | string
+type RuleSchema = Record<string, ValidationRule | ValidationRule[]>
+
+/**
+ * Converts the project's rule-array schema shape into the single-validator
+ * function shape expected by vee-validate's object validationSchema.
+ */
+export function toVeeSchema<T extends RuleSchema>(schema: T): Record<keyof T, ValidationRule> {
+  return Object.fromEntries(
+    Object.entries(schema).map(([field, rules]) => [
+      field,
+      (value: unknown) => {
+        for (const rule of Array.isArray(rules) ? rules : [rules]) {
+          const result = rule(value)
+          if (result !== true) return result
+        }
+        return true
+      },
+    ]),
+  ) as Record<keyof T, ValidationRule>
+}
+
+export function validateRuleSchema<T extends RuleSchema>(
+  schema: T,
+  values: Record<keyof T, unknown>,
+): Partial<Record<keyof T, string>> {
+  const errors: Partial<Record<keyof T, string>> = {}
+  for (const [field, rules] of Object.entries(schema) as [keyof T, ValidationRule | ValidationRule[]][]) {
+    for (const rule of Array.isArray(rules) ? rules : [rules]) {
+      const result = rule(values[field])
+      if (result !== true) {
+        errors[field] = result
+        break
+      }
+    }
+  }
+  return errors
+}
+
 /**
  * Returns a rule that fails when the value is not a valid number.
  * @param label - Human-readable field label used in the error message.

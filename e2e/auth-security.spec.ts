@@ -8,7 +8,7 @@ test.describe('Auth & Security', () => {
     await page.goto('/patients')
 
     // SPA boots, checks auth, redirects to login — may take time for JS to load
-    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 20000 })
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible({ timeout: 20000 })
 
     await context.close()
   })

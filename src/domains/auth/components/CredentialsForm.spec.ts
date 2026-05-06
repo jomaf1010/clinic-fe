@@ -17,7 +17,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
-import { stubStore } from '@/__tests__/helpers/createPinia'
+import { setupTestPinia } from '@/__tests__/helpers/createPinia'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import CredentialsForm from './CredentialsForm.vue'
 
@@ -73,19 +73,21 @@ const STUBS = {
 }
 
 function mount(initialUser: Record<string, unknown> = {}) {
-  const wrapper = mountWithDeps(CredentialsForm, { global: { stubs: STUBS } })
+  setupTestPinia()
   const auth = useAuthStore()
-  stubStore(auth, {
-    user: {
-      prc_license_number: '0012345',
-      ptr_number: '',
-      s2_license_number: '',
-      specialty: 'none',
-      sub_specialty: '',
-      ...initialUser,
-    },
-    fetchUser: vi.fn().mockResolvedValue(undefined),
-  } as never)
+  auth.user = {
+    prc_license_number: '0012345',
+    ptr_number: '',
+    s2_license_number: '',
+    specialty: 'none',
+    sub_specialty: '',
+    ...initialUser,
+  } as never
+  auth.fetchUser = vi.fn().mockResolvedValue(undefined)
+  const wrapper = mountWithDeps(CredentialsForm, {
+    noPinia: true,
+    global: { stubs: STUBS },
+  })
   return wrapper
 }
 
@@ -97,7 +99,7 @@ describe('CredentialsForm', () => {
     expect(httpGetSpy).toHaveBeenCalledWith('/specialties')
   })
 
-  it.skip('blocks submit when PRC license is longer than 50 chars', async () => {
+  it('blocks submit when PRC license is longer than 50 chars', async () => {
     updateProfileSpy.mockClear()
     const wrapper = mount()
     await flushPromises()
@@ -105,18 +107,18 @@ describe('CredentialsForm', () => {
     await wrapper.find('#cred-prc').setValue(longValue)
     await flushPromises()
 
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(updateProfileSpy).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('PRC license number must be no more than 50 characters.')
   })
 
-  it.skip('submits null for specialty when "none" is selected', async () => {
+  it('submits null for specialty when "none" is selected', async () => {
     updateProfileSpy.mockClear()
     const wrapper = mount()
     await flushPromises()
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(updateProfileSpy).toHaveBeenCalledOnce()
@@ -125,7 +127,7 @@ describe('CredentialsForm', () => {
     expect(payload.prc_license_number).toBe('0012345')
   })
 
-  it.skip('submits empty strings as null for optional fields', async () => {
+  it('submits empty strings as null for optional fields', async () => {
     updateProfileSpy.mockClear()
     const wrapper = mount({
       prc_license_number: '',
@@ -134,7 +136,7 @@ describe('CredentialsForm', () => {
       sub_specialty: '',
     })
     await flushPromises()
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(updateProfileSpy).toHaveBeenCalledOnce()

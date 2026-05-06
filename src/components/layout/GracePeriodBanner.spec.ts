@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
-import { stubStore } from '@/__tests__/helpers/createPinia'
+import { setupTestPinia } from '@/__tests__/helpers/createPinia'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import GracePeriodBanner from './GracePeriodBanner.vue'
 
@@ -16,15 +16,22 @@ vi.mock('vue-router', () => ({
 }))
 
 function mountBanner(isInGracePeriod: boolean) {
+  setupTestPinia()
+  const auth = useAuthStore()
+  auth.user = {
+    current_clinic: {
+      is_in_grace_period: isInGracePeriod,
+    },
+  } as never
+
   const wrapper = mountWithDeps(GracePeriodBanner, {
+    noPinia: true,
     global: {
       stubs: {
         Button: { template: '<button class="btn" @click="$emit(`click`, $event)"><slot /></button>' },
       },
     },
   })
-  const auth = useAuthStore()
-  stubStore(auth, { isInGracePeriod } as never)
   return wrapper
 }
 
@@ -34,19 +41,19 @@ describe('GracePeriodBanner', () => {
     expect(wrapper.text()).toBe('')
   })
 
-  it.skip('shows the overdue billing copy when in grace period', () => {
+  it('shows the overdue billing copy when in grace period', () => {
     const wrapper = mountBanner(true)
     expect(wrapper.text()).toContain('Your billing is overdue.')
     expect(wrapper.text()).toContain('Renew now to keep Pro features.')
   })
 
-  it.skip('exposes a Renew Now action', () => {
+  it('exposes a Renew Now action', () => {
     const wrapper = mountBanner(true)
     const renew = wrapper.findAll('button').find((b) => b.text().includes('Renew Now'))
     expect(renew).toBeDefined()
   })
 
-  it.skip('hides on dismiss click', async () => {
+  it('hides on dismiss click', async () => {
     const wrapper = mountBanner(true)
     const closeBtn = wrapper.findAll('button').at(-1)
     expect(closeBtn).toBeDefined()

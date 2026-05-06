@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
-import { stubStore } from '@/__tests__/helpers/createPinia'
+import { setupTestPinia, stubStore } from '@/__tests__/helpers/createPinia'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import FeatureGate from './FeatureGate.vue'
 
@@ -20,21 +20,23 @@ const SlotChild = defineComponent({
 })
 
 function mountGate(feature: string, hasFeatureReturn: boolean, label?: string) {
+  setupTestPinia()
+  const auth = useAuthStore()
+  stubStore(auth, { hasFeature: () => hasFeatureReturn })
+
   const wrapper = mountWithDeps(FeatureGate, {
     props: { feature, label },
     slots: { default: () => h(SlotChild) },
+    noPinia: true,
     global: {
       stubs: { UpgradePrompt: true },
     },
   })
-  // stubStore must run after mount so the active Pinia is this test's.
-  const auth = useAuthStore()
-  stubStore(auth, { hasFeature: () => hasFeatureReturn })
   return wrapper
 }
 
 describe('FeatureGate', () => {
-  it.skip('renders the default slot when authStore.hasFeature returns true', () => {
+  it('renders the default slot when authStore.hasFeature returns true', () => {
     const wrapper = mountGate('messages', true)
     expect(wrapper.findComponent(SlotChild).exists()).toBe(true)
     expect(wrapper.find('.slot-child').exists()).toBe(true)
