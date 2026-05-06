@@ -47,6 +47,7 @@ export default defineConfig({
         'src/domains/appointment/stores/**/*.ts',
         'src/domains/auth/components/{CredentialsForm,PasswordForm}.vue',
         'src/domains/auth/stores/**/*.ts',
+        'src/domains/consultation/composables/useFeeDiscount.ts',
         'src/domains/patient/components/EditPatientDialog.vue',
         'src/domains/patient/composables/usePatientSync.ts',
         'src/domains/patient/utils/profileCompleteness.ts',
@@ -75,7 +76,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 76,
+        functions: 77,
         statements: 70,
       },
     },
