@@ -36,7 +36,7 @@ import AddressForm from '@/components/AddressForm.vue'
 import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
 import { HttpError } from '@/lib/http'
-import { editPatientSchema } from '@/lib/validationRules'
+import { editPatientSchema, validateRuleSchema } from '@/lib/validationRules'
 import type { PatientResponse, PatientAddress, PatientName } from '../types/patient.types'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
 
@@ -50,9 +50,7 @@ const emit = defineEmits<{
   updated: []
 }>()
 
-const { handleSubmit, setFieldError, resetForm, setValues } = useForm({
-  validationSchema: editPatientSchema,
-})
+const { handleSubmit, setFieldError, resetForm, setValues } = useForm<EditPatientFormValues>()
 
 const { value: dateOfBirth, errorMessage: dateOfBirthError } = useField<string>('date_of_birth')
 const { value: sex, errorMessage: sexError } = useField<string>('sex')
@@ -68,6 +66,14 @@ const bloodType = ref<string>('')
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
+
+type EditPatientFormValues = {
+  date_of_birth: string
+  sex: string
+  contact_number: string
+  email: string
+  note: string
+}
 
 function populateForm() {
   setValues({
@@ -95,10 +101,25 @@ watch(
       populateForm()
     }
   },
+  { immediate: true },
 )
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
+
+  const validationErrors = validateRuleSchema(editPatientSchema, {
+    date_of_birth: values.date_of_birth,
+    sex: values.sex,
+    contact_number: values.contact_number,
+    email: values.email,
+    note: values.note,
+  })
+  if (Object.keys(validationErrors).length > 0) {
+    for (const field of Object.keys(validationErrors) as (keyof EditPatientFormValues)[]) {
+      setFieldError(field, validationErrors[field])
+    }
+    return
+  }
 
   if (!name.value?.first_name || !name.value?.last_name) {
     generalError.value = 'Please enter first and last name.'
@@ -136,7 +157,7 @@ const onSubmit = handleSubmit(async (values) => {
         const body = err.data as ValidationError
         const serverErrors = body.errors ?? {}
 
-        for (const [field, messages] of Object.entries(serverErrors)) {
+        for (const [field, messages] of Object.entries(serverErrors) as [keyof EditPatientFormValues, string[]][]) {
           setFieldError(field, messages[0])
         }
 

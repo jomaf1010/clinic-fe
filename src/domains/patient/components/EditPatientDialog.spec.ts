@@ -133,7 +133,7 @@ function mount(patient = makePatientResponse()) {
   })
 }
 
-describe.skip('EditPatientDialog', () => {
+describe('EditPatientDialog', () => {
   it('populates the contact number input from the patient on open', async () => {
     const wrapper = mount()
     await flushPromises()
