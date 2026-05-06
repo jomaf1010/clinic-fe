@@ -10,13 +10,11 @@ import { HttpError } from '@/lib/http'
 import { toast } from 'vue-sonner'
 import { Lock, KeyRound, LoaderCircle } from 'lucide-vue-next'
 import { authApi } from '../api/authApi'
-import { changePasswordSchema } from '@/lib/validationRules'
+import { changePasswordSchema, validateRuleSchema } from '@/lib/validationRules'
 import type { ValidationError } from '../types/auth.types'
 import PasswordStrengthBar from './PasswordStrengthBar.vue'
 
-const { handleSubmit, setFieldError, resetForm } = useForm({
-  validationSchema: changePasswordSchema,
-})
+const { handleSubmit, setFieldError, resetForm } = useForm()
 
 const { value: currentPassword, errorMessage: currentPasswordError } = useField<string>('current_password')
 const { value: newPassword, errorMessage: newPasswordError } = useField<string>('new_password')
@@ -27,6 +25,18 @@ const generalError = ref<string | null>(null)
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
+
+  const validationErrors = validateRuleSchema(changePasswordSchema, {
+    current_password: values.current_password,
+    new_password: values.new_password,
+    new_password_confirmation: values.new_password_confirmation,
+  })
+  if (Object.keys(validationErrors).length > 0) {
+    for (const [field, message] of Object.entries(validationErrors)) {
+      setFieldError(field, message)
+    }
+    return
+  }
 
   if (values.new_password !== values.new_password_confirmation) {
     setFieldError('new_password_confirmation', 'Passwords do not match.')

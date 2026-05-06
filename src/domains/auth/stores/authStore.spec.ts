@@ -352,32 +352,35 @@ describe('authStore — trial / grace / cancel derivations', () => {
     expect(store.isPro).toBe(false)
   })
 
-  it.skip('trialDaysLeft computes ceil(diff/day) and clamps at zero', async () => {
-    const future = new Date(Date.now() + 3.2 * 24 * 60 * 60 * 1000).toISOString()
-    const past = new Date(Date.now() - 1000 * 60 * 60).toISOString()
-    const ctx = makeClinicContext({ is_trial: true, trial_ends_at: future })
+  it('trialDaysLeft computes ceil(diff/day) and clamps at zero', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-06T00:00:00Z'))
 
-    const apiFuture = makeAuthApi({
-      me: vi.fn().mockResolvedValue({ data: makeUser({ current_clinic: ctx }), meta: { memberships: [makeMembership()] } }),
-    })
-    const { useAuthStore: useFuture } = await loadStore(apiFuture)
-    const futureStore = useFuture()
-    await futureStore.fetchUser()
-    expect(futureStore.isOnTrial).toBe(true)
-    expect(futureStore.trialDaysLeft).toBe(4) // ceil(3.2)
+    try {
+      const future = new Date(Date.now() + 3.2 * 24 * 60 * 60 * 1000).toISOString()
+      const past = new Date(Date.now() - 1000 * 60 * 60).toISOString()
+      const api = makeAuthApi({
+        me: vi.fn().mockResolvedValue({
+          data: makeUser({
+            current_clinic: makeClinicContext({ is_trial: true, trial_ends_at: future }),
+          }),
+          meta: { memberships: [makeMembership()] },
+        }),
+      })
+      const { useAuthStore } = await loadStore(api)
+      const store = useAuthStore()
+      await store.fetchUser()
 
-    vi.resetModules()
+      expect(store.isOnTrial).toBe(true)
+      expect(store.trialDaysLeft).toBe(4) // ceil(3.2)
 
-    const apiPast = makeAuthApi({
-      me: vi.fn().mockResolvedValue({
-        data: makeUser({ current_clinic: makeClinicContext({ is_trial: true, trial_ends_at: past }) }),
-        meta: { memberships: [makeMembership()] },
-      }),
-    })
-    const { useAuthStore: usePast } = await loadStore(apiPast)
-    const pastStore = usePast()
-    await pastStore.fetchUser()
-    expect(pastStore.trialDaysLeft).toBe(0)
+      store.user = makeUser({
+        current_clinic: makeClinicContext({ is_trial: true, trial_ends_at: past }),
+      })
+      expect(store.trialDaysLeft).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('isInGracePeriod / willCancel mirror clinic flags', async () => {

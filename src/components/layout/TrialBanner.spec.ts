@@ -12,7 +12,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
-import { stubStore } from '@/__tests__/helpers/createPinia'
+import { setupTestPinia } from '@/__tests__/helpers/createPinia'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import TrialBanner from './TrialBanner.vue'
 
@@ -21,15 +21,25 @@ vi.mock('vue-router', () => ({
 }))
 
 function mountBanner(trial: { isOnTrial: boolean; trialDaysLeft: number }) {
+  setupTestPinia()
+  const auth = useAuthStore()
+  auth.user = {
+    current_clinic: {
+      is_trial: trial.isOnTrial,
+      trial_ends_at: trial.trialDaysLeft > 0
+        ? new Date(Date.now() + trial.trialDaysLeft * 24 * 60 * 60 * 1000).toISOString()
+        : null,
+    },
+  } as never
+
   const wrapper = mountWithDeps(TrialBanner, {
+    noPinia: true,
     global: {
       stubs: {
         Button: { template: '<button class="btn" @click="$emit(`click`, $event)"><slot /></button>' },
       },
     },
   })
-  const auth = useAuthStore()
-  stubStore(auth, trial as never)
   return wrapper
 }
 
@@ -49,18 +59,18 @@ describe('TrialBanner', () => {
     expect(wrapper.text()).toBe('')
   })
 
-  it.skip('shows in the 1-to-7 band with the plural day count', () => {
+  it('shows in the 1-to-7 band with the plural day count', () => {
     const wrapper = mountBanner({ isOnTrial: true, trialDaysLeft: 5 })
     expect(wrapper.text()).toContain('Your Pro trial ends in 5 days.')
     expect(wrapper.text()).toContain('Upgrade now to keep all Pro features.')
   })
 
-  it.skip('uses the "tomorrow" copy when exactly 1 day is left', () => {
+  it('uses the "tomorrow" copy when exactly 1 day is left', () => {
     const wrapper = mountBanner({ isOnTrial: true, trialDaysLeft: 1 })
     expect(wrapper.text()).toContain('Your Pro trial ends tomorrow.')
   })
 
-  it.skip('hides itself when the close button is clicked', async () => {
+  it('hides itself when the close button is clicked', async () => {
     const wrapper = mountBanner({ isOnTrial: true, trialDaysLeft: 3 })
     expect(wrapper.text()).toContain('Your Pro trial ends in 3 days.')
     // The close × is the second button (after Upgrade) — find by being the

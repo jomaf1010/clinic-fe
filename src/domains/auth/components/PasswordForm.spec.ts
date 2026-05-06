@@ -67,11 +67,11 @@ function setField(wrapper: ReturnType<typeof mountWithDeps>, id: string, value: 
   return el.setValue(value)
 }
 
-describe.skip('PasswordForm', () => {
+describe('PasswordForm', () => {
   it('blocks submit when fields are empty and surfaces required errors', async () => {
     changePasswordSpy.mockClear()
     const wrapper = mountWithDeps(PasswordForm, { global: { stubs: STUBS } })
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(changePasswordSpy).not.toHaveBeenCalled()
@@ -88,7 +88,7 @@ describe.skip('PasswordForm', () => {
     await setField(wrapper, 'new-password', 'short')
     await setField(wrapper, 'new-password-confirmation', 'short')
     await flushPromises()
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(changePasswordSpy).not.toHaveBeenCalled()
@@ -103,7 +103,7 @@ describe.skip('PasswordForm', () => {
     await setField(wrapper, 'new-password', 'newpass-1234')
     await setField(wrapper, 'new-password-confirmation', 'different-1234')
     await flushPromises()
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(changePasswordSpy).not.toHaveBeenCalled()
@@ -119,7 +119,7 @@ describe.skip('PasswordForm', () => {
     await setField(wrapper, 'new-password', 'newpass-1234')
     await setField(wrapper, 'new-password-confirmation', 'newpass-1234')
     await flushPromises()
-    await wrapper.find('form').trigger('submit.prevent')
+    await wrapper.find('form').trigger('submit')
     await flushPromises()
 
     expect(changePasswordSpy).toHaveBeenCalledOnce()

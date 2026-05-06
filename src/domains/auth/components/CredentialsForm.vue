@@ -12,10 +12,18 @@ import { toast } from 'vue-sonner'
 import { Stethoscope, BadgeCheck, LoaderCircle } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../api/authApi'
-import { credentialsSchema } from '@/lib/validationRules'
+import { credentialsSchema, validateRuleSchema } from '@/lib/validationRules'
 import type { ValidationError } from '../types/auth.types'
 
 const authStore = useAuthStore()
+
+type CredentialsFormValues = {
+  prc_license_number: string
+  ptr_number: string
+  s2_license_number: string
+  specialty: string
+  sub_specialty: string
+}
 
 // Specialty options from API
 const specialtyOptions = ref<{ key: string; display_name: string }[]>([])
@@ -28,8 +36,7 @@ onMounted(async () => {
   }
 })
 
-const { handleSubmit, setFieldError } = useForm({
-  validationSchema: credentialsSchema,
+const { handleSubmit, setFieldError } = useForm<CredentialsFormValues>({
   initialValues: {
     prc_license_number: authStore.user?.prc_license_number ?? '',
     ptr_number: authStore.user?.ptr_number ?? '',
@@ -50,6 +57,21 @@ const generalError = ref<string | null>(null)
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
+
+  const validationErrors = validateRuleSchema(credentialsSchema, {
+    prc_license_number: values.prc_license_number,
+    ptr_number: values.ptr_number,
+    s2_license_number: values.s2_license_number,
+    specialty: values.specialty,
+    sub_specialty: values.sub_specialty,
+  })
+  if (Object.keys(validationErrors).length > 0) {
+    for (const field of Object.keys(validationErrors) as (keyof CredentialsFormValues)[]) {
+      setFieldError(field, validationErrors[field])
+    }
+    return
+  }
+
   isLoading.value = true
   try {
     await authApi.updateProfile({

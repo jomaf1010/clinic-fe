@@ -9,7 +9,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
-import { stubStore } from '@/__tests__/helpers/createPinia'
+import { setupTestPinia } from '@/__tests__/helpers/createPinia'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import UpgradePrompt from './UpgradePrompt.vue'
 
@@ -19,8 +19,20 @@ vi.mock('vue-router', () => ({
 }))
 
 function mount(props: { inline?: boolean; open?: boolean; feature?: string } = {}, trial: { isOnTrial?: boolean; trialDaysLeft?: number } = {}) {
+  setupTestPinia()
+  const auth = useAuthStore()
+  auth.user = {
+    current_clinic: {
+      is_trial: trial.isOnTrial ?? false,
+      trial_ends_at: trial.trialDaysLeft === undefined
+        ? null
+        : new Date(Date.now() + trial.trialDaysLeft * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  } as never
+
   const wrapper = mountWithDeps(UpgradePrompt, {
     props,
+    noPinia: true,
     global: {
       stubs: {
         // Dialog renders into a teleport — stubbing keeps the DOM tractable
@@ -30,15 +42,10 @@ function mount(props: { inline?: boolean; open?: boolean; feature?: string } = {
         DialogHeader: { template: '<div><slot /></div>' },
         DialogTitle: { template: '<div><slot /></div>' },
         DialogDescription: { template: '<div><slot /></div>' },
-        Button: { template: '<button class="btn" v-bind="$attrs" @click="$emit(`click`, $event)"><slot /></button>' },
+        Button: { template: '<button class="btn" v-bind="$attrs"><slot /></button>' },
       },
     },
   })
-  const auth = useAuthStore()
-  stubStore(auth, {
-    isOnTrial: trial.isOnTrial ?? false,
-    trialDaysLeft: trial.trialDaysLeft ?? 0,
-  } as never)
   return wrapper
 }
 
@@ -60,30 +67,23 @@ describe('UpgradePrompt', () => {
     expect(wrapper.text()).toContain('The Audit logs feature is available')
   })
 
-  // TODO: re-enable. Needs proper authStore module mock for getters
-  // (`isOnTrial`, `trialDaysLeft` are computed getters; stubStore on a
-  // post-mount instance doesn't reactively flow into the rendered text).
-  it.skip('shows trial-ending text when on trial with days remaining', () => {
+  it('shows trial-ending text when on trial with days remaining', () => {
     const wrapper = mount({ inline: true }, { isOnTrial: true, trialDaysLeft: 3 })
     expect(wrapper.text()).toContain('Your Pro trial ends in 3 days')
   })
 
-  // TODO: re-enable — same authStore-getter mocking issue as above.
-  it.skip('uses the singular "day" form when exactly 1 day is left', () => {
+  it('uses the singular "day" form when exactly 1 day is left', () => {
     const wrapper = mount({ inline: true }, { isOnTrial: true, trialDaysLeft: 1 })
     expect(wrapper.text()).toContain('Your Pro trial ends in 1 day.')
     expect(wrapper.text()).not.toContain('1 days')
   })
 
-  // TODO: re-enable — same authStore-getter mocking issue.
-  it.skip('shows expired copy when trial days reach 0', () => {
+  it('shows expired copy when trial days reach 0', () => {
     const wrapper = mount({ inline: true }, { isOnTrial: true, trialDaysLeft: 0 })
     expect(wrapper.text()).toContain('Your Pro trial has expired')
   })
 
-  // TODO: re-enable — pushSpy is being called twice, suggesting either the
-  // Button stub re-emits or the Dialog variant ALSO renders. Needs investigation.
-  it.skip('clicking Upgrade in inline mode navigates to subscription', async () => {
+  it('clicking Upgrade in inline mode navigates to subscription', async () => {
     pushSpy.mockClear()
     const wrapper = mount({ inline: true })
     const upgradeBtn = wrapper.findAll('.btn').find((b) => b.text().includes('Upgrade to Pro'))
