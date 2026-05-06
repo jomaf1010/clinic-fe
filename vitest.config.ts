@@ -55,6 +55,8 @@ export default defineConfig({
         'src/domains/queue/stores/**/*.ts',
         'src/domains/schedule/components/{BreakEditor,DayScheduleRow}.vue',
         'src/domains/schedule/stores/**/*.ts',
+        'src/domains/subscription/components/{PricingCard,SubscriptionStatus}.vue',
+        'src/domains/subscription/stores/**/*.ts',
         'src/lib/validationRules.ts',
       ],
       // Don't fail builds on tier-0 / infra files that exist mostly to
@@ -76,7 +78,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 77,
+        functions: 78,
         statements: 70,
       },
     },
