@@ -1,7 +1,8 @@
 import { test as base, expect } from '@playwright/test'
 
-const EMAIL = process.env.E2E_EMAIL || 'demo@mail.com'
-const PASSWORD = process.env.E2E_PASSWORD || 'password'
+const EMAIL = process.env.E2E_EMAIL
+const PASSWORD = process.env.E2E_PASSWORD
+const HAS_E2E_CREDENTIALS = Boolean(EMAIL && PASSWORD)
 
 // Custom fixture that provides a pre-authenticated page
 // Login happens once per worker, shared across all tests
@@ -30,6 +31,10 @@ export const test = base.extend<{}, { authenticatedContext: import('@playwright/
     await use(page)
     await page.close()
   },
+})
+
+test.beforeEach(({}, testInfo) => {
+  testInfo.skip(!HAS_E2E_CREDENTIALS, 'Set E2E_EMAIL and E2E_PASSWORD to run authenticated staging tests.')
 })
 
 export { expect }
