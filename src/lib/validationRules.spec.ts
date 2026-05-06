@@ -33,6 +33,8 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   createResetPasswordSchema,
+  toVeeSchema,
+  validateRuleSchema,
 } from './validationRules'
 
 describe('required', () => {
@@ -201,6 +203,29 @@ describe('oneOf', () => {
   it('passes empty value (defers to required)', () => {
     expect(rule('')).toBe(true)
     expect(rule(null)).toBe(true)
+  })
+})
+
+describe('schema adapters', () => {
+  const schema = {
+    name: [required('Name'), minLength('Name', 3)],
+    email: email('Email'),
+  }
+
+  it('toVeeSchema returns single field validators that stop on the first error', () => {
+    const veeSchema = toVeeSchema(schema)
+
+    expect(veeSchema.name('')).toBe('Name is required.')
+    expect(veeSchema.name('Al')).toBe('Name must be at least 3 characters.')
+    expect(veeSchema.name('Alice')).toBe(true)
+    expect(veeSchema.email('not-email')).toBe('Email must be a valid email address.')
+  })
+
+  it('validateRuleSchema returns only fields with validation errors', () => {
+    expect(validateRuleSchema(schema, { name: 'Al', email: 'valid@example.com' })).toEqual({
+      name: 'Name must be at least 3 characters.',
+    })
+    expect(validateRuleSchema(schema, { name: 'Alice', email: 'valid@example.com' })).toEqual({})
   })
 })
 
