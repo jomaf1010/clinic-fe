@@ -63,7 +63,7 @@ export default defineConfig({
         'src/domains/medicine/api/medicineApi.ts',
         'src/domains/message/api/messageApi.ts',
         'src/domains/notification/api/notificationApi.ts',
-        'src/domains/patient/api/addressApi.ts',
+        'src/domains/patient/api/{addressApi,patientApi}.ts',
         'src/domains/patient/components/EditPatientDialog.vue',
         'src/domains/patient/composables/usePatientSync.ts',
         'src/domains/patient/utils/profileCompleteness.ts',
@@ -101,7 +101,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 91,
+        functions: 92,
         statements: 70,
       },
     },
