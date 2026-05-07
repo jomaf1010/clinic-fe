@@ -46,6 +46,7 @@ export default defineConfig({
         'src/domains/appointment/api/appointmentApi.ts',
         'src/domains/appointment/components/{AppointmentCard,AppointmentStatusBadge}.vue',
         'src/domains/appointment/stores/**/*.ts',
+        'src/domains/auth/api/authApi.ts',
         'src/domains/auth/components/{CredentialsForm,PasswordForm}.vue',
         'src/domains/auth/stores/**/*.ts',
         'src/domains/billing/api/billingApi.ts',
@@ -95,7 +96,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 89,
+        functions: 90,
         statements: 70,
       },
     },
