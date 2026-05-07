@@ -19,6 +19,7 @@ const props = defineProps<{
   canFinalize: boolean
   summaryReady: boolean
   isGeneratingSummary: boolean
+  showPreviewAction?: boolean
 }>()
 const attrs = useAttrs()
 
@@ -43,6 +44,7 @@ const topbarProps = computed(() => ({
   canFinalize: props.canFinalize,
   summaryReady: props.summaryReady,
   isGeneratingSummary: props.isGeneratingSummary,
+  showPreviewAction: props.showPreviewAction,
 }))
 
 const forwardedTopbarProps = computed(() => ({

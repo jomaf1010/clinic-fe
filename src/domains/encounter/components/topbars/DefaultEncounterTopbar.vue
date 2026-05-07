@@ -27,9 +27,12 @@ export interface EncounterTopbarProps {
   canFinalize: boolean
   summaryReady: boolean
   isGeneratingSummary: boolean
+  showPreviewAction?: boolean
 }
 
-defineProps<EncounterTopbarProps>()
+withDefaults(defineProps<EncounterTopbarProps>(), {
+  showPreviewAction: true,
+})
 
 const emit = defineEmits<{
   back: []
@@ -124,7 +127,7 @@ const emit = defineEmits<{
         <p v-if="saveError" class="text-xs text-destructive">
           {{ saveError }}
         </p>
-        <Tooltip>
+        <Tooltip v-if="showPreviewAction">
           <TooltipTrigger as-child>
             <Button
               class="encounter-topbar-action encounter-topbar-action--icon"

@@ -5,7 +5,6 @@ import { HttpError } from '@/lib/http'
 import {
   Activity,
   AlertTriangle,
-  ArrowLeft,
   Baby,
   CalendarDays,
   CheckCircle2,
@@ -72,6 +71,7 @@ import PaymentTab from '@/domains/consultation/components/tabs/PaymentTab.vue'
 import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import DangerSignsChecklist from '../components/DangerSignsChecklist.vue'
 import PrenatalCareChecklist from '../components/PrenatalCareChecklist.vue'
+import ObgynPregnancyTopbar from '../components/ObgynPregnancyTopbar.vue'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { toast } from 'vue-sonner'
 import { CalendarDate, today, getLocalTimeZone, getDayOfWeek, type DateValue } from '@internationalized/date'
@@ -89,6 +89,7 @@ import VChart from 'vue-echarts'
 use([LineChart, GridComponent, TooltipComponent, CanvasRenderer])
 import type { DueReminders, Pregnancy as PregnancyType } from '../types/obgyn.types'
 import { useClinicalSummary } from '../composables/useClinicalSummary'
+import { RouteNames } from '@/router/routeNames'
 
 // ── Router / stores ─────────────────────────────────────────────────
 const route = useRoute()
@@ -139,6 +140,35 @@ const pregnancyRiskLevel = computed(() => pdStore.currentPregnancy?.risk_level ?
 const pregnancyLmp = computed(() => pdStore.currentPregnancy?.lmp ?? null)
 const patientData = computed(() => pdStore.patient)
 const gynProfile = computed(() => pdStore.gynProfile)
+const topbarPatientName = computed(() => store.current?.patient_name ?? patientData.value?.full_name ?? null)
+const topbarStatusLabel = computed(() =>
+  pdStore.currentPregnancy ? pregnancyStatusLabel(pdStore.currentPregnancy.status) : 'Loading',
+)
+const topbarStatusClass = computed(() =>
+  pdStore.currentPregnancy
+    ? pregnancyStatusClass(pdStore.currentPregnancy.status)
+    : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400',
+)
+
+function pregnancyStatusClass(status: PregnancyType['status']): string {
+  switch (status) {
+    case 'active': return 'border-green-200 bg-green-100 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400'
+    case 'postpartum': return 'border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400'
+    case 'delivered': return 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
+    case 'resolved': return 'border-red-200 bg-red-100 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400'
+    case 'inactive': return 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'
+  }
+}
+
+function pregnancyStatusLabel(status: PregnancyType['status']): string {
+  switch (status) {
+    case 'active': return 'Active'
+    case 'postpartum': return 'Postpartum'
+    case 'delivered': return 'Delivered'
+    case 'resolved': return 'Resolved'
+    case 'inactive': return 'Inactive'
+  }
+}
 
 // Previous visit comparison + trend data — derived from store dashboard
 const bpTrend = computed(() => pdStore.pregnancyDashboard?.bp_trend ?? [])
@@ -205,32 +235,25 @@ const gaWeeks = computed(() => store.current?.prenatal_visit?.gestational_age_we
 const gaDays = computed(() => store.current?.prenatal_visit?.gestational_age_days ?? null)
 const trimester = computed(() => store.current?.prenatal_visit?.trimester ?? null)
 const visitNumber = computed(() => store.current?.prenatal_visit?.visit_number ?? null)
+const displayGaWeeks = computed(() => pdStore.currentPregnancy?.current_ga?.weeks ?? gaWeeks.value)
+const displayGaDays = computed(() => pdStore.currentPregnancy?.current_ga?.days ?? gaDays.value)
+const displayTrimester = computed(() => pdStore.currentPregnancy?.current_ga?.trimester ?? trimester.value)
 
 const gaLabel = computed(() => {
-  const w = gaWeeks.value
-  const d = gaDays.value
+  const w = displayGaWeeks.value
+  const d = displayGaDays.value
   if (w === null) return null
   return d ? `${w}w${d}d` : `${w}w`
 })
 
 const trimesterLabel = computed(() => {
-  switch (trimester.value) {
+  switch (displayTrimester.value) {
     case '1': return 'Trimester 1'
     case '2': return 'Trimester 2'
     case '3': return 'Trimester 3'
-    default: return trimester.value ?? null
+    default: return displayTrimester.value ?? null
   }
 })
-
-const trimesterBadgeClass = computed(() => {
-  switch (trimester.value) {
-    case '1': return 'border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-400'
-    case '2': return 'border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-400'
-    case '3': return 'border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400'
-    default: return ''
-  }
-})
-
 
 // ── Local triage state ───────────────────────────────────────────────
 interface LocalTriage {
@@ -1128,12 +1151,23 @@ function savePlan(): void {
 // ── Lifecycle ────────────────────────────────────────────────────────
 onMounted(async () => {
   loadError.value = null
+  const id = typeof route.params.id === 'string' ? route.params.id : (route.params.id?.[0] ?? '')
+
   try {
-    const id = typeof route.params.id === 'string' ? route.params.id : (route.params.id?.[0] ?? '')
     // Skip if EncounterFormRouter already loaded this encounter
     if (!store.current || store.current.id !== id) {
       await store.loadEncounter(id)
     }
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 403) {
+      loadError.value = 'You don\'t have permission to access this encounter.'
+    } else {
+      loadError.value = 'Failed to load encounter. Please try again.'
+    }
+    return
+  }
+
+  try {
     syncTriageFromStore()
     syncAssessmentFromStore()
     syncPlanFromStore()
@@ -1150,28 +1184,26 @@ onMounted(async () => {
       // Load pregnancy detail (currentPregnancy, dashboard, visits, labsDue)
       if (enc.pregnancy_id) await pdStore.loadPregnancyDetail(enc.pregnancy_id)
     }
-    // Pre-populate normal defaults for new visits (documentation by exception)
-    const isNewVisit = !store.current?.prenatal_visit?.triage?.concerns
-      && !store.current?.prenatal_visit?.triage?.vitals?.bp_systolic
-      && !store.current?.prenatal_visit?.assessment?.notes
-    if (isNewVisit) applyNormalDefaults()
-    setupTabsObserver()
-    // If follow-up date already set, restore selection state
-    if (localPlan.next_visit_date) {
-      followUpSelectedDate.value = localPlan.next_visit_date
-      followUpBooked.value = true
-    }
-    // Load schedule then pre-check recommended date availability
-    loadDoctorSchedule().then(() => {
-      if (!localPlan.next_visit_date) checkRecommendedAvailability()
-    })
-  } catch (err) {
-    if (err instanceof HttpError && err.status === 403) {
-      loadError.value = 'You don\'t have permission to access this encounter.'
-    } else {
-      loadError.value = 'Failed to load encounter. Please try again.'
-    }
+  } catch {
+    // The encounter is already loaded. Patient/pregnancy side context can fail
+    // independently, but it should not block opening past visit records.
   }
+
+  // Pre-populate normal defaults for new visits (documentation by exception)
+  const isNewVisit = !store.current?.prenatal_visit?.triage?.concerns
+    && !store.current?.prenatal_visit?.triage?.vitals?.bp_systolic
+    && !store.current?.prenatal_visit?.assessment?.notes
+  if (isNewVisit) applyNormalDefaults()
+  setupTabsObserver()
+  // If follow-up date already set, restore selection state
+  if (localPlan.next_visit_date) {
+    followUpSelectedDate.value = localPlan.next_visit_date
+    followUpBooked.value = true
+  }
+  // Load schedule then pre-check recommended date availability
+  loadDoctorSchedule().then(() => {
+    if (!localPlan.next_visit_date) checkRecommendedAvailability()
+  })
 })
 
 onUnmounted(() => {
@@ -1221,6 +1253,26 @@ async function handleFinalizeConfirm(): Promise<void> {
   }
 }
 
+function goToPregnancyDetail(): void {
+  const patientId = store.current?.patient_id ?? route.params.patientId
+  const pregnancyId = store.current?.pregnancy_id ?? route.params.pregnancyId
+
+  if (typeof patientId === 'string' && typeof pregnancyId === 'string') {
+    router.push({
+      name: RouteNames.PREGNANCY_DETAIL,
+      params: { patientId, pregnancyId },
+    })
+    return
+  }
+
+  if (typeof patientId === 'string') {
+    router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: patientId } })
+    return
+  }
+
+  router.back()
+}
+
 // ── Tab navigation ───────────────────────────────────────────────────
 const allTabs = ['triage', 'assessment', 'plan', 'billing'] as const
 type TabKey = (typeof allTabs)[number]
@@ -1229,7 +1281,7 @@ const tabLabels: Record<TabKey, string> = {
   triage: 'Triage',
   assessment: 'Assessment',
   plan: 'Plan',
-  billing: 'Billing',
+  billing: 'Finalize',
 }
 
 const tabIcons: Record<TabKey, typeof Activity> = {
@@ -1284,95 +1336,33 @@ function goToTab(direction: 'prev' | 'next'): void {
   <Tabs
     v-else-if="store.current"
     v-model="activeTab"
-    class="-mx-4 -mb-4 flex min-h-0 flex-1 flex-col overflow-hidden"
+    class="encounter-workspace relative -mx-4 -mb-4 flex min-h-0 flex-1 flex-col overflow-hidden"
   >
-    <!-- Sticky header -->
-    <div class="sticky top-0 z-10 border-b bg-background">
-      <div class="flex flex-col gap-2 px-4 pb-1 pt-2 sm:flex-row sm:items-center sm:justify-between">
-        <!-- Left: back + patient info + badges -->
-        <div class="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" class="gap-1.5" @click="router.back()">
-            <ArrowLeft class="size-3.5" />
-            {{ store.current.patient_name }}
-          </Button>
-
-          <!-- GA badge -->
-          <Badge
-            v-if="gaLabel"
-            variant="secondary"
-            class="gap-1 font-mono"
-          >
-            <Baby class="size-3" />
-            {{ gaLabel }}
-          </Badge>
-
-          <!-- Trimester badge -->
-          <Badge
-            v-if="trimesterLabel"
-            variant="outline"
-            :class="trimesterBadgeClass"
-          >
-            {{ trimesterLabel }}
-          </Badge>
-
-          <!-- Visit number badge -->
-          <Badge
-            v-if="visitNumber"
-            variant="outline"
-          >
-            Visit #{{ visitNumber }}
-          </Badge>
-
-          <!-- Status badges -->
-          <Badge
-            v-if="store.isDraft"
-            class="border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400"
-            variant="outline"
-          >
-            Draft
-          </Badge>
-          <Badge
-            v-else-if="store.isFinalized"
-            class="border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
-            variant="outline"
-          >
-            <CheckCircle2 class="size-3" />
-            Finalized
-          </Badge>
-        </div>
-
-        <!-- Right: actions -->
-        <div v-if="store.isDraft" class="flex items-center gap-2">
-          <p v-if="store.isSaving" class="text-xs text-muted-foreground">
-            Saving...
-          </p>
-          <p v-if="store.saveError" class="text-xs text-destructive">
-            {{ store.saveError }}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="store.isSaving"
-            @click="store.saveSection({})"
-          >
-            <LoaderCircle v-if="store.isSaving" class="size-3.5 animate-spin" />
-            <ClipboardList v-else class="size-3.5" />
-            Save
-          </Button>
-          <Button
-            v-if="canFinalize"
-            size="sm"
-            @click="showFinalizeModal = true"
-          >
-            <CheckCircle2 class="size-3.5" />
-            Finalize
-          </Button>
-        </div>
-      </div>
-    </div>
+    <ObgynPregnancyTopbar
+      :patient-name="topbarPatientName"
+      :status-label="topbarStatusLabel"
+      :status-class="topbarStatusClass"
+      :risk-level="pregnancyRiskLevel"
+      :risk-factors="pdStore.currentPregnancy?.risk_factors"
+      :edd="pregnancyEdd"
+      :gestational-age-weeks="displayGaWeeks"
+      :gestational-age-days="displayGaDays"
+      :trimester="displayTrimester"
+      :is-active="pdStore.currentPregnancy?.status === 'active'"
+      :can-create-visit="false"
+      :has-draft-visit="false"
+      :can-create-postpartum-visit="false"
+      :can-close-postpartum="false"
+      :is-closing-postpartum="false"
+      :can-open-delivery="false"
+      :can-resolve-primary="false"
+      :can-resolve-menu="false"
+      :show-actions="false"
+      @back="goToPregnancyDetail"
+    />
 
     <!-- Two-column layout -->
-    <div class="relative flex min-h-0 flex-1 flex-col lg:flex-row">
+    <div class="relative -mt-[calc(var(--header-height)+1rem)] flex min-h-0 flex-1 flex-col gap-4 px-3 pb-4 lg:flex-row">
       <!-- Floating mini tabs (outside scroll, positioned over the form column) -->
       <Transition
         enter-active-class="transition-all duration-300 ease-out"
@@ -1384,30 +1374,33 @@ function goToTab(direction: 'prev' | 'next'): void {
       >
         <div
           v-if="showMiniTabs"
-          class="pointer-events-none absolute inset-x-0 top-2 z-30 flex lg:pr-[25%]"
+          class="pointer-events-none absolute inset-x-0 top-[calc(var(--header-height)+1.25rem)] z-40 flex lg:pr-80"
         >
-          <div class="pointer-events-auto mx-auto flex items-center gap-1 rounded-full border bg-background/95 px-2 py-1 shadow-md backdrop-blur">
+          <div class="encounter-mini-tabs surface-floating pointer-events-auto mx-auto flex items-center gap-1 rounded-full border px-2 py-1">
             <button
               v-for="tab in visibleTabs"
               :key="tab"
               type="button"
-              class="flex h-7 items-center justify-center gap-1.5 rounded-full px-2 text-[10px] font-medium transition-all duration-200"
+              class="flex h-7 items-center justify-center rounded-full px-2 text-[10px] font-medium uppercase tracking-wide transition-all duration-200"
               :class="activeTab === tab
-                ? 'bg-primary text-primary-foreground min-w-[4.5rem]'
-                : 'text-muted-foreground hover:bg-muted min-w-7 max-w-7'"
+                ? 'gap-1.5 bg-primary text-primary-foreground min-w-[5rem]'
+                : 'gap-0 text-muted-foreground hover:bg-white/40 size-7 min-w-7 max-w-7 px-0 dark:hover:bg-white/10'"
               @click="activeTab = tab"
             >
               <component :is="tabIcons[tab]" class="size-3.5 shrink-0" />
               <span
                 class="overflow-hidden whitespace-nowrap transition-all duration-200"
-                :class="activeTab === tab ? 'max-w-[4rem] opacity-100' : 'max-w-0 opacity-0'"
+                :class="activeTab === tab ? 'max-w-[5rem] opacity-100' : 'max-w-0 opacity-0'"
               >{{ tabLabels[tab] }}</span>
             </button>
           </div>
         </div>
       </Transition>
       <!-- Left: Tabs + Form (2/3) — scrolls independently -->
-      <div ref="formScrollRef" class="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 pt-0 md:px-6 md:pb-8 lg:w-3/4">
+      <div
+        ref="formScrollRef"
+        class="encounter-main-scroll min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 pt-[calc(var(--header-height)+1.75rem)] md:px-6 md:pb-8"
+      >
         <!-- Hidden TabsList for reka-ui accessibility -->
         <TabsList class="sr-only">
           <TabsTrigger v-for="tab in visibleTabs" :key="tab" :value="tab">{{ tabLabels[tab] }}</TabsTrigger>
@@ -1439,12 +1432,12 @@ function goToTab(direction: 'prev' | 'next'): void {
         </div>
 
         <!-- Step tabs -->
-        <div ref="tabsListRef" class="mb-5 py-3">
+        <div ref="tabsListRef" class="encounter-stepper mb-5 px-4 py-5">
           <div class="relative mx-0 md:mx-8">
             <!-- Connector line (single continuous line behind circles) -->
-            <div class="absolute top-5 left-5 right-5 h-0.5 bg-border">
+            <div class="encounter-stepper-line absolute left-5 right-5 top-5 h-0.5">
               <div
-                class="absolute inset-y-0 left-0 bg-primary/40 transition-all duration-500 ease-in-out"
+                class="absolute inset-y-0 left-0 rounded-full bg-primary/40 transition-all duration-500 ease-in-out"
                 :style="{ width: visibleTabs.length > 1 ? `${(currentTabIndex / (visibleTabs.length - 1)) * 100}%` : '0%' }"
               />
             </div>
@@ -1458,17 +1451,17 @@ function goToTab(direction: 'prev' | 'next'): void {
                 @click="activeTab = tab"
               >
                 <div
-                  class="flex size-10 items-center justify-center rounded-full border-2 transition-all duration-300"
+                  class="encounter-stepper-dot flex size-10 items-center justify-center rounded-full border transition-all duration-300"
                   :class="activeTab === tab
-                    ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/25 scale-110'
+                    ? 'is-active border-primary bg-primary text-primary-foreground scale-110'
                     : visibleTabs.indexOf(tab) < currentTabIndex
-                      ? 'border-primary bg-background text-primary hover:scale-105 scale-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground hover:scale-105 scale-100'"
+                      ? 'border-primary text-primary hover:scale-105 scale-100'
+                      : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground hover:scale-105 scale-100'"
                 >
-                  <component :is="tabIcons[tab]" class="size-4.5" />
+                  <component :is="tabIcons[tab]" class="size-4" />
                 </div>
                 <span
-                  class="text-xs font-medium transition-colors duration-200"
+                  class="text-xs font-semibold uppercase tracking-wide transition-colors duration-200"
                   :class="activeTab === tab ? 'text-primary' : 'text-muted-foreground'"
                 >
                   {{ tabLabels[tab] }}
@@ -1482,7 +1475,7 @@ function goToTab(direction: 'prev' | 'next'): void {
         <!-- Offline banner -->
         <div
           v-if="!isOnline"
-          class="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
+          class="encounter-feedback encounter-feedback--warning mb-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm"
         >
           <WifiOff class="size-3.5 shrink-0" />
           You are offline. Changes will be saved locally and synced when you reconnect.
@@ -1494,7 +1487,7 @@ function goToTab(direction: 'prev' | 'next'): void {
         <!-- Read-only banner -->
         <div
           v-if="store.isFinalized"
-          class="mb-3 flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+          class="surface-muted mb-3 flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm text-muted-foreground"
         >
           <Lock class="size-3.5 shrink-0" />
           This encounter has been finalized and is read-only.
@@ -1506,10 +1499,10 @@ function goToTab(direction: 'prev' | 'next'): void {
           <!-- GA context banner -->
           <div v-if="gaLabel">
           <div
-            class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-md border bg-muted/40 px-4 py-3 text-sm"
+            class="surface-card-lite flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-2xl border px-4 py-3 text-sm"
           >
             <Baby class="size-3.5 shrink-0 text-muted-foreground" />
-            <span class="font-medium">{{ gaWeeks }} weeks{{ gaDays ? ` ${gaDays} days` : '' }}</span>
+            <span class="font-medium">{{ displayGaWeeks }} weeks{{ displayGaDays ? ` ${displayGaDays} days` : '' }}</span>
             <span v-if="trimesterLabel" class="text-muted-foreground">—</span>
             <span v-if="trimesterLabel" class="text-muted-foreground">{{ trimesterLabel }}</span>
             <span v-if="visitNumber" class="text-muted-foreground">—</span>
@@ -1623,7 +1616,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             </div>
 
             <!-- BP alert (below the grid) -->
-            <p v-if="bpAlert === 'severe'" class="flex items-center gap-1.5 rounded-md border border-destructive bg-destructive/10 px-2.5 py-1.5 text-xs font-semibold text-destructive">
+            <p v-if="bpAlert === 'severe'" class="surface-card-lite flex items-center gap-1.5 rounded-2xl border border-destructive bg-destructive/10 px-2.5 py-1.5 text-xs font-semibold text-destructive">
               <AlertTriangle class="size-3.5" />
               Severe-range BP (>=160/110) — immediate evaluation required
             </p>
@@ -1742,7 +1735,7 @@ function goToTab(direction: 'prev' | 'next'): void {
 
           <!-- 6. Danger Signs -->
           <div class="flex flex-col gap-3">
-          <div class="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4">
+          <div class="surface-card-lite flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
             <h3 class="text-sm font-semibold uppercase tracking-wide text-destructive">Danger Signs</h3>
             <DangerSignsChecklist
               :model-value="localTriage.danger_signs"
@@ -1918,10 +1911,10 @@ function goToTab(direction: 'prev' | 'next'): void {
           <div v-if="showCervical">
           <Collapsible
             v-model:open="cervicalOpen"
-            class="rounded-md border"
+            class="surface-card-lite rounded-2xl border"
           >
             <CollapsibleTrigger
-              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/50"
+              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-white/40 dark:hover:bg-white/10"
             >
               Cervical Examination
               <ChevronsUpDown class="size-4 text-muted-foreground" />
@@ -2007,7 +2000,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 </div>
                 <div class="flex flex-col gap-2">
                   <Label class="text-xs text-muted-foreground">Bishop Score (auto)</Label>
-                  <div class="flex h-9 items-center rounded-md border bg-muted/50 px-3 text-sm font-semibold tabular-nums">
+                  <div class="surface-muted flex h-9 items-center rounded-xl border px-3 text-sm font-semibold tabular-nums">
                     {{ bishopScoreComputed !== null ? bishopScoreComputed : '—' }}
                     <span v-if="bishopScoreComputed !== null" class="ml-1.5 text-xs font-normal text-muted-foreground">/ 13</span>
                   </div>
@@ -2021,10 +2014,10 @@ function goToTab(direction: 'prev' | 'next'): void {
           <div>
           <Collapsible
             v-model:open="ultrasoundOpen"
-            class="rounded-md border"
+            class="surface-card-lite rounded-2xl border"
           >
             <CollapsibleTrigger
-              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/50"
+              class="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:bg-white/40 dark:hover:bg-white/10"
             >
               Ultrasound
               <ChevronsUpDown class="size-4 text-muted-foreground" />
@@ -2114,7 +2107,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             <!-- EDD comparison + adopt action -->
             <div v-if="eddDiffers && eddComparison && !store.isFinalized" class="flex flex-col gap-2">
               <!-- Adopt button -->
-              <div v-if="!eddDeclined" class="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-700 dark:bg-amber-950">
+              <div v-if="!eddDeclined" class="surface-card-lite flex items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-3 py-2.5 dark:border-amber-700 dark:bg-amber-950/60">
                 <div class="text-xs">
                   <p class="font-medium text-amber-800 dark:text-amber-300">Ultrasound EDD differs from current EDD by {{ eddComparison.diffDays }} days</p>
                   <p class="mt-0.5 text-amber-700 dark:text-amber-400">Current: {{ eddComparison.currentEdd }} ({{ eddComparison.currentGA }}) → Ultrasound: {{ eddComparison.newEdd }} ({{ eddComparison.newGA }})</p>
@@ -2124,7 +2117,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                 </Button>
               </div>
               <!-- Declined message -->
-              <div v-else class="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <div v-else class="surface-muted rounded-2xl border px-3 py-2 text-xs text-muted-foreground">
                 <span class="font-medium">EDD difference noted:</span>
                 Current EDD {{ eddComparison.currentEdd }} ({{ eddComparison.currentGA }}) differs from ultrasound EDD {{ eddComparison.newEdd }} ({{ eddComparison.newGA }}) by {{ eddComparison.diffDays }} days.
                 <button type="button" class="ml-1 font-medium text-primary underline" @click="showEddAdoptModal = true">Review again</button>
@@ -2133,7 +2126,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             <!-- Same EDD or read-only -->
             <div
               v-else-if="store.current.prenatal_visit && localAssessment.ultrasound.edd && !eddDiffers"
-              class="rounded-md bg-green-50 px-3 py-2 text-xs text-green-700 dark:bg-green-950 dark:text-green-400"
+              class="surface-card-lite rounded-2xl border border-green-300 bg-green-50/70 px-3 py-2 text-xs text-green-700 dark:border-green-700 dark:bg-green-950/60 dark:text-green-400"
             >
               Ultrasound EDD matches current pregnancy EDD.
             </div>
@@ -2251,7 +2244,7 @@ function goToTab(direction: 'prev' | 'next'): void {
               />
               <div
                 v-if="showDiagnosisDropdown"
-                class="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-popover shadow-md"
+                class="surface-floating absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-2xl border shadow-md"
               >
                 <button
                   v-for="(result, rIdx) in diagnosisResults"
@@ -2323,7 +2316,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Procedures</h3>
             <div
               v-if="dueReminders?.procedures?.length"
-              class="flex items-start gap-2 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 dark:border-purple-800 dark:bg-purple-950"
+              class="surface-card-lite flex items-start gap-2 rounded-2xl border border-purple-200 bg-purple-50/70 px-3 py-2 dark:border-purple-800 dark:bg-purple-950/60"
             >
               <ClipboardList class="mt-0.5 size-3.5 shrink-0 text-purple-600 dark:text-purple-400" />
               <div class="text-xs">
@@ -2346,7 +2339,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             <h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lab Orders</h3>
             <div
               v-if="dueReminders?.labs?.length"
-              class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800 dark:bg-amber-950"
+              class="surface-card-lite flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-800 dark:bg-amber-950/60"
             >
               <FlaskConical class="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
               <div class="text-xs">
@@ -2384,7 +2377,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             <!-- Booked state -->
             <div
               v-if="followUpBooked && followUpSelectedDate"
-              class="flex items-center gap-3 rounded-md border border-green-300 bg-green-50 p-3 dark:border-green-700 dark:bg-green-950"
+              class="surface-card-lite flex items-center gap-3 rounded-2xl border border-green-300 bg-green-50/70 p-3 dark:border-green-700 dark:bg-green-950/60"
             >
               <CheckCircle2 class="size-5 shrink-0 text-green-600 dark:text-green-400" />
               <div class="flex-1">
@@ -2459,7 +2452,7 @@ function goToTab(direction: 'prev' | 'next'): void {
 
               <!-- Recommendation: unavailable — show alternatives -->
               <div v-if="!followUpSelectedDate && !isCheckingRecommended && recommendedUnavailable" class="flex flex-col gap-3">
-                <div class="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950">
+                <div class="surface-card-lite flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/60">
                   <AlertTriangle class="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                   <div class="flex flex-col gap-2">
                     <p class="text-xs font-medium text-amber-800 dark:text-amber-300">
@@ -2501,7 +2494,7 @@ function goToTab(direction: 'prev' | 'next'): void {
                   Loading available slots...
                 </div>
 
-                <div v-else-if="availableFollowUpSlots.length === 0" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
+                <div v-else-if="availableFollowUpSlots.length === 0" class="surface-card-lite rounded-2xl border border-amber-200 bg-amber-50/70 p-3 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-400">
                   No available slots on this date. Please select another day.
                 </div>
 
@@ -2652,10 +2645,10 @@ function goToTab(direction: 'prev' | 'next'): void {
         </div>
 
         <!-- Right: Pregnancy Summary Sidebar (1/3) -->
-        <aside class="hidden min-h-0 overflow-y-auto border-l px-4 pb-4 pt-0 lg:block lg:w-1/4">
+        <aside class="encounter-sidebar hidden min-h-0 overflow-y-auto pb-4 pt-[calc(var(--header-height)+1.75rem)] lg:block lg:w-80">
           <div class="flex flex-col gap-3">
             <!-- Patient Card + GA Timeline (same as dashboard) -->
-            <div v-if="patientData" class="flex flex-col gap-4 rounded-xl border bg-card p-4">
+            <div v-if="patientData" class="encounter-sidebar-card surface-card-lite flex flex-col gap-4 rounded-2xl border p-4">
               <div class="flex items-center gap-3">
                 <div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-semibold text-white">
                   <img v-if="patientData.avatar_url" :src="patientData.avatar_url" :alt="patientData.full_name" class="size-full object-cover" />
@@ -2676,10 +2669,10 @@ function goToTab(direction: 'prev' | 'next'): void {
               </p>
 
               <!-- GA Timeline Ruler -->
-              <div v-if="gaWeeks !== null" class="flex flex-col gap-1.5">
+              <div v-if="displayGaWeeks !== null" class="flex flex-col gap-1.5">
                 <div class="flex items-center justify-between text-[10px] text-muted-foreground">
                   <span>{{ trimesterLabel }}</span>
-                  <span class="font-medium text-foreground">{{ gaWeeks }}w {{ gaDays }}d</span>
+                  <span class="font-medium text-foreground">{{ displayGaWeeks }}w {{ displayGaDays }}d</span>
                 </div>
                 <div class="relative mt-1 mb-2">
                   <div class="h-3 w-full overflow-hidden rounded-full bg-muted">
@@ -2687,12 +2680,12 @@ function goToTab(direction: 'prev' | 'next'): void {
                     <div class="absolute left-[66.6%] top-0 h-3 w-px bg-border/50 z-10" />
                     <div
                       class="absolute inset-y-0 left-0 h-3 rounded-full transition-all duration-1000 ease-out"
-                      :style="{ width: `${Math.min(100, ((gaWeeks + (gaDays ?? 0) / 7) / 42) * 100)}%`, background: 'linear-gradient(90deg, #a78bfa, #ec4899, #f97316, #eab308, #22c55e, #06b6d4)' }"
+                      :style="{ width: `${Math.min(100, ((displayGaWeeks + (displayGaDays ?? 0) / 7) / 42) * 100)}%`, background: 'linear-gradient(90deg, #a78bfa, #ec4899, #f97316, #eab308, #22c55e, #06b6d4)' }"
                     />
                   </div>
                   <div
                     class="absolute top-1/2 -translate-y-1/2 z-20 transition-all duration-1000 ease-out"
-                    :style="{ left: `${Math.min(100, ((gaWeeks + (gaDays ?? 0) / 7) / 42) * 100)}%` }"
+                    :style="{ left: `${Math.min(100, ((displayGaWeeks + (displayGaDays ?? 0) / 7) / 42) * 100)}%` }"
                   >
                     <span class="-ml-2 text-sm">👶</span>
                   </div>
@@ -2707,7 +2700,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             </div>
 
             <!-- Summary Cards (same as dashboard, stacked) -->
-            <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+            <div class="encounter-sidebar-card surface-card-lite flex items-start gap-3 rounded-2xl border p-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
                 <Baby class="size-4" />
               </div>
@@ -2718,18 +2711,18 @@ function goToTab(direction: 'prev' | 'next'): void {
               </div>
             </div>
 
-            <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+            <div class="encounter-sidebar-card surface-card-lite flex items-start gap-3 rounded-2xl border p-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-sm">
                 <CalendarDays class="size-4" />
               </div>
               <div class="min-w-0">
                 <p class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">EDD</p>
                 <p class="text-lg font-bold">{{ formatEdd() }}</p>
-                <p v-if="gaWeeks !== null && (40 - gaWeeks) > 0" class="text-[10px] text-muted-foreground">{{ 40 - gaWeeks }}w remaining</p>
+                <p v-if="displayGaWeeks !== null && (40 - displayGaWeeks) > 0" class="text-[10px] text-muted-foreground">{{ 40 - displayGaWeeks }}w remaining</p>
               </div>
             </div>
 
-            <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+            <div class="encounter-sidebar-card surface-card-lite flex items-start gap-3 rounded-2xl border p-3">
               <div
                 class="flex size-7 shrink-0 items-center justify-center rounded-md text-white shadow-sm"
                 :class="pregnancyRiskLevel === 'high' ? 'bg-gradient-to-br from-red-500 to-orange-500' : 'bg-gradient-to-br from-emerald-500 to-green-500'"
@@ -2744,7 +2737,7 @@ function goToTab(direction: 'prev' | 'next'): void {
               </div>
             </div>
 
-            <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+            <div class="encounter-sidebar-card surface-card-lite flex items-start gap-3 rounded-2xl border p-3">
               <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
                 <ClipboardList class="size-4" />
               </div>
@@ -2755,7 +2748,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             </div>
 
             <!-- Clinical Summary -->
-            <div class="rounded-xl border bg-card p-4">
+            <div class="encounter-sidebar-card surface-card-lite rounded-2xl border p-4">
               <div class="flex items-start gap-3">
                 <div class="flex size-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-slate-500 to-slate-600 text-white shadow-sm">
                   <FileText class="size-4" />
@@ -2769,7 +2762,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             </div>
 
             <!-- Previous Visit Comparison -->
-            <div v-if="previousVisitData" class="rounded-xl border bg-card p-4">
+            <div v-if="previousVisitData" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-4">
               <p class="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Last Visit</p>
               <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 <div class="text-muted-foreground">Date</div>
@@ -2797,11 +2790,11 @@ function goToTab(direction: 'prev' | 'next'): void {
 
             <!-- Trend Sparklines -->
             <div v-if="bpSparkline || fhrSparkline" class="flex flex-col gap-3">
-              <div v-if="bpSparkline" class="rounded-xl border bg-card p-3">
+              <div v-if="bpSparkline" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
                 <p class="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">BP Trend</p>
                 <VChart :option="bpSparkline" style="height: 48px; width: 100%" autoresize />
               </div>
-              <div v-if="fhrSparkline" class="rounded-xl border bg-card p-3">
+              <div v-if="fhrSparkline" class="encounter-sidebar-card surface-card-lite rounded-2xl border p-3">
                 <p class="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">FHR Trend</p>
                 <VChart :option="fhrSparkline" style="height: 48px; width: 100%" autoresize />
               </div>
@@ -2810,7 +2803,7 @@ function goToTab(direction: 'prev' | 'next'): void {
             <!-- Danger signs alert -->
             <div
               v-if="localTriage.danger_signs.length > 0"
-              class="rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+              class="encounter-sidebar-card surface-card-lite rounded-2xl border border-destructive/30 bg-destructive/5 p-4"
             >
               <p class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-destructive">
                 <AlertTriangle class="size-3.5" />
@@ -2923,3 +2916,59 @@ function goToTab(direction: 'prev' | 'next'): void {
 
   </Tabs>
 </template>
+
+<style scoped>
+.encounter-workspace {
+  --encounter-sidebar-width: 20rem;
+}
+
+.encounter-main-scroll {
+  scrollbar-gutter: stable;
+}
+
+.encounter-sidebar {
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.encounter-mini-tabs {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.encounter-stepper-line {
+  background: linear-gradient(90deg, rgb(37 99 235 / 0.16), rgb(20 184 166 / 0.18));
+  border-radius: 999px;
+}
+
+.encounter-stepper-dot {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.72), rgb(255 255 255 / 0.36)),
+    var(--surface-muted);
+  box-shadow:
+    0 12px 26px rgb(15 23 42 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.35);
+}
+
+.encounter-stepper-dot.is-active {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 18px 40px rgb(37 99 235 / 0.2),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.encounter-feedback--warning {
+  color: var(--feedback-warning-fg);
+  background: var(--feedback-warning-bg);
+  border-color: color-mix(in oklch, var(--feedback-warning-fg) 24%, transparent);
+}
+
+:global(.dark .encounter-stepper-dot) {
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.72), rgb(2 6 23 / 0.5)),
+    var(--surface-muted);
+  box-shadow:
+    0 14px 30px rgb(0 0 0 / 0.24),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+</style>

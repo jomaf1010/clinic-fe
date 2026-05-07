@@ -4,32 +4,24 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft,
   Baby,
-  LoaderCircle,
+  CheckCircle2,
   Pencil,
   Plus,
   CalendarDays,
-  CheckCircle2,
-  MoreVertical,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { RouteNames } from '@/router/routeNames'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import { useEncounterStore } from '@/domains/encounter/stores/encounterStore'
 import type { EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
 import PregnancySetupForm from '../components/PregnancySetupForm.vue'
-import GACalculator from '../components/GACalculator.vue'
-import RiskClassificationBadge from '../components/RiskClassificationBadge.vue'
 import PregnancyDashboard from '../components/PregnancyDashboard.vue'
 import ResolvePregnancyModal from '../components/ResolvePregnancyModal.vue'
+import ObgynPregnancyTopbar from '../components/ObgynPregnancyTopbar.vue'
 import type { Pregnancy, PregnancyOutcome } from '../types/obgyn.types'
 import { pregnancyOutcomeLabel } from '../types/obgyn.types'
 
@@ -51,7 +43,37 @@ const pregnancyId = computed(() => {
 const isNew = computed(() => route.name === RouteNames.PREGNANCY_CREATE)
 const showSetupForm = ref(false)
 const loadError = ref<string | null>(null)
+const isPageLoading = ref(route.name !== RouteNames.PREGNANCY_CREATE)
 const pregnancyReady = computed(() => !isNew.value && pdStore.currentPregnancy !== null)
+const topbarStatusLabel = computed(() =>
+  pdStore.currentPregnancy ? statusLabel(pdStore.currentPregnancy.status) : 'Loading',
+)
+const topbarStatusClass = computed(() =>
+  pdStore.currentPregnancy
+    ? statusClass(pdStore.currentPregnancy.status)
+    : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400',
+)
+const canCreateVisit = computed(() => pdStore.currentPregnancy?.status === 'active')
+const canCreatePostpartumVisit = computed(() => pdStore.currentPregnancy?.status === 'delivered')
+const canOpenDelivery = computed(() => Boolean(pdStore.currentPregnancy?.delivery_encounter_id))
+const draftPregnancyVisit = computed(() =>
+  encounterStore.patientEncounters.find((encounter) =>
+    encounter.status === 'draft'
+    && encounter.pregnancy_id === pregnancyId.value
+    && encounter.type === 'prenatal',
+  ) ?? null,
+)
+const hasDraftPregnancyVisit = computed(() => draftPregnancyVisit.value !== null)
+const canResolvePrimary = computed(() =>
+  pdStore.currentPregnancy?.status === 'active'
+  && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) >= 24
+  && !pdStore.currentPregnancy?.delivery_encounter_id,
+)
+const canResolveMenu = computed(() =>
+  pdStore.currentPregnancy?.status === 'active'
+  && !pdStore.currentPregnancy?.delivery_encounter_id
+  && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) < 24,
+)
 
 function formatDate(d: string | null): string {
   if (!d) return '—'
@@ -101,6 +123,7 @@ function encounterTypeBadgeClass(type: EncounterTimelineItem['type']): string {
 
 onMounted(async () => {
   loadError.value = null
+  isPageLoading.value = !isNew.value
   try {
     // Ensure patient is loaded in store (may navigate directly to this URL)
     if (!pdStore.patient) {
@@ -116,6 +139,8 @@ onMounted(async () => {
     }
   } catch {
     loadError.value = 'Failed to load pregnancy record.'
+  } finally {
+    isPageLoading.value = false
   }
 })
 
@@ -212,6 +237,25 @@ function goToVisit(encounterId: string): void {
   })
 }
 
+function goToDraftVisit(): void {
+  if (!draftPregnancyVisit.value) return
+  goToVisit(draftPregnancyVisit.value.id)
+}
+
+function goToPatientProfile(): void {
+  router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: patientId.value } })
+}
+
+function goToDelivery(): void {
+  const encounterId = pdStore.currentPregnancy?.delivery_encounter_id
+  if (!encounterId) return
+
+  router.push({
+    name: RouteNames.ENCOUNTER_DETAIL,
+    params: { patientId: patientId.value, id: encounterId },
+  })
+}
+
 // ── Close postpartum ────────────────────────────────────────────────
 const daysPostpartum = computed(() => {
   const delivered = pdStore.currentPregnancy?.delivered_at
@@ -242,25 +286,137 @@ async function closePostpartum(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col">
+  <div class="pregnancy-detail-page flex flex-1 flex-col">
+    <ObgynPregnancyTopbar
+      v-if="!isNew && !showSetupForm"
+      :patient-name="pdStore.patient?.full_name ?? null"
+      :status-label="topbarStatusLabel"
+      :status-class="topbarStatusClass"
+      :risk-level="pdStore.currentPregnancy?.risk_level"
+      :risk-factors="pdStore.currentPregnancy?.risk_factors"
+      :edd="pdStore.currentPregnancy?.edd"
+      :gestational-age-weeks="pdStore.currentPregnancy?.current_ga?.weeks"
+      :gestational-age-days="pdStore.currentPregnancy?.current_ga?.days"
+      :trimester="pdStore.currentPregnancy?.current_ga?.trimester"
+      :is-active="pdStore.currentPregnancy?.status === 'active'"
+      :can-create-visit="canCreateVisit"
+      :has-draft-visit="hasDraftPregnancyVisit"
+      :can-create-postpartum-visit="canCreatePostpartumVisit"
+      :can-close-postpartum="canClosePostpartum"
+      :is-closing-postpartum="isClosingPostpartum"
+      :can-open-delivery="canOpenDelivery"
+      :can-resolve-primary="canResolvePrimary"
+      :can-resolve-menu="canResolveMenu"
+      @back="goToPatientProfile"
+      @new-visit="goToNewVisit"
+      @continue-visit="goToDraftVisit"
+      @postpartum-visit="goToPostpartum"
+      @close-postpartum="closePostpartum"
+      @open-delivery="goToDelivery"
+      @resolve="showResolveModal = true"
+      @edit-setup="showSetupForm = true"
+    />
+
     <!-- Loading -->
-    <div v-if="pdStore.isLoadingObgyn && !pdStore.currentPregnancy && !isNew" class="flex flex-1 items-center justify-center py-16">
-      <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
+    <div
+      v-if="isPageLoading && !isNew"
+      class="pregnancy-dashboard-page flex flex-col gap-6 px-2 pb-4 pt-3"
+    >
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div class="flex min-w-0 flex-col gap-6">
+          <section class="surface-card rounded-2xl p-5">
+            <div class="mb-6 flex items-center gap-4">
+              <Skeleton class="size-14 rounded-full" />
+              <div class="min-w-0 flex-1 space-y-2">
+                <Skeleton class="h-5 w-56 rounded-xl" />
+                <Skeleton class="h-4 w-72 rounded-xl" />
+              </div>
+              <Skeleton class="hidden h-7 w-20 rounded-full sm:block" />
+            </div>
+            <Skeleton class="mb-5 h-3 w-full rounded-full" />
+            <div class="grid grid-cols-6 gap-4">
+              <Skeleton
+                v-for="n in 6"
+                :key="`marker-${n}`"
+                class="h-3 rounded-full"
+              />
+            </div>
+          </section>
+
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              v-for="n in 5"
+              :key="`summary-${n}`"
+              class="surface-card-lite rounded-2xl p-4"
+            >
+              <div class="flex items-start gap-3">
+                <Skeleton class="size-10 shrink-0 rounded-xl" />
+                <div class="min-w-0 flex-1 space-y-2">
+                  <Skeleton class="h-3 w-24 rounded-xl" />
+                  <Skeleton class="h-7 w-28 rounded-xl" />
+                  <Skeleton v-if="n === 2 || n === 3" class="h-4 w-36 rounded-xl" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <section
+              v-for="n in 2"
+              :key="`chart-${n}`"
+              class="surface-card rounded-2xl border-0 p-5"
+            >
+              <Skeleton class="mb-8 h-4 w-40 rounded-xl" />
+              <div class="space-y-5">
+                <Skeleton class="h-3 w-full rounded-full" />
+                <Skeleton class="h-3 w-10/12 rounded-full" />
+                <Skeleton class="h-3 w-11/12 rounded-full" />
+                <Skeleton class="h-3 w-8/12 rounded-full" />
+                <Skeleton class="h-3 w-9/12 rounded-full" />
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <aside class="surface-card hidden rounded-2xl p-4 xl:block">
+          <div class="mb-5 flex items-center gap-2">
+            <Skeleton class="size-4 rounded-full" />
+            <Skeleton class="h-4 w-24 rounded-xl" />
+          </div>
+          <div class="space-y-4">
+            <div
+              v-for="n in 4"
+              :key="`timeline-${n}`"
+              class="flex gap-3"
+            >
+              <div class="flex flex-col items-center">
+                <Skeleton class="mt-2 size-3 rounded-full" />
+                <div v-if="n < 4" class="mt-1 h-16 w-px bg-foreground/10" />
+              </div>
+              <div class="surface-card-lite flex-1 rounded-2xl p-3">
+                <Skeleton class="mb-3 h-4 w-24 rounded-xl" />
+                <Skeleton class="mb-2 h-4 w-full rounded-xl" />
+                <Skeleton class="h-3 w-28 rounded-xl" />
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
 
     <!-- Error -->
     <div
       v-else-if="loadError"
       role="alert"
-      class="mx-auto mt-8 max-w-md rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+      class="surface-card mx-auto mt-8 max-w-md rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
     >
       {{ loadError }}
     </div>
 
     <!-- New Pregnancy — show setup form only -->
     <template v-else-if="isNew || showSetupForm">
-      <div class="sticky top-0 z-10 border-b bg-background">
-        <div class="flex items-center gap-2 px-4 py-3">
+      <div class="pt-4">
+        <div class="surface-card flex items-center gap-2 rounded-2xl p-3">
           <Button variant="ghost" size="sm" class="gap-1.5" @click="isNew ? router.back() : (showSetupForm = false)">
             <ArrowLeft class="size-3.5" />
             {{ isNew ? 'Back' : 'Back to Dashboard' }}
@@ -270,7 +426,7 @@ async function closePostpartum(): Promise<void> {
           <span class="text-sm font-semibold">{{ isNew ? 'New Pregnancy Record' : 'Edit Pregnancy Setup' }}</span>
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto px-4 pb-8 pt-4 md:px-8">
+      <div class="flex-1 px-4 pb-8 pt-4 md:px-8">
         <div class="mx-auto max-w-3xl">
           <PregnancySetupForm
             :patient-id="patientId"
@@ -284,117 +440,19 @@ async function closePostpartum(): Promise<void> {
 
     <!-- Pregnancy Dashboard -->
     <template v-else-if="pregnancyReady">
-      <!-- Sticky Header -->
-      <div class="sticky top-0 z-10 border-b bg-background">
-        <div class="flex flex-col gap-2 px-4 pb-2 pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex items-center gap-2">
-            <Button variant="ghost" size="sm" class="gap-1.5" @click="router.back()">
-              <ArrowLeft class="size-3.5" />
-              Back
-            </Button>
-            <Separator orientation="vertical" class="h-4" />
-            <Baby class="size-4 text-purple-500" />
-            <span class="text-sm font-semibold">Pregnancy Dashboard</span>
-            <Badge
-              variant="outline"
-              class="text-xs"
-              :class="statusClass(pdStore.currentPregnancy!.status)"
-            >
-              {{ statusLabel(pdStore.currentPregnancy!.status) }}
-            </Badge>
-            <RiskClassificationBadge
-              v-if="pdStore.currentPregnancy!.risk_level"
-              :level="pdStore.currentPregnancy!.risk_level"
-              :factors="pdStore.currentPregnancy!.risk_factors"
-            />
-          </div>
-
-          <div class="flex items-center gap-2">
-            <!-- GA Summary -->
-            <GACalculator v-if="pdStore.currentPregnancy!.edd && pdStore.currentPregnancy!.status === 'active'" :edd="pdStore.currentPregnancy!.edd" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Dashboard content — 2 column layout -->
-      <div class="flex-1 overflow-y-auto">
-        <div class="flex flex-col gap-4 p-4 md:p-6 lg:flex-row lg:gap-6">
+      <div class="pregnancy-dashboard-page flex flex-col gap-6 px-2 pb-4 pt-3">
+        <!-- Dashboard content — 2 column layout -->
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
 
           <!-- Left: Dashboard (2/3) -->
-          <div class="flex flex-col gap-4 lg:w-2/3">
-            <!-- Action buttons -->
-            <div class="flex flex-wrap items-center gap-2">
-              <Button v-if="pdStore.currentPregnancy?.status === 'active'" size="sm" @click="goToNewVisit">
-                <Plus class="size-3.5" /> New Visit
-              </Button>
-              <Button v-if="pdStore.currentPregnancy?.status === 'delivered'" size="sm" @click="goToPostpartum">
-                <Plus class="size-3.5" /> Postpartum Visit
-              </Button>
-              <Button
-                v-if="canClosePostpartum"
-                size="sm"
-                variant="outline"
-                :disabled="isClosingPostpartum"
-                @click="closePostpartum"
-              >
-                <LoaderCircle v-if="isClosingPostpartum" class="size-3.5 animate-spin" />
-                <CheckCircle2 v-else class="size-3.5" />
-                Close Postpartum
-              </Button>
-
-              <div class="flex-1" />
-
-              <!-- Go to Delivery (pregnancy resolved with delivery encounter) -->
-              <Button
-                v-if="pdStore.currentPregnancy?.delivery_encounter_id"
-                size="sm"
-                variant="outline"
-                @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: patientId, id: pdStore.currentPregnancy.delivery_encounter_id } })"
-              >
-                <Baby class="size-3.5" /> Go to Delivery
-              </Button>
-
-              <!-- Resolve button (visible at ≥24 weeks, no delivery yet) -->
-              <Button
-                v-else-if="pdStore.currentPregnancy?.status === 'active' && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) >= 24"
-                size="sm"
-                variant="outline"
-                @click="showResolveModal = true"
-              >
-                <CheckCircle2 class="size-3.5" /> Resolve Pregnancy
-              </Button>
-
-              <!-- More actions -->
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="outline" size="icon" class="size-8">
-                    <MoreVertical class="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="showSetupForm = true">
-                    <Pencil class="mr-2 size-3.5" />
-                    Edit Setup
-                  </DropdownMenuItem>
-                  <!-- Resolve in menu only when <24 weeks and no delivery encounter -->
-                  <DropdownMenuItem
-                    v-if="pdStore.currentPregnancy?.status === 'active' && !pdStore.currentPregnancy?.delivery_encounter_id && (pdStore.currentPregnancy?.current_ga?.weeks ?? 0) < 24"
-                    @click="showResolveModal = true"
-                  >
-                    <CheckCircle2 class="mr-2 size-3.5" />
-                    Resolve Pregnancy
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
+          <div class="flex min-w-0 flex-col gap-6">
             <!-- Outcome banner for resolved/delivered pregnancies -->
             <div
               v-if="pdStore.currentPregnancy?.outcome && pdStore.currentPregnancy?.status !== 'active'"
-              class="rounded-md border p-3 text-sm"
+              class="surface-card rounded-2xl border p-3 text-sm"
               :class="pdStore.currentPregnancy.status === 'delivered'
-                ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950'
-                : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'"
+                ? 'border-blue-200 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/50'
+                : 'border-red-200 bg-red-50/60 dark:border-red-800 dark:bg-red-950/50'"
             >
               <p class="font-medium" :class="pdStore.currentPregnancy.status === 'delivered' ? 'text-blue-800 dark:text-blue-300' : 'text-red-800 dark:text-red-300'">
                 {{ pregnancyOutcomeLabel(pdStore.currentPregnancy.outcome) }}
@@ -433,7 +491,7 @@ async function closePostpartum(): Promise<void> {
             <!-- Empty dashboard state -->
             <div
               v-else-if="!encounterStore.isLoadingEncounters"
-              class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-16 text-center"
+              class="surface-card flex flex-col items-center justify-center gap-2 rounded-2xl py-16 text-center"
             >
               <CalendarDays class="size-10 text-muted-foreground/30" />
               <p class="text-sm font-medium text-muted-foreground">No visits recorded yet</p>
@@ -444,14 +502,14 @@ async function closePostpartum(): Promise<void> {
           </div>
 
           <!-- Right: Timeline (1/3) -->
-          <div class="flex flex-col gap-3 lg:w-1/3">
+          <aside class="surface-card flex flex-col gap-3 rounded-2xl p-4 xl:self-start">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <CalendarDays class="size-4 text-muted-foreground" />
                 <h3 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Timeline
                 </h3>
-                <span v-if="encounterStore.patientEncounters.length" class="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                <span v-if="encounterStore.patientEncounters.length" class="surface-muted rounded-full px-1.5 py-0.5 text-xs text-muted-foreground">
                   {{ encounterStore.patientEncounters.length }}
                 </span>
               </div>
@@ -460,11 +518,11 @@ async function closePostpartum(): Promise<void> {
             <!-- Loading -->
             <div v-if="encounterStore.isLoadingEncounters" class="mt-2">
               <div v-for="n in 3" :key="n" class="flex gap-3">
-                <div class="flex flex-col items-center">
-                  <div class="mt-3.5 size-2 shrink-0 rounded-full bg-muted animate-pulse" />
-                  <div v-if="n < 3" class="mt-1 flex-1 w-[2px] bg-foreground/15" />
+                <div class="pregnancy-visit-timeline-marker-col">
+                  <div class="pregnancy-visit-timeline-marker pregnancy-visit-timeline-marker--skeleton" />
+                  <div v-if="n < 3" class="pregnancy-visit-timeline-line" />
                 </div>
-                <div class="min-w-0 flex-1 rounded-lg border bg-card p-3" :class="n < 3 ? 'mb-3' : ''">
+                <div class="surface-card-lite min-w-0 flex-1 rounded-2xl p-3" :class="n < 3 ? 'mb-3' : ''">
                   <div class="h-3 w-20 mb-2 rounded bg-muted animate-pulse" />
                   <div class="h-4 w-3/4 rounded bg-muted animate-pulse" />
                 </div>
@@ -474,7 +532,7 @@ async function closePostpartum(): Promise<void> {
             <!-- Empty -->
             <div
               v-else-if="encounterStore.patientEncounters.length === 0"
-              class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12 text-center"
+              class="surface-muted flex flex-col items-center justify-center gap-2 rounded-2xl py-12 text-center"
             >
               <CalendarDays class="size-8 text-muted-foreground/30" />
               <p class="text-sm text-muted-foreground">No visits yet</p>
@@ -499,27 +557,30 @@ async function closePostpartum(): Promise<void> {
                 @click="goToVisit(e.id)"
               >
                 <!-- Dot + line -->
-                <div class="flex w-3 flex-col items-center">
+                <div class="pregnancy-visit-timeline-marker-col">
                   <div
-                    class="mt-3.5 shrink-0 rounded-full"
+                    class="pregnancy-visit-timeline-marker"
                     :class="
                       e.status === 'draft'
-                        ? 'size-3 bg-amber-400 pulse-ring-amber'
+                        ? 'pregnancy-visit-timeline-marker--draft'
                         : index === 0
-                          ? 'size-3 bg-primary pulse-ring-primary'
-                          : 'size-2 bg-primary'
+                          ? 'pregnancy-visit-timeline-marker--latest'
+                          : 'pregnancy-visit-timeline-marker--finalized'
                     "
-                  />
+                  >
+                    <Pencil v-if="e.status === 'draft'" class="size-3.5" />
+                    <CheckCircle2 v-else class="size-3.5" />
+                  </div>
                   <div
                     v-if="index < encounterStore.patientEncounters.length - 1"
-                    class="mt-1 flex-1 w-[2px]"
-                    :class="e.status === 'draft' ? 'bg-amber-300' : 'bg-foreground/15'"
+                    class="pregnancy-visit-timeline-line"
+                    :class="{ 'pregnancy-visit-timeline-line--draft': e.status === 'draft' }"
                   />
                 </div>
 
                 <!-- Card -->
                 <div
-                  class="min-w-0 flex-1 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/30"
+                  class="surface-card-lite min-w-0 flex-1 rounded-2xl p-3 transition-all hover:-translate-y-0.5"
                   :class="index < encounterStore.patientEncounters.length - 1 ? 'mb-3' : ''"
                 >
                   <div class="flex items-center justify-between mb-1">
@@ -539,7 +600,7 @@ async function closePostpartum(): Promise<void> {
                 </div>
               </div>
             </div>
-          </div>
+          </aside>
 
         </div>
       </div>
@@ -556,3 +617,58 @@ async function closePostpartum(): Promise<void> {
     />
   </div>
 </template>
+
+<style scoped>
+.pregnancy-visit-timeline-marker-col {
+  display: flex;
+  width: 2.25rem;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pregnancy-visit-timeline-marker {
+  margin-top: 0.5rem;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: white;
+  box-shadow:
+    0 10px 22px rgb(15 23 42 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.pregnancy-visit-timeline-marker--draft {
+  background: linear-gradient(135deg, rgb(245 158 11), rgb(249 115 22));
+}
+
+.pregnancy-visit-timeline-marker--latest {
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  animation: pulse-primary 2.2s ease-out infinite;
+}
+
+.pregnancy-visit-timeline-marker--finalized {
+  background: linear-gradient(135deg, rgb(20 184 166), rgb(16 185 129));
+}
+
+.pregnancy-visit-timeline-marker--skeleton {
+  background: rgb(148 163 184 / 0.28);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.pregnancy-visit-timeline-line {
+  margin-top: 0.5rem;
+  width: 2px;
+  flex: 1 1 auto;
+  min-height: 2rem;
+  background: linear-gradient(to bottom, rgb(37 99 235 / 0.22), rgb(20 184 166 / 0.14));
+}
+
+.pregnancy-visit-timeline-line--draft {
+  background: linear-gradient(to bottom, rgb(245 158 11 / 0.38), rgb(20 184 166 / 0.16));
+}
+</style>
