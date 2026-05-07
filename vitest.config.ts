@@ -56,6 +56,7 @@ export default defineConfig({
         'src/domains/consultation/composables/useFeeDiscount.ts',
         'src/domains/consumable/api/consumableApi.ts',
         'src/domains/dashboard/api/dashboardApi.ts',
+        'src/domains/encounter/api/encounterApi.ts',
         'src/domains/labService/api/labServiceApi.ts',
         'src/domains/medicine/api/medicineApi.ts',
         'src/domains/message/api/messageApi.ts',
