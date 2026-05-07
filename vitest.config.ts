@@ -41,6 +41,7 @@ export default defineConfig({
       // currently covered by Vitest. Broaden this list phase-by-phase as new
       // workflow tests land, instead of counting the entire app at once.
       include: [
+        'src/api/centrifugoApi.ts',
         'src/components/layout/{GracePeriodBanner,TrialBanner}.vue',
         'src/components/shared/{FeatureGate,UpgradePrompt}.vue',
         'src/domains/appointment/api/appointmentApi.ts',
@@ -62,6 +63,7 @@ export default defineConfig({
         'src/domains/medicine/api/medicineApi.ts',
         'src/domains/message/api/messageApi.ts',
         'src/domains/notification/api/notificationApi.ts',
+        'src/domains/patient/api/addressApi.ts',
         'src/domains/patient/components/EditPatientDialog.vue',
         'src/domains/patient/composables/usePatientSync.ts',
         'src/domains/patient/utils/profileCompleteness.ts',
