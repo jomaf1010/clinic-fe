@@ -61,6 +61,7 @@ export default defineConfig({
         'src/domains/patient/components/EditPatientDialog.vue',
         'src/domains/patient/composables/usePatientSync.ts',
         'src/domains/patient/utils/profileCompleteness.ts',
+        'src/domains/queue/api/{centrifugoApi,queueApi}.ts',
         'src/domains/queue/components/{QueueCard,QueueStatusBadge}.vue',
         'src/domains/queue/stores/**/*.ts',
         'src/domains/roles/api/roleApi.ts',
