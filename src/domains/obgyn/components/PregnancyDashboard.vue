@@ -237,7 +237,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex flex-col gap-6">
     <!-- Loading state -->
     <div v-if="pdStore.isLoadingObgyn" class="flex items-center justify-center py-16">
       <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
@@ -245,7 +245,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
 
     <template v-else-if="pdStore.pregnancyDashboard">
       <!-- A. Patient Card + GA Timeline ────────────────────────────────── -->
-      <div v-if="pdStore.patient" class="flex flex-col gap-4 rounded-xl border bg-card p-4">
+      <div v-if="pdStore.patient" class="surface-card flex flex-col gap-4 rounded-2xl p-4">
         <!-- Patient info row -->
         <div class="flex items-center gap-4">
           <Avatar class="size-12">
@@ -280,7 +280,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
           <!-- Progress bar -->
           <div class="relative mt-2 mb-3">
             <!-- Track -->
-            <div class="h-3 w-full overflow-hidden rounded-full bg-muted">
+            <div class="surface-muted h-3 w-full overflow-hidden rounded-full">
               <!-- Trimester dividers -->
               <div class="absolute left-[33.3%] top-0 h-3 w-px bg-border/50 z-10" />
               <div class="absolute left-[66.6%] top-0 h-3 w-px bg-border/50 z-10" />
@@ -299,7 +299,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
             >
               <div class="group relative flex items-center justify-center" :class="pregnancy.fetus_count > 1 ? '-ml-3.5 size-7' : '-ml-2.5 size-5'">
                 <span class="absolute inset-0 animate-ping rounded-full" :class="babyPingColor" />
-                <span class="relative flex items-center justify-center overflow-visible rounded-full bg-white shadow-md ring-2 whitespace-nowrap cursor-pointer" :class="[babyRingColor, pregnancy.fetus_count > 1 ? 'size-7' : 'size-5']">
+                <span class="relative flex items-center justify-center overflow-visible rounded-full bg-white shadow-md ring-2 whitespace-nowrap cursor-pointer dark:bg-slate-950" :class="[babyRingColor, pregnancy.fetus_count > 1 ? 'size-7' : 'size-5']">
                   <span :class="pregnancy.fetus_count > 1 ? 'text-sm' : 'text-lg'">{{ babyEmoji }}</span>
                 </span>
                 <!-- Hover tooltip -->
@@ -334,7 +334,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
 
           <!-- Progress bar -->
           <div class="relative mt-2 mb-3">
-            <div class="h-3 w-full overflow-hidden rounded-full bg-muted">
+            <div class="surface-muted h-3 w-full overflow-hidden rounded-full">
               <div
                 class="absolute inset-y-0 left-0 h-3 rounded-full transition-all duration-1000 ease-out"
                 :style="{ width: `${ppProgress}%`, background: 'linear-gradient(90deg, #14b8a6, #06b6d4, #3b82f6)' }"
@@ -348,7 +348,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
             >
               <div class="group relative -ml-2 flex items-center justify-center size-4">
                 <span class="absolute inset-0 animate-ping rounded-full bg-teal-400/30" />
-                <span class="relative flex size-4 items-center justify-center rounded-full bg-white shadow-md ring-2 ring-teal-400">
+                <span class="relative flex size-4 items-center justify-center rounded-full bg-white shadow-md ring-2 ring-teal-400 dark:bg-slate-950">
                   <span class="size-2 rounded-full bg-teal-500" />
                 </span>
               </div>
@@ -389,10 +389,10 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       </div>
 
       <!-- B. Summary Cards — Prenatal ────────────────────────────────── -->
-      <div v-if="!isPostpartum" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-if="!isPostpartum" class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <!-- Obstetric Hx -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
             <PregnantIcon class="size-5" />
           </div>
           <div class="min-w-0">
@@ -402,8 +402,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- Gestational Age -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white shadow-sm">
             <PregnantWeeksIcon class="size-5" />
           </div>
           <div class="min-w-0">
@@ -414,8 +414,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- EDD -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-sm">
             <CalendarDays class="size-5" />
           </div>
           <div class="min-w-0">
@@ -431,9 +431,9 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- Risk Level -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
           <div
-            class="flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
+            class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
             :class="pregnancy.risk_level === 'high'
               ? 'bg-gradient-to-br from-red-500 to-orange-500'
               : 'bg-gradient-to-br from-emerald-500 to-green-500'"
@@ -452,8 +452,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- Total Visits -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
             <ChartLineIcon class="size-5" />
           </div>
           <div class="min-w-0">
@@ -464,10 +464,10 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       </div>
 
       <!-- B. Summary Cards — Postpartum ────────────────────────────── -->
-      <div v-else class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div v-else class="grid grid-cols-2 gap-5 lg:grid-cols-4">
         <!-- Days Postpartum -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-sm">
             <CalendarDays class="size-5" />
           </div>
           <div class="min-w-0">
@@ -480,8 +480,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- Delivery Mode -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm">
             <Baby class="size-5" />
           </div>
           <div class="min-w-0">
@@ -494,8 +494,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- Next Visit -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-sm">
             <CalendarDays class="size-5" />
           </div>
           <div class="min-w-0">
@@ -508,8 +508,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
         </div>
 
         <!-- Total Visits -->
-        <div class="flex items-start gap-3 rounded-xl border bg-card p-3">
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
+        <div class="pregnancy-summary-tile surface-card-lite flex items-start gap-3 rounded-2xl p-3">
+          <div class="pregnancy-dashboard-icon flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm">
             <ChartLineIcon class="size-5" />
           </div>
           <div class="min-w-0">
@@ -523,7 +523,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       </div>
 
       <!-- Delivery Summary Card (postpartum only) ────────────────── -->
-      <Card v-if="isPostpartum && dashboardData?.delivery_summary" class="border-teal-200 bg-teal-50/30 dark:border-teal-800 dark:bg-teal-950/30">
+      <Card v-if="isPostpartum && dashboardData?.delivery_summary" class="rounded-2xl border-0 bg-teal-50/30 dark:bg-teal-950/30">
         <CardHeader class="pb-2 pt-3">
           <CardTitle class="text-sm font-semibold">Delivery Summary</CardTitle>
         </CardHeader>
@@ -586,7 +586,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       />
 
       <!-- Postpartum Checklist ────────────────────────────────────────── -->
-      <Card v-if="isPostpartum">
+      <Card v-if="isPostpartum" class="rounded-2xl border-0">
         <CardHeader class="pb-2 pt-3">
           <div class="flex items-center justify-between">
             <CardTitle class="text-sm font-semibold">Postpartum Checklist</CardTitle>
@@ -598,7 +598,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
             <div
               v-for="item in postpartumChecklist"
               :key="item.key"
-              class="flex items-center gap-2.5 rounded-md px-2 py-1.5"
+              class="surface-muted flex items-center gap-2.5 rounded-xl px-2 py-1.5"
             >
               <CheckCircle2 v-if="item.done" class="size-4 shrink-0 text-teal-500" />
               <Circle v-else class="size-4 shrink-0 text-muted-foreground/30" />
@@ -609,7 +609,7 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
       </Card>
 
       <!-- D. Visit Timeline ───────────────────────────────────────────── -->
-      <Card v-if="visitTimeline.length > 0">
+      <Card v-if="visitTimeline.length > 0" class="rounded-2xl border-0">
         <CardHeader class="pb-2 pt-3">
           <CardTitle class="text-sm font-semibold">Visit Timeline</CardTitle>
         </CardHeader>
@@ -618,8 +618,8 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
             <div
               v-for="v in visitTimeline"
               :key="v.id"
-              class="flex flex-col gap-1.5 rounded-md border px-3 py-2.5"
-              :class="v.danger_signs.length > 0 ? 'border-l-2 border-l-red-400 bg-red-50/40 dark:bg-red-950/20' : 'bg-card'"
+              class="surface-card-lite flex flex-col gap-1.5 rounded-2xl px-3 py-2.5"
+              :class="v.danger_signs.length > 0 ? 'border-l-2 border-l-red-400 bg-red-50/40 dark:bg-red-950/20' : ''"
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
@@ -685,3 +685,31 @@ const ppChecklistDone = computed(() => postpartumChecklist.value.filter((i) => i
     </template>
   </div>
 </template>
+
+<style scoped>
+.pregnancy-summary-tile {
+  box-shadow:
+    0 24px 58px -34px rgb(15 23 42 / 0.48),
+    0 10px 26px -18px rgb(37 99 235 / 0.28),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.pregnancy-dashboard-icon {
+  box-shadow:
+    0 16px 34px rgb(37 99 235 / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+:global(.dark) .pregnancy-summary-tile {
+  box-shadow:
+    0 24px 58px -34px rgb(0 0 0 / 0.8),
+    0 12px 30px -18px rgb(20 184 166 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+:global(.dark) .pregnancy-dashboard-icon {
+  box-shadow:
+    0 16px 34px rgb(0 0 0 / 0.32),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+</style>

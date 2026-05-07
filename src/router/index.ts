@@ -7,6 +7,7 @@ declare module 'vue-router' {
     requiresGuest?: boolean
     requiredPermission?: string
     requiredFeature?: string
+    usesCustomTopbar?: boolean
     devOnly?: boolean
   }
 }
@@ -61,7 +62,7 @@ const router = createRouter({
           path: 'patients/:patientId/pregnancies/:pregnancyId',
           name: RouteNames.PREGNANCY_DETAIL,
           component: () => import('@/domains/obgyn/views/PregnancyDetailView.vue'),
-          meta: { requiresAuth: true, requiresClinicContext: true },
+          meta: { requiresAuth: true, requiresClinicContext: true, usesCustomTopbar: true },
         },
         {
           path: 'patients/:patientId/pregnancies/:pregnancyId/visits/new',

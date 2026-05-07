@@ -28,6 +28,7 @@ const announcementStore = useAnnouncementStore()
 const isEncounterRoute = computed(() =>
   route.name === RouteNames.ENCOUNTER_NEW || route.name === RouteNames.ENCOUNTER_DETAIL,
 )
+const usesCustomTopbar = computed(() => isEncounterRoute.value || route.meta.usesCustomTopbar === true)
 
 let notificationPollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -61,13 +62,13 @@ onUnmounted(() => {
   <SidebarProvider class="app-shell" style="--header-height: 3.5rem">
     <AppSidebar />
     <SidebarInset>
-      <SiteHeader v-if="!isEncounterRoute" />
+      <SiteHeader v-if="!usesCustomTopbar" />
       <AnnouncementBanners />
       <TrialBanner />
       <GracePeriodBanner />
       <div
         class="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-4 pb-4"
-        :class="isEncounterRoute
+        :class="usesCustomTopbar
           ? 'pt-0'
           : '-mt-[calc(var(--header-height)+1rem)] pt-[calc(var(--header-height)+1.75rem)]'"
       >

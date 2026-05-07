@@ -120,15 +120,15 @@ function typeBadgeClass(type: ChecklistItem['type']): string {
 </script>
 
 <template>
-  <Card>
-    <CardHeader class="pb-2 pt-3">
+  <Card class="rounded-2xl border-0">
+    <CardHeader class="px-5 pb-2 pt-5">
       <div class="flex items-center justify-end">
         <span v-if="!isLoading && totalCount > 0" class="text-xs text-muted-foreground">
           {{ completedCount }}/{{ totalCount }}
         </span>
       </div>
     </CardHeader>
-    <CardContent class="pb-4">
+    <CardContent class="px-5 pb-5">
       <!-- Loading -->
       <div v-if="isLoading" class="flex items-center gap-2 py-4 text-sm text-muted-foreground">
         <LoaderCircle class="size-3.5 animate-spin" />
@@ -155,7 +155,7 @@ function typeBadgeClass(type: ChecklistItem['type']): string {
               v-for="item in group.items"
               :key="item.key"
               type="button"
-              class="flex items-start gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors"
+              class="flex items-start gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors"
               :class="[
                 item.status === 'overdue' ? 'bg-red-50/50 dark:bg-red-950/20' : 'hover:bg-muted/40',
                 disabled ? 'cursor-default' : 'cursor-pointer',

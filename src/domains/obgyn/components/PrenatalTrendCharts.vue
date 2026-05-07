@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { use } from 'echarts/core'
-import { LineChart } from 'echarts/charts'
+import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
 import {
   GridComponent,
   TooltipComponent,
@@ -13,7 +13,7 @@ import VChart from 'vue-echarts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { PregnancyDashboard } from '../types/obgyn.types'
 
-use([LineChart, GridComponent, TooltipComponent, LegendComponent, MarkLineComponent, CanvasRenderer])
+use([BarChart, LineChart, ScatterChart, GridComponent, TooltipComponent, LegendComponent, MarkLineComponent, CanvasRenderer])
 
 const props = withDefaults(defineProps<{
   dashboardData: PregnancyDashboard
@@ -31,7 +31,12 @@ function gaLabel(weeks: number | null | undefined, date: string): string {
   return weeks != null ? `${weeks}w` : shortDate(date)
 }
 
-const baseGrid = { top: 8, right: 8, bottom: 28, left: 40 }
+function bpNeedsAttention(systolic: number, diastolic: number): boolean {
+  return systolic >= 140 || diastolic >= 90
+}
+
+const baseGrid = { top: 8, right: 8, bottom: 54, left: 40 }
+const noLegendGrid = { ...baseGrid, bottom: 28 }
 
 const baseAxisLabel = { fontSize: 10 }
 const baseXAxisLabel = { fontSize: 9 }
@@ -42,14 +47,32 @@ const baseSplitLine = { lineStyle: { color: 'hsl(var(--border))', opacity: 0.15,
 const bpOption = computed(() => {
   const pts = props.dashboardData.bp_trend
   if (pts.length === 0) return {}
+  const showPointLabels = pts.length <= 8
+  const pointSize = showPointLabels ? 24 : 12
+  const rangeBarWidth = pointSize + 6
+  const rangePaddingMmHg = showPointLabels ? 4 : 3
+  const normalPointColor = '#2563eb'
+  const alertPointColor = '#ef4444'
+  const primaryRangeGradient = {
+    type: 'linear' as const,
+    x: 0,
+    y: 1,
+    x2: 0,
+    y2: 0,
+    colorStops: [
+      { offset: 0, color: 'rgba(37, 99, 235, 0.28)' },
+      { offset: 1, color: 'rgba(20, 184, 166, 0.42)' },
+    ],
+  }
 
   return {
     animation: true,
     animationDuration: 300,
-    grid: baseGrid,
+    grid: noLegendGrid,
     tooltip: {
       trigger: 'axis',
-      formatter: (params: { dataIndex: number; seriesName: string; value: number }[]) => {
+      axisPointer: { type: 'shadow' },
+      formatter: (params: { dataIndex: number; seriesName: string; value: number | number[] }[]) => {
         if (!params[0]) return ''
         const pt = pts[params[0].dataIndex]
         if (!pt) return ''
@@ -58,13 +81,13 @@ const bpOption = computed(() => {
         return `<div style="font-size:12px"><b>${date}${ga}</b><br/>Systolic: <b>${pt.systolic}</b> mmHg<br/>Diastolic: <b>${pt.diastolic}</b> mmHg</div>`
       },
     },
-    legend: { data: ['Systolic', 'Diastolic'], bottom: 0, itemHeight: 8, textStyle: { fontSize: 11 } },
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
       axisLabel: baseXAxisLabel,
       axisLine: baseAxisLine,
-      splitLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { show: true, lineStyle: { color: 'hsl(var(--border))', opacity: 0.22, type: 'dotted' as const } },
     },
     yAxis: {
       type: 'value',
@@ -78,34 +101,110 @@ const bpOption = computed(() => {
     },
     series: [
       {
-        name: 'Systolic',
-        type: 'line',
-        data: pts.map((p) => p.systolic),
-        lineStyle: { color: '#ef4444', width: 2 },
-        itemStyle: { color: '#ef4444' },
-        symbolSize: 5,
+        type: 'bar',
+        stack: 'bp',
+        data: pts.map((p) => p.diastolic - rangePaddingMmHg),
+        barWidth: rangeBarWidth,
+        itemStyle: { color: 'transparent' },
+        emphasis: { disabled: true },
+        silent: true,
+      },
+      {
+        name: 'BP range',
+        type: 'bar',
+        stack: 'bp',
+        data: pts.map((p) => Math.max(0, p.systolic - p.diastolic + (rangePaddingMmHg * 2))),
+        barWidth: rangeBarWidth,
+        barGap: '-100%',
+        itemStyle: {
+          borderRadius: [999, 999, 999, 999],
+          color: primaryRangeGradient,
+          shadowBlur: 16,
+          shadowColor: 'rgba(37, 99, 235, 0.18)',
+        },
+        emphasis: {
+          disabled: true,
+        },
         markLine: {
           silent: true,
           symbol: 'none',
-          data: [{ yAxis: 140, name: '140' }],
-          lineStyle: { color: '#ef4444', type: 'dashed', width: 1, opacity: 0.6 },
-          label: { formatter: '140', fontSize: 10, color: '#ef4444' },
+          data: [
+            { yAxis: 140, name: '140' },
+            { yAxis: 90, name: '90' },
+          ],
+          lineStyle: { color: '#ef4444', type: 'dashed', width: 1, opacity: 0.42 },
+          label: { formatter: '{b}', fontSize: 10, color: '#ef4444' },
         },
       },
       {
-        name: 'Diastolic',
-        type: 'line',
-        data: pts.map((p) => p.diastolic),
-        lineStyle: { color: '#3b82f6', width: 2 },
-        itemStyle: { color: '#3b82f6' },
-        symbolSize: 5,
-        markLine: {
-          silent: true,
-          symbol: 'none',
-          data: [{ yAxis: 90, name: '90' }],
-          lineStyle: { color: '#3b82f6', type: 'dashed', width: 1, opacity: 0.6 },
-          label: { formatter: '90', fontSize: 10, color: '#3b82f6' },
+        name: 'Systolic',
+        type: 'scatter',
+        data: pts.map((p, index) => [index, p.systolic]),
+        symbolSize: pointSize,
+        itemStyle: {
+          color: (params: { dataIndex: number }) => {
+            const pt = pts[params.dataIndex]
+            return pt && bpNeedsAttention(pt.systolic, pt.diastolic) ? alertPointColor : normalPointColor
+          },
+          borderColor: 'rgba(255, 255, 255, 0.95)',
+          borderWidth: 2,
+          shadowBlur: 10,
+          shadowColor: (params: { dataIndex: number }) => {
+            const pt = pts[params.dataIndex]
+            return pt && bpNeedsAttention(pt.systolic, pt.diastolic)
+              ? 'rgba(239, 68, 68, 0.42)'
+              : 'rgba(37, 99, 235, 0.42)'
+          },
         },
+        emphasis: {
+          disabled: true,
+          scale: false,
+        },
+        label: showPointLabels
+          ? {
+              show: true,
+              formatter: (params: { value: [number, number] }) => String(params.value[1]),
+              color: '#ffffff',
+              fontSize: 9,
+              fontWeight: 700,
+            }
+          : undefined,
+        z: 3,
+      },
+      {
+        name: 'Diastolic',
+        type: 'scatter',
+        data: pts.map((p, index) => [index, p.diastolic]),
+        symbolSize: pointSize,
+        itemStyle: {
+          color: (params: { dataIndex: number }) => {
+            const pt = pts[params.dataIndex]
+            return pt && bpNeedsAttention(pt.systolic, pt.diastolic) ? alertPointColor : normalPointColor
+          },
+          borderColor: 'rgba(255, 255, 255, 0.95)',
+          borderWidth: 2,
+          shadowBlur: 10,
+          shadowColor: (params: { dataIndex: number }) => {
+            const pt = pts[params.dataIndex]
+            return pt && bpNeedsAttention(pt.systolic, pt.diastolic)
+              ? 'rgba(239, 68, 68, 0.42)'
+              : 'rgba(37, 99, 235, 0.42)'
+          },
+        },
+        emphasis: {
+          disabled: true,
+          scale: false,
+        },
+        label: showPointLabels
+          ? {
+              show: true,
+              formatter: (params: { value: [number, number] }) => String(params.value[1]),
+              color: '#ffffff',
+              fontSize: 9,
+              fontWeight: 700,
+            }
+          : undefined,
+        z: 3,
       },
     ],
   }
@@ -146,8 +245,10 @@ const weightOption = computed(() => {
     legend: {
       data: rec ? ['Actual Gain', 'Min Recommended', 'Max Recommended'] : ['Actual Gain'],
       bottom: 0,
+      left: 'center',
+      itemGap: 12,
       itemHeight: 8,
-      textStyle: { fontSize: 11 },
+      textStyle: { fontSize: 10 },
     },
     xAxis: {
       type: 'category',
@@ -233,7 +334,14 @@ const fundalOption = computed(() => {
         return `<div style="font-size:12px"><b>${date}${ga}</b><br/>Fundal Height: <b>${pt.fundal_height} cm</b>${exp}</div>`
       },
     },
-    legend: { data: ['Fundal Height', 'Expected (GA)', '+3cm band', '-3cm band'], bottom: 0, itemHeight: 8, textStyle: { fontSize: 11 } },
+    legend: {
+      data: ['Fundal Height', 'Expected range'],
+      bottom: 0,
+      left: 'center',
+      itemGap: 10,
+      itemHeight: 8,
+      textStyle: { fontSize: 10 },
+    },
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
@@ -253,7 +361,7 @@ const fundalOption = computed(() => {
     },
     series: [
       {
-        name: '+3cm band',
+        name: 'Expected range',
         type: 'line',
         data: pts.map((p) => (p.expected !== null ? p.expected + 3 : null)),
         lineStyle: { color: '#22c55e', width: 1, type: 'dashed' as const, opacity: 0.5 },
@@ -262,7 +370,7 @@ const fundalOption = computed(() => {
         areaStyle: { color: '#22c55e', opacity: 0.07 },
       },
       {
-        name: '-3cm band',
+        name: 'Expected range',
         type: 'line',
         data: pts.map((p) => (p.expected !== null ? p.expected - 3 : null)),
         lineStyle: { color: '#22c55e', width: 1, type: 'dashed' as const, opacity: 0.5 },
@@ -273,6 +381,7 @@ const fundalOption = computed(() => {
         name: 'Expected (GA)',
         type: 'line',
         data: pts.map((p) => p.expected),
+        legendHoverLink: false,
         lineStyle: { color: '#94a3b8', width: 1.5, type: 'dotted' as const },
         itemStyle: { color: '#94a3b8' },
         symbol: 'none',
@@ -317,7 +426,15 @@ const fhrOption = computed(() => {
         return `<div style="font-size:12px"><b>${date}${ga}</b><br/>FHR: <b>${pt.fetal_heart_rate} bpm${flag}</b></div>`
       },
     },
-    legend: { data: ['FHR', 'Normal 110-160'], bottom: 0, itemHeight: 8, textStyle: { fontSize: 11 }, selected: { 'Normal lower': false } },
+    legend: {
+      data: ['FHR', 'Normal 110-160'],
+      bottom: 0,
+      left: 'center',
+      itemGap: 12,
+      itemHeight: 8,
+      textStyle: { fontSize: 10 },
+      selected: { 'Normal lower': false },
+    },
     xAxis: {
       type: 'category',
       data: pts.map((p) => gaLabel(p.gestational_age_weeks, p.date)),
@@ -382,13 +499,13 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
     <!-- Blood Pressure -->
-    <Card>
-      <CardHeader class="px-3 pb-0 pt-2.5">
+    <Card class="rounded-2xl border-0">
+      <CardHeader class="px-5 pb-0 pt-5">
         <CardTitle class="text-[11px] font-semibold">Blood Pressure Trend</CardTitle>
       </CardHeader>
-      <CardContent class="px-2 pb-1.5">
+      <CardContent class="px-4 pb-4">
         <div v-if="!hasBpData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No blood pressure data recorded
         </div>
@@ -402,11 +519,11 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
     </Card>
 
     <!-- Weight Gain -->
-    <Card>
-      <CardHeader class="px-3 pb-0 pt-2.5">
+    <Card class="rounded-2xl border-0">
+      <CardHeader class="px-5 pb-0 pt-5">
         <CardTitle class="text-[11px] font-semibold">Weight Gain Trend</CardTitle>
       </CardHeader>
-      <CardContent class="px-2 pb-1.5">
+      <CardContent class="px-4 pb-4">
         <div v-if="!hasWeightData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No weight data recorded
         </div>
@@ -414,17 +531,17 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="weightOption"
           autoresize
-          style="height: 220px; width: 100%"
+          style="height: 240px; width: 100%"
         />
       </CardContent>
     </Card>
 
     <!-- Fundal Height (prenatal only) -->
-    <Card v-if="showFetalCharts">
-      <CardHeader class="px-3 pb-0 pt-2.5">
+    <Card v-if="showFetalCharts" class="rounded-2xl border-0">
+      <CardHeader class="px-5 pb-0 pt-5">
         <CardTitle class="text-[11px] font-semibold">Fundal Height Trend</CardTitle>
       </CardHeader>
-      <CardContent class="px-2 pb-1.5">
+      <CardContent class="px-4 pb-4">
         <div v-if="!hasFundalData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No fundal height data recorded
         </div>
@@ -432,17 +549,17 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="fundalOption"
           autoresize
-          style="height: 220px; width: 100%"
+          style="height: 240px; width: 100%"
         />
       </CardContent>
     </Card>
 
     <!-- Fetal Heart Rate (prenatal only) -->
-    <Card v-if="showFetalCharts">
-      <CardHeader class="px-3 pb-0 pt-2.5">
+    <Card v-if="showFetalCharts" class="rounded-2xl border-0">
+      <CardHeader class="px-5 pb-0 pt-5">
         <CardTitle class="text-[11px] font-semibold">Fetal Heart Rate Trend</CardTitle>
       </CardHeader>
-      <CardContent class="px-2 pb-1.5">
+      <CardContent class="px-4 pb-4">
         <div v-if="!hasFhrData" class="flex h-[260px] items-center justify-center text-xs text-muted-foreground">
           No FHR data recorded
         </div>
@@ -450,7 +567,7 @@ const hasFhrData = computed(() => props.dashboardData.fhr_trend.length > 0)
           v-else
           :option="fhrOption"
           autoresize
-          style="height: 220px; width: 100%"
+          style="height: 240px; width: 100%"
         />
       </CardContent>
     </Card>
