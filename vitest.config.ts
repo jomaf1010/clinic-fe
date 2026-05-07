@@ -56,6 +56,7 @@ export default defineConfig({
         'src/domains/consultation/composables/useFeeDiscount.ts',
         'src/domains/consumable/api/consumableApi.ts',
         'src/domains/dashboard/api/dashboardApi.ts',
+        'src/domains/dental/api/dentalApi.ts',
         'src/domains/encounter/api/encounterApi.ts',
         'src/domains/labService/api/labServiceApi.ts',
         'src/domains/medicine/api/medicineApi.ts',
@@ -98,7 +99,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 90,
+        functions: 91,
         statements: 70,
       },
     },
