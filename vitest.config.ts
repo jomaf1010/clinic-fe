@@ -72,6 +72,7 @@ export default defineConfig({
         'src/domains/schedule/components/{BreakEditor,DayScheduleRow}.vue',
         'src/domains/schedule/stores/**/*.ts',
         'src/domains/service/api/serviceApi.ts',
+        'src/domains/subscription/api/subscriptionApi.ts',
         'src/domains/subscription/components/{PricingCard,SubscriptionStatus}.vue',
         'src/domains/subscription/stores/**/*.ts',
         'src/domains/team/api/teamApi.ts',
