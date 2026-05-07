@@ -52,6 +52,29 @@ describe('SubscriptionStatus', () => {
     expect(wrapper.text()).toContain('Trial ends in 1 day')
   })
 
+  it('renders trial copy with plural day grammar', () => {
+    const wrapper = mountStatus(makeStatus({
+      is_trial: true,
+      trial_days_left: 3,
+      billing_period_ends_at: null,
+    }))
+
+    expect(wrapper.text()).toContain('Trial ends in 3 days')
+  })
+
+  it('renders free plan without billing or subscription actions', () => {
+    const wrapper = mountStatus(makeStatus({
+      plan: 'free',
+      billing_period_ends_at: null,
+      next_billing_amount: 0,
+    }))
+
+    expect(wrapper.text()).toContain('Free')
+    expect(wrapper.text()).not.toContain('Next billing')
+    expect(wrapper.text()).not.toContain('Cancel Subscription')
+    expect(wrapper.text()).not.toContain('Reactivate')
+  })
+
   it('renders grace-period warning', () => {
     const wrapper = mountStatus(makeStatus({ is_in_grace_period: true }))
 

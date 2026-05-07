@@ -92,6 +92,20 @@ describe('QueueCard', () => {
     expect(wrapper.classes()).toContain('border-amber-300')
   })
 
+  it('does not mark a completed previous-day visit as carryover and uses completed_at for wait time', () => {
+    const wrapper = mountCard(makeVisit({
+      status: 'completed',
+      checked_in_at: '2026-05-05T23:00:00.000Z',
+      completed_at: '2026-05-06T01:10:00.000Z',
+      type: 'appointment',
+    }))
+
+    expect(wrapper.text()).toContain('Appointment')
+    expect(wrapper.text()).toContain('2h 10m')
+    expect(wrapper.text()).not.toContain('From May 5')
+    expect(wrapper.classes()).not.toContain('border-amber-300')
+  })
+
   it('emits waiting actions when the user can manage the queue', async () => {
     const wrapper = mountCard()
 
@@ -111,11 +125,25 @@ describe('QueueCard', () => {
     expect(wrapper.text()).not.toContain('Call')
   })
 
+  it('allows managers to act even when the visit belongs to another doctor', async () => {
+    const wrapper = mountCard(makeVisit({ doctor_id: 'doctor-2' }), { canManage: true, canCall: false })
+
+    await wrapper.findAll('button').find((button) => button.text().includes('Call'))?.trigger('click')
+
+    expect(wrapper.emitted('call')).toEqual([['visit-1']])
+  })
+
   it('hides action buttons when the user cannot act on the visit', () => {
     const wrapper = mountCard(makeVisit({ doctor_id: 'doctor-2' }), { canManage: false, canCall: true })
 
     expect(wrapper.text()).not.toContain('Call')
     expect(wrapper.text()).not.toContain('Complete')
+  })
+
+  it('hides consultation action when no encounter is linked', () => {
+    const wrapper = mountCard(makeVisit({ encounter_id: null }))
+
+    expect(wrapper.text()).not.toContain('Consultation')
   })
 
   it('opens the linked consultation when present', async () => {

@@ -283,4 +283,36 @@ describe('scheduleStore - studio data', () => {
     expect(store.studioError).toBe('Failed to load schedule view.')
     expect(store.isLoadingStudio).toBe(false)
   })
+
+  it('ignores duplicate in-flight studio requests for the same parameters', async () => {
+    let resolveList: (value: Awaited<ReturnType<MockAppointmentApi['list']>>) => void = () => {}
+    const scheduleApi = makeScheduleApi()
+    const appointmentApi = makeAppointmentApi({
+      list: vi.fn().mockImplementation(() => new Promise((resolve) => {
+        resolveList = resolve
+      })),
+    })
+    const { useScheduleStore } = await loadStore(scheduleApi, appointmentApi)
+    const store = useScheduleStore()
+    const params = {
+      userId: 'doctor-1',
+      date: '2026-05-06',
+      start: '2026-05-01',
+      end: '2026-05-31',
+      blockRangeEnd: '2026-06-30',
+      refreshKey: 1,
+    }
+
+    const first = store.fetchStudioData(params)
+    const second = store.fetchStudioData(params)
+
+    await expect(second).resolves.toBeUndefined()
+    expect(appointmentApi.list).toHaveBeenCalledOnce()
+    resolveList({
+      data: [makeAppointment()],
+      meta: { pagination: { page: 1, per_page: 300, total: 1, last_page: 1 } },
+    })
+    await first
+    expect(store.isLoadingStudio).toBe(false)
+  })
 })

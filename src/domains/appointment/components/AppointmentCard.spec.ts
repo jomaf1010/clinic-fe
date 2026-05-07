@@ -80,10 +80,34 @@ describe('AppointmentCard', () => {
     expect(wrapper.text()).toContain('in 1h')
   })
 
+  it.each([
+    ['2026-05-06T01:30:10.000Z', 'now'],
+    ['2026-05-06T01:00:00.000Z', '30m ago'],
+    ['2026-05-08T01:30:00.000Z', 'in 2d'],
+    ['2026-06-20T01:30:00.000Z', 'in 1mo'],
+  ])('renders relative time for %s as %s', (scheduledAt, expected) => {
+    const wrapper = mountCard(makeAppointment({ scheduled_at: scheduledAt }))
+
+    expect(wrapper.text()).toContain(expected)
+  })
+
   it('falls back to Unknown Patient when patient_name is missing', () => {
     const wrapper = mountCard(makeAppointment({ patient_name: null }))
 
     expect(wrapper.text()).toContain('Unknown Patient')
+  })
+
+  it('omits optional appointment details and relative time when they are not applicable', () => {
+    const wrapper = mountCard(makeAppointment({
+      status: 'cancelled',
+      doctor_name: null,
+      reason: null,
+    }))
+
+    expect(wrapper.text()).not.toContain('Dr.')
+    expect(wrapper.text()).not.toContain('Follow-up')
+    expect(wrapper.text()).not.toContain('ago')
+    expect(wrapper.text()).not.toContain('in ')
   })
 
   it('emits click when the card body is selected', async () => {

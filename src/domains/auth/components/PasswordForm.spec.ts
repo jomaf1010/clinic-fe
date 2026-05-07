@@ -13,6 +13,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
+import { HttpError } from '@/lib/http'
 import PasswordForm from './PasswordForm.vue'
 
 // `vi.mock` is hoisted to the top of the file; the spies it references must
@@ -132,5 +133,53 @@ describe('PasswordForm', () => {
     expect(payload.new_password).toBe(btoa('newpass-1234'))
     expect(payload.new_password_confirmation).toBe(btoa('newpass-1234'))
     expect(toastSuccess).toHaveBeenCalledWith('Password changed successfully.')
+  })
+
+  it('surfaces 422 field errors from changePassword', async () => {
+    changePasswordSpy.mockRejectedValueOnce(new HttpError(422, 'Invalid', {
+      message: 'Please review your password.',
+      errors: {
+        current_password: ['Current password is incorrect.'],
+      },
+    }))
+    const wrapper = mountWithDeps(PasswordForm, { global: { stubs: STUBS } })
+
+    await setField(wrapper, 'current-password', 'oldpass1234')
+    await setField(wrapper, 'new-password', 'newpass-1234')
+    await setField(wrapper, 'new-password-confirmation', 'newpass-1234')
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Please review your password.')
+    expect(wrapper.text()).toContain('Current password is incorrect.')
+  })
+
+  it('uses the fallback validation message for 422 responses without a message', async () => {
+    changePasswordSpy.mockRejectedValueOnce(new HttpError(422, 'Invalid', { errors: {} }))
+    const wrapper = mountWithDeps(PasswordForm, { global: { stubs: STUBS } })
+
+    await setField(wrapper, 'current-password', 'oldpass1234')
+    await setField(wrapper, 'new-password', 'newpass-1234')
+    await setField(wrapper, 'new-password-confirmation', 'newpass-1234')
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Validation failed.')
+  })
+
+  it('surfaces a generic message when changePassword fails unexpectedly', async () => {
+    changePasswordSpy.mockRejectedValueOnce(new Error('server unavailable'))
+    const wrapper = mountWithDeps(PasswordForm, { global: { stubs: STUBS } })
+
+    await setField(wrapper, 'current-password', 'oldpass1234')
+    await setField(wrapper, 'new-password', 'newpass-1234')
+    await setField(wrapper, 'new-password-confirmation', 'newpass-1234')
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('An unexpected error occurred. Please try again.')
   })
 })

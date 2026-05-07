@@ -28,4 +28,11 @@ describe('QueueStatusBadge', () => {
     expect(wrapper.text()).toBe(label)
     expect(wrapper.find('span').attributes('class')).toContain(colorClass)
   })
+
+  it('falls back to the raw status for unknown values', () => {
+    const wrapper = mountBadge('deferred' as QueueVisitStatus)
+
+    expect(wrapper.text()).toBe('deferred')
+    expect(wrapper.find('span').attributes('class') ?? '').toBe('')
+  })
 })

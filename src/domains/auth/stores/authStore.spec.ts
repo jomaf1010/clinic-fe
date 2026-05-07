@@ -232,6 +232,75 @@ describe('authStore — login flow', () => {
     expect(store.memberships).toHaveLength(2)
     expect(store.needsClinicSelection).toBe(true)
   })
+
+  it('fetches user without selecting when memberships are inactive', async () => {
+    const loginResp: LoginResponse = {
+      data: { access_token: 'login-tok', token_type: 'Bearer', expires_in: 3600 },
+      meta: {
+        memberships: [makeMembership({ clinic_id: 'c1', status: 'inactive' })],
+      },
+    }
+    const meResp: MeResponse = {
+      data: makeUser({ current_clinic: null }),
+      meta: { memberships: loginResp.meta.memberships },
+    }
+    const api = makeAuthApi({
+      login: vi.fn().mockResolvedValue(loginResp),
+      me: vi.fn().mockResolvedValue(meResp),
+    })
+
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+    await store.login({ email: 't@example.com', password: 'secret' })
+
+    expect(api.selectClinic).not.toHaveBeenCalled()
+    expect(api.me).toHaveBeenCalled()
+    expect(store.needsClinicSelection).toBe(true)
+  })
+
+  it('forwards google auth, google link, confirm link, and signup calls', async () => {
+    const api = makeAuthApi({
+      googleAuth: vi.fn().mockResolvedValue({
+        data: { access_token: 'google-tok', token_type: 'Bearer', expires_in: 3600 },
+        meta: { memberships: [] },
+      }),
+      confirmGoogleLink: vi.fn().mockResolvedValue({
+        data: { access_token: 'linked-tok', token_type: 'Bearer', expires_in: 3600 },
+        meta: { memberships: [] },
+      }),
+    })
+
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+
+    await store.googleLogin('google-credential', true)
+    await store.requestGoogleLink('link-credential')
+    await store.confirmGoogleLink('t@example.com', '123456', false)
+    await store.signup({
+      first_name: 'Dr',
+      last_name: 'Test',
+      email: 't@example.com',
+      password: 'secret-password',
+      recaptcha_token: 'recaptcha-token',
+    })
+
+    expect(api.googleAuth).toHaveBeenCalledWith({ credential: 'google-credential', remember_me: true })
+    expect(api.requestGoogleLink).toHaveBeenCalledWith({ credential: 'link-credential' })
+    expect(api.confirmGoogleLink).toHaveBeenCalledWith({
+      email: 't@example.com',
+      token: '123456',
+      remember_me: false,
+    })
+    expect(api.signup).toHaveBeenCalledWith({
+      first_name: 'Dr',
+      last_name: 'Test',
+      email: 't@example.com',
+      password: 'secret-password',
+      recaptcha_token: 'recaptcha-token',
+    })
+    expect(api.me).toHaveBeenCalledTimes(2)
+    expect(store.token).toBe('linked-tok')
+  })
 })
 
 describe('authStore — selectClinic', () => {
@@ -335,6 +404,53 @@ describe('authStore — permission + feature helpers', () => {
     expect(store.getLimit('team_members')).toEqual({ max: 10, used: 3, remaining: 7 })
     // null max → unlimited (remaining null)
     expect(store.getLimit('pdf_generation_daily')).toEqual({ max: null, used: 5, remaining: null })
+  })
+
+  it('getLimit defaults missing limits and clamps overage remaining at zero', async () => {
+    const meResp: MeResponse = {
+      data: makeUser({
+        current_clinic: makeClinicContext({
+          limits: {
+            team_members: { max: 2, used: 5 },
+          } as ClinicContext['limits'],
+        }),
+      }),
+      meta: { memberships: [makeMembership()] },
+    }
+    const api = makeAuthApi({ me: vi.fn().mockResolvedValue(meResp) })
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+    await store.fetchUser()
+
+    expect(store.getLimit('team_members')).toEqual({ max: 2, used: 5, remaining: 0 })
+    expect(store.getLimit('pdf_generation_daily')).toEqual({ max: null, used: 0, remaining: null })
+  })
+})
+
+describe('authStore — fetchUser side effects', () => {
+  it('applies theme and loads specialty config when present', async () => {
+    const setTheme = vi.fn()
+    const fetchConfig = vi.fn()
+    const api = makeAuthApi({
+      me: vi.fn().mockResolvedValue({
+        data: makeUser({ theme: 'dark', specialty: 'cardiology' }),
+        meta: { memberships: [] },
+      }),
+    })
+    vi.doMock('../api/authApi', () => ({ authApi: api }))
+    vi.doMock('@/lib/http', () => ({ setAuthToken: vi.fn() }))
+    vi.doMock('@/composables/useTheme', () => ({ useTheme: () => ({ setTheme }) }))
+    vi.doMock('@/composables/useCentrifugo', () => ({ useCentrifugo: () => ({ disconnect: vi.fn() }) }))
+    vi.doMock('@/stores/specialtyConfigStore', () => ({
+      useSpecialtyConfigStore: () => ({ fetchConfig }),
+    }))
+    const { useAuthStore } = await import('./authStore')
+    const store = useAuthStore()
+
+    await store.fetchUser()
+
+    expect(setTheme).toHaveBeenCalledWith('dark')
+    expect(fetchConfig).toHaveBeenCalledWith('cardiology')
   })
 })
 
@@ -462,5 +578,29 @@ describe('authStore — logout', () => {
     expect(store.user).toBeNull()
     expect(store.memberships).toEqual([])
     expect(store.isAuthenticated).toBe(false)
+  })
+
+  it('still clears local state when broadcast and indexedDB cleanup are unavailable', async () => {
+    const api = makeAuthApi()
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+
+    store.user = makeUser({ current_clinic: makeClinicContext() })
+    store.memberships = [makeMembership()]
+    store.setToken('tok')
+    vi.stubGlobal('BroadcastChannel', vi.fn(() => {
+      throw new Error('not supported')
+    }))
+    vi.stubGlobal('indexedDB', {
+      deleteDatabase: vi.fn(() => {
+        throw new Error('not supported')
+      }),
+    })
+
+    await store.logout()
+
+    expect(store.token).toBeNull()
+    expect(store.user).toBeNull()
+    expect(store.memberships).toEqual([])
   })
 })
