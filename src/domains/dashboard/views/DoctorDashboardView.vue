@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
 import { RouteNames } from '@/router/routeNames'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { createDebouncedRefresh, shouldRunFallbackRefresh } from '@/composables/realtimeRefresh'
 import { queueApi } from '@/domains/queue/api/queueApi'
 import { toast } from 'vue-sonner'
 
@@ -129,7 +130,7 @@ async function fetchStats(): Promise<void> {
 }
 
 // Real-time updates
-const { subscribe, unsubscribe } = useCentrifugo()
+const { isConnected, subscribe, unsubscribe } = useCentrifugo()
 let pollInterval: ReturnType<typeof setInterval> | undefined
 
 function silentRefresh() {
@@ -137,6 +138,8 @@ function silentRefresh() {
     stats.value = response.data
   }).catch(() => {})
 }
+
+const refreshFromRealtime = createDebouncedRefresh(silentRefresh, 1_000)
 
 onMounted(() => {
   fetchStats()
@@ -146,12 +149,13 @@ onMounted(() => {
   if (clinicId) {
     const queueChannel = `clinic:${clinicId}:queue`
     subscribe(queueChannel, () => {
-      silentRefresh()
+      refreshFromRealtime()
     })
   }
 
-  // Fallback poll every 5 minutes in case Centrifugo disconnects
-  pollInterval = setInterval(silentRefresh, 5 * 60 * 1000)
+  pollInterval = setInterval(() => {
+    if (shouldRunFallbackRefresh(isConnected.value)) silentRefresh()
+  }, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
