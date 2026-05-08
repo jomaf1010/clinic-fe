@@ -15,6 +15,7 @@ import { syncEngine } from '@/lib/sync/SyncEngine'
 
 const isOnline = ref(navigator.onLine)
 const pendingCount = ref(0)
+const failedCount = ref(0)
 
 let listenersInstalled = false
 let refCount = 0
@@ -37,9 +38,13 @@ const unsubStopped = syncEngine.on('queue-stopped', ({ reason, processed }) => {
   }
   void refreshPendingCount()
 })
+const unsubFailed = syncEngine.on('action-failed', ({ reason }) => {
+  toast.error('An offline change needs review', { description: reason })
+  void refreshCounts()
+})
 const unsubDiscarded = syncEngine.on('action-discarded', ({ reason }) => {
-  toast.error('An offline change was dropped', { description: reason })
-  void refreshPendingCount()
+  toast.error('An offline change was dropped after retrying', { description: reason })
+  void refreshCounts()
 })
 
 // The composable unmounts periodically; keep the subscriptions alive for
@@ -47,11 +52,24 @@ const unsubDiscarded = syncEngine.on('action-discarded', ({ reason }) => {
 void unsubSucceeded
 void unsubDrained
 void unsubStopped
+void unsubFailed
 void unsubDiscarded
+
+async function refreshCounts(): Promise<void> {
+  await Promise.all([refreshPendingCount(), refreshFailedCount()])
+}
 
 async function refreshPendingCount(): Promise<void> {
   try {
     pendingCount.value = await syncEngine.pendingCount()
+  } catch {
+    // best-effort
+  }
+}
+
+async function refreshFailedCount(): Promise<void> {
+  try {
+    failedCount.value = await syncEngine.failedCount()
   } catch {
     // best-effort
   }
@@ -82,7 +100,7 @@ export function useOfflineSync() {
   onMounted(() => {
     refCount++
     installListeners()
-    void refreshPendingCount()
+    void refreshCounts()
     // If we mounted in an online state with a backlog, get started.
     if (navigator.onLine) {
       void syncEngine.flush()
@@ -100,7 +118,10 @@ export function useOfflineSync() {
   return {
     isOnline,
     pendingCount,
+    failedCount,
     flushQueue: () => syncEngine.flush(),
     refreshPendingCount,
+    refreshFailedCount,
+    refreshCounts,
   }
 }

@@ -43,12 +43,24 @@ export interface PendingAction {
   nextAttemptAt?: number
   /** Last captured error for diagnostics. Not used by retry logic. */
   lastError?: string
+  /** API response body for failed offline mutation recovery. */
+  lastErrorDetails?: unknown
+}
+
+export interface FailedAction extends Omit<PendingAction, 'id'> {
+  id?: number
+  originalActionId?: number
+  failedAt: number
+  status: number
+  reason: string
+  details?: unknown
 }
 
 class AppDatabase extends Dexie {
   encounters!: Table<CachedEncounter, string>
   labOrders!: Table<CachedLabOrder, string>
   pendingActions!: Table<PendingAction, number>
+  failedActions!: Table<FailedAction, number>
 
   constructor() {
     super('clinicapp-offline')
@@ -68,6 +80,15 @@ class AppDatabase extends Dexie {
       encounters: 'id',
       labOrders: 'encounter_id',
       pendingActions: '++id, createdAt, type, nextAttemptAt',
+    })
+
+    // v3 — retain permanently rejected offline mutations for user recovery
+    // instead of silently deleting clinical edits that the API rejected.
+    this.version(3).stores({
+      encounters: 'id',
+      labOrders: 'encounter_id',
+      pendingActions: '++id, createdAt, type, nextAttemptAt',
+      failedActions: '++id, failedAt, type, status',
     })
   }
 }
