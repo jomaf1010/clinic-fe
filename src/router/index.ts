@@ -5,7 +5,7 @@ declare module 'vue-router' {
     requiresAuth?: boolean
     requiresClinicContext?: boolean
     requiresGuest?: boolean
-    requiredPermission?: string
+    requiredPermission?: string | string[]
     requiredFeature?: string
     usesCustomTopbar?: boolean
     devOnly?: boolean
@@ -16,6 +16,17 @@ import HomeView from '@/views/HomeView.vue'
 import { RouteNames } from './routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { HttpError } from '@/lib/http'
+
+export function canAccessRequiredPermission(
+  requiredPermission: string | string[] | undefined,
+  hasPermission: (permission: string) => boolean,
+): boolean {
+  if (!requiredPermission) return true
+  if (Array.isArray(requiredPermission)) {
+    return requiredPermission.some((permission) => hasPermission(permission))
+  }
+  return hasPermission(requiredPermission)
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -126,6 +137,7 @@ const router = createRouter({
               path: 'templates',
               name: RouteNames.CLINIC_TEMPLATES,
               component: () => import('@/domains/template/views/TemplateListView.vue'),
+              meta: { requiredPermission: 'clinic.manage' },
             },
             {
               path: 'team',
@@ -151,6 +163,7 @@ const router = createRouter({
           path: 'clinic/templates/:category/:variation',
           name: RouteNames.TEMPLATE_EDITOR,
           component: () => import('@/domains/template/views/TemplateEditorView.vue'),
+          meta: { requiredPermission: 'clinic.manage' },
         },
         {
           path: 'schedule',
@@ -173,11 +186,13 @@ const router = createRouter({
           path: 'billing',
           name: RouteNames.BILLING,
           component: () => import('@/domains/billing/views/BillingView.vue'),
+          meta: { requiredPermission: ['billing.view', 'billing.view-own'] },
         },
         {
           path: 'subscription',
           name: RouteNames.SUBSCRIPTION,
           component: () => import('@/domains/subscription/views/SubscriptionView.vue'),
+          meta: { requiredPermission: 'clinic.manage' },
         },
         {
           path: 'account',
@@ -353,7 +368,7 @@ router.beforeEach(async (to) => {
     if (to.meta.requiredFeature && !authStore.hasFeature(to.meta.requiredFeature)) {
       return { name: RouteNames.HOME }
     }
-    if (to.meta.requiredPermission && !authStore.hasPermission(to.meta.requiredPermission)) {
+    if (!canAccessRequiredPermission(to.meta.requiredPermission, authStore.hasPermission)) {
       return { name: RouteNames.HOME }
     }
   }
