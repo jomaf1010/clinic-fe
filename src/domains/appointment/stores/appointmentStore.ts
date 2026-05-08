@@ -5,6 +5,7 @@ import { scheduleApi } from '@/domains/schedule/api/scheduleApi'
 import type {
   AppointmentListFilters,
   AppointmentResponse,
+  CheckInResponse,
   ClinicDoctor,
   CreateAppointmentPayload,
 } from '../types/appointment.types'
@@ -159,11 +160,12 @@ export const useAppointmentStore = defineStore('appointment', () => {
     if (current.value?.id === uuid) current.value = response.data
   }
 
-  async function checkInAppointment(uuid: string): Promise<void> {
+  async function checkInAppointment(uuid: string): Promise<CheckInResponse['data']> {
     const response = await appointmentApi.checkIn(uuid)
     const idx = appointments.value.findIndex((a) => a.id === uuid)
     if (idx !== -1) appointments.value[idx] = response.data.appointment
     if (current.value?.id === uuid) current.value = response.data.appointment
+    return response.data
   }
 
   async function markNoShow(uuid: string): Promise<void> {

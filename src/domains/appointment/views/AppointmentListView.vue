@@ -5,7 +5,6 @@ import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { toast } from 'vue-sonner'
 import { CalendarDate, getLocalTimeZone, today, type DateValue } from '@internationalized/date'
 import { AlertTriangle, CalendarCheck, CalendarIcon, ClipboardPlus, LayoutDashboard, List, LoaderCircle, Plus, UserRound, X } from 'lucide-vue-next'
-import { RouteNames } from '@/router/routeNames'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -36,6 +35,7 @@ import {
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import { useAppointmentStore } from '../stores/appointmentStore'
+import { buildAppointmentTriageRoute } from '../utils/triageRoute'
 import AppointmentBookingWizard from '../components/AppointmentBookingWizard.vue'
 import AppointmentBoard from '../components/AppointmentBoard.vue'
 import AppointmentCalendar from '../components/AppointmentCalendar.vue'
@@ -311,21 +311,20 @@ function refreshVisibleView() {
 const showTriageDialog = ref(false)
 const triagePatientId = ref<string | null>(null)
 const triagePatientName = ref<string | null>(null)
+const triageEncounterId = ref<string | null>(null)
 
 async function handleCheckIn(id: string) {
   try {
-    await store.checkInAppointment(id)
+    const checkInData = await store.checkInAppointment(id)
     toast.success('Patient checked in')
     showDetailSheet.value = false
     refreshVisibleView()
 
-    // Find the appointment to get patient info for triage prompt
-    const appointment = store.appointments.find((a) => a.id === id)
-    if (appointment) {
-      triagePatientId.value = appointment.patient_id
-      triagePatientName.value = appointment.patient_name
-      showTriageDialog.value = true
-    }
+    const appointment = checkInData.appointment
+    triagePatientId.value = appointment.patient_id
+    triagePatientName.value = appointment.patient_name
+    triageEncounterId.value = checkInData.queue_visit.encounter_id
+    showTriageDialog.value = true
   } catch {
     toast.error('Failed to check in')
   }
@@ -334,10 +333,7 @@ async function handleCheckIn(id: string) {
 function goToTriage() {
   if (!triagePatientId.value) return
   showTriageDialog.value = false
-  router.push({
-    name: RouteNames.ENCOUNTER_NEW,
-    params: { patientId: triagePatientId.value },
-  })
+  router.push(buildAppointmentTriageRoute(triagePatientId.value, triageEncounterId.value))
 }
 
 // Cancel confirmation

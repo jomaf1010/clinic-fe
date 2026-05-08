@@ -81,6 +81,7 @@ export interface CheckInResponse {
       id: string
       position: number
       status: string
+      encounter_id: string | null
       [key: string]: unknown
     }
   }
