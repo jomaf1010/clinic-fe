@@ -229,6 +229,36 @@ describe('encounterStore — saveSection offline queueing', () => {
     expect(queueActionMock).not.toHaveBeenCalled()
     expect(store.saveError).toBe('Failed to save. Please try again.')
   })
+
+  it('rolls back optimistic encounter changes and cache writes when an online update is rejected', async () => {
+    const original = makeEncounter({
+      consultation: {
+        id: 'cons-1',
+        type: 'default',
+        triage: {} as never,
+        bmi: null,
+        assessment: { chief_complaint: 'Original complaint' } as never,
+        treatment_plan: {} as never,
+      },
+    })
+    const api = makeApi({
+      update: vi.fn().mockRejectedValue(new Error('validation failed')),
+    })
+    const { useEncounterStore } = await loadStore(api)
+    const store = useEncounterStore()
+    store.current = original
+
+    await store.saveSection({ assessment: { chief_complaint: 'Rejected complaint' } as never })
+
+    expect(store.current?.consultation?.assessment).toEqual({ chief_complaint: 'Original complaint' })
+    expect(cacheEncounterMock).not.toHaveBeenCalledWith(expect.objectContaining({
+      consultation: expect.objectContaining({
+        assessment: expect.objectContaining({ chief_complaint: 'Rejected complaint' }),
+      }),
+    }))
+    expect(queueActionMock).not.toHaveBeenCalled()
+    expect(store.saveError).toBe('Failed to save. Please try again.')
+  })
 })
 
 describe('encounterStore — finalize', () => {

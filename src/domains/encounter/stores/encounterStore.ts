@@ -136,6 +136,8 @@ export const useEncounterStore = defineStore('encounter', () => {
     isSaving.value = true
     saveError.value = null
 
+    const previous = JSON.parse(JSON.stringify(current.value)) as EncounterResponse
+
     // Optimistically update the nested type-specific data
     const updated = { ...current.value }
 
@@ -184,8 +186,6 @@ export const useEncounterStore = defineStore('encounter', () => {
 
     current.value = updated
 
-    await cacheEncounter(updated as unknown as Record<string, unknown>)
-
     try {
       const response = await encounterApi.update(current.value.id, payload)
       current.value = response.data
@@ -200,10 +200,14 @@ export const useEncounterStore = defineStore('encounter', () => {
           body: payload,
           createdAt: Date.now(),
         })
+        await cacheEncounter(updated as unknown as Record<string, unknown>)
         isOfflineCached.value = true
         saveError.value = null
         toast.info('Saved offline — will sync when back online')
       } else {
+        current.value = previous
+        isOfflineCached.value = false
+        await cacheEncounter(previous as unknown as Record<string, unknown>)
         saveError.value = 'Failed to save. Please try again.'
       }
     } finally {
