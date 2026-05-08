@@ -1,21 +1,24 @@
-import type { PendingAction } from '../db'
+import type { FailedAction, PendingAction } from '../db'
 
 /**
  * Decision returned by SyncEngine's per-action runner.
  *
  *   - 'succeeded' → remove from queue, continue
  *   - 'retry' → leave in queue with updated retry metadata, continue
- *   - 'abort' → stop processing entirely (network dropped, rate-limited, etc.)
- *   - 'discard' → remove from queue (permanent 4xx), continue with next
+ *   - 'abort' → stop processing entirely (network dropped, etc.)
+ *   - 'auth' → pause sync until the user re-authenticates
+ *   - 'failed' → move rejected clinical mutation to failedActions, continue
+ *   - 'discard' → remove from queue (retry budget exhausted), continue
  */
-export type ActionOutcome = 'succeeded' | 'retry' | 'abort' | 'discard'
+export type ActionOutcome = 'succeeded' | 'retry' | 'abort' | 'auth' | 'failed' | 'discard'
 
 export interface SyncEventMap {
   'action-succeeded': { action: PendingAction }
   'action-discarded': { action: PendingAction; reason: string }
+  'action-failed': { action: PendingAction; failedAction: FailedAction; reason: string }
   'action-retrying': { action: PendingAction; nextAttemptAt: number }
   'queue-drained': { processed: number }
-  'queue-stopped': { reason: 'offline' | 'error' | 'backoff'; processed: number }
+  'queue-stopped': { reason: 'offline' | 'error' | 'backoff' | 'auth'; processed: number }
   'conflict-detected': { entity: string; id: string; localUpdatedAt: string; remoteUpdatedAt: string }
 }
 

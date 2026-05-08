@@ -21,6 +21,7 @@ interface FakeSyncEngine {
   on: ReturnType<typeof vi.fn>
   flush: ReturnType<typeof vi.fn>
   pendingCount: ReturnType<typeof vi.fn>
+  failedCount: ReturnType<typeof vi.fn>
   /** Internal: dispatch an event manually from the test. */
   __emit: (type: string, payload: unknown) => void
 }
@@ -38,6 +39,7 @@ function makeSyncEngine(): FakeSyncEngine {
     }),
     flush: vi.fn().mockResolvedValue(undefined),
     pendingCount: vi.fn().mockResolvedValue(0),
+    failedCount: vi.fn().mockResolvedValue(0),
     __emit: (type: string, payload: unknown) => {
       for (const cb of handlers.get(type) ?? []) cb(payload)
     },
@@ -83,6 +85,7 @@ describe('useOfflineSync — setup', () => {
         'action-succeeded',
         'queue-drained',
         'queue-stopped',
+        'action-failed',
         'action-discarded',
       ]),
     )
@@ -120,11 +123,20 @@ describe('useOfflineSync — toast side-effects', () => {
     expect(toastMock.success).toHaveBeenCalledWith('Synced 2 offline changes')
   })
 
+  it('action-failed triggers a recovery review toast with the reason', async () => {
+    await loadComposable()
+    syncEngine.__emit('action-failed', { reason: 'HTTP 422: Request failed with status 422' })
+    expect(toastMock.error).toHaveBeenCalledWith(
+      'An offline change needs review',
+      expect.objectContaining({ description: 'HTTP 422: Request failed with status 422' }),
+    )
+  })
+
   it('action-discarded triggers an error toast with the reason', async () => {
     await loadComposable()
     syncEngine.__emit('action-discarded', { reason: 'max retries exceeded' })
     expect(toastMock.error).toHaveBeenCalledWith(
-      'An offline change was dropped',
+      'An offline change was dropped after retrying',
       expect.objectContaining({ description: 'max retries exceeded' }),
     )
   })

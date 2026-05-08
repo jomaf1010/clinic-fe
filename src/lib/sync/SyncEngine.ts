@@ -1,4 +1,4 @@
-import { db, type PendingAction } from '../db'
+import { db, type FailedAction, type PendingAction } from '../db'
 import { http, HttpError } from '../http'
 import type { ActionOutcome, SyncEventHandler, SyncEventMap, SyncEventType } from './types'
 
@@ -73,6 +73,16 @@ class SyncEngineImpl {
         await db.pendingActions.delete(id)
         this.emit('action-succeeded', { action })
         processed++
+      } else if (outcome === 'failed') {
+        const latestAction = await db.pendingActions.get(id)
+        const failedAction = await this.recordFailedAction(latestAction ?? action)
+        await db.pendingActions.delete(id)
+        this.emit('action-failed', {
+          action,
+          failedAction,
+          reason: failedAction.reason,
+        })
+        processed++
       } else if (outcome === 'discard') {
         await db.pendingActions.delete(id)
         this.emit('action-discarded', {
@@ -85,6 +95,9 @@ class SyncEngineImpl {
         // Stop processing so later actions don't starve behind this one's
         // backoff window.
         this.emit('queue-stopped', { reason: 'backoff', processed })
+        return
+      } else if (outcome === 'auth') {
+        this.emit('queue-stopped', { reason: 'auth', processed })
         return
       } else {
         // 'abort' — stop cleanly, don't touch the row.
@@ -116,14 +129,24 @@ class SyncEngineImpl {
       return 'abort'
     }
 
-    // 4xx is a permanent client error — the server said "this request is
-    // invalid". Retrying the same body won't help. Log and discard so the
-    // queue doesn't clog forever.
+    // 401 means the browser/session must re-authenticate before this queued
+    // clinical mutation can be retried. Keep it in pendingActions untouched.
+    if (err.status === 401) {
+      await db.pendingActions.update(action.id as number, {
+        lastError: 'HTTP 401: authentication required',
+      })
+      return 'auth'
+    }
+
+    // 4xx means the server rejected this exact offline mutation. Retrying the
+    // same body will not help, but deleting it would silently lose clinical
+    // data, so move it to failedActions for recovery/review.
     if (err.status >= 400 && err.status < 500) {
       await db.pendingActions.update(action.id as number, {
         lastError: `HTTP ${err.status}: ${err.message}`,
+        lastErrorDetails: err.data,
       })
-      return 'discard'
+      return 'failed'
     }
 
     // 5xx — server is struggling. Schedule exponential backoff.
@@ -150,8 +173,38 @@ class SyncEngineImpl {
     return 'retry'
   }
 
+  private async recordFailedAction(action: PendingAction): Promise<FailedAction> {
+    const failedAction: FailedAction = {
+      type: action.type,
+      url: action.url,
+      method: action.method,
+      body: action.body,
+      createdAt: action.createdAt,
+      attemptCount: action.attemptCount,
+      nextAttemptAt: action.nextAttemptAt,
+      lastError: action.lastError,
+      lastErrorDetails: action.lastErrorDetails,
+      originalActionId: action.id,
+      failedAt: Date.now(),
+      status: this.parseStatus(action.lastError),
+      reason: action.lastError ?? 'HTTP 400: rejected offline mutation',
+      details: action.lastErrorDetails,
+    }
+    const id = await db.failedActions.add(failedAction)
+    return { ...failedAction, id }
+  }
+
+  private parseStatus(error?: string): number {
+    const match = error?.match(/^HTTP (\d{3})/)
+    return match ? Number(match[1]) : 400
+  }
+
   async pendingCount(): Promise<number> {
     return db.pendingActions.count()
+  }
+
+  async failedCount(): Promise<number> {
+    return db.failedActions.count()
   }
 
   on<T extends SyncEventType>(event: T, handler: SyncEventHandler<T>): () => void {

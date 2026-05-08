@@ -1,6 +1,6 @@
-import { db, type PendingAction } from './db'
+import { db, type FailedAction, type PendingAction } from './db'
 
-export type { PendingAction }
+export type { FailedAction, PendingAction }
 
 // --- Encounters ---
 
@@ -44,4 +44,23 @@ export async function removePendingAction(key: number): Promise<void> {
 
 export async function getPendingActionCount(): Promise<number> {
   return db.pendingActions.count()
+}
+
+// --- Failed Actions (offline mutation recovery queue) ---
+
+export async function recordFailedAction(action: FailedAction): Promise<number> {
+  const { id: _ignored, ...rest } = action
+  return db.failedActions.add(rest as FailedAction)
+}
+
+export async function getFailedActions(): Promise<FailedAction[]> {
+  return db.failedActions.orderBy('failedAt').toArray()
+}
+
+export async function getFailedActionCount(): Promise<number> {
+  return db.failedActions.count()
+}
+
+export async function removeFailedAction(key: number): Promise<void> {
+  await db.failedActions.delete(key)
 }
