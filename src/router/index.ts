@@ -326,8 +326,14 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // Authenticated on auth pages → redirect based on state
-  if ((to.name === RouteNames.LOGIN || to.name === RouteNames.SIGNUP || to.name === RouteNames.VERIFY_EMAIL_NOTICE || to.name === RouteNames.VERIFY_EMAIL) && authStore.isAuthenticated) {
+  const isAuthPage =
+    to.name === RouteNames.LOGIN ||
+    to.name === RouteNames.SIGNUP ||
+    to.name === RouteNames.VERIFY_EMAIL_NOTICE ||
+    to.name === RouteNames.VERIFY_EMAIL
+
+  // Authenticated on guest-only pages → redirect based on state
+  if ((to.meta.requiresGuest || isAuthPage) && authStore.isAuthenticated) {
     if (authStore.needsOnboarding) {
       return { name: RouteNames.ONBOARDING_CREATE_CLINIC }
     }

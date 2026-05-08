@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 import router, { canAccessRequiredPermission } from './index'
 import { RouteNames } from './routeNames'
 
@@ -30,5 +31,32 @@ describe('sensitive route guards', () => {
   it('does not expose the retired odontogram playground route', () => {
     expect(router.getRoutes().some((route) => route.path === '/odontogram')).toBe(false)
     expect(router.getRoutes().some((route) => route.name === 'odontogram-playground')).toBe(false)
+  })
+
+  it('redirects authenticated users away from every requiresGuest route', async () => {
+    const authStore = useAuthStore()
+    authStore.setToken('test-token')
+    authStore.user = {
+      id: 'user-1',
+      name: 'Doctor Test',
+      email: 'doctor@example.test',
+      email_verified_at: '2026-05-08T00:00:00Z',
+      onboarding_completed: true,
+      current_clinic: {
+        id: 'clinic-1',
+        name: 'Test Clinic',
+        role: 'owner',
+        permissions: [],
+        features: [],
+        plan: 'pro',
+      },
+    } as typeof authStore.user
+    authStore.memberships = [{ clinic_id: 'clinic-1', status: 'active' }] as typeof authStore.memberships
+
+    for (const routeName of [RouteNames.FORGOT_PASSWORD, RouteNames.RESET_PASSWORD]) {
+      await router.push({ name: routeName })
+
+      expect(router.currentRoute.value.name).toBe(RouteNames.HOME)
+    }
   })
 })
