@@ -100,6 +100,9 @@ export default defineConfig({
   define: {
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
+  build: {
+    sourcemap: false,
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,

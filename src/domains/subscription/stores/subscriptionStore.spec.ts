@@ -49,7 +49,7 @@ function makeSubscriptionApi(overrides: Partial<MockSubscriptionApi> = {}): Mock
       meta: { current_page: 2, last_page: 4, per_page: 10, total: 31 },
     }),
     createCheckout: vi.fn().mockResolvedValue({
-      data: { checkout_url: 'https://checkout.example/session', payment_id: 'payment-1' },
+      data: { checkout_url: 'https://checkout.paymongo.com/session', payment_id: 'payment-1' },
     }),
     cancel: vi.fn().mockResolvedValue({ message: 'Subscription will cancel at period end.' }),
     reactivate: vi.fn().mockResolvedValue({ message: 'Subscription reactivated.' }),
@@ -121,7 +121,7 @@ describe('subscriptionStore - actions', () => {
     await store.initiateCheckout()
 
     expect(subscriptionApi.createCheckout).toHaveBeenCalledOnce()
-    expect(window.location.href).toBe('https://checkout.example/session')
+    expect(window.location.href).toBe('https://checkout.paymongo.com/session')
     expect(store.checkoutLoading).toBe(false)
   })
 
