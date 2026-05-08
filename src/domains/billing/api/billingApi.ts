@@ -45,8 +45,8 @@ export const billingApi = {
     return http.post<InvoiceDetailResponse>(`/invoices/${id}/request-medcert`)
   },
 
-  forEncounter(encounterId: string): Promise<InvoiceDetailResponse> {
-    return http.get<InvoiceDetailResponse>(`/encounters/${encounterId}/invoice`)
+  forConsultation(consultationId: string): Promise<InvoiceDetailResponse> {
+    return http.get<InvoiceDetailResponse>(`/consultations/${consultationId}/invoice`)
   },
 
   summary(): Promise<BillingSummaryResponse> {

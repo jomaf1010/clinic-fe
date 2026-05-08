@@ -3,7 +3,7 @@
  *
  * Coverage focus per Phase 3 plan:
  *   - Invoice fetch + pagination (page/total/last_page wiring).
- *   - Single-invoice fetch + per-encounter fetch fallback.
+ *   - Single-invoice fetch + per-consultation fetch fallback.
  *   - createInvoice / updateInvoice / recordPayment / voidInvoice — verify
  *     state mutation, list update, isSaving lifecycle.
  *   - Summary fetch.
@@ -19,7 +19,7 @@ interface MockBillingApi {
   recordPayment: ReturnType<typeof vi.fn>
   void: ReturnType<typeof vi.fn>
   requestMedCert: ReturnType<typeof vi.fn>
-  forEncounter: ReturnType<typeof vi.fn>
+  forConsultation: ReturnType<typeof vi.fn>
   summary: ReturnType<typeof vi.fn>
 }
 
@@ -71,7 +71,7 @@ function makeApi(overrides: Partial<MockBillingApi> = {}): MockBillingApi {
     recordPayment: vi.fn().mockResolvedValue({ data: makeInvoice() }),
     void: vi.fn().mockResolvedValue({ data: makeInvoice() }),
     requestMedCert: vi.fn().mockResolvedValue({ data: makeInvoice() }),
-    forEncounter: vi.fn().mockResolvedValue({ data: makeInvoice() }),
+    forConsultation: vi.fn().mockResolvedValue({ data: makeInvoice() }),
     summary: vi.fn().mockResolvedValue({
       data: { total_revenue_this_month: 0, outstanding_balance: 0, invoices_today: 0, paid_today: 0 },
     }),
@@ -137,7 +137,7 @@ describe('billingStore — fetchInvoices', () => {
   })
 })
 
-describe('billingStore — fetchInvoice / fetchForEncounter', () => {
+describe('billingStore — fetchInvoice / fetchForConsultation', () => {
   it('sets currentInvoice on success', async () => {
     const api = makeApi({
       get: vi.fn().mockResolvedValue({ data: makeInvoice({ id: 'inv-X' }) }),
@@ -149,26 +149,26 @@ describe('billingStore — fetchInvoice / fetchForEncounter', () => {
     expect(store.currentInvoice?.id).toBe('inv-X')
   })
 
-  it('fetchForEncounter returns invoice on success', async () => {
+  it('fetchForConsultation returns invoice on success', async () => {
     const api = makeApi({
-      forEncounter: vi.fn().mockResolvedValue({ data: makeInvoice({ id: 'inv-E', encounter_id: 'enc-7' }) }),
+      forConsultation: vi.fn().mockResolvedValue({ data: makeInvoice({ id: 'inv-C', encounter_id: 'consultation-7' }) }),
     })
     const { useBillingStore } = await loadStore(api)
     const store = useBillingStore()
 
-    const result = await store.fetchForEncounter('enc-7')
-    expect(result?.id).toBe('inv-E')
-    expect(store.currentInvoice?.id).toBe('inv-E')
+    const result = await store.fetchForConsultation('consultation-7')
+    expect(result?.id).toBe('inv-C')
+    expect(store.currentInvoice?.id).toBe('inv-C')
   })
 
-  it('fetchForEncounter returns null and clears currentInvoice when API rejects', async () => {
+  it('fetchForConsultation returns null and clears currentInvoice when API rejects', async () => {
     const api = makeApi({
-      forEncounter: vi.fn().mockRejectedValue(new Error('not found')),
+      forConsultation: vi.fn().mockRejectedValue(new Error('not found')),
     })
     const { useBillingStore } = await loadStore(api)
     const store = useBillingStore()
 
-    const result = await store.fetchForEncounter('enc-missing')
+    const result = await store.fetchForConsultation('consultation-missing')
     expect(result).toBeNull()
     expect(store.currentInvoice).toBeNull()
   })

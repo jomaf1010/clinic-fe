@@ -39,17 +39,17 @@ describe('billingApi', () => {
     expect(http.get).toHaveBeenNthCalledWith(2, '/invoices?page=2&per_page=25&status=paid&search=Juan+Dela+Cruz')
   })
 
-  it('loads invoice detail, encounter invoice, summary, and pdf metadata', async () => {
+  it('loads invoice detail, consultation invoice, summary, and pdf metadata', async () => {
     const http = makeHttp()
     const { billingApi } = await loadApi(http)
 
     await billingApi.get('invoice-1')
-    await billingApi.forEncounter('encounter-1')
+    await billingApi.forConsultation('consultation-1')
     await billingApi.summary()
     await billingApi.getPdf('invoice-1')
 
     expect(http.get).toHaveBeenNthCalledWith(1, '/invoices/invoice-1')
-    expect(http.get).toHaveBeenNthCalledWith(2, '/encounters/encounter-1/invoice')
+    expect(http.get).toHaveBeenNthCalledWith(2, '/consultations/consultation-1/invoice')
     expect(http.get).toHaveBeenNthCalledWith(3, '/billing/summary')
     expect(http.get).toHaveBeenNthCalledWith(4, '/invoices/invoice-1/pdf')
   })
