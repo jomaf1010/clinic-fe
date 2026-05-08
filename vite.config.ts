@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { runtimeCaching } from './src/pwa/workboxRuntimeCaching'
 
 let commitHash = 'dev'
 try {
@@ -47,39 +48,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        // Don't precache the API — runtime caching handles it.
         navigateFallbackDenylist: [/^\/api\//],
         navigateFallback: '/index.html',
-        runtimeCaching: [
-          {
-            // Read-only catalogs — ICD-10 search, system medicines, specialty config.
-            // Stable, cacheable, fine to serve stale while revalidating.
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith('/api/icd10') ||
-              url.pathname.startsWith('/api/system-medicines') ||
-              url.pathname.startsWith('/api/specialties'),
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'mediflow-catalogs',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // GET requests for clinic data. Network-first so users see fresh
-            // data when online; cache is the offline fallback. Phase 2's
-            // SyncEngine will own richer per-repository caching.
-            urlPattern: ({ url, request }) =>
-              url.pathname.startsWith('/api/') && request.method === 'GET',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'mediflow-api',
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // Never runtime-cache authenticated clinic/PHI API data.
+        // Keep only explicitly safe catalog endpoints cacheable.
+        runtimeCaching,
       },
       devOptions: {
         // Keep the virtual:pwa-register module resolvable during dev so

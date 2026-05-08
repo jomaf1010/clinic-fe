@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { clearAppCaches } from '@/lib/appCaches'
 import { setAuthToken } from '@/lib/http'
 import { authApi } from '../api/authApi'
+
 import type { ClinicContext, GoogleAuthResponse, LoginCredentials, LoginResponse, Membership, SignupCredentials, User } from '../types/auth.types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -87,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function selectClinic(clinicId: string): Promise<void> {
     const response = await authApi.selectClinic(clinicId)
     setToken(response.data.access_token)
+    await clearAppCaches()
     await fetchUser()
   }
 
@@ -142,6 +145,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // Not supported or already absent — fine
     }
+    await clearAppCaches()
     token.value = null
     user.value = null
     memberships.value = []
