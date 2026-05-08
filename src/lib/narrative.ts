@@ -65,6 +65,21 @@ function humanizeFrequency(freq: string): string {
   return FREQUENCY_HUMAN[freq] ?? freq.toLowerCase()
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function userText(value: string): string {
+  return escapeHtml(value)
+}
+
+function emphasizedUserText(value: string): string {
+  return `<strong>${userText(value)}</strong>`
+}
+
 function joinList(items: string[]): string {
   if (items.length === 1) return items[0]!
   return items.slice(0, -1).join(', ') + ` and ${items[items.length - 1]}`
@@ -72,10 +87,10 @@ function joinList(items: string[]): string {
 
 function buildRxNarrative(items: { drug_name: string; dose: string; frequency: string; duration: string }[]): string {
   const parts = items.map((item) => {
-    let text = `<strong>${item.drug_name}</strong>`
-    if (item.dose) text += ` ${item.dose}`
+    let text = emphasizedUserText(item.drug_name)
+    if (item.dose) text += ` ${userText(item.dose)}`
     text += `, ${humanizeFrequency(item.frequency)}`
-    if (item.duration) text += ` for ${item.duration}`
+    if (item.duration) text += ` for ${userText(item.duration)}`
     return text
   })
   return joinList(parts)
@@ -102,13 +117,13 @@ export function buildNarrative(input: NarrativeInput): string {
   // Complaint
   if (input.complaint) {
     const fn = complaintPhrases[stableIndex(id, complaintPhrases.length)]!
-    parts.push(fn(input.complaint.toLowerCase()))
+    parts.push(fn(userText(input.complaint.toLowerCase())))
   }
 
   // Diagnoses
   const diagnoses = (input.diagnoses ?? []).filter(Boolean)
   if (diagnoses.length) {
-    const joined = joinList(diagnoses.map(d => `<strong>${d}</strong>`))
+    const joined = joinList(diagnoses.map(d => emphasizedUserText(d)))
     const fn = diagnosisPhrases[stableIndex(id + 'd', diagnosisPhrases.length)]!
     parts.push(fn(joined))
   }
@@ -116,7 +131,7 @@ export function buildNarrative(input: NarrativeInput): string {
   // Advice
   if (input.advice) {
     const fn = advicePhrases[stableIndex(id + 'a', advicePhrases.length)]!
-    parts.push(fn(input.advice.toLowerCase()))
+    parts.push(fn(userText(input.advice.toLowerCase())))
   }
 
   // Prescription
