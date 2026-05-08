@@ -280,7 +280,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/queue-display/:token',
+      path: '/queue-display/:token?',
       name: RouteNames.QUEUE_DISPLAY,
       component: () => import('@/domains/queue/views/QueueDisplayView.vue'),
       meta: { requiresAuth: false },
