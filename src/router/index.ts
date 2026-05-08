@@ -285,12 +285,6 @@ const router = createRouter({
       component: () => import('@/domains/queue/views/QueueDisplayView.vue'),
       meta: { requiresAuth: false },
     },
-    {
-      path: '/odontogram',
-      name: RouteNames.ODONTOGRAM_PLAYGROUND,
-      component: () => import('@/domains/dental/views/OdontogramPlaygroundView.vue'),
-      meta: { requiresAuth: false },
-    },
   ],
 })
 
