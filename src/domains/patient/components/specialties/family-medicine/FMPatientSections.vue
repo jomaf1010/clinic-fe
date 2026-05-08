@@ -17,10 +17,6 @@ import {
   TrendingUp,
   FileText,
 } from 'lucide-vue-next'
-import { use } from 'echarts/core'
-import { LineChart } from 'echarts/charts'
-import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
 import { Button } from '@/components/ui/button'
 import MFDatePicker from '@/components/shared/MFDatePicker.vue'
 import PatientSectionWidget from '../PatientSectionWidget.vue'
@@ -58,9 +54,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { usePatientDetailStore } from '@/stores/patientDetailStore'
 import type { LifestyleData } from '@/domains/consultation/types/consultation.types'
 import type { FamilyHistoryEntry, FamilyHistoryCondition, StoreMedicationPayload, StorePreventiveCarePayload } from '@/domains/patient/api/patientApi'
-import { classificationLabel, classificationColor } from '@/domains/patient/utils/chronicTrendsLabels'
-
-use([LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
+import { classificationLabel } from '@/domains/patient/utils/chronicTrendsLabels'
 
 const pdStore = usePatientDetailStore()
 
@@ -521,7 +515,6 @@ function preventiveStatusClass(status: 'completed' | 'due' | 'overdue' | 'declin
 // ── Patient Trends ────────────────────────────────────────────────────────
 const showTrendsModal = ref(false)
 const trendsData = computed(() => pdStore.chronicTrends)
-const activeTrendTab = ref<'bp' | 'blood_sugar' | 'weight' | 'bmi'>('bp')
 
 const trendsWidgetDetail = computed(() => {
   if (!trendsData.value) return 'No data'
@@ -530,128 +523,6 @@ const trendsWidgetDetail = computed(() => {
   return 'Vitals over time'
 })
 
-// @ts-expect-error TS6133: kept until the trends widget is wired into the FM section template
-const trendsChartOption = computed(() => {
-  const tab = activeTrendTab.value
-  const data = trendsData.value
-  if (!data) return {}
-
-  if (tab === 'bp') {
-    const points = data.bp ?? []
-    return {
-      animation: true,
-      animationDuration: 300,
-      grid: { top: 16, right: 24, bottom: 40, left: 52 },
-      tooltip: {
-        trigger: 'axis',
-        formatter: (params: { dataIndex: number }[]) => {
-          const p = params[0]
-          if (!p) return ''
-          const pt = points[p.dataIndex]
-          if (!pt) return ''
-          const date = new Date(pt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          return `<div style="font-size:12px;">
-            <b>${date}</b><br/>
-            ${pt.systolic}/${pt.diastolic} mmHg
-            ${pt.classification ? `<br/><span style="color:${classificationColor(pt.classification)}">${classificationLabel(pt.classification)}</span>` : ''}
-          </div>`
-        },
-      },
-      xAxis: {
-        type: 'category',
-        data: points.map(p => {
-          const d = new Date(p.date)
-          return `${d.getMonth() + 1}/${d.getDate()}`
-        }),
-        axisLabel: { fontSize: 11 },
-        axisLine: { lineStyle: { color: 'hsl(var(--border))' } },
-        splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        name: 'mmHg',
-        nameLocation: 'middle',
-        nameGap: 40,
-        axisLabel: { fontSize: 11 },
-        axisLine: { lineStyle: { color: 'hsl(var(--border))' } },
-        splitLine: { lineStyle: { color: 'hsl(var(--border))', opacity: 0.15, type: 'dotted' } },
-      },
-      series: [
-        {
-          name: 'Systolic',
-          type: 'line',
-          data: points.map(p => p.systolic),
-          lineStyle: { color: '#ef4444', width: 2 },
-          itemStyle: { color: '#ef4444' },
-          symbolSize: 6,
-        },
-        {
-          name: 'Diastolic',
-          type: 'line',
-          data: points.map(p => p.diastolic),
-          lineStyle: { color: '#3b82f6', width: 2 },
-          itemStyle: { color: '#3b82f6' },
-          symbolSize: 6,
-        },
-      ],
-    }
-  }
-
-  const points = (tab === 'blood_sugar' ? data.blood_sugar : tab === 'weight' ? data.weight : data.bmi) ?? []
-  const unit = tab === 'blood_sugar' ? 'mg/dL' : tab === 'weight' ? 'kg' : ''
-  const color = '#00B2B2'
-
-  return {
-    animation: true,
-    animationDuration: 300,
-    grid: { top: 16, right: 24, bottom: 40, left: 52 },
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: { dataIndex: number }[]) => {
-        const p = params[0]
-        if (!p) return ''
-        const pt = points[p.dataIndex]
-        if (!pt) return ''
-        const date = new Date(pt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        return `<div style="font-size:12px;">
-          <b>${date}</b><br/>
-          ${pt.value} ${unit}
-          ${pt.classification ? `<br/><span style="color:${classificationColor(pt.classification)}">${classificationLabel(pt.classification)}</span>` : ''}
-        </div>`
-      },
-    },
-    xAxis: {
-      type: 'category',
-      data: points.map(p => {
-        const d = new Date(p.date)
-        return `${d.getMonth() + 1}/${d.getDate()}`
-      }),
-      axisLabel: { fontSize: 11 },
-      axisLine: { lineStyle: { color: 'hsl(var(--border))' } },
-      splitLine: { show: false },
-    },
-    yAxis: {
-      type: 'value',
-      name: unit,
-      nameLocation: 'middle',
-      nameGap: 40,
-      axisLabel: { fontSize: 11 },
-      axisLine: { lineStyle: { color: 'hsl(var(--border))' } },
-      splitLine: { lineStyle: { color: 'hsl(var(--border))', opacity: 0.15, type: 'dotted' } },
-    },
-    series: [
-      {
-        name: tab === 'blood_sugar' ? 'Blood Sugar' : tab === 'weight' ? 'Weight' : 'BMI',
-        type: 'line',
-        data: points.map(p => p.value),
-        lineStyle: { color, width: 2 },
-        itemStyle: { color },
-        areaStyle: { color, opacity: 0.08 },
-        symbolSize: 6,
-      },
-    ],
-  }
-})
 
 // ── Clinical Narrative Summary ────────────────────────────────────────────
 const narrativeProblems = computed(() => pdStore.problems)
