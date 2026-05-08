@@ -6,6 +6,7 @@ import type { PublicationContext, SubscriptionTokenContext } from 'centrifuge'
 import { Clock, Users, Stethoscope, WifiOff } from 'lucide-vue-next'
 import { queueApi } from '@/domains/queue/api/queueApi'
 import type { QueueVisitResponse } from '@/domains/queue/types/queue.types'
+import { readQueueDisplayToken } from '@/domains/queue/utils/displayTokenLaunch'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,7 +24,7 @@ interface RealtimeEvent {
 // ---------------------------------------------------------------------------
 
 const route = useRoute()
-const token = route.params.token as string
+const token = readQueueDisplayToken(route.params.token)
 
 const clinicName = ref('')
 const visits = ref<QueueVisitResponse[]>([])
@@ -106,6 +107,7 @@ let latestConnectionToken = ''
 let latestSubscriptionToken = ''
 
 async function fetchFreshTokens(): Promise<void> {
+  if (!token) throw new Error('INVALID_TOKEN')
   const tokens = await queueApi.refreshDisplayTokens(token)
   latestConnectionToken = tokens.connection_token
   latestSubscriptionToken = tokens.subscription_token
@@ -132,6 +134,7 @@ function clearTokenRefreshTimer(): void {
 }
 
 function startPollingFallback(): void {
+  if (!token) return
   if (pollTimer !== null) return
   pollTimer = setInterval(async () => {
     try {
@@ -239,13 +242,19 @@ async function bootstrap(): Promise<void> {
   isLoading.value = true
   displayError.value = null
 
+  if (!token) {
+    isLoading.value = false
+    displayError.value = 'INVALID_TOKEN'
+    return
+  }
+
   try {
     const data = await queueApi.getDisplay(token)
     clinicName.value = data.clinic_name
     visits.value = data.visits
     isLoading.value = false
 
-    // Remove token from URL so it doesn't linger in browser history or referrer headers
+    // Remove legacy path tokens from the URL so they don't linger in browser history or referrer headers
     window.history.replaceState(null, '', '/queue-display')
 
     initCentrifuge(

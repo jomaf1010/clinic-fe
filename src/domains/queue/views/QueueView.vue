@@ -48,6 +48,7 @@ import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useQueueStore } from '../stores/queueStore'
 import { queueApi } from '../api/queueApi'
 import type { QueueDisplayTokenStatus } from '../types/queue.types'
+import { buildQueueDisplayUrl, storeQueueDisplayToken } from '../utils/displayTokenLaunch'
 import QueueCard from '../components/QueueCard.vue'
 import QueueKanban from '../components/QueueKanban.vue'
 import WalkInDialog from '../components/WalkInDialog.vue'
@@ -181,7 +182,7 @@ async function confirmCancel() {
 
 const displayUrl = computed(() => {
   if (!displayToken.value.token) return null
-  return `${window.location.origin}/queue-display/${displayToken.value.token}`
+  return buildQueueDisplayUrl(window.location.origin, displayToken.value.token)
 })
 
 async function loadDisplayToken() {
@@ -223,12 +224,13 @@ async function revokeDisplayToken() {
 function copyDisplayUrl() {
   if (displayUrl.value) {
     navigator.clipboard.writeText(displayUrl.value)
-    toast.success('Link copied to clipboard')
+    toast.success('Display URL copied without access token')
   }
 }
 
 function openDisplayInNewTab() {
-  if (displayUrl.value) {
+  if (displayUrl.value && displayToken.value.token) {
+    storeQueueDisplayToken(displayToken.value.token)
     window.open(displayUrl.value, '_blank')
   }
 }
@@ -320,6 +322,9 @@ onUnmounted(() => {
                   <div class="rounded-md border bg-muted/50 p-2">
                     <p class="break-all text-xs font-mono text-muted-foreground">
                       {{ displayUrl }}
+                    </p>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                      Open from this browser to keep the access token out of the URL and clipboard.
                     </p>
                   </div>
                   <div class="flex gap-2">
