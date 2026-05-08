@@ -26,4 +26,9 @@ describe('sensitive route guards', () => {
     expect(metaFor(RouteNames.CLINIC_TEMPLATES).requiredPermission).toBe('clinic.manage')
     expect(metaFor(RouteNames.TEMPLATE_EDITOR).requiredPermission).toBe('clinic.manage')
   })
+
+  it('does not expose the retired odontogram playground route', () => {
+    expect(router.getRoutes().some((route) => route.path === '/odontogram')).toBe(false)
+    expect(router.getRoutes().some((route) => route.name === 'odontogram-playground')).toBe(false)
+  })
 })
