@@ -92,4 +92,27 @@ describe('UpgradePrompt', () => {
     expect(pushSpy).toHaveBeenCalledOnce()
     expect(pushSpy.mock.calls[0]?.[0]).toMatchObject({ name: expect.any(String) })
   })
+
+  it('clicking Maybe Later in dialog mode closes the prompt', async () => {
+    const wrapper = mount({ open: true })
+    const closeBtn = wrapper.findAll('.btn').find((b) => b.text().includes('Maybe Later'))
+    expect(closeBtn).toBeDefined()
+
+    await closeBtn!.trigger('click')
+
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+  })
+
+  it('clicking Upgrade in dialog mode closes and navigates', async () => {
+    pushSpy.mockClear()
+    const wrapper = mount({ open: true })
+    const upgradeBtn = wrapper.findAll('.btn').find((b) => b.text().trim() === 'Upgrade')
+    expect(upgradeBtn).toBeDefined()
+
+    await upgradeBtn!.trigger('click')
+
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+    expect(pushSpy).toHaveBeenCalledOnce()
+    expect(pushSpy.mock.calls[0]?.[0]).toMatchObject({ name: expect.any(String) })
+  })
 })

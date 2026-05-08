@@ -189,6 +189,40 @@ describe('EditPatientDialog', () => {
     expect(payload.note).toBeNull()
   })
 
+  it('submits edited demographic and optional fields', async () => {
+    const wrapper = mount()
+    await flushPromises()
+
+    await wrapper.find('.dob-picker').setValue('1991-02-03')
+    wrapper.findAllComponents({ name: 'Select' })[0].vm.$emit('update:modelValue', 'female')
+    wrapper.findAllComponents({ name: 'Select' })[1].vm.$emit('update:modelValue', 'O+')
+    await wrapper.find('#edit_email').setValue('updated@example.com')
+    await wrapper.find('#edit_note').setValue('Updated note')
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(updatePatientSpy).toHaveBeenCalledOnce()
+    const payload = updatePatientSpy.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(payload.date_of_birth).toBe('1991-02-03')
+    expect(payload.sex).toBe('female')
+    expect(payload.blood_type).toBe('O+')
+    expect(payload.email).toBe('updated@example.com')
+    expect(payload.note).toBe('Updated note')
+  })
+
+  it('emits close when cancel is clicked', async () => {
+    const wrapper = mount()
+    await flushPromises()
+
+    const cancelButton = wrapper.findAll('button').find((button) => button.text().includes('Cancel'))
+    expect(cancelButton).toBeDefined()
+    await cancelButton!.trigger('click')
+
+    expect(wrapper.emitted('update:open')).toContainEqual([false])
+  })
+
   it('shows a general error when the patient name is incomplete', async () => {
     const wrapper = mount()
     await flushPromises()
