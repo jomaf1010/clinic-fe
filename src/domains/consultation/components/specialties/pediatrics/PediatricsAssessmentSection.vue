@@ -247,7 +247,5 @@ function emitSave() {
         Type to search or press Enter to add a custom diagnosis
       </p>
     </div>
-
-    <!-- TODO: Developmental screening section (ASQ-3, M-CHAT) -->
   </div>
 </template>

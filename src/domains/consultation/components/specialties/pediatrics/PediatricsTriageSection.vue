@@ -164,8 +164,5 @@ function emitSave() {
         @blur="onBlur"
       />
     </div>
-
-    <!-- TODO: Growth chart section (plot weight/height/head-circumference against WHO growth charts) -->
-    <!-- TODO: Developmental screening section (ASQ-3, M-CHAT) -->
   </div>
 </template>
