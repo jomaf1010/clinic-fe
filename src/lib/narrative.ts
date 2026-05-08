@@ -62,7 +62,7 @@ const prescriptionIntroPhrases = [
 // -- Helpers ------------------------------------------------------------
 
 function humanizeFrequency(freq: string): string {
-  return FREQUENCY_HUMAN[freq] ?? freq.toLowerCase()
+  return FREQUENCY_HUMAN[freq] ?? userText(freq.toLowerCase())
 }
 
 function escapeHtml(value: string): string {
@@ -73,11 +73,17 @@ function escapeHtml(value: string): string {
 }
 
 function userText(value: string): string {
-  return escapeHtml(value)
+  const textOnly = DOMPurify
+    .sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+    .replace(/<[^>]*>/g, '')
+    .trim()
+
+  return escapeHtml(textOnly)
 }
 
 function emphasizedUserText(value: string): string {
-  return `<strong>${userText(value)}</strong>`
+  const text = userText(value)
+  return text ? `<strong>${text}</strong>` : ''
 }
 
 function joinList(items: string[]): string {
@@ -88,12 +94,13 @@ function joinList(items: string[]): string {
 function buildRxNarrative(items: { drug_name: string; dose: string; frequency: string; duration: string }[]): string {
   const parts = items.map((item) => {
     let text = emphasizedUserText(item.drug_name)
+    if (!text) return ''
     if (item.dose) text += ` ${userText(item.dose)}`
     text += `, ${humanizeFrequency(item.frequency)}`
     if (item.duration) text += ` for ${userText(item.duration)}`
     return text
-  })
-  return joinList(parts)
+  }).filter(Boolean)
+  return parts.length ? joinList(parts) : ''
 }
 
 // -- Main builder -------------------------------------------------------
@@ -116,22 +123,24 @@ export function buildNarrative(input: NarrativeInput): string {
 
   // Complaint
   if (input.complaint) {
+    const complaint = userText(input.complaint.toLowerCase())
     const fn = complaintPhrases[stableIndex(id, complaintPhrases.length)]!
-    parts.push(fn(userText(input.complaint.toLowerCase())))
+    if (complaint) parts.push(fn(complaint))
   }
 
   // Diagnoses
-  const diagnoses = (input.diagnoses ?? []).filter(Boolean)
+  const diagnoses = (input.diagnoses ?? []).map(d => emphasizedUserText(d)).filter(Boolean)
   if (diagnoses.length) {
-    const joined = joinList(diagnoses.map(d => emphasizedUserText(d)))
+    const joined = joinList(diagnoses)
     const fn = diagnosisPhrases[stableIndex(id + 'd', diagnosisPhrases.length)]!
     parts.push(fn(joined))
   }
 
   // Advice
   if (input.advice) {
+    const advice = userText(input.advice.toLowerCase())
     const fn = advicePhrases[stableIndex(id + 'a', advicePhrases.length)]!
-    parts.push(fn(userText(input.advice.toLowerCase())))
+    if (advice) parts.push(fn(advice))
   }
 
   // Prescription
@@ -139,7 +148,7 @@ export function buildNarrative(input: NarrativeInput): string {
   if (rxItems.length) {
     const rxText = buildRxNarrative(rxItems)
     const fn = prescriptionIntroPhrases[stableIndex(id + 'rx', prescriptionIntroPhrases.length)]!
-    parts.push(fn(rxText))
+    if (rxText) parts.push(fn(rxText))
   }
 
   if (!parts.length) return ''
