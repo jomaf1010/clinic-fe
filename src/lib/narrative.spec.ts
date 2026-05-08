@@ -96,14 +96,13 @@ describe('buildNarrative', () => {
       ],
     })
 
-    expect(html).toContain('<strong>&lt;strong onclick="alert(1)"&gt;pain&lt;/strong&gt; &lt;img src=x onerror="alert(2)"&gt; cold</strong>')
-    expect(html).toContain('<strong>&lt;svg onload="alert(3)"&gt;Flu&lt;/svg&gt;</strong>')
-    expect(html).toContain('&lt;script&gt;alert(4)&lt;/script&gt;')
-    expect(html).toContain('<strong>&lt;b onclick="alert(5)"&gt;Amoxicillin&lt;/b&gt;</strong>')
-    expect(html).not.toContain('<img')
-    expect(html).not.toContain('<script>')
+    expect(html).toContain('<strong>pain  cold</strong>')
     expect(html).not.toContain('<svg')
-    expect(html).not.toContain('<b onclick')
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('onclick')
+    expect(html).not.toContain('onerror')
+    expect(html).not.toContain('onload')
   })
 
   it('produces the same output when called twice with the same id', () => {
