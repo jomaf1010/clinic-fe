@@ -111,6 +111,7 @@ const router = createRouter({
               path: 'settings',
               name: RouteNames.CLINIC_SETTINGS,
               component: () => import('@/domains/clinic/views/ClinicSettingsView.vue'),
+              meta: { requiredPermission: 'clinic.manage' },
             },
             {
               path: 'medicines',

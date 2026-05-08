@@ -19,6 +19,10 @@ describe('sensitive route guards', () => {
     expect(metaFor(RouteNames.BILLING).requiredPermission).toEqual(['billing.view', 'billing.view-own'])
   })
 
+  it('requires clinic management for clinic settings access', () => {
+    expect(metaFor(RouteNames.CLINIC_SETTINGS).requiredPermission).toBe('clinic.manage')
+  })
+
   it('requires owner-level clinic management for subscription access', () => {
     expect(metaFor(RouteNames.SUBSCRIPTION).requiredPermission).toBe('clinic.manage')
   })
