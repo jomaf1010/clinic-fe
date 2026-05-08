@@ -85,14 +85,25 @@ describe('buildNarrative', () => {
     expect(html.toLowerCase()).toContain('custom')
   })
 
-  it('strips disallowed HTML tags in the input via DOMPurify', () => {
-    const html = buildNarrative({ id: 'x', complaint: '<script>alert(1)</script>cold' })
-    // The script tag and its content should be removed by DOMPurify.
-    // (DOMPurify strips disallowed tags AND their inner content as the safe default,
-    // so `cold` — wrapped inside the `<strong>` along with the script — also goes
-    // when the implementation interpolates the raw user input into the strong tag.)
+  it('escapes user-provided HTML before rendering narrative emphasis', () => {
+    const html = buildNarrative({
+      id: 'x',
+      complaint: '<strong onclick="alert(1)">Pain</strong> <img src=x onerror="alert(2)"> cold',
+      diagnoses: ['<svg onload="alert(3)">Flu</svg>'],
+      advice: 'Rest <script>alert(4)</script>',
+      prescriptionItems: [
+        { drug_name: '<b onclick="alert(5)">Amoxicillin</b>', dose: '<img src=x onerror="alert(6)">500mg', frequency: 'TID', duration: '<script>alert(7)</script>7 days' },
+      ],
+    })
+
+    expect(html).toContain('<strong>&lt;strong onclick="alert(1)"&gt;pain&lt;/strong&gt; &lt;img src=x onerror="alert(2)"&gt; cold</strong>')
+    expect(html).toContain('<strong>&lt;svg onload="alert(3)"&gt;Flu&lt;/svg&gt;</strong>')
+    expect(html).toContain('&lt;script&gt;alert(4)&lt;/script&gt;')
+    expect(html).toContain('<strong>&lt;b onclick="alert(5)"&gt;Amoxicillin&lt;/b&gt;</strong>')
+    expect(html).not.toContain('<img')
     expect(html).not.toContain('<script>')
-    expect(html).not.toContain('alert(1)')
+    expect(html).not.toContain('<svg')
+    expect(html).not.toContain('<b onclick')
   })
 
   it('produces the same output when called twice with the same id', () => {
