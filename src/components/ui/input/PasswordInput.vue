@@ -39,8 +39,8 @@ const showPassword = ref(false)
     >
     <button
       type="button"
-      tabindex="-1"
-      class="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+      :aria-label="showPassword ? 'Hide password' : 'Show password'"
+      class="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2"
       @click="showPassword = !showPassword"
     >
       <EyeOff v-if="showPassword" class="size-4" />
