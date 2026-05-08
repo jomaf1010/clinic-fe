@@ -152,7 +152,7 @@ export function oneOf(label: string, options: string[]) {
  * Pass directly to `useForm({ validationSchema: loginSchema })`.
  */
 export const loginSchema = {
-  email: required('Email'),
+  email: [required('Email'), email('Email')],
   password: required('Password'),
 }
 

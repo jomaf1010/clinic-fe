@@ -230,10 +230,13 @@ describe('schema adapters', () => {
 })
 
 describe('composed schemas', () => {
-  it('loginSchema enforces required email and password', () => {
-    expect(loginSchema.email('')).toBe('Email is required.')
+  it('loginSchema enforces required email, email format, and password', () => {
+    const emailRules = loginSchema.email
+
+    expect(emailRules[0]('')).toBe('Email is required.')
+    expect(emailRules[1]('not-email')).toBe('Email must be a valid email address.')
+    expect(emailRules[1]('user@example.com')).toBe(true)
     expect(loginSchema.password('')).toBe('Password is required.')
-    expect(loginSchema.email('user@example.com')).toBe(true)
     expect(loginSchema.password('hunter2')).toBe(true)
   })
 
