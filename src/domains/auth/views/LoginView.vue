@@ -52,7 +52,6 @@ const { value: password, errorMessage: passwordError } = useField<string>('passw
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
 const generalNotice = ref<string | null>(null)
-const showResendLink = ref(false)
 const rememberMe = ref(true)
 const linkDialogOpen = ref(false)
 const pendingGoogleCredential = ref<string | null>(null)
@@ -70,7 +69,6 @@ onMounted(() => {
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
   generalNotice.value = null
-  showResendLink.value = false
   isLoading.value = true
 
   try {
@@ -91,12 +89,7 @@ const onSubmit = handleSubmit(async (values) => {
         generalError.value = 'Invalid email or password.'
       } else if (err.status === 403) {
         const body = err.data as { message?: string; error_code?: string }
-        if (body.error_code === 'email_not_verified') {
-          generalError.value = 'Please verify your email address before signing in.'
-          showResendLink.value = true
-        } else {
-          generalError.value = body.message || 'Access denied.'
-        }
+        generalError.value = body.error_code === 'email_not_verified' ? 'Access denied.' : body.message || 'Access denied.'
       } else {
         generalError.value = 'An unexpected error occurred. Please try again.'
       }
@@ -132,7 +125,6 @@ function handleGoogleError(err: unknown): void {
 async function onGoogleCredential(credential: string): Promise<void> {
   generalError.value = null
   generalNotice.value = null
-  showResendLink.value = false
   pendingGoogleCredential.value = credential
   isLoading.value = true
 
@@ -262,13 +254,6 @@ async function requestGoogleLink(): Promise<void> {
                 role="alert"
               >
                 {{ generalError }}
-                <RouterLink
-                  v-if="showResendLink"
-                  :to="{ name: RouteNames.VERIFY_EMAIL_NOTICE, query: { email: email } }"
-                  class="mt-1 block"
-                >
-                  Resend verification email
-                </RouterLink>
               </AuthFeedbackAlert>
 
               <AuthFeedbackAlert
@@ -352,12 +337,20 @@ async function requestGoogleLink(): Promise<void> {
                 :class="ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'"
               >
                 <div class="flex justify-end overflow-hidden">
-                  <RouterLink
-                    :to="{ name: RouteNames.FORGOT_PASSWORD }"
-                    class="max-w-full truncate text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
-                  >
-                    Forgot password?
-                  </RouterLink>
+                  <div class="flex max-w-full flex-wrap justify-end gap-x-3 gap-y-1 text-xs">
+                    <RouterLink
+                      :to="{ name: RouteNames.VERIFY_EMAIL_NOTICE, query: email ? { email } : {} }"
+                      class="text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                    >
+                      Need a verification email?
+                    </RouterLink>
+                    <RouterLink
+                      :to="{ name: RouteNames.FORGOT_PASSWORD }"
+                      class="text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                    >
+                      Forgot password?
+                    </RouterLink>
+                  </div>
                 </div>
               </div>
 
