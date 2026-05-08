@@ -379,19 +379,31 @@ describe('appointmentStore - mutations', () => {
     expect(store.current?.id).toBe('appt-1')
   })
 
-  it('checkInAppointment uses the nested appointment payload', async () => {
+  it('checkInAppointment uses the nested appointment payload and returns the linked queue visit', async () => {
+    const checkedIn = makeAppointment({ id: 'appt-1', status: 'checked_in' })
     const appointmentApi = makeAppointmentApi({
-      checkIn: vi.fn().mockResolvedValue({ data: { appointment: makeAppointment({ id: 'appt-1', status: 'checked_in' }) } }),
+      checkIn: vi.fn().mockResolvedValue({
+        data: {
+          appointment: checkedIn,
+          queue_visit: {
+            id: 'queue-1',
+            position: 1,
+            status: 'waiting',
+            encounter_id: 'encounter-1',
+          },
+        },
+      }),
     })
     const { useAppointmentStore } = await loadStore(appointmentApi)
     const store = useAppointmentStore()
     store.appointments = [makeAppointment({ id: 'appt-1' })]
     store.current = makeAppointment({ id: 'appt-1' })
 
-    await store.checkInAppointment('appt-1')
+    const result = await store.checkInAppointment('appt-1')
 
     expect(store.appointments[0]?.status).toBe('checked_in')
     expect(store.current?.status).toBe('checked_in')
+    expect(result.queue_visit.encounter_id).toBe('encounter-1')
   })
 
   it('markNoShow updates the matching list item and current appointment', async () => {
