@@ -168,6 +168,19 @@ describe('appointmentStore - list fetching', () => {
       status: 'checked_in',
     })
   })
+
+  it('fetchAllForRange omits status when no status filter is provided', async () => {
+    const appointmentApi = makeAppointmentApi()
+    const { useAppointmentStore } = await loadStore(appointmentApi)
+    const store = useAppointmentStore()
+
+    await store.fetchAllForRange('2026-05-01', '2026-05-31')
+
+    expect(appointmentApi.list).toHaveBeenCalledWith(1, 500, {
+      start_date: '2026-05-01',
+      end_date: '2026-05-31',
+    })
+  })
 })
 
 describe('appointmentStore - board data', () => {
@@ -236,6 +249,69 @@ describe('appointmentStore - board data', () => {
     expect(store.boardError).toBe('Failed to load appointment board.')
     expect(store.isLoadingBoard).toBe(false)
   })
+
+  it('applies doctor and status filters and tolerates availability failures', async () => {
+    const doctorOne = makeDoctor({ id: 'doctor-1' })
+    const doctorTwo = makeDoctor({ id: 'doctor-2' })
+    const appointmentApi = makeAppointmentApi({
+      list: vi.fn().mockResolvedValue(makeListResponse([
+        makeAppointment({ id: 'appt-filtered', doctor_id: 'doctor-2', status: 'checked_in' }),
+      ])),
+      getDoctors: vi.fn().mockResolvedValue({ data: [doctorOne, doctorTwo] }),
+    })
+    const scheduleApi = makeScheduleApi({
+      getAvailability: vi.fn().mockRejectedValue(new Error('availability down')),
+    })
+    const { useAppointmentStore } = await loadStore(appointmentApi, scheduleApi)
+    const store = useAppointmentStore()
+
+    await store.fetchBoardData({
+      date: '2026-05-06',
+      start: '2026-05-01',
+      end: '2026-05-31',
+      doctorFilter: 'doctor-2',
+      statusFilter: 'checked_in',
+    })
+
+    expect(appointmentApi.list).toHaveBeenCalledWith(1, 500, {
+      start_date: '2026-05-01',
+      end_date: '2026-05-31',
+      doctor_id: 'doctor-2',
+      status: 'checked_in',
+    })
+    expect(scheduleApi.getAvailability).toHaveBeenCalledWith('doctor-2', '2026-05-06')
+    expect(store.boardAppointments.map((appointment) => appointment.id)).toEqual(['appt-filtered'])
+    expect(store.boardAvailabilityByDoctor).toEqual({ 'doctor-2': [] })
+    expect(store.boardCalendarBlocks).toEqual([])
+  })
+
+  it('ignores duplicate in-flight board requests for the same parameters', async () => {
+    let resolveList: (value: ReturnType<typeof makeListResponse>) => void = () => {}
+    const appointmentApi = makeAppointmentApi({
+      list: vi.fn().mockImplementation(() => new Promise((resolve) => {
+        resolveList = resolve
+      })),
+    })
+    const { useAppointmentStore } = await loadStore(appointmentApi)
+    const store = useAppointmentStore()
+    const params = {
+      date: '2026-05-06',
+      start: '2026-05-01',
+      end: '2026-05-31',
+      doctorFilter: 'all',
+      statusFilter: 'all',
+    }
+
+    const first = store.fetchBoardData(params)
+    const second = store.fetchBoardData(params)
+
+    await expect(second).resolves.toBeUndefined()
+    expect(appointmentApi.list).toHaveBeenCalledOnce()
+    resolveList(makeListResponse())
+    await first
+    await second
+    expect(store.isLoadingBoard).toBe(false)
+  })
 })
 
 describe('appointmentStore - mutations', () => {
@@ -285,6 +361,22 @@ describe('appointmentStore - mutations', () => {
     expect(store.appointments[0]?.status).toBe('cancelled')
     expect(store.appointments[1]?.id).toBe('appt-2')
     expect(store.current?.status).toBe('cancelled')
+  })
+
+  it('cancelAppointment omits the reason payload and leaves unrelated state unchanged', async () => {
+    const appointmentApi = makeAppointmentApi({
+      cancel: vi.fn().mockResolvedValue({ data: makeAppointment({ id: 'appt-missing', status: 'cancelled' }) }),
+    })
+    const { useAppointmentStore } = await loadStore(appointmentApi)
+    const store = useAppointmentStore()
+    store.appointments = [makeAppointment({ id: 'appt-1' })]
+    store.current = makeAppointment({ id: 'appt-1' })
+
+    await store.cancelAppointment('appt-missing')
+
+    expect(appointmentApi.cancel).toHaveBeenCalledWith('appt-missing', undefined)
+    expect(store.appointments[0]?.id).toBe('appt-1')
+    expect(store.current?.id).toBe('appt-1')
   })
 
   it('checkInAppointment uses the nested appointment payload', async () => {

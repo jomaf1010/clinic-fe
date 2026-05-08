@@ -13,7 +13,7 @@
  * inline and we can interact with it directly.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
 import EditPatientDialog from './EditPatientDialog.vue'
@@ -134,6 +134,11 @@ function mount(patient = makePatientResponse()) {
 }
 
 describe('EditPatientDialog', () => {
+  beforeEach(() => {
+    updatePatientSpy.mockReset()
+    updatePatientSpy.mockResolvedValue(undefined)
+  })
+
   it('populates the contact number input from the patient on open', async () => {
     const wrapper = mount()
     await flushPromises()
@@ -156,7 +161,6 @@ describe('EditPatientDialog', () => {
   })
 
   it('accepts a +639XXXXXXXXX formatted phone and submits', async () => {
-    updatePatientSpy.mockClear()
     const wrapper = mount()
     await flushPromises()
 
@@ -168,10 +172,11 @@ describe('EditPatientDialog', () => {
     expect(updatePatientSpy).toHaveBeenCalledOnce()
     const payload = updatePatientSpy.mock.calls[0]?.[1] as Record<string, unknown>
     expect(payload.contact_number).toBe('+639171112222')
+    expect(wrapper.emitted('updated')).toEqual([[]])
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
   })
 
   it('normalises empty optional fields to null in the submit payload', async () => {
-    updatePatientSpy.mockClear()
     const wrapper = mount(makePatientResponse({ contact_number: '', email: '', note: '' }))
     await flushPromises()
     await wrapper.find('form').trigger('submit.prevent')
@@ -184,8 +189,38 @@ describe('EditPatientDialog', () => {
     expect(payload.note).toBeNull()
   })
 
+  it('shows a general error when the patient name is incomplete', async () => {
+    const wrapper = mount()
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'NameForm' }).vm.$emit('update:modelValue', {
+      first_name: '',
+      middle_name: null,
+      last_name: 'Dela Cruz',
+      suffix: null,
+    })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(updatePatientSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Please enter first and last name.')
+  })
+
+  it('shows a general error when the address is missing', async () => {
+    const wrapper = mount()
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'AddressForm' }).vm.$emit('update:modelValue', null)
+    await flushPromises()
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(updatePatientSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Please complete the address fields.')
+  })
+
   it('maps server-side 422 field errors back onto the form', async () => {
-    updatePatientSpy.mockReset()
     updatePatientSpy.mockRejectedValue(
       new FakeHttpError(422, 'Validation failed', {
         message: 'Validation failed',
@@ -198,5 +233,27 @@ describe('EditPatientDialog', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Already in use.')
+  })
+
+  it('shows a generic error for non-validation HttpError failures', async () => {
+    updatePatientSpy.mockRejectedValue(new FakeHttpError(500, 'Server error'))
+    const wrapper = mount()
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('An unexpected error occurred. Please try again.')
+  })
+
+  it('shows a connection error for non-HttpError failures', async () => {
+    updatePatientSpy.mockRejectedValue(new Error('offline'))
+    const wrapper = mount()
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Unable to connect to the server. Please try again.')
   })
 })

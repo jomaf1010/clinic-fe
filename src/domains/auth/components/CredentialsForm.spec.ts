@@ -19,6 +19,7 @@ import { flushPromises } from '@vue/test-utils'
 import { mountWithDeps } from '@/__tests__/helpers/mountWithDeps'
 import { setupTestPinia } from '@/__tests__/helpers/createPinia'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
+import { HttpError } from '@/lib/http'
 import CredentialsForm from './CredentialsForm.vue'
 
 const updateProfileSpy = vi.fn().mockResolvedValue(undefined)
@@ -99,6 +100,15 @@ describe('CredentialsForm', () => {
     expect(httpGetSpy).toHaveBeenCalledWith('/specialties')
   })
 
+  it('silently keeps the specialty dropdown empty when the fetch fails', async () => {
+    httpGetSpy.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = mount()
+    await flushPromises()
+
+    expect(httpGetSpy).toHaveBeenCalledWith('/specialties')
+    expect(wrapper.text()).not.toContain('Family Medicine')
+  })
+
   it('blocks submit when PRC license is longer than 50 chars', async () => {
     updateProfileSpy.mockClear()
     const wrapper = mount()
@@ -112,6 +122,38 @@ describe('CredentialsForm', () => {
 
     expect(updateProfileSpy).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('PRC license number must be no more than 50 characters.')
+  })
+
+  it('blocks submit and renders specialty field validation errors', async () => {
+    updateProfileSpy.mockClear()
+    const wrapper = mount({
+      specialty: 's'.repeat(256),
+      sub_specialty: 'x'.repeat(256),
+    })
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateProfileSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Specialty must be no more than 255 characters.')
+    expect(wrapper.text()).toContain('Sub-specialty must be no more than 255 characters.')
+  })
+
+  it('blocks submit and renders PTR and S2 field validation errors', async () => {
+    updateProfileSpy.mockClear()
+    const wrapper = mount()
+    await flushPromises()
+    await wrapper.find('#cred-ptr').setValue('2'.repeat(51))
+    await wrapper.find('#cred-s2').setValue('3'.repeat(51))
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateProfileSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('PTR number must be no more than 50 characters.')
+    expect(wrapper.text()).toContain('S2 license number must be no more than 50 characters.')
   })
 
   it('submits null for specialty when "none" is selected', async () => {
@@ -145,5 +187,76 @@ describe('CredentialsForm', () => {
     expect(payload.ptr_number).toBeNull()
     expect(payload.s2_license_number).toBeNull()
     expect(payload.sub_specialty).toBeNull()
+  })
+
+  it('submits the selected specialty when it is not "none"', async () => {
+    updateProfileSpy.mockClear()
+    const wrapper = mount({
+      specialty: 'family_medicine',
+      sub_specialty: 'Geriatrics',
+    })
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateProfileSpy).toHaveBeenCalledOnce()
+    const payload = updateProfileSpy.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(payload.specialty).toBe('family_medicine')
+    expect(payload.sub_specialty).toBe('Geriatrics')
+  })
+
+  it('shows the saving state while updateProfile is pending', async () => {
+    let resolveUpdate: (() => void) | undefined
+    updateProfileSpy.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      resolveUpdate = resolve
+    }))
+    const wrapper = mount()
+    await flushPromises()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Saving...')
+
+    resolveUpdate?.()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Save credentials')
+  })
+
+  it('surfaces 422 field errors from updateProfile', async () => {
+    updateProfileSpy.mockRejectedValueOnce(new HttpError(422, 'Invalid', {
+      message: 'Please review your credentials.',
+      errors: {
+        ptr_number: ['PTR number is invalid.'],
+      },
+    }))
+    const wrapper = mount()
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Please review your credentials.')
+    expect(wrapper.text()).toContain('PTR number is invalid.')
+  })
+
+  it('uses the fallback validation message for 422 responses without a message', async () => {
+    updateProfileSpy.mockRejectedValueOnce(new HttpError(422, 'Invalid', { errors: {} }))
+    const wrapper = mount()
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Validation failed.')
+  })
+
+  it('surfaces a generic message when updateProfile fails unexpectedly', async () => {
+    updateProfileSpy.mockRejectedValueOnce(new Error('server unavailable'))
+    const wrapper = mount()
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('An unexpected error occurred. Please try again.')
   })
 })
