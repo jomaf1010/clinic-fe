@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Card,
   CardContent,
@@ -22,10 +23,12 @@ const { canvasRef } = useNeuralNetwork()
 const email = computed(() =>
   typeof route.query.email === 'string' ? route.query.email : '',
 )
+const resendEmail = ref(email.value)
 
 const isResending = ref(false)
 const resendMessage = ref<string | null>(null)
 const resendError = ref<string | null>(null)
+const emailPromptError = ref<string | null>(null)
 
 const ready = ref(false)
 onMounted(() => {
@@ -36,14 +39,19 @@ onMounted(() => {
 })
 
 async function resend() {
-  if (!email.value) return
+  const targetEmail = resendEmail.value.trim()
+  if (!targetEmail) {
+    emailPromptError.value = 'Enter your email address to resend verification.'
+    return
+  }
 
   resendMessage.value = null
   resendError.value = null
+  emailPromptError.value = null
   isResending.value = true
 
   try {
-    const response = await authApi.resendVerification({ email: email.value })
+    const response = await authApi.resendVerification({ email: targetEmail })
     resendMessage.value = response.message
   } catch (err) {
     if (err instanceof HttpError && err.status === 429) {
@@ -82,9 +90,12 @@ async function resend() {
               <MailCheck class="size-6 text-primary" />
             </div>
             <CardTitle class="text-xl">Check your email</CardTitle>
-            <CardDescription>
+            <CardDescription v-if="email">
               We've sent a verification link to
               <span v-if="email" class="font-medium text-foreground">{{ email }}</span>
+            </CardDescription>
+            <CardDescription v-else>
+              Enter your email address and we'll send a verification link if the account exists.
             </CardDescription>
           </CardHeader>
 
@@ -92,6 +103,23 @@ async function resend() {
             <p class="text-center text-sm text-muted-foreground">
               Click the link in the email to verify your account. If you don't see it, check your spam folder.
             </p>
+
+            <Input
+              v-if="!email"
+              v-model="resendEmail"
+              type="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              aria-label="Email address"
+            />
+
+            <div
+              v-if="emailPromptError"
+              role="alert"
+              class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-center text-sm text-destructive"
+            >
+              {{ emailPromptError }}
+            </div>
 
             <div
               v-if="resendMessage"
