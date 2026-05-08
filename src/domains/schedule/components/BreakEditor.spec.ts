@@ -48,6 +48,23 @@ describe('BreakEditor', () => {
     ])
   })
 
+  it('updates break start and end times independently', async () => {
+    const wrapper = mountEditor([
+      { label: 'Lunch', start_time: '12:00', end_time: '13:00' },
+    ])
+    const timeInputs = wrapper.findAll('input[type="time"]')
+
+    await timeInputs[0].setValue('12:15')
+    await timeInputs[1].setValue('13:15')
+
+    expect(wrapper.emitted('update:breaks')?.[0]?.[0]).toEqual([
+      { label: 'Lunch', start_time: '12:15', end_time: '13:00' },
+    ])
+    expect(wrapper.emitted('update:breaks')?.[1]?.[0]).toEqual([
+      { label: 'Lunch', start_time: '12:00', end_time: '13:15' },
+    ])
+  })
+
   it('removes the selected break', async () => {
     const wrapper = mountEditor([
       { label: 'Lunch', start_time: '12:00', end_time: '13:00' },

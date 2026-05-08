@@ -101,7 +101,7 @@ export default defineConfig({
         branches: 70,
         // Vue template handlers are counted as generated functions; raise this
         // phase-by-phase as more component interaction tests land.
-        functions: 92,
+        functions: 95,
         statements: 70,
       },
     },
