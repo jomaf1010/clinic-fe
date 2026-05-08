@@ -60,11 +60,11 @@ function navigateToPregnancy(pregnancyUuid: string) {
     name: RouteNames.PREGNANCY_DETAIL,
     params: { patientId: patientId.value, pregnancyId: pregnancyUuid },
   }
-  console.log('[OB-GYN] Navigating to:', target)
+  if (import.meta.env.DEV) console.log('[OB-GYN] Navigating to:', target)
   router.push(target).then(() => {
-    console.log('[OB-GYN] Navigation succeeded')
+    if (import.meta.env.DEV) console.log('[OB-GYN] Navigation succeeded')
   }).catch((err) => {
-    console.error('[OB-GYN] Navigation failed:', err)
+    if (import.meta.env.DEV) console.error('[OB-GYN] Navigation failed:', err)
   })
 }
 

@@ -238,7 +238,7 @@ async function fetchPatients() {
     patients.value = response.data
     pagination.value = response.meta.pagination
   } catch (err) {
-    console.error('[PatientListView] fetchPatients failed:', err)
+    if (import.meta.env.DEV) console.error('[PatientListView] fetchPatients failed:', err)
     error.value = 'Failed to load patients. Please try again.'
   } finally {
     isLoading.value = false
@@ -253,7 +253,7 @@ async function fetchAttentionSummary() {
     const response = await patientApi.attentionSummary(6)
     attentionSummary.value = response.data
   } catch (err) {
-    console.error('[PatientListView] fetchAttentionSummary failed:', err)
+    if (import.meta.env.DEV) console.error('[PatientListView] fetchAttentionSummary failed:', err)
     attentionError.value = 'Failed to load attention items.'
   } finally {
     isAttentionLoading.value = false
