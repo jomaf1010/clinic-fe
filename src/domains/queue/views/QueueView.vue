@@ -49,6 +49,7 @@ import { useQueueStore } from '../stores/queueStore'
 import { queueApi } from '../api/queueApi'
 import type { QueueDisplayTokenStatus } from '../types/queue.types'
 import { buildQueueDisplayUrl, storeQueueDisplayToken } from '../utils/displayTokenLaunch'
+import { hasActiveDisplayToken, hasLaunchableDisplayToken } from '../utils/displayTokenStatus'
 import QueueCard from '../components/QueueCard.vue'
 import QueueKanban from '../components/QueueKanban.vue'
 import WalkInDialog from '../components/WalkInDialog.vue'
@@ -70,7 +71,7 @@ const error = ref<string | null>(null)
 const statusFilter = ref<string>('all')
 const viewMode = ref<'list' | 'kanban'>(window.innerWidth < 1024 ? 'list' : 'kanban')
 
-const displayToken = ref<QueueDisplayTokenStatus>({ token: null, created_at: null })
+const displayToken = ref<QueueDisplayTokenStatus>({ active: false, token: null, created_at: null, expires_at: null })
 const isLoadingDisplayToken = ref(false)
 const isGeneratingDisplayToken = ref(false)
 const isRevokingDisplayToken = ref(false)
@@ -212,7 +213,7 @@ async function revokeDisplayToken() {
   isRevokingDisplayToken.value = true
   try {
     await queueApi.revokeDisplayToken()
-    displayToken.value = { token: null, created_at: null }
+    displayToken.value = { active: false, token: null, created_at: null, expires_at: null }
     toast.success('Display link revoked')
   } catch {
     toast.error('Failed to revoke display link')
@@ -317,8 +318,8 @@ onUnmounted(() => {
                   <LoaderCircle class="size-4 animate-spin text-muted-foreground" />
                 </div>
 
-                <!-- Has active token -->
-                <template v-else-if="displayToken.token">
+                <!-- Newly generated token: launchable once in this browser -->
+                <template v-else-if="hasLaunchableDisplayToken(displayToken)">
                   <div class="rounded-md border bg-muted/50 p-2">
                     <p class="break-all text-xs font-mono text-muted-foreground">
                       {{ displayUrl }}
@@ -330,13 +331,44 @@ onUnmounted(() => {
                   <div class="flex gap-2">
                     <Button variant="outline" size="sm" class="flex-1 h-8" @click="copyDisplayUrl">
                       <Copy class="size-3.5" />
-                      Copy
+                      Copy App URL
                     </Button>
                     <Button variant="outline" size="sm" class="flex-1 h-8" @click="openDisplayInNewTab">
                       <ExternalLink class="size-3.5" />
                       Open
                     </Button>
                   </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    class="h-8 w-full"
+                    :disabled="isRevokingDisplayToken"
+                    @click="revokeDisplayToken"
+                  >
+                    <LoaderCircle v-if="isRevokingDisplayToken" class="size-3.5 animate-spin" />
+                    <Trash2 v-else class="size-3.5" />
+                    Revoke Link
+                  </Button>
+                </template>
+
+                <!-- Existing active token: raw token is intentionally not returned again -->
+                <template v-else-if="hasActiveDisplayToken(displayToken)">
+                  <div class="rounded-md border bg-muted/50 p-3">
+                    <p class="text-sm font-medium">Display link is active</p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      For security, existing display links cannot be shown again. Generate a new link if you need to copy or open it from this browser.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    class="h-8 w-full"
+                    :disabled="isGeneratingDisplayToken"
+                    @click="generateDisplayToken"
+                  >
+                    <LoaderCircle v-if="isGeneratingDisplayToken" class="size-3.5 animate-spin" />
+                    <Monitor v-else class="size-3.5" />
+                    Generate New Link
+                  </Button>
                   <Button
                     variant="destructive"
                     size="sm"

@@ -56,6 +56,8 @@ export interface QueueDisplayCentrifugoTokens {
 }
 
 export interface QueueDisplayTokenStatus {
-  token: string | null
+  active: boolean
+  token?: string | null
   created_at: string | null
+  expires_at: string | null
 }
