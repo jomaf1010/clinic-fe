@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { createDebouncedRefresh } from '@/composables/realtimeRefresh'
 import { useBillingStore } from '../stores/billingStore'
 import BillingStatCards from '../components/BillingStatCards.vue'
 import InvoiceTable from '../components/InvoiceTable.vue'
@@ -191,11 +192,15 @@ function onInvoiceCreated() {
 
 watch(statusFilter, onStatusChange)
 
+const refreshBillingFromRealtime = createDebouncedRefresh(() => {
+  fetchInvoices(billingStore.currentPage)
+  billingStore.fetchSummary()
+}, 500)
+
 function onBillingEvent(ctx: { data?: { type?: string } }) {
   const type = ctx.data?.type
   if (type?.startsWith('invoice.')) {
-    fetchInvoices(billingStore.currentPage)
-    billingStore.fetchSummary()
+    refreshBillingFromRealtime()
   }
 }
 

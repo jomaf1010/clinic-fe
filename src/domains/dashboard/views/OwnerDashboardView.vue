@@ -15,6 +15,7 @@ import { dashboardApi } from '@/domains/dashboard/api/dashboardApi'
 import type { OwnerDashboardStats } from '@/domains/dashboard/api/dashboardApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { createDebouncedRefresh, shouldRunFallbackRefresh } from '@/composables/realtimeRefresh'
 import StatCard from '@/domains/dashboard/components/StatCard.vue'
 import OwnerRevenueChart from '@/domains/dashboard/components/OwnerRevenueChart.vue'
 import { use } from 'echarts/core'
@@ -163,7 +164,7 @@ async function fetchStats(): Promise<void> {
 }
 
 // Real-time updates
-const { subscribe, unsubscribe } = useCentrifugo()
+const { isConnected, subscribe, unsubscribe } = useCentrifugo()
 let pollInterval: ReturnType<typeof setInterval> | undefined
 
 function silentRefresh() {
@@ -172,6 +173,8 @@ function silentRefresh() {
   }).catch(() => {})
 }
 
+const refreshFromRealtime = createDebouncedRefresh(silentRefresh, 1_000)
+
 onMounted(() => {
   fetchStats()
   if (isPro.value) fetchDistribution()
@@ -179,12 +182,13 @@ onMounted(() => {
   const clinicId = authStore.currentClinic?.id
   if (clinicId) {
     subscribe(`clinic:${clinicId}:queue`, () => {
-      silentRefresh()
+      refreshFromRealtime()
     })
   }
 
-  // Fallback poll every 5 minutes in case Centrifugo disconnects
-  pollInterval = setInterval(silentRefresh, 5 * 60 * 1000)
+  pollInterval = setInterval(() => {
+    if (shouldRunFallbackRefresh(isConnected.value)) silentRefresh()
+  }, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
