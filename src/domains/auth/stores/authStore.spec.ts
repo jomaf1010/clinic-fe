@@ -551,6 +551,43 @@ describe('authStore — silentRefresh', () => {
     expect(ok).toBe(false)
     expect(store.token).toBeNull()
   })
+
+  it('updates the visible user state when an external tab refreshes into another account', async () => {
+    const oldUser = makeUser({ id: 'old-user', email: 'old@example.test', current_clinic: makeClinicContext({ id: 'old-clinic' }) })
+    const newUser = makeUser({ id: 'new-user', email: 'new@example.test', current_clinic: makeClinicContext({ id: 'new-clinic' }) })
+    const api = makeAuthApi({
+      me: vi.fn().mockResolvedValue({ data: newUser, meta: { memberships: [makeMembership({ clinic_id: 'new-clinic' })] } }),
+    })
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+    store.user = oldUser
+    store.memberships = [makeMembership({ clinic_id: 'old-clinic' })]
+    store.setToken('old-token')
+
+    await store.syncExternalSession('new-token')
+
+    expect(store.token).toBe('new-token')
+    expect(store.user?.email).toBe('new@example.test')
+    expect(store.currentClinic?.id).toBe('new-clinic')
+    expect(store.memberships[0]?.clinic_id).toBe('new-clinic')
+  })
+
+  it('clears stale visible user state when external session reconciliation fails', async () => {
+    const api = makeAuthApi({
+      me: vi.fn().mockRejectedValue(new Error('session lookup failed')),
+    })
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+    store.user = makeUser({ id: 'old-user', email: 'old@example.test', current_clinic: makeClinicContext({ id: 'old-clinic' }) })
+    store.memberships = [makeMembership({ clinic_id: 'old-clinic' })]
+    store.setToken('old-token')
+
+    await expect(store.syncExternalSession('new-token')).rejects.toThrow('session lookup failed')
+
+    expect(store.token).toBeNull()
+    expect(store.user).toBeNull()
+    expect(store.memberships).toEqual([])
+  })
 })
 
 describe('authStore — logout', () => {
