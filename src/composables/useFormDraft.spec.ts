@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { defineComponent, h, ref, type Ref } from 'vue'
+import { defineComponent, h, nextTick, ref, type Ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { useFormDraft } from './useFormDraft'
 
@@ -25,6 +25,7 @@ function makeField<T>(initial: T): FieldRef & { value: T } {
 
 beforeEach(() => {
   localStorage.clear()
+  sessionStorage.clear()
   vi.useFakeTimers()
 })
 
@@ -118,6 +119,52 @@ describe('useFormDraft', () => {
     const stored = JSON.parse(localStorage.getItem('signup') ?? '{}') as Record<string, unknown>
     expect(stored.email).toBe('a@b.co')
     expect(stored.tags).toEqual(['vip'])
+  })
+
+  it('can use sessionStorage for PHI-sensitive drafts', async () => {
+    const email = makeField('')
+
+    mountWithDraft(() => {
+      useFormDraft('create-patient:user:clinic', { email }, undefined, { storage: sessionStorage })
+    })
+
+    email.value = 'patient@example.com'
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(sessionStorage.getItem('create-patient:user:clinic')).toContain('patient@example.com')
+    expect(localStorage.getItem('create-patient:user:clinic')).toBeNull()
+  })
+
+  it('disables draft persistence while the reactive key is null', async () => {
+    const email = makeField('')
+    const draftKey = ref<string | null>(null)
+
+    mountWithDraft(() => {
+      useFormDraft(draftKey, { email }, undefined, { storage: sessionStorage })
+    })
+
+    email.value = 'patient@example.com'
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('loads the active scoped draft and resets stale values when the key changes', async () => {
+    sessionStorage.setItem('create-patient:user-a:clinic-a', JSON.stringify({ email: 'a@example.com' }))
+    const email = makeField('')
+    const draftKey = ref<string | null>('create-patient:user-a:clinic-a')
+
+    mountWithDraft(() => {
+      useFormDraft(draftKey, { email }, undefined, { storage: sessionStorage })
+    })
+
+    expect(email.value).toBe('a@example.com')
+
+    draftKey.value = 'create-patient:user-b:clinic-b'
+    await nextTick()
+
+    expect(email.value).toBe('')
+    expect(sessionStorage.getItem('create-patient:user-b:clinic-b')).toBeNull()
   })
 
   it.skip('debounces multiple rapid changes into a single write', async () => {

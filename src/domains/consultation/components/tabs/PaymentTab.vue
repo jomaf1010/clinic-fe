@@ -446,6 +446,7 @@ async function fetchInvoice() {
     const result = await billingStore.fetchForEncounter(props.encounterId)
     invoice.value = result
   } catch {
+    invoice.value = null
     loadError.value = 'Failed to load invoice.'
   } finally {
     isLoading.value = false

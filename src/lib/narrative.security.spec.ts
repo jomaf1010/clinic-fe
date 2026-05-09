@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildNarrative, buildVitalsNarrative } from './narrative'
+import { boldUserHtml, escapeUserHtml } from './htmlSafety'
 import type { ConsultationTriage } from '@/domains/consultation/types/consultation.types'
 
 describe('narrative HTML safety', () => {
@@ -63,5 +64,16 @@ describe('narrative HTML safety', () => {
     expect(html).toContain('<strong>')
     expect(html).not.toContain('<img')
     expect(html).not.toContain('onerror')
+  })
+
+  it('escapes user text before wrapping narrative emphasis tags', () => {
+    const html = boldUserHtml('<img src=x onerror=alert(1)>')
+
+    expect(html).toBe('<b>&lt;img src=x onerror=alert(1)&gt;</b>')
+    expect(html).not.toContain('<img')
+  })
+
+  it('escapes non-emphasized user text', () => {
+    expect(escapeUserHtml('<script>alert(1)</script>')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;')
   })
 })

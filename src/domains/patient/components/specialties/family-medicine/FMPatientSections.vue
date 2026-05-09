@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { boldUserHtml } from '@/lib/htmlSafety'
 import {
   Plus,
   ChevronRight,
@@ -528,7 +529,7 @@ const trendsWidgetDetail = computed(() => {
 const narrativeProblems = computed(() => pdStore.problems)
 const narrativeAllergies = computed(() => pdStore.allergies)
 
-function b(text: string | number) { return `<b>${text}</b>` }
+function b(text: string | number) { return boldUserHtml(text) }
 
 const narrativeSummary = computed(() => {
   const lines: string[] = []

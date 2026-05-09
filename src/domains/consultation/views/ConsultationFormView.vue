@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { HttpError } from '@/lib/http'
+import { boldUserHtml } from '@/lib/htmlSafety'
 import {
   Stethoscope,
   Activity,
@@ -378,7 +379,7 @@ const clinicalSummary = computed<string | null>(() => {
   const ls = pdStore.lifestyle
   const fh = pdStore.familyHistory
 
-  const b = (t: string | number) => `<b>${t}</b>`
+  const b = (t: string | number) => boldUserHtml(t)
 
   if (problems.length) {
     const top = problems.slice(0, 3).map((p) => b(p.description)).join(', ')
