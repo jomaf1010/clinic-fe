@@ -380,8 +380,140 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex flex-1 items-center justify-center pt-16">
-    <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
+  <div
+    v-if="isLoading"
+    class="patient-detail-shell grid flex-1 gap-6 pt-4 xl:grid-cols-[minmax(0,1fr)_360px]"
+  >
+    <main class="patient-detail-main flex min-w-0 flex-col gap-6">
+      <section class="patient-modules-card order-1 surface-card rounded-2xl p-5">
+        <div class="mb-5 space-y-2">
+          <Skeleton class="h-5 w-44 rounded-xl" />
+          <Skeleton class="h-4 w-72 max-w-full rounded-xl" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            v-for="n in 4"
+            :key="`module-skeleton-${n}`"
+            class="surface-card-lite rounded-2xl p-4"
+          >
+            <div class="mb-4 flex items-center gap-3">
+              <Skeleton class="size-10 shrink-0 rounded-xl" />
+              <div class="min-w-0 flex-1 space-y-2">
+                <Skeleton class="h-4 w-28 rounded-xl" />
+                <Skeleton class="h-3 w-20 rounded-xl" />
+              </div>
+            </div>
+            <Skeleton class="mb-2 h-2 w-full rounded-full" />
+            <Skeleton class="h-3 w-24 rounded-xl" />
+          </div>
+        </div>
+      </section>
+
+      <section class="patient-timeline-card order-2 surface-card rounded-2xl p-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="space-y-2">
+            <Skeleton class="h-5 w-44 rounded-xl" />
+            <Skeleton class="h-4 w-80 max-w-full rounded-xl" />
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <Skeleton class="h-10 w-44 rounded-xl" />
+            <Skeleton class="h-10 w-28 rounded-xl" />
+            <Skeleton class="h-10 w-24 rounded-xl" />
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <div
+            v-for="n in 4"
+            :key="`timeline-skeleton-${n}`"
+            class="patient-timeline-row flex gap-4"
+          >
+            <div class="patient-timeline-marker-col">
+              <Skeleton class="mt-3 size-8 shrink-0 rounded-full" />
+              <div v-if="n < 4" class="patient-timeline-line" />
+            </div>
+            <div
+              class="patient-timeline-skeleton surface-card-lite min-w-0 flex-1 rounded-2xl p-4"
+              :class="n < 4 ? 'mb-3' : ''"
+            >
+              <Skeleton class="mb-3 h-3 w-24 rounded-xl" />
+              <Skeleton class="mb-2 h-5 w-3/4 rounded-xl" />
+              <Skeleton class="mb-4 h-3 w-1/2 rounded-xl" />
+              <div class="flex gap-2">
+                <Skeleton class="h-8 w-24 rounded-xl" />
+                <Skeleton class="h-8 w-20 rounded-xl" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="patient-profile-sidebar xl:self-start">
+      <section class="patient-profile-card surface-card overflow-hidden rounded-2xl">
+        <div class="patient-profile-banner relative">
+          <div class="absolute left-4 top-4">
+            <Skeleton class="size-10 rounded-full" />
+          </div>
+          <div class="absolute right-4 top-4">
+            <Skeleton class="h-9 w-24 rounded-full" />
+          </div>
+          <div class="absolute inset-x-0 -bottom-12 flex justify-center">
+            <Skeleton class="size-28 rounded-full ring-4 ring-white/70 dark:ring-slate-950/50" />
+          </div>
+        </div>
+
+        <div class="px-5 pb-5 pt-16">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1 space-y-3">
+              <Skeleton class="h-7 w-64 max-w-full rounded-xl" />
+              <Skeleton class="h-4 w-36 rounded-xl" />
+              <Skeleton class="h-4 w-44 rounded-xl" />
+            </div>
+            <Skeleton class="size-10 shrink-0 rounded-full" />
+          </div>
+
+          <div class="mt-5 grid gap-2">
+            <Skeleton class="h-11 w-full rounded-full" />
+            <Skeleton class="h-10 w-full rounded-full" />
+          </div>
+
+          <div class="mt-5 space-y-3">
+            <Skeleton class="h-5 w-3/4 rounded-xl" />
+            <Skeleton class="h-5 w-2/3 rounded-xl" />
+            <Skeleton class="h-5 w-full rounded-xl" />
+          </div>
+
+          <div class="patient-profile-stats surface-muted mt-5 grid grid-cols-3 rounded-2xl p-4">
+            <div v-for="n in 3" :key="`stat-skeleton-${n}`" class="space-y-2">
+              <Skeleton class="mx-auto h-7 w-10 rounded-xl" />
+              <Skeleton class="mx-auto h-3 w-16 rounded-xl" />
+            </div>
+          </div>
+
+          <div class="patient-mini-card surface-muted mt-5 rounded-2xl p-4">
+            <div class="flex items-start gap-3">
+              <Skeleton class="size-5 shrink-0 rounded-md" />
+              <div class="flex-1 space-y-2">
+                <Skeleton class="h-4 w-20 rounded-xl" />
+                <Skeleton class="h-4 w-32 rounded-xl" />
+              </div>
+            </div>
+          </div>
+
+          <div class="patient-mini-card surface-muted mt-4 rounded-2xl p-4">
+            <div class="mb-3 flex items-center justify-between gap-4">
+              <div class="flex-1 space-y-2">
+                <Skeleton class="h-4 w-28 rounded-xl" />
+                <Skeleton class="h-3 w-40 rounded-xl" />
+              </div>
+              <Skeleton class="h-4 w-10 rounded-xl" />
+            </div>
+            <Skeleton class="h-2 w-full rounded-full" />
+          </div>
+        </div>
+      </section>
+    </aside>
   </div>
 
   <div

@@ -24,7 +24,7 @@ import RiskClassificationBadge from './RiskClassificationBadge.vue'
 import type { Pregnancy } from '../types/obgyn.types'
 import { computed } from 'vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   patientName: string | null
   statusLabel: string
   statusClass: string
@@ -44,7 +44,9 @@ const props = defineProps<{
   canResolvePrimary: boolean
   canResolveMenu: boolean
   showActions?: boolean
-}>()
+}>(), {
+  showActions: true,
+})
 
 const emit = defineEmits<{
   back: []
@@ -153,7 +155,7 @@ const weeksToEdd = computed(() => {
           <span v-if="trimester" class="obgyn-pregnancy-topbar-trimester">
             {{ trimester }} tri
           </span>
-          <span v-if="weeksToEdd !== null" class="hidden text-xs text-muted-foreground xl:inline">
+          <span v-if="weeksToEdd !== null" class="obgyn-pregnancy-topbar-edd hidden text-xs text-muted-foreground xl:inline">
             {{ weeksToEdd }}w to EDD
           </span>
         </div>
@@ -338,22 +340,42 @@ const weeksToEdd = computed(() => {
 }
 
 :global(.dark) .obgyn-pregnancy-topbar {
+  color: rgb(248 250 252);
   background:
-    linear-gradient(135deg, rgb(15 23 42 / 0.38), rgb(15 23 42 / 0.16) 52%, rgb(15 23 42 / 0.28)),
-    rgb(15 23 42 / 0.08);
-  box-shadow: 0 18px 50px -30px rgb(0 0 0 / 0.72), 0 18px 45px rgb(0 0 0 / 0.28);
+    radial-gradient(circle at 10% 0%, rgb(37 99 235 / 0.2), transparent 32%),
+    radial-gradient(circle at 92% 0%, rgb(20 184 166 / 0.18), transparent 36%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.86), rgb(2 6 23 / 0.64) 56%, rgb(15 23 42 / 0.74)),
+    rgb(2 6 23 / 0.7);
+  box-shadow:
+    0 24px 80px -38px rgb(0 0 0 / 0.86),
+    0 18px 48px rgb(0 0 0 / 0.32);
+}
+
+:global(.dark) .obgyn-pregnancy-topbar::before {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    inset 0 0 0 1px rgb(148 163 184 / 0.14);
 }
 
 :global(.dark) .obgyn-pregnancy-topbar-icon,
 :global(.dark) .obgyn-pregnancy-topbar-action {
-  border-color: rgb(255 255 255 / 0.1);
-  background: rgb(255 255 255 / 0.08);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 0.24);
+  color: rgb(226 232 240);
+  border-color: rgb(148 163 184 / 0.2);
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.78), rgb(2 6 23 / 0.44)),
+    rgb(15 23 42 / 0.5);
+  box-shadow:
+    0 12px 30px rgb(0 0 0 / 0.32),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
 
 :global(.dark) .obgyn-pregnancy-topbar-icon:hover,
 :global(.dark) .obgyn-pregnancy-topbar-action:hover {
-  background: rgb(255 255 255 / 0.12);
+  border-color: rgb(96 165 250 / 0.36);
+  background:
+    radial-gradient(circle at 0% 0%, rgb(37 99 235 / 0.22), transparent 42%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.86), rgb(2 6 23 / 0.56)),
+    rgb(15 23 42 / 0.56);
 }
 
 :global(.dark) .obgyn-pregnancy-topbar-action--primary {
@@ -363,6 +385,16 @@ const weeksToEdd = computed(() => {
 }
 
 :global(.dark) .obgyn-pregnancy-topbar-ga {
-  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(148 163 184 / 0.14);
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.74), rgb(2 6 23 / 0.42)),
+    rgb(15 23 42 / 0.5);
+  box-shadow:
+    0 12px 28px rgb(0 0 0 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+:global(.dark) .obgyn-pregnancy-topbar-edd {
+  color: rgb(203 213 225 / 0.78);
 }
 </style>

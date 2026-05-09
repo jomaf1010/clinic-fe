@@ -350,6 +350,104 @@
     box-shadow: var(--surface-shadow-strong);
   }
 
+  .dark .obgyn-pregnancy-topbar {
+    color: rgb(248 250 252) !important;
+    background:
+      radial-gradient(circle at 12% 0%, rgb(59 130 246 / 0.24), transparent 34%),
+      radial-gradient(circle at 92% 0%, rgb(20 184 166 / 0.18), transparent 38%),
+      linear-gradient(135deg, rgb(15 23 42 / 0.92), rgb(2 6 23 / 0.78) 56%, rgb(15 23 42 / 0.84)),
+      rgb(2 6 23 / 0.82) !important;
+    border-color: rgb(148 163 184 / 0.16) !important;
+    box-shadow:
+      0 28px 90px -42px rgb(0 0 0 / 0.9),
+      inset 0 1px 0 rgb(255 255 255 / 0.1) !important;
+  }
+
+  .dark .obgyn-pregnancy-topbar-icon,
+  .dark .obgyn-pregnancy-topbar-action,
+  .dark .obgyn-pregnancy-topbar-ga {
+    color: rgb(226 232 240) !important;
+    border-color: rgb(148 163 184 / 0.2) !important;
+    background:
+      linear-gradient(135deg, rgb(15 23 42 / 0.84), rgb(2 6 23 / 0.54)),
+      rgb(15 23 42 / 0.62) !important;
+    box-shadow:
+      0 12px 30px rgb(0 0 0 / 0.34),
+      inset 0 1px 0 rgb(255 255 255 / 0.08) !important;
+  }
+
+  .dark .obgyn-pregnancy-topbar-action--primary {
+    color: white !important;
+    border-color: rgb(255 255 255 / 0.16) !important;
+    background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)) !important;
+    box-shadow: 0 18px 42px rgb(37 99 235 / 0.24) !important;
+  }
+
+  .dark .obgyn-pregnancy-topbar-trimester {
+    color: white !important;
+    background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)) !important;
+  }
+
+  .dark .obgyn-pregnancy-topbar-edd,
+  .dark .obgyn-pregnancy-topbar .text-muted-foreground {
+    color: rgb(203 213 225 / 0.78) !important;
+  }
+
+  .dark .resolve-pregnancy-dialog {
+    color: rgb(248 250 252) !important;
+    background:
+      radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.16), transparent 34%),
+      radial-gradient(circle at 82% 100%, rgb(20 184 166 / 0.1), transparent 36%),
+      linear-gradient(145deg, rgb(15 23 42 / 0.94), rgb(2 6 23 / 0.86) 58%, rgb(15 23 42 / 0.9)),
+      rgb(2 6 23 / 0.86) !important;
+    border-color: rgb(148 163 184 / 0.2) !important;
+    box-shadow: 0 32px 90px -42px rgb(0 0 0 / 0.92) !important;
+  }
+
+  .dark .resolve-outcome-option {
+    color: rgb(248 250 252) !important;
+    border-color: rgb(148 163 184 / 0.18) !important;
+    background:
+      radial-gradient(circle at 0% 0%, rgb(37 99 235 / 0.12), transparent 38%),
+      linear-gradient(135deg, rgb(15 23 42 / 0.88), rgb(2 6 23 / 0.74)),
+      rgb(15 23 42 / 0.78) !important;
+    box-shadow:
+      0 16px 34px rgb(0 0 0 / 0.34),
+      inset 0 1px 0 rgb(255 255 255 / 0.08) !important;
+  }
+
+  .dark .resolve-outcome-option:hover,
+  .dark .resolve-outcome-option.is-selected {
+    border-color: rgb(96 165 250 / 0.5) !important;
+    background:
+      radial-gradient(circle at 0% 0%, rgb(37 99 235 / 0.28), transparent 42%),
+      radial-gradient(circle at 100% 0%, rgb(20 184 166 / 0.2), transparent 38%),
+      linear-gradient(135deg, rgb(15 23 42 / 0.94), rgb(2 6 23 / 0.78)),
+      rgb(15 23 42 / 0.82) !important;
+    box-shadow:
+      0 18px 42px rgb(37 99 235 / 0.14),
+      inset 0 1px 0 rgb(255 255 255 / 0.1) !important;
+  }
+
+  .dark .resolve-outcome-option p:last-child,
+  .dark .resolve-pregnancy-dialog .text-muted-foreground {
+    color: rgb(203 213 225 / 0.78) !important;
+  }
+
+  .dark .resolve-outcome-radio {
+    border-color: rgb(203 213 225 / 0.42) !important;
+    background: rgb(15 23 42 / 0.78) !important;
+    box-shadow:
+      0 8px 18px rgb(0 0 0 / 0.32),
+      inset 0 1px 0 rgb(255 255 255 / 0.1) !important;
+  }
+
+  .dark .resolve-outcome-radio[data-state='checked'] {
+    color: white !important;
+    border-color: rgb(96 165 250) !important;
+    background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)) !important;
+  }
+
   .clinical-solid {
     background: var(--surface-solid);
     border-color: var(--surface-border);
