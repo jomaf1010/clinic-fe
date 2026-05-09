@@ -89,7 +89,7 @@ async function handleDownload(documentId: string) {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(documentId)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
   }

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import { clearAppCaches } from '@/lib/appCaches'
+import { clearOfflineDatabase } from '@/lib/db'
 import { setAuthToken } from '@/lib/http'
 import { authApi } from '../api/authApi'
 
@@ -177,8 +178,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
-    await authApi.logout()
+    try {
+      await authApi.logout()
+    } catch {
+      // Local logout must still complete even if the server/network fails.
+    }
+
     useCentrifugo().disconnect()
+    token.value = null
+    user.value = null
+    memberships.value = []
+    setAuthToken(null)
+
     try {
       const channel = new BroadcastChannel('auth_token_sync')
       channel.postMessage({ type: 'logged_out' })
@@ -188,17 +199,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
     // Clear PHI draft keys from localStorage
     localStorage.removeItem('create-patient')
+    try {
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith('create-patient:'))
+        .forEach((key) => sessionStorage.removeItem(key))
+    } catch {
+      // Session storage may be unavailable — fine
+    }
     // Wipe offline IndexedDB to prevent PHI leaking between sessions
     try {
-      indexedDB.deleteDatabase('clinicapp-offline')
+      await clearOfflineDatabase()
     } catch {
       // Not supported or already absent — fine
     }
     await clearAppCaches()
-    token.value = null
-    user.value = null
-    memberships.value = []
-    setAuthToken(null)
   }
 
   async function silentRefresh(): Promise<boolean> {

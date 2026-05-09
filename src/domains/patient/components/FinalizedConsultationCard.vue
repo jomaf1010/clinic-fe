@@ -78,7 +78,7 @@ async function downloadDocument(documentId: string) {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(documentId)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get download link')

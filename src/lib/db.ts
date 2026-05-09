@@ -96,6 +96,11 @@ class AppDatabase extends Dexie {
 
 export const db = new AppDatabase()
 
+export async function clearOfflineDatabase(): Promise<void> {
+  db.close()
+  await Dexie.delete('clinicapp-offline')
+}
+
 // Some users carry a stale IndexedDB from the pre-Dexie raw-IDB era (or an
 // older Dexie shape) whose primary keys don't match what we declare above.
 // Dexie can't upgrade across primary-key changes, so it throws

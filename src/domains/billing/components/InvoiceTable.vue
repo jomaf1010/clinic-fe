@@ -66,7 +66,7 @@ async function handlePdfClick(e: Event, invoice: InvoiceResponse) {
     const tab = openNewTab()
     try {
       const url = await documentApi.getSignedUrl(doc.id)
-      tab.navigate(url)
+      await tab.navigate(url)
     } catch {
       tab.close()
       toast.error('Failed to download invoice PDF')

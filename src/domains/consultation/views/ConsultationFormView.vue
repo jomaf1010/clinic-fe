@@ -178,7 +178,7 @@ async function downloadSummary() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(summaryDoc.value.id)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
   }

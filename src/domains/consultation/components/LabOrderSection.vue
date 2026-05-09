@@ -526,7 +526,7 @@ async function downloadLabRequest() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(labRequestDoc.value.id)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get download link')

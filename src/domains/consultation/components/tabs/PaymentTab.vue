@@ -149,7 +149,7 @@ async function downloadMedCert() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(docId)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get medical certificate')
@@ -205,7 +205,7 @@ async function openPrescriptionPdf() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(docId)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get prescription PDF')
