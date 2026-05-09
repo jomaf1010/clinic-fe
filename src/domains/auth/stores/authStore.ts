@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { useTheme } from '@/composables/useTheme'
 import { useCentrifugo } from '@/composables/useCentrifugo'
 import { clearAppCaches } from '@/lib/appCaches'
-import { clearOfflineDatabase } from '@/lib/db'
 import { setAuthToken } from '@/lib/http'
 import { authApi } from '../api/authApi'
 
@@ -208,6 +207,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     // Wipe offline IndexedDB to prevent PHI leaking between sessions
     try {
+      const { clearOfflineDatabase } = await import('@/lib/db')
       await clearOfflineDatabase()
     } catch {
       // Not supported or already absent — fine
