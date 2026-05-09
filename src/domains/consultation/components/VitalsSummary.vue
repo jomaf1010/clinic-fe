@@ -6,8 +6,8 @@ import { AlertTriangle, CheckCircle2, History, LoaderCircle, TrendingUp, FlaskCo
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { http } from '@/lib/http'
-import type { ConsultationTriage, ConsultationResponse, LabOrderSummary } from '../types/consultation.types'
-import type { EncounterResponse } from '@/domains/encounter/types/encounter.types'
+import type { ConsultationTriage, LabOrderSummary } from '../types/consultation.types'
+import type { EncounterResponse, EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
 import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyBmi } from '@/lib/vitals'
 import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import { labOrderApi } from '../api/labOrderApi'
@@ -112,7 +112,7 @@ const isLoadingPreview = ref(false)
 async function fetchPastDiagnoses() {
   if (!props.patientId) return
   try {
-    const res = await http.get<{ data: ConsultationResponse[]; meta: unknown }>(
+    const res = await http.get<{ data: EncounterTimelineItem[]; meta: unknown }>(
       `/patients/${props.patientId}/encounters?per_page=3&page=1`,
     )
     const diagnoses: PastDiagnosis[] = []
@@ -121,10 +121,10 @@ async function fetchPastDiagnoses() {
       if (c.id === props.encounterId) continue
       if (c.status !== 'finalized') continue
       if (count >= 2) break
-      for (const d of c.assessment?.diagnoses ?? []) {
+      for (const d of c.display_summary?.diagnoses ?? []) {
         diagnoses.push({
-          description: d.description,
-          code: d.code,
+          description: d,
+          code: null,
           date: c.finalized_at ?? c.created_at,
           encounterId: c.id,
         })
@@ -141,7 +141,7 @@ async function openConsultationPreview(encounterId: string) {
   isLoadingPreview.value = true
   showPreview.value = true
   try {
-    const res = await http.get<{ data: EncounterResponse }>(`/consultations/${encounterId}`)
+    const res = await http.get<{ data: EncounterResponse }>(`/encounters/${encounterId}`)
     previewConsultation.value = res.data
   } catch {
     showPreview.value = false
