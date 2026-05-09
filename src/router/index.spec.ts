@@ -19,8 +19,19 @@ describe('sensitive route guards', () => {
     expect(metaFor(RouteNames.BILLING).requiredPermission).toEqual(['billing.view', 'billing.view-own'])
   })
 
-  it('requires patient view permission for the patients route', () => {
-    expect(metaFor(RouteNames.PATIENT_LIST).requiredPermission).toBe('patients.view')
+  it('requires patient view permission for patient routes', () => {
+    for (const routeName of [
+      RouteNames.PATIENT_LIST,
+      RouteNames.PATIENT_DETAIL,
+      RouteNames.ENCOUNTER_NEW,
+      RouteNames.ENCOUNTER_DETAIL,
+      RouteNames.PREGNANCY_CREATE,
+      RouteNames.PREGNANCY_DETAIL,
+      RouteNames.PRENATAL_VISIT_CREATE,
+      RouteNames.PRENATAL_VISIT_DETAIL,
+    ]) {
+      expect(metaFor(routeName).requiredPermission).toBe('patients.view')
+    }
   })
 
   it('requires schedule permission and feature access for the schedule route', () => {

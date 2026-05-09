@@ -234,6 +234,8 @@ function profileCompleteness(patient: PatientResponse): number {
 }
 
 async function fetchPatients() {
+  if (!canViewPatients.value) return
+
   isLoading.value = true
   error.value = null
 
@@ -250,6 +252,8 @@ async function fetchPatients() {
 }
 
 async function fetchAttentionSummary() {
+  if (!canViewPatients.value) return
+
   isAttentionLoading.value = true
   attentionError.value = null
 
