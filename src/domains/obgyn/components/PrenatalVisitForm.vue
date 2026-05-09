@@ -62,7 +62,7 @@ interface FormState {
   visit_date: string
   // Subjective
   concerns: string
-  fetal_movement: 'normal' | 'decreased' | 'not_yet_felt' | ''
+  fetal_movement: 'present' | 'decreased' | 'absent' | ''
   danger_signs: string[]
   // Vitals
   bp_systolic: number | null
@@ -168,8 +168,11 @@ async function handleSubmit(): Promise<void> {
     concerns: form.concerns || null,
     fetal_movement: form.fetal_movement || null,
     danger_signs: form.danger_signs,
-    bp_systolic: form.bp_systolic,
-    bp_diastolic: form.bp_diastolic,
+    systolic_bp: form.bp_systolic,
+    diastolic_bp: form.bp_diastolic,
+    heart_rate: form.heart_rate,
+    respiratory_rate: form.respiratory_rate,
+    temperature: form.temperature,
     weight: form.weight,
     fundal_height: form.fundal_height,
     fetal_heart_rate: form.fetal_heart_rate,
@@ -253,9 +256,9 @@ async function handleSubmit(): Promise<void> {
               <SelectValue placeholder="Select..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="present">Present / normal</SelectItem>
               <SelectItem value="decreased">Decreased</SelectItem>
-              <SelectItem value="not_yet_felt">Not yet felt</SelectItem>
+              <SelectItem value="absent">Absent / not yet felt</SelectItem>
             </SelectContent>
           </Select>
         </div>
