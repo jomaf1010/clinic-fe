@@ -43,10 +43,13 @@ export interface CreateVisitPayload {
   gestational_age_weeks?: number | null
   gestational_age_days?: number | null
   concerns?: string | null
-  fetal_movement?: string | null
+  fetal_movement?: 'present' | 'decreased' | 'absent' | null
   danger_signs?: string[]
-  bp_systolic?: number | null
-  bp_diastolic?: number | null
+  systolic_bp?: number | null
+  diastolic_bp?: number | null
+  heart_rate?: number | null
+  respiratory_rate?: number | null
+  temperature?: number | null
   weight?: number | null
   fundal_height?: number | null
   fetal_heart_rate?: number | null
