@@ -67,9 +67,11 @@ import CreatePatientDialog from '../components/CreatePatientDialog.vue'
 import PatientCompletenessRing from '../components/PatientCompletenessRing.vue'
 import { calculatePatientProfileCompleteness } from '../utils/profileCompleteness'
 import type { PatientResponse, PatientListFilters, PatientStatus, PatientSortField, SortDirection, PatientAttentionItem, PatientAttentionSummary } from '../types/patient.types'
+import { useAuthStore } from '@/domains/auth/stores/authStore'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 
 const patients = ref<PatientResponse[]>([])
 const isLoading = ref(false)
@@ -104,6 +106,8 @@ const searchQuery = ref((route.query.search as string) || '')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const hasActiveFilters = computed(() => !!filters.value.status || !!filters.value.sex || !!filters.value.sort_by || !!filters.value.sort_dir)
+const canViewPatients = computed(() => authStore.hasPermission('patients.view'))
+const canCreatePatient = computed(() => authStore.hasPermission('patients.create'))
 
 const newPatientCount = computed(() => patients.value.filter((patient) => patient.status === 'new').length)
 
@@ -230,6 +234,8 @@ function profileCompleteness(patient: PatientResponse): number {
 }
 
 async function fetchPatients() {
+  if (!canViewPatients.value) return
+
   isLoading.value = true
   error.value = null
 
@@ -246,6 +252,8 @@ async function fetchPatients() {
 }
 
 async function fetchAttentionSummary() {
+  if (!canViewPatients.value) return
+
   isAttentionLoading.value = true
   attentionError.value = null
 
@@ -261,6 +269,8 @@ async function fetchAttentionSummary() {
 }
 
 async function refreshPatientData() {
+  if (!canViewPatients.value) return
+
   await Promise.all([
     fetchPatients(),
     fetchAttentionSummary(),
@@ -356,7 +366,7 @@ watch(
 
 onMounted(() => {
   refreshPatientData()
-  if (route.query.create === '1') {
+  if (route.query.create === '1' && canCreatePatient.value) {
     showCreateDialog.value = true
     router.replace({ query: { ...route.query, create: undefined } })
   }
@@ -376,7 +386,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <Button class="h-10 w-full shrink-0 px-5 text-sm sm:w-auto" @click="showCreateDialog = true">
+        <Button v-if="canCreatePatient" class="h-10 w-full shrink-0 px-5 text-sm sm:w-auto" @click="showCreateDialog = true">
           <UserPlus class="size-4" />
           Add Patient
         </Button>
@@ -634,7 +644,7 @@ onMounted(() => {
       >
         <Users class="mb-3 size-10 opacity-50" />
         <p>No patients yet.</p>
-        <Button variant="link" class="mt-2" @click="showCreateDialog = true">
+        <Button v-if="canCreatePatient" variant="link" class="mt-2" @click="showCreateDialog = true">
           Add your first patient
         </Button>
       </div>
@@ -938,6 +948,7 @@ onMounted(() => {
 
     <!-- Create Dialog -->
     <CreatePatientDialog
+      v-if="canCreatePatient"
       :open="showCreateDialog"
       @update:open="showCreateDialog = $event"
       @created="onPatientCreated"
