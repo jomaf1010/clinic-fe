@@ -182,7 +182,7 @@ async function handleBlockSave(payload: StoreCalendarBlockPayload | UpdateCalend
   isSavingBlock.value = true
   try {
     if (editingBlock.value) {
-      await store.updateBlock(editingBlock.value.id, payload as UpdateCalendarBlockPayload)
+      await store.updateBlock(editingBlock.value.id, payload as UpdateCalendarBlockPayload, editingBlock.value.updated_at)
       toast.success('Block updated')
     } else {
       await store.createBlock(payload as StoreCalendarBlockPayload)

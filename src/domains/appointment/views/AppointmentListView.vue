@@ -53,6 +53,7 @@ const viewMode = ref<'board' | 'list' | 'calendar'>('board')
 const showBookingWizard = ref(false)
 const bookingMode = ref<'create' | 'reschedule'>('create')
 const rescheduleAppointmentId = ref<string | null>(null)
+const rescheduleExpectedUpdatedAt = ref<string | null>(null)
 const prefillDateTime = ref<string | null>(null)
 const prefillDoctorId = ref<string | null>(null)
 const prefillDoctorName = ref<string | null>(null)
@@ -85,6 +86,7 @@ function openBookingWizard(options?: {
 }) {
   bookingMode.value = 'create'
   rescheduleAppointmentId.value = null
+  rescheduleExpectedUpdatedAt.value = null
   prefillDateTime.value = options?.dateTime ?? null
   prefillDoctorId.value = options?.doctorId ?? null
   prefillDoctorName.value = options?.doctorName ?? null
@@ -97,6 +99,7 @@ function openRescheduleWizard(appointment: AppointmentResponse) {
   savedScrollY = window.scrollY
   bookingMode.value = 'reschedule'
   rescheduleAppointmentId.value = appointment.id
+  rescheduleExpectedUpdatedAt.value = appointment.updated_at
   prefillDateTime.value = appointment.scheduled_at
   prefillDoctorId.value = appointment.doctor_id
   prefillDoctorName.value = appointment.doctor_name ?? null
@@ -108,6 +111,7 @@ function openRescheduleWizard(appointment: AppointmentResponse) {
 function clearBookingPrefill() {
   bookingMode.value = 'create'
   rescheduleAppointmentId.value = null
+  rescheduleExpectedUpdatedAt.value = null
   prefillDateTime.value = null
   prefillDoctorId.value = null
   prefillDoctorName.value = null
@@ -698,6 +702,7 @@ onUnmounted(() => {
       :open="showBookingWizard"
       :mode="bookingMode"
       :appointment-id="rescheduleAppointmentId"
+      :expected-updated-at="rescheduleExpectedUpdatedAt"
       :prefill-date-time="prefillDateTime"
       :prefill-doctor-id="prefillDoctorId"
       :prefill-doctor-name="prefillDoctorName"

@@ -219,10 +219,10 @@ describe('scheduleStore - schedule lifecycle', () => {
       start: '2026-05-06T01:00:00.000Z',
       end: '2026-05-06T02:00:00.000Z',
     })
-    await store.updateBlock('block-1', { title: 'Updated' })
+    await store.updateBlock('block-1', { title: 'Updated' }, '2026-05-08T09:00:00Z')
 
     expect(scheduleApi.createBlock).toHaveBeenCalledOnce()
-    expect(scheduleApi.updateBlock).toHaveBeenCalledWith('block-1', { title: 'Updated' })
+    expect(scheduleApi.updateBlock).toHaveBeenCalledWith('block-1', { title: 'Updated' }, '2026-05-08T09:00:00Z')
   })
 })
 

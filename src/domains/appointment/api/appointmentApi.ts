@@ -41,11 +41,17 @@ export const appointmentApi = {
     return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/no-show`)
   },
 
-  reschedule(uuid: string, scheduledAt: string): Promise<SingleAppointmentResponse> {
+  reschedule(uuid: string, scheduledAt: string, expectedUpdatedAt?: string): Promise<SingleAppointmentResponse> {
+    if (expectedUpdatedAt) {
+      return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/reschedule`, { scheduled_at: scheduledAt }, { 'X-Expected-Updated-At': expectedUpdatedAt })
+    }
     return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/reschedule`, { scheduled_at: scheduledAt })
   },
 
-  resize(uuid: string, duration: number): Promise<SingleAppointmentResponse> {
+  resize(uuid: string, duration: number, expectedUpdatedAt?: string): Promise<SingleAppointmentResponse> {
+    if (expectedUpdatedAt) {
+      return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/resize`, { duration }, { 'X-Expected-Updated-At': expectedUpdatedAt })
+    }
     return http.patch<SingleAppointmentResponse>(`/appointments/${uuid}/resize`, { duration })
   },
 
