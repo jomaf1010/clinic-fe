@@ -21,10 +21,11 @@ describe('offlineDb queueAction', () => {
 
   it('coalesces multiple pending encounter updates behind the original lock token', async () => {
     const { db, queueAction } = await importOfflineDb()
+    const url = '/encounters/offline-db-spec-lock-token'
 
     await queueAction({
       type: 'update-encounter',
-      url: '/encounters/enc-1',
+      url,
       method: 'PATCH',
       body: {
         triage: { chief_complaint: 'Cough', temperature_c: 38 },
@@ -34,7 +35,7 @@ describe('offlineDb queueAction', () => {
     })
     await queueAction({
       type: 'update-encounter',
-      url: '/encounters/enc-1',
+      url,
       method: 'PATCH',
       body: {
         triage: { temperature_c: 37.5 },
@@ -44,12 +45,12 @@ describe('offlineDb queueAction', () => {
       createdAt: 1_700_000_000_500,
     })
 
-    const queued = await db.pendingActions.toArray()
+    const queued = (await db.pendingActions.toArray()).filter((action) => action.url === url)
 
     expect(queued).toHaveLength(1)
     expect(queued[0]).toEqual(expect.objectContaining({
       type: 'update-encounter',
-      url: '/encounters/enc-1',
+      url,
       method: 'PATCH',
       headers: { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
       body: {
@@ -61,10 +62,11 @@ describe('offlineDb queueAction', () => {
 
   it('keeps unrelated pending actions as separate queue entries', async () => {
     const { db, queueAction } = await importOfflineDb()
+    const urls = ['/encounters/offline-db-spec-unrelated-1', '/encounters/offline-db-spec-unrelated-2']
 
     await queueAction({
       type: 'update-encounter',
-      url: '/encounters/enc-1',
+      url: urls[0],
       method: 'PATCH',
       body: { assessment: { diagnosis: 'URI' } },
       headers: { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
@@ -72,13 +74,14 @@ describe('offlineDb queueAction', () => {
     })
     await queueAction({
       type: 'update-encounter',
-      url: '/encounters/enc-2',
+      url: urls[1],
       method: 'PATCH',
       body: { assessment: { diagnosis: 'Well' } },
       headers: { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
       createdAt: 2,
     })
 
-    await expect(db.pendingActions.count()).resolves.toBe(2)
+    const queued = (await db.pendingActions.toArray()).filter((action) => urls.includes(action.url))
+    expect(queued).toHaveLength(2)
   })
 })
