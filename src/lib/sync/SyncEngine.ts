@@ -113,9 +113,9 @@ class SyncEngineImpl {
     try {
       const method = action.method.toLowerCase() as 'post' | 'patch' | 'delete'
       if (method === 'delete') {
-        await http.delete(action.url)
+        await http.delete(action.url, action.headers)
       } else {
-        await http[method](action.url, action.body)
+        await http[method](action.url, action.body, action.headers)
       }
       return 'succeeded'
     } catch (err) {

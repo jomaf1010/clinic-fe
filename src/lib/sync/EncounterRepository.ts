@@ -1,4 +1,5 @@
 import { db } from '../db'
+import { queueAction } from '../offlineDb'
 import { encounterApi } from '@/domains/encounter/api/encounterApi'
 import type {
   EncounterResponse,
@@ -75,29 +76,31 @@ class EncounterRepositoryImpl implements Repository<EncounterLike> {
     await db.encounters.put(merged)
 
     if (!navigator.onLine) {
-      await db.pendingActions.add({
+      await queueAction({
         type: 'update-encounter',
         url: `/encounters/${data.id}`,
         method: 'PATCH',
         body: this.toPayload(data),
+        headers: this.lockHeaders(data),
         createdAt: Date.now(),
       })
       return merged as unknown as EncounterLike
     }
 
     try {
-      const response = await encounterApi.update(data.id, this.toPayload(data))
+      const response = await encounterApi.update(data.id, this.toPayload(data), data.updated_at)
       const fresh = response.data as EncounterLike
       await db.encounters.put(this.toStorage(fresh))
       return fresh
     } catch {
       // Network dropped mid-save — queue the mutation and keep the local
       // optimistic state. SyncEngine will flush it when online again.
-      await db.pendingActions.add({
+      await queueAction({
         type: 'update-encounter',
         url: `/encounters/${data.id}`,
         method: 'PATCH',
         body: this.toPayload(data),
+        headers: this.lockHeaders(data),
         createdAt: Date.now(),
       })
       void syncEngine.flush()
@@ -132,6 +135,10 @@ class EncounterRepositoryImpl implements Repository<EncounterLike> {
     // narrow — keeps the wire contract honest. Refine per consumer.
     const { id: _id, updated_at: _u, created_at: _c, ...rest } = data
     return rest as UpdateEncounterPayload
+  }
+
+  private lockHeaders(data: Partial<EncounterLike>): Record<string, string> | undefined {
+    return data.updated_at ? { 'X-Expected-Updated-At': data.updated_at } : undefined
   }
 }
 
