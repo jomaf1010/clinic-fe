@@ -66,6 +66,16 @@ export const useAuthStore = defineStore('auth', () => {
     return { max, used, remaining: max === null ? null : Math.max(0, max - used) }
   }
 
+  function broadcastSessionChanged(): void {
+    try {
+      const channel = new BroadcastChannel('auth_token_sync')
+      channel.postMessage({ type: 'session_changed' })
+      channel.close()
+    } catch {
+      // BroadcastChannel not supported — fine
+    }
+  }
+
   function setToken(newToken: string): void {
     token.value = newToken
     setAuthToken(newToken)
@@ -86,11 +96,49 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function selectClinic(clinicId: string): Promise<void> {
+  interface SyncExternalSessionOptions {
+    reloadOnAccountChange?: boolean
+  }
+
+  async function syncExternalSession(newToken: string, options: SyncExternalSessionOptions = {}): Promise<void> {
+    const previousUserId = user.value?.id ?? null
+    const previousClinicId = currentClinic.value?.id ?? null
+
+    setToken(newToken)
+    try {
+      await fetchUser()
+    } catch (error) {
+      token.value = null
+      user.value = null
+      memberships.value = []
+      setAuthToken(null)
+      if (options.reloadOnAccountChange && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+      throw error
+    }
+
+    const nextUserId = user.value?.id ?? null
+    const nextClinicId = currentClinic.value?.id ?? null
+    const accountOrClinicChanged = previousUserId !== null
+      && (previousUserId !== nextUserId || previousClinicId !== nextClinicId)
+
+    if (accountOrClinicChanged) {
+      await clearAppCaches()
+      if (options.reloadOnAccountChange && typeof window !== 'undefined') {
+        window.location.reload()
+      }
+    }
+  }
+
+  async function selectClinic(clinicId: string, options: { broadcast?: boolean } = {}): Promise<void> {
     const response = await authApi.selectClinic(clinicId)
     setToken(response.data.access_token)
     await clearAppCaches()
     await fetchUser()
+    if (options.broadcast !== false) {
+      broadcastSessionChanged()
+    }
   }
 
   async function completeTokenLogin(response: LoginResponse | GoogleAuthResponse): Promise<void> {
@@ -98,13 +146,14 @@ export const useAuthStore = defineStore('auth', () => {
     memberships.value = response.meta.memberships
     const activeMemberships = response.meta.memberships.filter((m) => m.status === 'active')
     if (activeMemberships.length === 1) {
-      await selectClinic(activeMemberships[0]!.clinic_id)
+      await selectClinic(activeMemberships[0]!.clinic_id, { broadcast: false })
     } else if (activeMemberships.length === 0 && response.meta.memberships.length === 0) {
       // No memberships at all — will trigger onboarding
       await fetchUser()
     } else {
       await fetchUser()
     }
+    broadcastSessionChanged()
   }
 
   async function login(credentials: LoginCredentials): Promise<void> {
@@ -157,6 +206,7 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authApi.refresh()
       setToken(response.data.access_token)
       await fetchUser()
+      broadcastSessionChanged()
       return true
     } catch {
       return false
@@ -183,6 +233,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasFeature,
     getLimit,
     setToken,
+    syncExternalSession,
     fetchUser,
     login,
     googleLogin,

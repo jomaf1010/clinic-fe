@@ -42,6 +42,15 @@ class HttpError extends Error {
 
 let refreshPromise: Promise<boolean> | null = null
 
+async function syncAuthStore(newToken: string): Promise<void> {
+  try {
+    const { useAuthStore } = await import('@/domains/auth/stores/authStore')
+    await useAuthStore().syncExternalSession(newToken, { reloadOnAccountChange: true })
+  } catch {
+    // Auth store may not be mounted yet; keep the HTTP token in sync at minimum.
+  }
+}
+
 async function attemptRefresh(): Promise<boolean> {
   // Network errors (TypeError) propagate — callers must distinguish
   // "server rejected refresh" (false) from "server unreachable" (throw)
@@ -55,6 +64,7 @@ async function attemptRefresh(): Promise<boolean> {
   const newToken = result?.data?.access_token
   if (!newToken) return false
   setAuthToken(newToken)
+  await syncAuthStore(newToken)
   authChannel.postMessage({ type: 'session_changed' })
   return true
 }
@@ -76,9 +86,12 @@ authChannel.addEventListener('message', (event) => {
       credentials: 'include',
     })
       .then(r => (r.ok ? r.json() : null))
-      .then((result) => {
+      .then(async (result) => {
         const newToken = result?.data?.access_token
-        if (newToken) setAuthToken(newToken)
+        if (newToken) {
+          setAuthToken(newToken)
+          await syncAuthStore(newToken)
+        }
       })
       .catch(() => { /* keep existing token on network error */ })
   } else if (event.data?.type === 'logged_out') {
