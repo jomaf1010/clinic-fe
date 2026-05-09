@@ -129,7 +129,10 @@ describe('QueueView display session controls', () => {
     await wrapper.findAll('button').find((button) => button.text().includes('Open Display'))?.trigger('click')
 
     expect(sessionStorage.getItem('mediflow.queueDisplay.token')).toBe('queue-token-123')
-    expect(window.open).toHaveBeenCalledWith('http://localhost:3000/queue-display', '_blank')
-    expect(window.open).not.toHaveBeenCalledWith(expect.stringContaining('queue-token-123'), expect.anything())
+
+    const openCall = vi.mocked(window.open).mock.calls[0]
+    expect(openCall?.[1]).toBe('_blank')
+    expect(new URL(openCall?.[0] as string).pathname).toBe('/queue-display')
+    expect(openCall?.[0]).not.toContain('queue-token-123')
   })
 })
