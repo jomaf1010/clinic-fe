@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { consultationApi } from '../../../api/consultationApi'
-import type { DiagnosisSearchResult } from '../../../api/consultationApi'
-import type { ConsultationAssessment, AssessmentDiagnosis } from '../../../types/consultation.types'
+import { consultationApi } from '../../api/consultationApi'
+import type { DiagnosisSearchResult } from '../../api/consultationApi'
+import type { ConsultationAssessment, AssessmentDiagnosis } from '../../types/consultation.types'
 
 const props = defineProps<{
   assessment: ConsultationAssessment
