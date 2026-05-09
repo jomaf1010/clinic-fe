@@ -12,14 +12,18 @@
  *     them.
  *   - `cn` is the ubiquitous tailwind-merge wrapper. We sanity-check
  *     dedup/override behaviour so a bad clsx upgrade is caught.
- *
- * `printPdf` and `openNewTab` rely on `window.open`/iframes and aren't
- * covered here — they're DOM-side-effect functions that belong in an
- * e2e or component test. Pure formatters only.
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { cn, toYmd, todayYmd, formatRelativeTime, timeAgo } from './utils'
+import { cn, toYmd, todayYmd, formatRelativeTime, timeAgo, openNewTab } from './utils'
+
+const downloadMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@/lib/http', () => ({
+  http: {
+    download: downloadMock,
+  },
+}))
 
 describe('cn', () => {
   it('merges plain classes', () => {
@@ -167,5 +171,37 @@ describe('timeAgo', () => {
 
   it('returns "Just now" for < 60s', () => {
     expect(timeAgo('2026-04-29T11:59:30Z')).toBe('Just now')
+  })
+})
+
+describe('openNewTab', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    downloadMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('downloads signed URLs and navigates only to a blob URL', async () => {
+    const blob = new Blob(['pdf'], { type: 'application/pdf' })
+    const openedWindow = { closed: false, location: { href: '' }, close: vi.fn() }
+    downloadMock.mockResolvedValue(blob)
+    vi.spyOn(window, 'open').mockReturnValue(openedWindow as unknown as Window)
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:document-1')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+
+    const tab = openNewTab()
+    await tab.navigate('https://signed.example.test/private.pdf?token=secret')
+
+    expect(downloadMock).toHaveBeenCalledWith('https://signed.example.test/private.pdf?token=secret')
+    expect(openedWindow.location.href).toBe('blob:document-1')
+    expect(openedWindow.location.href).not.toContain('signed.example.test')
+    expect(createObjectURL).toHaveBeenCalledWith(blob)
+
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:document-1')
   })
 })

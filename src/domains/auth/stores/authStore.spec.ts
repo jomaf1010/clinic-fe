@@ -119,6 +119,7 @@ function makeMembership(overrides: Partial<Membership> = {}): Membership {
 async function loadStore(api: MockAuthApi) {
   vi.doMock('../api/authApi', () => ({ authApi: api }))
   vi.doMock('@/lib/http', () => ({ setAuthToken: vi.fn() }))
+  vi.doMock('@/lib/db', () => ({ clearOfflineDatabase: vi.fn().mockResolvedValue(undefined) }))
   vi.doMock('@/composables/useTheme', () => ({ useTheme: () => ({ setTheme: vi.fn() }) }))
   vi.doMock('@/composables/useCentrifugo', () => ({ useCentrifugo: () => ({ disconnect: vi.fn() }) }))
   // Avoid loading the real specialty store on me()
@@ -135,6 +136,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.doUnmock('../api/authApi')
   vi.doUnmock('@/lib/http')
+  vi.doUnmock('@/lib/db')
   vi.doUnmock('@/composables/useTheme')
   vi.doUnmock('@/composables/useCentrifugo')
   vi.doUnmock('@/stores/specialtyConfigStore')
@@ -603,10 +605,6 @@ describe('authStore — logout', () => {
     await store.fetchUser()
     expect(store.user).not.toBeNull()
 
-    // Stub indexedDB.deleteDatabase so logout doesn't try to talk to the
-    // real (or fake) IDB.
-    vi.stubGlobal('indexedDB', { deleteDatabase: vi.fn() })
-
     store.setToken('tok')
     await store.logout()
 
@@ -617,22 +615,42 @@ describe('authStore — logout', () => {
     expect(store.isAuthenticated).toBe(false)
   })
 
-  it('still clears local state when broadcast and indexedDB cleanup are unavailable', async () => {
-    const api = makeAuthApi()
+  it('clears local state and PHI drafts even when remote logout fails', async () => {
+    const api = makeAuthApi({ logout: vi.fn().mockRejectedValue(new Error('network down')) })
     const { useAuthStore } = await loadStore(api)
+    const { clearOfflineDatabase } = await import('@/lib/db')
     const store = useAuthStore()
 
     store.user = makeUser({ current_clinic: makeClinicContext() })
     store.memberships = [makeMembership()]
     store.setToken('tok')
+    localStorage.setItem('create-patient', '{"name":"legacy"}')
+    sessionStorage.setItem('create-patient:u1:c1', '{"name":"scoped"}')
+
+    await store.logout()
+
+    expect(api.logout).toHaveBeenCalled()
+    expect(store.token).toBeNull()
+    expect(store.user).toBeNull()
+    expect(store.memberships).toEqual([])
+    expect(localStorage.getItem('create-patient')).toBeNull()
+    expect(sessionStorage.getItem('create-patient:u1:c1')).toBeNull()
+    expect(clearOfflineDatabase).toHaveBeenCalled()
+  })
+
+  it('still clears local state when broadcast and offline cleanup are unavailable', async () => {
+    const api = makeAuthApi()
+    const { useAuthStore } = await loadStore(api)
+    const { clearOfflineDatabase } = await import('@/lib/db')
+    const store = useAuthStore()
+
+    store.user = makeUser({ current_clinic: makeClinicContext() })
+    store.memberships = [makeMembership()]
+    store.setToken('tok')
+    vi.mocked(clearOfflineDatabase).mockRejectedValueOnce(new Error('not supported'))
     vi.stubGlobal('BroadcastChannel', vi.fn(() => {
       throw new Error('not supported')
     }))
-    vi.stubGlobal('indexedDB', {
-      deleteDatabase: vi.fn(() => {
-        throw new Error('not supported')
-      }),
-    })
 
     await store.logout()
 

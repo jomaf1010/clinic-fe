@@ -177,8 +177,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
-    await authApi.logout()
+    try {
+      await authApi.logout()
+    } catch {
+      // Local logout must still complete even if the server/network fails.
+    }
+
     useCentrifugo().disconnect()
+    token.value = null
+    user.value = null
+    memberships.value = []
+    setAuthToken(null)
+
     try {
       const channel = new BroadcastChannel('auth_token_sync')
       channel.postMessage({ type: 'logged_out' })
@@ -197,15 +207,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
     // Wipe offline IndexedDB to prevent PHI leaking between sessions
     try {
-      indexedDB.deleteDatabase('clinicapp-offline')
+      const { clearOfflineDatabase } = await import('@/lib/db')
+      await clearOfflineDatabase()
     } catch {
       // Not supported or already absent — fine
     }
     await clearAppCaches()
-    token.value = null
-    user.value = null
-    memberships.value = []
-    setAuthToken(null)
   }
 
   async function silentRefresh(): Promise<boolean> {
