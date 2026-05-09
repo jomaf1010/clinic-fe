@@ -168,6 +168,7 @@ async function eventSourceFn(
           patientName: appt.patient_name ?? 'Patient',
           statusLabel,
           duration: appt.duration,
+          updatedAt: appt.updated_at,
         },
       })
     }
@@ -241,7 +242,8 @@ async function handleEventDrop(info: EventDropArg) {
   }
 
   try {
-    await appointmentApi.reschedule(apptId, newStart.toISOString())
+    const expectedUpdatedAt = info.event.extendedProps.updatedAt as string | undefined
+    await appointmentApi.reschedule(apptId, newStart.toISOString(), expectedUpdatedAt)
     toast.success('Appointment rescheduled')
     // Refresh to get updated data
     calendarRef.value?.getApi()?.refetchEvents()
@@ -269,7 +271,8 @@ async function handleEventResize(info: EventResizeDoneArg) {
   }
 
   try {
-    await appointmentApi.resize(apptId, durationMin)
+    const expectedUpdatedAt = info.event.extendedProps.updatedAt as string | undefined
+    await appointmentApi.resize(apptId, durationMin, expectedUpdatedAt)
     toast.success('Appointment duration updated')
     calendarRef.value?.getApi()?.refetchEvents()
   } catch (err) {

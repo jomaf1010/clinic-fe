@@ -69,8 +69,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     await scheduleApi.createBlock(payload)
   }
 
-  async function updateBlock(uuid: string, payload: UpdateCalendarBlockPayload): Promise<void> {
-    await scheduleApi.updateBlock(uuid, payload)
+  async function updateBlock(uuid: string, payload: UpdateCalendarBlockPayload, expectedUpdatedAt?: string): Promise<void> {
+    await scheduleApi.updateBlock(uuid, payload, expectedUpdatedAt)
   }
 
   async function fetchStudioData(params: {

@@ -32,6 +32,7 @@ const props = defineProps<{
   open: boolean
   mode?: 'create' | 'reschedule'
   appointmentId?: string | null
+  expectedUpdatedAt?: string | null
   prefillDateTime?: string | null // ISO datetime from calendar click
   prefillDoctorId?: string | null // pre-select doctor (skip step 1)
   prefillDoctorName?: string | null
@@ -138,7 +139,7 @@ async function submit() {
     isRescheduling.value = true
 
     try {
-      await appointmentApi.reschedule(props.appointmentId, selectedSlot.value)
+      await appointmentApi.reschedule(props.appointmentId, selectedSlot.value, props.expectedUpdatedAt ?? undefined)
       toast.success('Appointment rescheduled')
       emit('created')
       emit('update:open', false)

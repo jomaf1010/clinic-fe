@@ -27,7 +27,10 @@ export const scheduleApi = {
     return http.post<CalendarBlockResponse>('/calendar-blocks', payload)
   },
 
-  updateBlock(uuid: string, payload: UpdateCalendarBlockPayload): Promise<CalendarBlockResponse> {
+  updateBlock(uuid: string, payload: UpdateCalendarBlockPayload, expectedUpdatedAt?: string): Promise<CalendarBlockResponse> {
+    if (expectedUpdatedAt) {
+      return http.patch<CalendarBlockResponse>(`/calendar-blocks/${uuid}`, payload, { 'X-Expected-Updated-At': expectedUpdatedAt })
+    }
     return http.patch<CalendarBlockResponse>(`/calendar-blocks/${uuid}`, payload)
   },
 

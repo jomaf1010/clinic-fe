@@ -60,9 +60,9 @@ describe('scheduleApi', () => {
     const updatePayload = { reason: 'clinic meeting' }
 
     await scheduleApi.createBlock(createPayload)
-    await scheduleApi.updateBlock('block-1', updatePayload)
+    await scheduleApi.updateBlock('block-1', updatePayload, '2026-05-08T09:00:00Z')
 
     expect(http.post).toHaveBeenCalledWith('/calendar-blocks', createPayload)
-    expect(http.patch).toHaveBeenCalledWith('/calendar-blocks/block-1', updatePayload)
+    expect(http.patch).toHaveBeenCalledWith('/calendar-blocks/block-1', updatePayload, { 'X-Expected-Updated-At': '2026-05-08T09:00:00Z' })
   })
 })
