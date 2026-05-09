@@ -6,7 +6,6 @@ import { toast } from 'vue-sonner'
 import {
   AlertTriangle,
   Columns3,
-  Copy,
   ExternalLink,
   List,
   ListOrdered,
@@ -201,9 +200,9 @@ async function generateDisplayToken() {
   isGeneratingDisplayToken.value = true
   try {
     displayToken.value = await queueApi.generateDisplayToken()
-    toast.success('Display link generated')
+    toast.success('Display session generated')
   } catch {
-    toast.error('Failed to generate display link')
+    toast.error('Failed to generate display session')
   } finally {
     isGeneratingDisplayToken.value = false
   }
@@ -214,18 +213,11 @@ async function revokeDisplayToken() {
   try {
     await queueApi.revokeDisplayToken()
     displayToken.value = { active: false, token: null, created_at: null, expires_at: null }
-    toast.success('Display link revoked')
+    toast.success('Display session revoked')
   } catch {
-    toast.error('Failed to revoke display link')
+    toast.error('Failed to revoke display session')
   } finally {
     isRevokingDisplayToken.value = false
-  }
-}
-
-function copyDisplayUrl() {
-  if (displayUrl.value) {
-    navigator.clipboard.writeText(displayUrl.value)
-    toast.success('Display URL copied without access token')
   }
 }
 
@@ -309,7 +301,7 @@ onUnmounted(() => {
                 <div>
                   <h4 class="text-sm font-medium">Queue Display Screen</h4>
                   <p class="text-xs text-muted-foreground">
-                    Generate a link to show the queue on a TV or tablet in your waiting room.
+                    Generate a same-browser display session for a TV or tablet in your waiting room.
                   </p>
                 </div>
 
@@ -320,24 +312,16 @@ onUnmounted(() => {
 
                 <!-- Newly generated token: launchable once in this browser -->
                 <template v-else-if="hasLaunchableDisplayToken(displayToken)">
-                  <div class="rounded-md border bg-muted/50 p-2">
-                    <p class="break-all text-xs font-mono text-muted-foreground">
-                      {{ displayUrl }}
-                    </p>
-                    <p class="mt-1 text-[11px] text-muted-foreground">
-                      Open from this browser to keep the access token out of the URL and clipboard.
+                  <div class="rounded-md border bg-muted/50 p-3">
+                    <p class="text-sm font-medium">Display session is ready</p>
+                    <p class="mt-1 text-xs text-muted-foreground">
+                      Open the display from this browser. The access token is stored only in this browser session and is never shown or copied.
                     </p>
                   </div>
-                  <div class="flex gap-2">
-                    <Button variant="outline" size="sm" class="flex-1 h-8" @click="copyDisplayUrl">
-                      <Copy class="size-3.5" />
-                      Copy App URL
-                    </Button>
-                    <Button variant="outline" size="sm" class="flex-1 h-8" @click="openDisplayInNewTab">
-                      <ExternalLink class="size-3.5" />
-                      Open
-                    </Button>
-                  </div>
+                  <Button variant="outline" size="sm" class="h-8 w-full" @click="openDisplayInNewTab">
+                    <ExternalLink class="size-3.5" />
+                    Open Display
+                  </Button>
                   <Button
                     variant="destructive"
                     size="sm"
@@ -347,16 +331,16 @@ onUnmounted(() => {
                   >
                     <LoaderCircle v-if="isRevokingDisplayToken" class="size-3.5 animate-spin" />
                     <Trash2 v-else class="size-3.5" />
-                    Revoke Link
+                    Revoke Session
                   </Button>
                 </template>
 
                 <!-- Existing active token: raw token is intentionally not returned again -->
                 <template v-else-if="hasActiveDisplayToken(displayToken)">
                   <div class="rounded-md border bg-muted/50 p-3">
-                    <p class="text-sm font-medium">Display link is active</p>
+                    <p class="text-sm font-medium">Display session is active</p>
                     <p class="mt-1 text-xs text-muted-foreground">
-                      For security, existing display links cannot be shown again. Generate a new link if you need to copy or open it from this browser.
+                      For security, existing display sessions cannot be shown again. Generate a new session if you need to open it from this browser.
                     </p>
                   </div>
                   <Button
@@ -367,7 +351,7 @@ onUnmounted(() => {
                   >
                     <LoaderCircle v-if="isGeneratingDisplayToken" class="size-3.5 animate-spin" />
                     <Monitor v-else class="size-3.5" />
-                    Generate New Link
+                    Generate New Session
                   </Button>
                   <Button
                     variant="destructive"
@@ -378,7 +362,7 @@ onUnmounted(() => {
                   >
                     <LoaderCircle v-if="isRevokingDisplayToken" class="size-3.5 animate-spin" />
                     <Trash2 v-else class="size-3.5" />
-                    Revoke Link
+                    Revoke Session
                   </Button>
                 </template>
 
@@ -392,7 +376,7 @@ onUnmounted(() => {
                   >
                     <LoaderCircle v-if="isGeneratingDisplayToken" class="size-3.5 animate-spin" />
                     <Monitor v-else class="size-3.5" />
-                    Generate Display Link
+                    Generate Display Session
                   </Button>
                 </template>
               </div>
