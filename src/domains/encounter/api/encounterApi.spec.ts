@@ -68,6 +68,20 @@ describe('encounterApi', () => {
     expect(http.patch).toHaveBeenCalledWith('/encounters/encounter-1', payload)
   })
 
+  it('sends optimistic-lock header when updating with an expected timestamp', async () => {
+    const http = makeHttp()
+    const { encounterApi } = await loadApi(http)
+    const payload = { assessment: { chief_complaint: 'Headache' } }
+
+    await encounterApi.update('encounter-1', payload, '2026-04-30T00:00:00Z')
+
+    expect(http.patch).toHaveBeenCalledWith(
+      '/encounters/encounter-1',
+      payload,
+      { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
+    )
+  })
+
   it('delegates encounter lifecycle actions', async () => {
     const http = makeHttp()
     const { encounterApi } = await loadApi(http)

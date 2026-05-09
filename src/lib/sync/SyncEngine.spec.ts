@@ -48,6 +48,28 @@ describe('SyncEngine', () => {
     httpDelete.mockReset()
   })
 
+  it('passes queued mutation headers through to the HTTP client', async () => {
+    const { db, syncEngine } = await importSyncModules()
+    await db.pendingActions.add({
+      type: 'update-encounter',
+      url: '/encounters/enc-1',
+      method: 'PATCH',
+      body: { assessment: { chief_complaint: 'offline edit' } },
+      headers: { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
+      createdAt: 1_700_000_000_000,
+    })
+    httpPatch.mockResolvedValueOnce({ data: { id: 'enc-1' } })
+
+    await syncEngine.flush()
+
+    expect(httpPatch).toHaveBeenCalledWith(
+      '/encounters/enc-1',
+      { assessment: { chief_complaint: 'offline edit' } },
+      { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
+    )
+    await expect(db.pendingActions.count()).resolves.toBe(0)
+  })
+
   it('moves 4xx clinical mutations to failed actions instead of silently discarding them', async () => {
     const { db, syncEngine } = await importSyncModules()
     const action: PendingAction = {

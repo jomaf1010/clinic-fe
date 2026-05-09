@@ -36,6 +36,7 @@ export interface PendingAction {
   url: string
   method: 'POST' | 'PATCH' | 'DELETE'
   body?: unknown
+  headers?: Record<string, string>
   createdAt: number
   /** Number of failed attempts so far. Incremented on every 5xx/network error. */
   attemptCount?: number

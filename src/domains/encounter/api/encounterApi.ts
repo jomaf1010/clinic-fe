@@ -28,7 +28,10 @@ export const encounterApi = {
     return http.get<EncounterDetailResponse>(`/encounters/${id}`)
   },
 
-  update(id: string, payload: UpdateEncounterPayload): Promise<UpdateEncounterResponse> {
+  update(id: string, payload: UpdateEncounterPayload, expectedUpdatedAt?: string): Promise<UpdateEncounterResponse> {
+    if (expectedUpdatedAt) {
+      return http.patch<UpdateEncounterResponse>(`/encounters/${id}`, payload, { 'X-Expected-Updated-At': expectedUpdatedAt })
+    }
     return http.patch<UpdateEncounterResponse>(`/encounters/${id}`, payload)
   },
 

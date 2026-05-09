@@ -137,6 +137,7 @@ export const useEncounterStore = defineStore('encounter', () => {
     saveError.value = null
 
     const previous = JSON.parse(JSON.stringify(current.value)) as EncounterResponse
+    const expectedUpdatedAt = previous.updated_at
 
     // Optimistically update the nested type-specific data
     const updated = { ...current.value }
@@ -187,7 +188,7 @@ export const useEncounterStore = defineStore('encounter', () => {
     current.value = updated
 
     try {
-      const response = await encounterApi.update(current.value.id, payload)
+      const response = await encounterApi.update(current.value.id, payload, expectedUpdatedAt)
       current.value = response.data
       isOfflineCached.value = false
       await cacheEncounter(response.data as unknown as Record<string, unknown>)
@@ -198,6 +199,7 @@ export const useEncounterStore = defineStore('encounter', () => {
           url: `/encounters/${current.value.id}`,
           method: 'PATCH',
           body: payload,
+          headers: { 'X-Expected-Updated-At': expectedUpdatedAt },
           createdAt: Date.now(),
         })
         await cacheEncounter(updated as unknown as Record<string, unknown>)

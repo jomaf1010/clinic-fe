@@ -194,6 +194,21 @@ describe('encounterStore — loadForPatient request-id race', () => {
 })
 
 describe('encounterStore — saveSection offline queueing', () => {
+  it('passes the current encounter timestamp as optimistic-lock token when saving', async () => {
+    const api = makeApi({
+      update: vi.fn().mockResolvedValue({ data: makeEncounter({ updated_at: '2026-04-30T01:00:00Z' }) }),
+    })
+    const { useEncounterStore } = await loadStore(api)
+    const store = useEncounterStore()
+    store.current = makeEncounter({ updated_at: '2026-04-30T00:00:00Z' })
+
+    const payload = { assessment: { chief_complaint: 'Headache' } as never }
+    await store.saveSection(payload)
+
+    expect(api.update).toHaveBeenCalledWith('enc-1', payload, '2026-04-30T00:00:00Z')
+    expect(store.current?.updated_at).toBe('2026-04-30T01:00:00Z')
+  })
+
   it('queues a pending action when navigator is offline and update fails', async () => {
     const api = makeApi({
       update: vi.fn().mockRejectedValue(new Error('offline')),
@@ -210,6 +225,7 @@ describe('encounterStore — saveSection offline queueing', () => {
       type: 'update-encounter',
       method: 'PATCH',
       url: '/encounters/enc-1',
+      headers: { 'X-Expected-Updated-At': '2026-04-30T00:00:00Z' },
     }))
     expect(store.isOfflineCached).toBe(true)
     expect(store.saveError).toBeNull()
