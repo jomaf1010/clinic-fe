@@ -45,6 +45,7 @@ const router = createRouter({
           path: 'patients',
           name: RouteNames.PATIENT_LIST,
           component: () => import('@/domains/patient/views/PatientListView.vue'),
+          meta: { requiredPermission: 'patients.view' },
         },
         {
           path: 'patients/:id',

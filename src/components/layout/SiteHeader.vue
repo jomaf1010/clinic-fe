@@ -39,6 +39,8 @@ const { isMobile } = useSidebar()
 const isEncounterRoute = computed(() =>
   route.name === RouteNames.ENCOUNTER_NEW || route.name === RouteNames.ENCOUNTER_DETAIL,
 )
+const canSearchPatients = computed(() => authStore.hasPermission('patients.view'))
+const canCreatePatient = computed(() => authStore.hasPermission('patients.create'))
 
 watch(() => authStore.user, () => {
   hasMessagesPermission.value = authStore.hasPermission('messages.view')
@@ -52,6 +54,8 @@ const activeIndex = ref(-1)
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(query, (val) => {
+  if (!canSearchPatients.value) return
+
   if (debounceTimer) clearTimeout(debounceTimer)
 
   const trimmed = val.trim()
@@ -86,6 +90,8 @@ function selectPatient(patient: PatientSearchResult) {
 }
 
 function goToCreatePatient() {
+  if (!canCreatePatient.value) return
+
   query.value = ''
   results.value = []
   showDropdown.value = false
@@ -140,7 +146,7 @@ function onFocus() {
     <div class="flex h-full w-full items-center gap-3 p-3">
       <SidebarTrigger v-if="isMobile" class="glass-topbar-icon -ml-1" />
 
-      <div v-if="!isEncounterRoute" class="relative min-w-0 flex-1 sm:max-w-xl">
+      <div v-if="!isEncounterRoute && canSearchPatients" class="relative min-w-0 flex-1 sm:max-w-xl">
         <SearchIcon class="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           v-model="query"
@@ -186,6 +192,7 @@ function onFocus() {
           <div v-else-if="!isSearching" class="px-2 py-3 text-center">
             <p class="text-sm text-muted-foreground">No patients found.</p>
             <button
+              v-if="canCreatePatient"
               type="button"
               class="mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold text-blue-600 hover:bg-white/55 dark:text-blue-300 dark:hover:bg-white/10"
               @mousedown.prevent="goToCreatePatient"
