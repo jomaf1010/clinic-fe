@@ -1,8 +1,9 @@
 import { computed, type Ref } from 'vue'
+import { boldUserHtml } from '@/lib/htmlSafety'
 import { contraceptionLabel } from '../types/obgyn.types'
 import type { GynProfile, Pregnancy, ContraceptiveEntry } from '../types/obgyn.types'
 
-function b(text: string | number) { return `<b>${text}</b>` }
+function b(text: string | number) { return boldUserHtml(text) }
 
 function formatDate(d: string | null): string {
   if (!d) return ''

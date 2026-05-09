@@ -186,8 +186,15 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // BroadcastChannel not supported — fine
     }
-    // Clear PHI draft keys from localStorage
+    // Clear legacy PHI draft keys from persistent storage
     localStorage.removeItem('create-patient')
+    try {
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith('create-patient:'))
+        .forEach((key) => sessionStorage.removeItem(key))
+    } catch {
+      // Session storage may be unavailable — fine
+    }
     // Wipe offline IndexedDB to prevent PHI leaking between sessions
     try {
       indexedDB.deleteDatabase('clinicapp-offline')

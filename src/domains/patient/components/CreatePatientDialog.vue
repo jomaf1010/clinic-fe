@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -76,8 +76,15 @@ const bloodType = ref<string>('')
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
 
+const draftKey = computed(() => {
+  const userId = authStore.user?.id
+  const clinicId = authStore.currentClinic?.id
+  if (!userId || !clinicId) return null
+  return `create-patient:${userId}:${clinicId}`
+})
+
 const { clearDraft } = useFormDraft(
-  'create-patient',
+  draftKey,
   {
     date_of_birth: dateOfBirth,
     sex,
@@ -85,6 +92,8 @@ const { clearDraft } = useFormDraft(
     email,
     note,
   },
+  undefined,
+  { storage: sessionStorage },
 )
 
 watch(

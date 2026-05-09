@@ -11,6 +11,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InvoiceListResponse, InvoiceResponse } from '../types/billing.types'
 
+class MockHttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+vi.mock('@/lib/http', () => ({ HttpError: MockHttpError }))
+
 interface MockBillingApi {
   list: ReturnType<typeof vi.fn>
   get: ReturnType<typeof vi.fn>
@@ -161,15 +172,31 @@ describe('billingStore — fetchInvoice / fetchForEncounter', () => {
     expect(store.currentInvoice?.id).toBe('inv-E')
   })
 
-  it('fetchForEncounter returns null and clears currentInvoice when API rejects', async () => {
+  it('fetchForEncounter returns null and clears currentInvoice when invoice is missing', async () => {
     const api = makeApi({
-      forEncounter: vi.fn().mockRejectedValue(new Error('not found')),
+      forEncounter: vi.fn().mockRejectedValue(new MockHttpError(404, 'not found')),
     })
     const { useBillingStore } = await loadStore(api)
     const store = useBillingStore()
 
     const result = await store.fetchForEncounter('enc-missing')
     expect(result).toBeNull()
+    expect(store.currentInvoice).toBeNull()
+  })
+
+  it('fetchForEncounter propagates non-404 failures and clears stale current invoice', async () => {
+    const api = makeApi({
+      forEncounter: vi.fn()
+        .mockResolvedValueOnce({ data: makeInvoice({ id: 'inv-old' }) })
+        .mockRejectedValueOnce(new MockHttpError(403, 'forbidden')),
+    })
+    const { useBillingStore } = await loadStore(api)
+    const store = useBillingStore()
+
+    await store.fetchForEncounter('enc-old')
+    expect(store.currentInvoice?.id).toBe('inv-old')
+
+    await expect(store.fetchForEncounter('enc-denied')).rejects.toThrow('forbidden')
     expect(store.currentInvoice).toBeNull()
   })
 })

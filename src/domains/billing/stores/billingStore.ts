@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { HttpError } from '@/lib/http'
 import { billingApi } from '../api/billingApi'
 import type {
   BillingSummary,
@@ -54,9 +55,14 @@ export const useBillingStore = defineStore('billing', () => {
       const response = await billingApi.forEncounter(encounterId)
       currentInvoice.value = response.data
       return response.data
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 404) {
+        currentInvoice.value = null
+        return null
+      }
+
       currentInvoice.value = null
-      return null
+      throw error
     }
   }
 
