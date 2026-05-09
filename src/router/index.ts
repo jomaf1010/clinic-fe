@@ -170,7 +170,7 @@ const router = createRouter({
           path: 'schedule',
           name: RouteNames.SCHEDULE,
           component: () => import('@/domains/schedule/views/ScheduleView.vue'),
-          meta: { requiredFeature: 'schedule' },
+          meta: { requiredPermission: 'schedule.view', requiredFeature: 'schedule' },
         },
         {
           path: 'queue',

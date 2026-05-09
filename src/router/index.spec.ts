@@ -19,6 +19,11 @@ describe('sensitive route guards', () => {
     expect(metaFor(RouteNames.BILLING).requiredPermission).toEqual(['billing.view', 'billing.view-own'])
   })
 
+  it('requires schedule permission and feature access for the schedule route', () => {
+    expect(metaFor(RouteNames.SCHEDULE).requiredPermission).toBe('schedule.view')
+    expect(metaFor(RouteNames.SCHEDULE).requiredFeature).toBe('schedule')
+  })
+
   it('requires clinic management for clinic settings access', () => {
     expect(metaFor(RouteNames.CLINIC_SETTINGS).requiredPermission).toBe('clinic.manage')
   })
