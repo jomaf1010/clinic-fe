@@ -166,7 +166,6 @@ async function handleSubmit(): Promise<void> {
     gestational_age_weeks: currentGa.value?.weeks ?? null,
     gestational_age_days: currentGa.value?.days ?? null,
     concerns: form.concerns || null,
-    fetal_movement: form.fetal_movement || null,
     danger_signs: form.danger_signs,
     systolic_bp: form.bp_systolic,
     diastolic_bp: form.bp_diastolic,
@@ -183,6 +182,10 @@ async function handleSubmit(): Promise<void> {
       : [],
     pregnancy_progress: form.pregnancy_progress || null,
     risk_level_update: form.risk_level_update || null,
+  }
+
+  if (form.fetal_movement) {
+    payload.fetal_movement = form.fetal_movement
   }
 
   let result: PrenatalVisit

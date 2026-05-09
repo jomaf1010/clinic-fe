@@ -33,14 +33,18 @@ describe('PrenatalVisitForm', () => {
     setActivePinia(createPinia())
   })
 
-  it('submits backend-valid fetal movement and vital field names', async () => {
-    const wrapper = shallowMount(PrenatalVisitForm, {
+  function mountForm() {
+    return shallowMount(PrenatalVisitForm, {
       props: {
         patientId: 'patient-1',
         pregnancyId: 'pregnancy-1',
         pregnancy,
       },
     })
+  }
+
+  it('submits backend-valid fetal movement and vital field names', async () => {
+    const wrapper = mountForm()
     const store = usePregnancyStore()
     const createVisit = vi.fn().mockResolvedValue(savedVisit)
     store.createVisit = createVisit
@@ -71,5 +75,18 @@ describe('PrenatalVisitForm', () => {
     const payload = createVisit.mock.calls[0]?.[2]
     expect(payload).not.toHaveProperty('bp_systolic')
     expect(payload).not.toHaveProperty('bp_diastolic')
+  })
+
+  it('omits blank fetal movement instead of sending backend-invalid null', async () => {
+    const wrapper = mountForm()
+    const store = usePregnancyStore()
+    const createVisit = vi.fn().mockResolvedValue(savedVisit)
+    store.createVisit = createVisit
+
+    await (wrapper.vm as unknown as PrenatalVisitFormVm).handleSubmit()
+    await nextTick()
+
+    const payload = createVisit.mock.calls[0]?.[2]
+    expect(payload).not.toHaveProperty('fetal_movement')
   })
 })
