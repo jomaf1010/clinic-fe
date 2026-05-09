@@ -1,4 +1,5 @@
 import { db } from '../db'
+import { queueAction } from '../offlineDb'
 import { encounterApi } from '@/domains/encounter/api/encounterApi'
 import type {
   EncounterResponse,
@@ -75,7 +76,7 @@ class EncounterRepositoryImpl implements Repository<EncounterLike> {
     await db.encounters.put(merged)
 
     if (!navigator.onLine) {
-      await db.pendingActions.add({
+      await queueAction({
         type: 'update-encounter',
         url: `/encounters/${data.id}`,
         method: 'PATCH',
@@ -94,7 +95,7 @@ class EncounterRepositoryImpl implements Repository<EncounterLike> {
     } catch {
       // Network dropped mid-save — queue the mutation and keep the local
       // optimistic state. SyncEngine will flush it when online again.
-      await db.pendingActions.add({
+      await queueAction({
         type: 'update-encounter',
         url: `/encounters/${data.id}`,
         method: 'PATCH',

@@ -26,10 +26,48 @@ export async function getCachedLabOrder(encounterId: string): Promise<Record<str
 
 // --- Pending Actions (offline mutation queue) ---
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function mergePendingBody(current: unknown, next: unknown): unknown {
+  if (!isPlainRecord(current) || !isPlainRecord(next)) return next
+
+  const merged: Record<string, unknown> = { ...current }
+  for (const [key, value] of Object.entries(next)) {
+    merged[key] = isPlainRecord(merged[key]) && isPlainRecord(value)
+      ? mergePendingBody(merged[key], value)
+      : value
+  }
+  return merged
+}
+
+async function coalesceEncounterUpdate(action: Omit<PendingAction, 'id'>): Promise<boolean> {
+  if (action.type !== 'update-encounter' || action.method !== 'PATCH') return false
+
+  const matches = await db.pendingActions
+    .where('type')
+    .equals('update-encounter')
+    .filter((pending) => pending.method === 'PATCH' && pending.url === action.url)
+    .toArray()
+  const existing = matches[matches.length - 1]
+
+  if (!existing?.id) return false
+
+  await db.pendingActions.update(existing.id, {
+    body: mergePendingBody(existing.body, action.body),
+    // Keep the original optimistic-lock header. The coalesced payload is still
+    // one logical offline edit against the server version the user started from.
+    headers: existing.headers ?? action.headers,
+  })
+  return true
+}
+
 export async function queueAction(action: PendingAction): Promise<void> {
   // Dexie auto-assigns `id` via the `++id` primary-key spec — strip any
   // caller-supplied id so we never collide with an existing row.
   const { id: _ignored, ...rest } = action
+  if (await coalesceEncounterUpdate(rest as Omit<PendingAction, 'id'>)) return
   await db.pendingActions.add(rest as PendingAction)
 }
 
