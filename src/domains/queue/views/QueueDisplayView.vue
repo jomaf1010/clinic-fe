@@ -7,6 +7,7 @@ import { Clock, Users, Stethoscope, WifiOff } from 'lucide-vue-next'
 import { queueApi } from '@/domains/queue/api/queueApi'
 import type { QueueVisitResponse } from '@/domains/queue/types/queue.types'
 import { readQueueDisplayToken } from '@/domains/queue/utils/displayTokenLaunch'
+import { mergeQueueRealtimeEvent } from '@/domains/queue/utils/realtimeEvents'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,34 +65,6 @@ function updateTime(): void {
 }
 
 let clockInterval: ReturnType<typeof setInterval> | null = null
-
-// ---------------------------------------------------------------------------
-// Realtime event handler (mirrors queueStore.handleRealtimeEvent)
-// ---------------------------------------------------------------------------
-
-function handleRealtimeEvent(event: RealtimeEvent): void {
-  const { type, data } = event
-  const index = visits.value.findIndex((v) => v.id === data.id)
-
-  switch (type) {
-    case 'queue.visit.created':
-      if (index === -1) {
-        visits.value.push(data)
-      } else {
-        visits.value[index] = data
-      }
-      break
-    case 'queue.visit.called':
-    case 'queue.visit.completed':
-    case 'queue.visit.cancelled':
-      if (index !== -1) {
-        visits.value[index] = data
-      } else {
-        visits.value.push(data)
-      }
-      break
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Centrifuge
@@ -213,7 +186,7 @@ function initCentrifuge(
   sub.on('publication', (ctx: PublicationContext) => {
     const event = ctx.data as RealtimeEvent
     if (event && event.type && event.data) {
-      handleRealtimeEvent(event)
+      visits.value = mergeQueueRealtimeEvent(visits.value, event)
     }
   })
 
@@ -242,6 +215,12 @@ async function bootstrap(): Promise<void> {
   isLoading.value = true
   displayError.value = null
 
+  // Remove legacy path tokens before any network request so invalid or failed
+  // bootstraps do not leave bearer tokens in the visible URL/history.
+  if (route.params.token) {
+    window.history.replaceState(null, '', '/queue-display')
+  }
+
   if (!token) {
     isLoading.value = false
     displayError.value = 'INVALID_TOKEN'
@@ -253,9 +232,6 @@ async function bootstrap(): Promise<void> {
     clinicName.value = data.clinic_name
     visits.value = data.visits
     isLoading.value = false
-
-    // Remove legacy path tokens from the URL so they don't linger in browser history or referrer headers
-    window.history.replaceState(null, '', '/queue-display')
 
     initCentrifuge(
       data.centrifugo.connection_token,
