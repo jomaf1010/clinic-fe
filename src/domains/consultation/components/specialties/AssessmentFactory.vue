@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSpecialtyConfigStore } from '@/stores/specialtyConfigStore'
-import GeneralAssessmentSection from './general/GeneralAssessmentSection.vue'
-import PediatricsAssessmentSection from './pediatrics/PediatricsAssessmentSection.vue'
+import BaseAssessmentSection from './BaseAssessmentSection.vue'
 import FamilyMedicineAssessmentSection from './family-medicine/FamilyMedicineAssessmentSection.vue'
 import OBGYNAssessmentSection from './obgyn/OBGYNAssessmentSection.vue'
 import type { ConsultationAssessment } from '../../types/consultation.types'
@@ -21,11 +20,11 @@ const specialtyStore = useSpecialtyConfigStore()
 // Adding a new specialty = one new file + one case here.
 const currentComponent = computed(() => {
   switch (specialtyStore.config?.key) {
-    case 'pediatrics': return PediatricsAssessmentSection
+    case 'pediatrics': return BaseAssessmentSection
     case 'family_medicine':
     case 'internal_medicine': return FamilyMedicineAssessmentSection
     case 'obgyn': return OBGYNAssessmentSection
-    default: return GeneralAssessmentSection
+    default: return BaseAssessmentSection
   }
 })
 </script>
