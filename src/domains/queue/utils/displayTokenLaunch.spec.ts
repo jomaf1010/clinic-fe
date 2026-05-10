@@ -54,6 +54,10 @@ describe('queue display token launch handoff', () => {
     storeQueueDisplayToken('stored-token', storage)
 
     expect(readQueueDisplayToken('legacy-token', storage)).toBe('legacy-token')
-    expect(readQueueDisplayToken(['bad-token'], storage)).toBe('stored-token')
+    expect(readQueueDisplayToken(undefined, storage)).toBe('legacy-token')
+
+    const fallbackStorage = new MemoryStorage()
+    storeQueueDisplayToken('stored-token', fallbackStorage)
+    expect(readQueueDisplayToken(['bad-token'], fallbackStorage)).toBe('stored-token')
   })
 })

@@ -13,6 +13,7 @@ export function readQueueDisplayToken(
   storage: Storage = window.sessionStorage,
 ): string | null {
   if (typeof routeToken === 'string' && routeToken.trim() !== '') {
+    storeQueueDisplayToken(routeToken, storage)
     return routeToken
   }
 

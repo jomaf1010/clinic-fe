@@ -16,6 +16,7 @@ import HomeView from '@/views/HomeView.vue'
 import { RouteNames } from './routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { HttpError } from '@/lib/http'
+import { storeQueueDisplayToken } from '@/domains/queue/utils/displayTokenLaunch'
 
 export function canAccessRequiredPermission(
   requiredPermission: string | string[] | undefined,
@@ -93,7 +94,7 @@ const router = createRouter({
           path: 'appointments',
           name: RouteNames.APPOINTMENT_LIST,
           component: () => import('@/domains/appointment/views/AppointmentListView.vue'),
-          meta: { requiredFeature: 'appointments' },
+          meta: { requiredPermission: 'appointments.view', requiredFeature: 'appointments' },
         },
         {
           path: 'clinic',
@@ -125,16 +126,19 @@ const router = createRouter({
               path: 'consumables',
               name: RouteNames.CLINIC_CONSUMABLES,
               component: () => import('@/domains/consumable/views/ConsumableListView.vue'),
+              meta: { requiredPermission: 'consumables.view', requiredFeature: 'consumables' },
             },
             {
               path: 'lab-services',
               name: RouteNames.CLINIC_LAB_SERVICES,
               component: () => import('@/domains/labService/views/LabServiceListView.vue'),
+              meta: { requiredPermission: 'lab-services.view', requiredFeature: 'lab_services' },
             },
             {
               path: 'services',
               name: RouteNames.CLINIC_SERVICES,
               component: () => import('@/domains/service/views/ServiceListView.vue'),
+              meta: { requiredPermission: 'lab-services.view' },
             },
             {
               path: 'templates',
@@ -178,12 +182,13 @@ const router = createRouter({
           path: 'queue',
           name: RouteNames.QUEUE,
           component: () => import('@/domains/queue/views/QueueView.vue'),
+          meta: { requiredPermission: 'queue.view' },
         },
         {
           path: 'messages',
           name: RouteNames.MESSAGES,
           component: () => import('@/domains/message/views/MessagesView.vue'),
-          meta: { requiredFeature: 'messages' },
+          meta: { requiredPermission: 'messages.view', requiredFeature: 'messages' },
         },
         {
           path: 'billing',
@@ -304,12 +309,20 @@ router.onError((error) => {
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
+  // Legacy queue-display links may carry a bearer token in the path. Move the
+  // token into tab-scoped storage and strip it before any guard-triggered API
+  // calls, including authenticated refreshes that fetch /auth/me.
+  if (to.name === RouteNames.QUEUE_DISPLAY && typeof to.params.token === 'string' && to.params.token.trim() !== '') {
+    storeQueueDisplayToken(to.params.token)
+    return { name: RouteNames.QUEUE_DISPLAY, replace: true }
+  }
+
   if (to.meta.devOnly && !import.meta.env.DEV) {
     return { name: RouteNames.HOME }
   }
 
   // Page refresh: token exists but user not yet loaded
-  if (authStore.isAuthenticated && !authStore.user) {
+  if (authStore.isAuthenticated && !authStore.user && to.name !== RouteNames.QUEUE_DISPLAY) {
     try {
       await authStore.fetchUser()
     } catch (error) {

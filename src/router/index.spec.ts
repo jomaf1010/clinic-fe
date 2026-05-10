@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import router, { canAccessRequiredPermission } from './index'
 import { RouteNames } from './routeNames'
@@ -39,6 +39,14 @@ describe('sensitive route guards', () => {
     expect(metaFor(RouteNames.SCHEDULE).requiredFeature).toBe('schedule')
   })
 
+  it('requires permissions and features for direct-access operational routes', () => {
+    expect(metaFor(RouteNames.APPOINTMENT_LIST).requiredPermission).toBe('appointments.view')
+    expect(metaFor(RouteNames.APPOINTMENT_LIST).requiredFeature).toBe('appointments')
+    expect(metaFor(RouteNames.QUEUE).requiredPermission).toBe('queue.view')
+    expect(metaFor(RouteNames.MESSAGES).requiredPermission).toBe('messages.view')
+    expect(metaFor(RouteNames.MESSAGES).requiredFeature).toBe('messages')
+  })
+
   it('requires clinic management for clinic settings access', () => {
     expect(metaFor(RouteNames.CLINIC_SETTINGS).requiredPermission).toBe('clinic.manage')
   })
@@ -50,6 +58,14 @@ describe('sensitive route guards', () => {
   it('requires clinic management for template list and editor routes', () => {
     expect(metaFor(RouteNames.CLINIC_TEMPLATES).requiredPermission).toBe('clinic.manage')
     expect(metaFor(RouteNames.TEMPLATE_EDITOR).requiredPermission).toBe('clinic.manage')
+  })
+
+  it('requires matching permissions and features for clinic inventory/service tabs', () => {
+    expect(metaFor(RouteNames.CLINIC_CONSUMABLES).requiredPermission).toBe('consumables.view')
+    expect(metaFor(RouteNames.CLINIC_CONSUMABLES).requiredFeature).toBe('consumables')
+    expect(metaFor(RouteNames.CLINIC_LAB_SERVICES).requiredPermission).toBe('lab-services.view')
+    expect(metaFor(RouteNames.CLINIC_LAB_SERVICES).requiredFeature).toBe('lab_services')
+    expect(metaFor(RouteNames.CLINIC_SERVICES).requiredPermission).toBe('lab-services.view')
   })
 
   it('does not expose the retired odontogram playground route', () => {
@@ -82,5 +98,20 @@ describe('sensitive route guards', () => {
 
       expect(router.currentRoute.value.name).toBe(RouteNames.HOME)
     }
+  })
+
+  it('scrubs legacy queue display path tokens before authenticated refresh can fetch user state', async () => {
+    const authStore = useAuthStore()
+    authStore.setToken('test-token')
+    authStore.user = null
+    authStore.memberships = [] as typeof authStore.memberships
+    sessionStorage.removeItem('mediflow.queueDisplay.token')
+    const fetchUser = vi.spyOn(authStore, 'fetchUser')
+
+    await router.push('/queue-display/legacy-token')
+
+    expect(fetchUser).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.fullPath).toBe('/queue-display')
+    expect(sessionStorage.getItem('mediflow.queueDisplay.token')).toBe('legacy-token')
   })
 })
