@@ -140,7 +140,7 @@ function onFocus() {
 
 <template>
   <header
-    class="glass-topbar-shell sticky top-2 z-50 mx-2 mb-2 flex w-[calc(100%-1rem)] items-center overflow-hidden rounded-2xl"
+    class="glass-topbar-shell sticky top-2 z-50 mx-2 mb-2 flex w-[calc(100%-1rem)] items-center rounded-2xl"
     style="height: calc(var(--header-height) + 0.5rem)"
   >
     <div class="flex h-full w-full items-center gap-3 p-3">
