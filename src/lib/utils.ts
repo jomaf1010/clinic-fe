@@ -1,8 +1,28 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { http } from '@/lib/http'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+/**
+ * Format a Date as `YYYY-MM-DD` in the user's local timezone — the canonical
+ * shape the backend accepts on every `date_format:Y-m-d` validated field.
+ *
+ * Prefer this over `date.toISOString().slice(0, 10)`, which silently truncates
+ * full ISO-8601 strings and reads as a timezone bug every time we revisit it.
+ */
+export function toYmd(date: Date): string {
+  const y = String(date.getFullYear()).padStart(4, '0')
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/** Today as `YYYY-MM-DD`. */
+export function todayYmd(): string {
+  return toYmd(new Date())
 }
 
 export function formatRelativeTime(dateString: string): string {
@@ -61,16 +81,18 @@ export function timeAgo(dateString: string): string {
  * Must be called synchronously from a user gesture — open the blank tab first,
  * then set the location after any async work (e.g. fetching a signed URL).
  */
-export function openNewTab(): { navigate: (url: string) => void; close: () => void } {
+export function openNewTab(): { navigate: (url: string) => Promise<void>; close: () => void } {
   const win = window.open('', '_blank')
   return {
-    navigate: (url: string) => {
+    navigate: async (url: string) => {
+      const blob = await http.download(url)
+      const blobUrl = URL.createObjectURL(blob)
       if (win && !win.closed) {
-        win.location.href = url
+        win.location.href = blobUrl
       } else {
-        // Fallback: popup was blocked, try direct navigation
-        window.location.href = url
+        window.open(blobUrl, '_blank')
       }
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
     },
     close: () => {
       if (win && !win.closed) win.close()
@@ -94,8 +116,7 @@ export function printPdf(url: string): void {
     // relative URL, keep as-is
   }
 
-  fetch(url, { credentials: 'include' })
-    .then((res) => res.blob())
+  http.download(url)
     .then((blob) => {
       const blobUrl = URL.createObjectURL(blob)
       const iframe = document.createElement('iframe')
@@ -112,7 +133,7 @@ export function printPdf(url: string): void {
           iframe.contentWindow?.focus()
           iframe.contentWindow?.print()
         } catch {
-          window.open(url, '_blank')
+          window.open(blobUrl, '_blank')
         }
         setTimeout(() => {
           document.body.removeChild(iframe)
@@ -120,7 +141,5 @@ export function printPdf(url: string): void {
         }, 60000)
       }
     })
-    .catch(() => {
-      window.open(url, '_blank')
-    })
+    .catch(() => {})
 }

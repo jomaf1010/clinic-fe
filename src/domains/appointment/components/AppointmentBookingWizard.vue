@@ -30,9 +30,14 @@ import type { ClinicDoctor } from '../types/appointment.types'
 
 const props = defineProps<{
   open: boolean
+  mode?: 'create' | 'reschedule'
+  appointmentId?: string | null
+  expectedUpdatedAt?: string | null
   prefillDateTime?: string | null // ISO datetime from calendar click
   prefillDoctorId?: string | null // pre-select doctor (skip step 1)
   prefillDoctorName?: string | null
+  prefillPatientId?: string | null
+  prefillPatientName?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -43,7 +48,11 @@ const emit = defineEmits<{
 const appointmentStore = useAppointmentStore()
 
 const step = ref(1)
-const totalSteps = computed(() => hasPrefillDoctor.value ? 3 : 4)
+const isReschedule = computed(() => props.mode === 'reschedule')
+const totalSteps = computed(() => {
+  if (isReschedule.value) return 1
+  return hasPrefillDoctor.value ? 3 : 4
+})
 
 // Step 1: Doctor
 const doctorId = ref<string | null>(null)
@@ -64,6 +73,7 @@ const reason = ref('')
 const notes = ref('')
 
 const generalError = ref<string | null>(null)
+const isRescheduling = ref(false)
 
 // Prefill helpers — extract date and ISO from prefillDateTime
 const prefillDate = computed(() => {
@@ -97,6 +107,8 @@ function handlePatientSelect(patient: PatientSearchResult) {
 }
 
 const canNext = computed(() => {
+  if (isReschedule.value) return !!selectedSlot.value
+
   switch (step.value) {
     case 1:
       return !!doctorId.value
@@ -121,6 +133,31 @@ function prev() {
 }
 
 async function submit() {
+  if (isReschedule.value) {
+    if (!props.appointmentId || !selectedSlot.value) return
+    generalError.value = null
+    isRescheduling.value = true
+
+    try {
+      await appointmentApi.reschedule(props.appointmentId, selectedSlot.value, props.expectedUpdatedAt ?? undefined)
+      toast.success('Appointment rescheduled')
+      emit('created')
+      emit('update:open', false)
+      reset()
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 422) {
+        const body = err.data as { message?: string; errors?: Record<string, string[]> }
+        generalError.value = body.message ?? 'Validation failed.'
+      } else {
+        generalError.value = 'Failed to reschedule appointment. Please try again.'
+      }
+    } finally {
+      isRescheduling.value = false
+    }
+
+    return
+  }
+
   if (!doctorId.value || !selectedSlot.value || !patientId.value) return
   generalError.value = null
 
@@ -148,10 +185,17 @@ async function submit() {
 }
 
 const hasPrefillDoctor = computed(() => !!props.prefillDoctorId)
-const displayStep = computed(() => hasPrefillDoctor.value ? step.value - 1 : step.value)
+const displayStep = computed(() => {
+  if (isReschedule.value) return 1
+  return hasPrefillDoctor.value ? step.value - 1 : step.value
+})
 
 function reset() {
-  if (props.prefillDoctorId) {
+  if (isReschedule.value) {
+    step.value = 2
+    doctorId.value = props.prefillDoctorId ?? null
+    doctorName.value = props.prefillDoctorName ?? ''
+  } else if (props.prefillDoctorId) {
     // Skip doctor step — start at date/slot
     step.value = 2
     doctorId.value = props.prefillDoctorId
@@ -163,8 +207,8 @@ function reset() {
   }
   selectedSlot.value = null
   selectedDuration.value = null
-  patientId.value = null
-  patientName.value = ''
+  patientId.value = props.prefillPatientId ?? null
+  patientName.value = props.prefillPatientName ?? ''
   reason.value = ''
   notes.value = ''
   generalError.value = null
@@ -181,6 +225,8 @@ watch(
 )
 
 const stepTitle = computed(() => {
+  if (isReschedule.value) return 'Choose New Date & Time'
+
   switch (step.value) {
     case 1:
       return 'Select Doctor'
@@ -215,7 +261,7 @@ function formatSlotTime(iso: string | null): string {
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <CalendarCheck class="size-5 text-primary" />
-          Book Appointment
+          {{ isReschedule ? 'Reschedule Appointment' : 'Book Appointment' }}
         </DialogTitle>
         <div class="flex items-center gap-2 pt-2">
           <div
@@ -276,12 +322,13 @@ function formatSlotTime(iso: string | null): string {
           v-model:duration="selectedDuration"
           :doctor-id="doctorId"
           :initial-date="prefillDate"
-          :auto-select-time="prefillDateTime ?? undefined"
+          :auto-select-time="isReschedule ? undefined : prefillDateTime ?? undefined"
+          :allow-duration-selection="!isReschedule"
         />
       </div>
 
       <!-- Step 3: Patient -->
-      <div v-if="step === 3" class="flex flex-col gap-3">
+      <div v-if="!isReschedule && step === 3" class="flex flex-col gap-3">
         <Label class="flex items-center gap-1.5">
           <User class="size-3.5 text-muted-foreground" />
           Patient
@@ -290,7 +337,7 @@ function formatSlotTime(iso: string | null): string {
       </div>
 
       <!-- Step 4: Confirm -->
-      <div v-if="step === 4" class="flex flex-col gap-4">
+      <div v-if="!isReschedule && step === 4" class="flex flex-col gap-4">
         <div class="rounded-lg border p-4">
           <div class="grid gap-2 text-sm">
             <div class="flex justify-between">
@@ -324,18 +371,18 @@ function formatSlotTime(iso: string | null): string {
       </div>
 
       <DialogFooter class="flex-row gap-2">
-        <Button v-if="step > (hasPrefillDoctor ? 2 : 1)" variant="outline" @click="prev">
+        <Button v-if="!isReschedule && step > (hasPrefillDoctor ? 2 : 1)" variant="outline" @click="prev">
           <ChevronLeft class="size-4" />
           Back
         </Button>
         <div class="flex-1" />
-        <Button v-if="step < totalSteps" :disabled="!canNext" @click="next">
+        <Button v-if="!isReschedule && step < totalSteps" :disabled="!canNext" @click="next">
           Next
           <ChevronRight class="size-4" />
         </Button>
-        <Button v-if="step === totalSteps" :disabled="appointmentStore.isCreating" @click="submit">
-          <LoaderCircle v-if="appointmentStore.isCreating" class="size-3.5 animate-spin" />
-          Book Appointment
+        <Button v-if="isReschedule || step === totalSteps" :disabled="isReschedule ? isRescheduling || !canNext : appointmentStore.isCreating" @click="submit">
+          <LoaderCircle v-if="isReschedule ? isRescheduling : appointmentStore.isCreating" class="size-3.5 animate-spin" />
+          {{ isReschedule ? 'Reschedule' : 'Book Appointment' }}
         </Button>
       </DialogFooter>
     </DialogContent>

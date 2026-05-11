@@ -8,7 +8,7 @@ export interface LabOrderItem {
 
 export interface LabOrderResponse {
   id: string
-  consultation_id: string
+  encounter_id: string
   clinic_id: string
   created_by: string
   status: 'pending' | 'completed'

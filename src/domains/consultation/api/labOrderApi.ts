@@ -1,18 +1,16 @@
 import { http } from '@/lib/http'
 import type { LabOrderResponse, SystemLabItem } from '../types/labOrder.types'
 
-const API_URL = import.meta.env.VITE_API_URL as string
-
 export const labOrderApi = {
-  getForConsultation(consultationId: string): Promise<{ data: LabOrderResponse }> {
-    return http.get<{ data: LabOrderResponse }>(`/consultations/${consultationId}/lab-order`)
+  getForEncounter(encounterId: string): Promise<{ data: LabOrderResponse }> {
+    return http.get<{ data: LabOrderResponse }>(`/encounters/${encounterId}/lab-order`)
   },
 
   create(
-    consultationId: string,
+    encounterId: string,
     items: { description: string; instruction?: string }[],
   ): Promise<{ data: LabOrderResponse }> {
-    return http.post<{ data: LabOrderResponse }>(`/consultations/${consultationId}/lab-order`, {
+    return http.post<{ data: LabOrderResponse }>(`/encounters/${encounterId}/lab-order`, {
       items,
     })
   },
@@ -44,24 +42,12 @@ export const labOrderApi = {
     itemId: string,
     file: File,
   ): Promise<{ data: LabOrderResponse }> {
-    const token = localStorage.getItem('auth_token')
     const formData = new FormData()
     formData.append('file', file)
-
-    return fetch(`${API_URL}/lab-orders/${labOrderId}/items/${itemId}/result`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: formData,
-    }).then(async (response) => {
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(`Upload failed with status ${response.status}`)
-      }
-      return data as { data: LabOrderResponse }
-    })
+    return http.upload<{ data: LabOrderResponse }>(
+      `/lab-orders/${labOrderId}/items/${itemId}/result`,
+      formData,
+    )
   },
 
   searchSystemItems(query: string): Promise<{ data: SystemLabItem[] }> {

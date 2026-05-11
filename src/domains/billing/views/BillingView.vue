@@ -14,6 +14,7 @@ import Button from '@/components/ui/button/Button.vue'
 import Input from '@/components/ui/input/Input.vue'
 import Label from '@/components/ui/label/Label.vue'
 import Textarea from '@/components/ui/textarea/Textarea.vue'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { createDebouncedRefresh } from '@/composables/realtimeRefresh'
 import { useBillingStore } from '../stores/billingStore'
 import BillingStatCards from '../components/BillingStatCards.vue'
 import InvoiceTable from '../components/InvoiceTable.vue'
@@ -190,11 +192,15 @@ function onInvoiceCreated() {
 
 watch(statusFilter, onStatusChange)
 
+const refreshBillingFromRealtime = createDebouncedRefresh(() => {
+  fetchInvoices(billingStore.currentPage)
+  billingStore.fetchSummary()
+}, 500)
+
 function onBillingEvent(ctx: { data?: { type?: string } }) {
   const type = ctx.data?.type
   if (type?.startsWith('invoice.')) {
-    fetchInvoices(billingStore.currentPage)
-    billingStore.fetchSummary()
+    refreshBillingFromRealtime()
   }
 }
 
@@ -219,7 +225,27 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-1 flex-col gap-6 pt-4">
+  <div class="billing-shell flex flex-1 flex-col gap-4 pt-4">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="text-2xl font-semibold tracking-normal">Billing</h1>
+          <Badge variant="secondary" class="rounded-full px-2.5 text-sm tabular-nums">
+            {{ billingStore.totalInvoices }}
+          </Badge>
+        </div>
+      </div>
+
+      <Button
+        v-if="authStore.hasPermission('billing.create')"
+        class="h-10 w-full shrink-0 gap-2 px-5 text-sm sm:w-auto"
+        @click="showCreateDialog = true"
+      >
+        <Plus class="size-4" />
+        Create Invoice
+      </Button>
+    </div>
+
     <!-- Stat cards -->
     <BillingStatCards
       :summary="billingStore.summary"
@@ -227,18 +253,19 @@ onUnmounted(() => {
     />
 
     <!-- Filter bar -->
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-      <div class="relative flex-1 sm:max-w-xs">
-        <Search class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+    <div class="flex flex-col gap-3 md:flex-row md:items-center">
+      <div class="relative min-w-0 flex-1">
+        <Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           :model-value="searchQuery"
+          aria-label="Search invoices"
           placeholder="Search invoices..."
-          class="pl-8"
+          class="billing-search-input h-11 pl-10"
           @update:model-value="onSearchInput"
         />
       </div>
       <Select v-model="statusFilter" @update:model-value="onStatusChange">
-        <SelectTrigger class="w-full sm:w-[160px]">
+        <SelectTrigger class="billing-select-trigger h-10 w-full md:w-[170px]">
           <SelectValue placeholder="All statuses" />
         </SelectTrigger>
         <SelectContent>
@@ -249,15 +276,6 @@ onUnmounted(() => {
           <SelectItem value="void">Void</SelectItem>
         </SelectContent>
       </Select>
-      <Button
-        v-if="authStore.hasPermission('billing.create')"
-        class="w-full sm:ml-auto sm:w-auto"
-        @click="showCreateDialog = true"
-      >
-        <Plus class="size-4" />
-        <span class="hidden sm:inline">Create Invoice</span>
-        <span class="sm:hidden">New</span>
-      </Button>
     </div>
 
     <!-- Invoice table -->
@@ -270,16 +288,16 @@ onUnmounted(() => {
     <!-- Pagination -->
     <div
       v-if="billingStore.lastPage > 1"
-      class="flex items-center justify-between border-t pt-4"
+      class="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
     >
-      <p class="text-sm text-muted-foreground">
+      <p>
         Page {{ billingStore.currentPage }} of {{ billingStore.lastPage }}
       </p>
       <div class="flex items-center gap-1">
         <Button
           variant="outline"
           size="icon"
-          class="size-8"
+          class="size-8 rounded-full"
           :disabled="billingStore.currentPage <= 1 || billingStore.isLoading"
           @click="goToPrevPage"
         >
@@ -290,7 +308,7 @@ onUnmounted(() => {
           <Button
             v-else
             size="sm"
-            class="size-8 p-0"
+            class="size-8 rounded-full p-0"
             :variant="page === billingStore.currentPage ? 'default' : 'outline'"
             :disabled="billingStore.isLoading"
             @click="fetchInvoices(page as number)"
@@ -301,7 +319,7 @@ onUnmounted(() => {
         <Button
           variant="outline"
           size="icon"
-          class="size-8"
+          class="size-8 rounded-full"
           :disabled="billingStore.currentPage >= billingStore.lastPage || billingStore.isLoading"
           @click="goToNextPage"
         >
@@ -395,3 +413,43 @@ onUnmounted(() => {
     </Dialog>
   </div>
 </template>
+
+<style scoped>
+.billing-search-input {
+  border-radius: 9999px;
+  border-color: rgb(255 255 255 / 0.52);
+  background: rgb(255 255 255 / 0.68);
+  box-shadow: 0 14px 34px rgb(15 23 42 / 0.07);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.billing-select-trigger {
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+:global(.dark .billing-search-input) {
+  border-color: rgb(148 163 184 / 0.14) !important;
+  background:
+    linear-gradient(145deg, rgb(15 23 42 / 0.78), rgb(2 6 23 / 0.58)),
+    rgb(15 23 42 / 0.72) !important;
+  color: rgb(248 250 252 / 0.92) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 14px 32px rgb(0 0 0 / 0.22) !important;
+}
+
+:global(.dark .billing-search-input::placeholder) {
+  color: rgb(148 163 184 / 0.78) !important;
+}
+
+:global(.dark .billing-search-input:focus-visible) {
+  border-color: rgb(125 211 252 / 0.34) !important;
+  background:
+    linear-gradient(145deg, rgb(15 23 42 / 0.86), rgb(2 6 23 / 0.66)),
+    rgb(15 23 42 / 0.82) !important;
+  box-shadow:
+    0 0 0 3px rgb(56 189 248 / 0.14),
+    0 16px 36px rgb(0 0 0 / 0.26) !important;
+}
+</style>

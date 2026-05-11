@@ -11,7 +11,7 @@ export interface QueueVisitResponse {
   doctor_id: string | null
   doctor_name: string | null
   appointment_id: string | null
-  consultation_id: string | null
+  encounter_id: string | null
   status: QueueVisitStatus
   type: QueueVisitType
   priority: number
@@ -56,6 +56,8 @@ export interface QueueDisplayCentrifugoTokens {
 }
 
 export interface QueueDisplayTokenStatus {
-  token: string | null
+  active: boolean
+  token?: string | null
   created_at: string | null
+  expires_at: string | null
 }

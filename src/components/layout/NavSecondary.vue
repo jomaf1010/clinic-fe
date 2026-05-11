@@ -24,7 +24,7 @@ defineProps<{
         <SidebarMenuItem v-for="item in items" :key="item.title">
           <SidebarMenuButton as="a" :href="item.url" size="sm">
             <component :is="item.icon" />
-            <span>{{ item.title }}</span>
+            <span class="group-data-[collapsible=icon]:hidden">{{ item.title }}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

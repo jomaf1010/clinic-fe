@@ -6,20 +6,16 @@ import {
   Stethoscope,
   Pill,
   UserCog,
-  CalendarDays,
   RefreshCw,
   ChevronRight,
-  ListOrdered,
-  Clock,
-  FileCheck,
   TrendingUp,
   AlertTriangle,
-  MapPin,
 } from 'lucide-vue-next'
 import { dashboardApi } from '@/domains/dashboard/api/dashboardApi'
 import type { OwnerDashboardStats } from '@/domains/dashboard/api/dashboardApi'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { createDebouncedRefresh, shouldRunFallbackRefresh } from '@/composables/realtimeRefresh'
 import StatCard from '@/domains/dashboard/components/StatCard.vue'
 import OwnerRevenueChart from '@/domains/dashboard/components/OwnerRevenueChart.vue'
 import { use } from 'echarts/core'
@@ -49,16 +45,6 @@ const stats = ref<OwnerDashboardStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const revenueFormatted = computed(() => {
-  if (stats.value === null) return '₱0'
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(stats.value.total_revenue_today)
-})
-
 const todayDate = new Date().toISOString().slice(0, 10)
 
 function formatDate(dateString: string): string {
@@ -67,13 +53,6 @@ function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric',
   }).format(new Date(dateString))
-}
-
-function formatShortDate(dateString: string): string {
-  return new Intl.DateTimeFormat('en-PH', {
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(dateString + 'T00:00:00'))
 }
 
 function formatMonth(dateString: string): string {
@@ -185,7 +164,7 @@ async function fetchStats(): Promise<void> {
 }
 
 // Real-time updates
-const { subscribe, unsubscribe } = useCentrifugo()
+const { isConnected, subscribe, unsubscribe } = useCentrifugo()
 let pollInterval: ReturnType<typeof setInterval> | undefined
 
 function silentRefresh() {
@@ -194,6 +173,8 @@ function silentRefresh() {
   }).catch(() => {})
 }
 
+const refreshFromRealtime = createDebouncedRefresh(silentRefresh, 1_000)
+
 onMounted(() => {
   fetchStats()
   if (isPro.value) fetchDistribution()
@@ -201,11 +182,13 @@ onMounted(() => {
   const clinicId = authStore.currentClinic?.id
   if (clinicId) {
     subscribe(`clinic:${clinicId}:queue`, () => {
-      silentRefresh()
+      refreshFromRealtime()
     })
   }
 
-  pollInterval = setInterval(silentRefresh, 30000)
+  pollInterval = setInterval(() => {
+    if (shouldRunFallbackRefresh(isConnected.value)) silentRefresh()
+  }, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
@@ -237,7 +220,7 @@ onUnmounted(() => {
       <!-- Stat cards -->
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <button class="text-left h-full" @click="router.push({ name: RouteNames.PATIENT_LIST })">
-          <div class="h-full rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+          <div class="surface-card h-full rounded-xl border p-6 text-card-foreground">
             <div class="flex items-start justify-between">
               <div class="flex flex-col gap-1">
                 <span class="text-sm font-medium text-muted-foreground">Total Patients</span>
@@ -267,7 +250,7 @@ onUnmounted(() => {
           />
         </button>
         <button class="text-left h-full" @click="router.push({ name: RouteNames.TEAM })">
-          <div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+          <div class="surface-card rounded-xl border p-6 text-card-foreground">
             <div class="flex items-start justify-between">
               <div class="flex flex-col gap-3">
                 <span class="text-sm font-medium text-muted-foreground">Team Members</span>
@@ -321,7 +304,7 @@ onUnmounted(() => {
         <OwnerRevenueChart />
 
         <!-- Your Upcoming Appointments -->
-        <div v-if="hasAppointments && (loading || stats?.my_upcoming_appointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+        <div v-if="hasAppointments && (loading || stats?.my_upcoming_appointments.length)" class="surface-card overflow-hidden rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">
               Your Upcoming Appointments
@@ -346,7 +329,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overflow-x-hidden">
             <li
-              v-for="appt in stats.my_upcoming_appointments"
+              v-for="appt in stats?.my_upcoming_appointments ?? []"
               :key="appt.id"
               class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: appt.patient_id } })"
@@ -382,7 +365,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Today's Clinic Appointments -->
-        <div v-if="hasAppointments && (loading || stats?.todays_appointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+        <div v-if="hasAppointments && (loading || stats?.todays_appointments.length)" class="surface-card overflow-hidden rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Today's Clinic Appointments</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.APPOINTMENT_LIST })">
@@ -404,7 +387,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overflow-x-hidden">
             <li
-              v-for="appt in stats.todays_appointments"
+              v-for="appt in stats?.todays_appointments ?? []"
               :key="appt.id"
               class="flex cursor-pointer items-center gap-3 py-2.5 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: appt.patient_id } })"
@@ -434,7 +417,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Queue -->
-        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
               Queue
@@ -460,7 +443,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="item in stats.queue_list"
+              v-for="item in stats?.queue_list ?? []"
               :key="item.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: item.patient_id } })"
@@ -489,7 +472,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Recent Consultations -->
-        <div v-if="loading || stats?.recent_consultations.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.recent_consultations.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <h2 class="mb-4 text-sm font-semibold">Recent Consultations</h2>
 
           <div v-if="loading" class="flex flex-col gap-3">
@@ -504,10 +487,10 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="consultation in stats.recent_consultations"
+              v-for="consultation in stats?.recent_consultations ?? []"
               :key="consultation.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 rounded-lg"
-              @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: consultation.patient_id, id: consultation.id } })"
+              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: consultation.patient_id, id: consultation.id } })"
             >
               <PatientAvatar
                 :avatar-url="consultation.patient_avatar_url"
@@ -525,7 +508,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Medicines Widget -->
-        <div v-if="loading || stats?.top_medicines.length || stats?.low_stock_medicines.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.top_medicines.length || stats?.low_stock_medicines.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Medicines</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.CLINIC_MEDICINES })">

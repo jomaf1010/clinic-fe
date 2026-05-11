@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { today, getLocalTimeZone } from '@internationalized/date'
 import type { DateRange, DateValue } from 'reka-ui'
 import { toast } from 'vue-sonner'
@@ -23,12 +23,15 @@ import { openNewTab, printPdf } from '@/lib/utils'
 import { documentApi, type GeneratedDocumentResponse } from '../api/documentApi'
 import type { AssessmentDiagnosis } from '../types/consultation.types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
-  consultationId: string
+  encounterId: string
   diagnoses: AssessmentDiagnosis[]
   documentUpdate?: GeneratedDocumentResponse | null
-}>()
+  canGenerate?: boolean
+}>(), {
+  canGenerate: true,
+})
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
@@ -36,10 +39,10 @@ const emit = defineEmits<{
 
 const diagnosis = ref('')
 const recommendation = ref('')
-const dateRange = ref<DateRange>({
+const dateRange = ref({
   start: today(getLocalTimeZone()),
   end: today(getLocalTimeZone()),
-})
+}) as Ref<DateRange>
 const purpose = ref('')
 
 const isGenerating = ref(false)
@@ -56,8 +59,8 @@ function formatDate(date: DateValue | undefined): string {
 }
 
 const rangeDateLabel = computed(() => {
-  const start = dateRange.value.start
-  const end = dateRange.value.end
+  const start = dateRange.value.start as DateValue | undefined
+  const end = dateRange.value.end as DateValue | undefined
   if (start && end) return `${formatDate(start)} — ${formatDate(end)}`
   if (start) return formatDate(start)
   return 'Select duration'
@@ -95,7 +98,7 @@ watch(() => props.documentUpdate, (update) => {
 
 async function loadExistingDoc() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     medCertDoc.value = res.data.find((d) => d.type === 'medical-certificate') ?? null
   } catch {
     // ignore
@@ -105,7 +108,7 @@ async function loadExistingDoc() {
 async function generate() {
   isGenerating.value = true
   try {
-    const res = await documentApi.generate(props.consultationId, 'medical-certificate', {
+    const res = await documentApi.generate(props.encounterId, 'medical-certificate', {
       diagnosis: diagnosis.value,
       recommendation: recommendation.value,
       duration_from: dateRange.value.start?.toString() || null,
@@ -151,7 +154,7 @@ async function download() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(medCertDoc.value.id)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get download link')
@@ -180,19 +183,19 @@ const isReady = computed(() => medCertDoc.value?.status === 'completed')
           Medical Certificate
         </DialogTitle>
         <DialogDescription>
-          Fill in the details below. Diagnosis is pre-filled from the assessment.
+          {{ canGenerate ? 'Fill in the details below. Diagnosis is pre-filled from the assessment.' : 'View or download the medical certificate.' }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-2">
           <Label for="mc-diagnosis">Diagnosis / Findings</Label>
-          <Textarea id="mc-diagnosis" v-model="diagnosis" rows="2" placeholder="e.g., Upper Respiratory Tract Infection" />
+          <Textarea id="mc-diagnosis" v-model="diagnosis" rows="2" placeholder="e.g., Upper Respiratory Tract Infection" :disabled="!canGenerate" />
         </div>
 
         <div class="flex flex-col gap-2">
           <Label for="mc-recommendation">Recommendation</Label>
-          <Textarea id="mc-recommendation" v-model="recommendation" rows="2" placeholder="e.g., Rest for 3 days. Fit to resume work after rest period." />
+          <Textarea id="mc-recommendation" v-model="recommendation" rows="2" placeholder="e.g., Rest for 3 days. Fit to resume work after rest period." :disabled="!canGenerate" />
         </div>
 
         <div class="flex flex-col gap-2">
@@ -224,7 +227,7 @@ const isReady = computed(() => medCertDoc.value?.status === 'completed')
               {{ preset }}
             </button>
           </div>
-          <Input id="mc-purpose" v-model="purpose" placeholder="Or type a custom purpose..." />
+          <Input id="mc-purpose" v-model="purpose" placeholder="Or type a custom purpose..." :disabled="!canGenerate" />
         </div>
 
         <!-- Download/Print if ready -->
@@ -244,7 +247,7 @@ const isReady = computed(() => medCertDoc.value?.status === 'completed')
 
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Close</Button>
-        <Button :disabled="isGenerating || !diagnosis.trim()" @click="generate">
+        <Button v-if="canGenerate" :disabled="isGenerating || !diagnosis.trim()" @click="generate">
           <LoaderCircle v-if="isGenerating" class="size-4 animate-spin" />
           <FileCheck v-else class="size-4" />
           {{ isGenerating ? 'Generating...' : isReady ? 'Regenerate' : 'Generate' }}

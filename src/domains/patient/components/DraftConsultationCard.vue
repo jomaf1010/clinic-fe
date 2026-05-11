@@ -9,11 +9,13 @@ import { RouteNames } from '@/router/routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { timeAgo } from '@/lib/utils'
 import { classifyBpString, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyPain } from '@/lib/vitals'
-import type { ConsultationResponse, LabOrderSummary } from '@/domains/consultation/types/consultation.types'
-import { buildNarrative } from '@/lib/narrative'
+import type { LabOrderSummary } from '@/domains/consultation/types/consultation.types'
+import type { EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
+import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
+import EncounterSummaryDetail from './EncounterSummaryDetail.vue'
 
 const props = defineProps<{
-  consultation: ConsultationResponse
+  consultation: EncounterTimelineItem
   patientId: string
 }>()
 
@@ -23,6 +25,9 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const authStore = useAuthStore()
+const vitalsConfig = useVitalsConfigStore()
+const timelineLine = computed(() => props.consultation.auto_display_line ?? props.consultation.display_line ?? null)
+const timelineSummary = computed(() => props.consultation.auto_display_summary ?? null)
 
 const doctorInitials = computed(() => {
   const name = props.consultation.doctor_name ?? ''
@@ -44,45 +49,57 @@ function badgeColor(severity: string): string {
   return BADGE_AMBER
 }
 
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function toStr(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
 const abnormalVitals = computed(() => {
   const vitals = props.consultation.triage?.vitals
   if (!vitals) return []
 
   const alerts: VitalAlert[] = []
 
-  const bp = classifyBpString(vitals.bp)
+  const cfg = vitalsConfig.config
+
+  const bp = classifyBpString(toStr(vitals.bp), cfg)
   if (bp && bp.severity >= 1) {
     alerts.push({ label: 'BP', value: `${vitals.bp} · ${bp.label}`, status: bp.label, color: bp.severity >= 2 ? BADGE_RED : BADGE_AMBER })
   }
 
-  const hr = classifyHr(vitals.hr)
+  const hr = classifyHr(toNum(vitals.hr), cfg)
   if (hr && hr.severity !== 'normal') {
     alerts.push({ label: 'HR', value: `${vitals.hr} bpm`, status: hr.label, color: badgeColor(hr.severity) })
   }
 
-  const temp = classifyTemp(vitals.temp)
+  const temp = classifyTemp(toNum(vitals.temp), cfg)
   if (temp && temp.severity !== 'normal') {
     alerts.push({ label: 'Temp', value: `${vitals.temp}°C`, status: temp.label, color: badgeColor(temp.severity) })
   }
 
-  const spo2 = classifySpo2(vitals.spo2)
+  const spo2 = classifySpo2(toNum(vitals.spo2), cfg)
   if (spo2 && spo2.severity !== 'normal') {
     alerts.push({ label: 'SpO2', value: `${vitals.spo2}%`, status: spo2.label, color: badgeColor(spo2.severity) })
   }
 
-  const rr = classifyRr(vitals.rr)
+  const rr = classifyRr(toNum(vitals.rr), cfg)
   if (rr && rr.severity !== 'normal') {
     alerts.push({ label: 'RR', value: `${vitals.rr}/min`, status: rr.label, color: badgeColor(rr.severity) })
   }
 
-  const bs = classifyBloodSugar(vitals.blood_sugar)
+  const bs = classifyBloodSugar(toNum(vitals.blood_sugar), cfg, toStr(vitals.blood_glucose_timing))
   if (bs && bs.severity !== 'normal') {
     alerts.push({ label: 'Sugar', value: `${vitals.blood_sugar} mg/dL`, status: bs.label, color: badgeColor(bs.severity) })
   }
 
-  const pain = classifyPain(props.consultation.triage?.pain_score)
+  const pain = classifyPain(toNum(vitals.pain_score), cfg)
   if (pain) {
-    alerts.push({ label: 'Pain', value: `${props.consultation.triage?.pain_score}/10`, status: pain.label, color: BADGE_RED })
+    alerts.push({ label: 'Pain', value: `${vitals.pain_score}/10`, status: pain.label, color: BADGE_RED })
   }
 
   return alerts
@@ -97,27 +114,17 @@ const labOrderLabel = computed(() => {
   return `${all[0]} and ${all.length - 1} more`
 })
 
-const narrativeSummary = computed(() => {
-  const c = props.consultation
-  return buildNarrative({
-    id: c.id,
-    complaint: c.triage?.chief_complaint,
-    diagnoses: authStore.hasPermission('consultations.edit-assessment')
-      ? (c.assessment?.diagnoses ?? []).map(d => d.description)
-      : [],
-    advice: authStore.hasPermission('consultations.edit-treatment-plan') ? c.treatment_plan?.advice : null,
-    prescriptionItems: c.prescription_summary?.items,
-  })
-})
-
 const isOwner = computed(() => authStore.currentClinic?.role === 'owner')
-const isMine = computed(() => props.consultation.created_by === authStore.user?.id)
-const canEditTriage = computed(() => authStore.hasPermission('consultations.edit-triage'))
-const canContinue = computed(() => isMine.value || isOwner.value || canEditTriage.value)
+const currentRole = computed(() => authStore.currentClinic?.role)
+const isSecretaryOrStaff = computed(() => currentRole.value === 'secretary' || currentRole.value === 'staff')
+const isMine = computed(() => props.consultation.doctor_id === authStore.user?.id)
+const canEditTriage = computed(() => authStore.hasPermission('encounters.edit-triage'))
+// Mirrors backend ensureDraftOwnership: owner OR assigned doctor OR secretary/staff with edit-triage.
+const canContinue = computed(() => isMine.value || isOwner.value || (isSecretaryOrStaff.value && canEditTriage.value))
 
 function openDraft() {
   router.push({
-    name: RouteNames.CONSULTATION_DETAIL,
+    name: RouteNames.ENCOUNTER_DETAIL,
     params: { patientId: props.patientId, id: props.consultation.id },
   })
 }
@@ -132,7 +139,7 @@ function formatDate(iso: string): string {
 
 <template>
   <div
-    class="rounded-lg border border-dashed border-amber-300 bg-amber-50/50 p-3 dark:border-amber-700 dark:bg-amber-950/30"
+    class="patient-draft-card surface-card-lite rounded-2xl p-4"
   >
     <div class="flex flex-col gap-3 sm:flex-row">
       <!-- Left (66% on sm+) -->
@@ -150,14 +157,21 @@ function formatDate(iso: string): string {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <span v-if="consultation.type === 'follow_up'" class="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
-          <span class="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400">
+          <span v-if="consultation.consultation_type === 'follow_up'" class="surface-muted rounded-full px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">Follow-up</span>
+          <span class="patient-draft-pill rounded-full px-2 py-0.5 text-[10px] font-medium">
             Draft
           </span>
         </div>
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <p v-if="narrativeSummary" class="mt-1 text-sm text-muted-foreground leading-relaxed" v-html="narrativeSummary" />
-        <p v-else class="mt-1 text-sm italic text-muted-foreground">No chief complaint yet</p>
+        <div v-if="consultation.display_summary" class="mt-1">
+          <EncounterSummaryDetail
+            :summary="consultation.display_summary"
+            :headline="timelineLine"
+            :display-summary="timelineSummary"
+          />
+        </div>
+        <p v-else-if="timelineLine" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ timelineLine }}</p>
+        <p v-if="!consultation.display_summary && timelineSummary" class="mt-1 text-sm text-muted-foreground leading-relaxed">{{ timelineSummary }}</p>
+        <p v-else-if="!timelineLine" class="mt-1 text-sm italic text-muted-foreground">No chief complaint yet</p>
 
         <!-- Abnormal vitals -->
         <div v-if="abnormalVitals.length" class="mt-2 flex flex-wrap gap-1.5">
@@ -185,14 +199,14 @@ function formatDate(iso: string): string {
         </div>
 
         <!-- Continue -->
-        <Button v-if="canContinue" variant="secondary" size="sm" class="mt-3 gap-1.5" @click.stop="openDraft">
+        <Button v-if="canContinue" variant="secondary" size="sm" class="patient-draft-action mt-3 gap-1.5 rounded-full" @click.stop="openDraft">
           <PlayCircle class="size-3.5" />
           {{ isMine || isOwner ? 'Continue' : 'Edit Triage' }}
         </Button>
       </div>
 
       <!-- Right (33%) -->
-      <div v-if="consultation.lab_order_summary || consultation.documents?.length" class="flex flex-col gap-2 border-t pt-3 sm:flex-[1] sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+      <div v-if="consultation.lab_order_summary || consultation.documents?.length" class="patient-draft-side flex flex-col gap-2 border-t pt-3 sm:flex-[1] sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
         <button
           v-if="consultation.lab_order_summary"
           type="button"
@@ -209,7 +223,7 @@ function formatDate(iso: string): string {
             :key="doc.id"
             :href="doc.download_url!"
             target="_blank"
-            class="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
+            class="surface-muted inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-300"
             @click.stop
           >
             <FileDown class="size-3" />
@@ -220,3 +234,53 @@ function formatDate(iso: string): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.patient-draft-card {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 10%, rgb(245 158 11 / 0.14), transparent 32%),
+    radial-gradient(circle at 86% 16%, rgb(20 184 166 / 0.08), transparent 34%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.42) 56%, rgb(255 255 255 / 0.58)),
+    var(--surface-panel-strong);
+  box-shadow:
+    inset 0 0 0 1px rgb(245 158 11 / 0.18),
+    var(--surface-shadow);
+}
+
+.patient-draft-pill {
+  color: rgb(180 83 9);
+  background: rgb(245 158 11 / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(245 158 11 / 0.18);
+}
+
+.patient-draft-action {
+  box-shadow: 0 12px 26px rgb(245 158 11 / 0.12);
+}
+
+.patient-draft-side {
+  border-color: rgb(245 158 11 / 0.18);
+}
+
+:global(.dark .patient-draft-card) {
+  background:
+    radial-gradient(circle at 12% 10%, rgb(245 158 11 / 0.16), transparent 32%),
+    radial-gradient(circle at 86% 16%, rgb(20 184 166 / 0.1), transparent 34%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(245 158 11 / 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 22px 70px -42px rgb(0 0 0 / 0.76);
+}
+
+:global(.dark .patient-draft-pill) {
+  color: rgb(252 211 77);
+  background: rgb(245 158 11 / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(245 158 11 / 0.2);
+}
+
+:global(.dark .patient-draft-side) {
+  border-color: rgb(255 255 255 / 0.1);
+}
+</style>

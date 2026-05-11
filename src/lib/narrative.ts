@@ -4,9 +4,10 @@
  * stay consistent across re-renders.
  */
 
+import DOMPurify from 'dompurify'
 import { FREQUENCY_HUMAN } from '@/domains/medicine/constants'
 import type { ConsultationTriage } from '@/domains/consultation/types/consultation.types'
-import { parseBp, compareBp, classifyBp, isBpConcerning } from '@/lib/vitals'
+import { parseBp, compareBp, classifyBp, isBpConcerning, DEFAULT_VITALS_CONFIG, type VitalsConfig } from '@/lib/vitals'
 
 // -- Stable hash --------------------------------------------------------
 
@@ -61,23 +62,45 @@ const prescriptionIntroPhrases = [
 // -- Helpers ------------------------------------------------------------
 
 function humanizeFrequency(freq: string): string {
-  return FREQUENCY_HUMAN[freq] ?? freq.toLowerCase()
+  return FREQUENCY_HUMAN[freq] ?? userText(freq.toLowerCase())
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function userText(value: string): string {
+  const textOnly = DOMPurify
+    .sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+    .replace(/<[^>]*>/g, '')
+    .trim()
+
+  return escapeHtml(textOnly)
+}
+
+function emphasizedUserText(value: string): string {
+  const text = userText(value)
+  return text ? `<strong>${text}</strong>` : ''
 }
 
 function joinList(items: string[]): string {
-  if (items.length === 1) return items[0]
+  if (items.length === 1) return items[0]!
   return items.slice(0, -1).join(', ') + ` and ${items[items.length - 1]}`
 }
 
 function buildRxNarrative(items: { drug_name: string; dose: string; frequency: string; duration: string }[]): string {
   const parts = items.map((item) => {
-    let text = `<strong>${item.drug_name}</strong>`
-    if (item.dose) text += ` ${item.dose}`
+    let text = emphasizedUserText(item.drug_name)
+    if (!text) return ''
+    if (item.dose) text += ` ${userText(item.dose)}`
     text += `, ${humanizeFrequency(item.frequency)}`
-    if (item.duration) text += ` for ${item.duration}`
+    if (item.duration) text += ` for ${userText(item.duration)}`
     return text
-  })
-  return joinList(parts)
+  }).filter(Boolean)
+  return parts.length ? joinList(parts) : ''
 }
 
 // -- Main builder -------------------------------------------------------
@@ -100,34 +123,36 @@ export function buildNarrative(input: NarrativeInput): string {
 
   // Complaint
   if (input.complaint) {
-    const fn = complaintPhrases[stableIndex(id, complaintPhrases.length)]
-    parts.push(fn(input.complaint.toLowerCase()))
+    const complaint = userText(input.complaint.toLowerCase())
+    const fn = complaintPhrases[stableIndex(id, complaintPhrases.length)]!
+    if (complaint) parts.push(fn(complaint))
   }
 
   // Diagnoses
-  const diagnoses = (input.diagnoses ?? []).filter(Boolean)
+  const diagnoses = (input.diagnoses ?? []).map(d => emphasizedUserText(d)).filter(Boolean)
   if (diagnoses.length) {
-    const joined = joinList(diagnoses.map(d => `<strong>${d}</strong>`))
-    const fn = diagnosisPhrases[stableIndex(id + 'd', diagnosisPhrases.length)]
+    const joined = joinList(diagnoses)
+    const fn = diagnosisPhrases[stableIndex(id + 'd', diagnosisPhrases.length)]!
     parts.push(fn(joined))
   }
 
   // Advice
   if (input.advice) {
-    const fn = advicePhrases[stableIndex(id + 'a', advicePhrases.length)]
-    parts.push(fn(input.advice.toLowerCase()))
+    const advice = userText(input.advice.toLowerCase())
+    const fn = advicePhrases[stableIndex(id + 'a', advicePhrases.length)]!
+    if (advice) parts.push(fn(advice))
   }
 
   // Prescription
   const rxItems = input.prescriptionItems ?? []
   if (rxItems.length) {
     const rxText = buildRxNarrative(rxItems)
-    const fn = prescriptionIntroPhrases[stableIndex(id + 'rx', prescriptionIntroPhrases.length)]
-    parts.push(fn(rxText))
+    const fn = prescriptionIntroPhrases[stableIndex(id + 'rx', prescriptionIntroPhrases.length)]!
+    if (rxText) parts.push(fn(rxText))
   }
 
   if (!parts.length) return ''
-  return parts.join(', ') + '.'
+  return DOMPurify.sanitize(parts.join(', ') + '.', { ALLOWED_TAGS: ['strong'], ALLOWED_ATTR: [] })
 }
 
 // -- Vitals comparison narrative ----------------------------------------
@@ -214,48 +239,72 @@ const vitalsIntroPhrases = [
   'Versus the previous visit, ',
 ]
 
-function collectChanges(current: ConsultationTriage, previous: ConsultationTriage): VitalChange[] {
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function toStr(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
+function normalizeVitals(v: ConsultationTriage['vitals']) {
+  return {
+    bp: toStr(v.bp),
+    hr: toNum(v.hr),
+    temp: toNum(v.temp),
+    spo2: toNum(v.spo2),
+    rr: toNum(v.rr),
+    blood_sugar: toNum(v.blood_sugar),
+    weight: toNum(v.weight),
+    height: toNum(v.height),
+    pain_score: toNum(v.pain_score),
+  }
+}
+
+function collectChanges(current: ConsultationTriage, previous: ConsultationTriage, config: VitalsConfig): VitalChange[] {
   const result: VitalChange[] = []
-  const curr = current.vitals
-  const prev = previous.vitals
+  const curr = normalizeVitals(current.vitals)
+  const prev = normalizeVitals(previous.vitals)
 
   // BP — AHA category comparison
   const currBp = parseBp(curr.bp)
   const prevBp = parseBp(prev.bp)
   if (currBp && prevBp && curr.bp !== prev.bp) {
-    const comparison = compareBp(currBp, prevBp)
-    const currClass = classifyBp(currBp)
-    const prevClass = classifyBp(prevBp)
+    const comparison = compareBp(currBp, prevBp, config)
+    const currClass = classifyBp(currBp, config)
+    const prevClass = classifyBp(prevBp, config)
     if (comparison !== 'same') {
-      result.push({ label: 'Blood Pressure', prev: `${prev.bp} (${prevClass.label})`, curr: `${curr.bp} (${currClass.label})`, direction: comparison, concern: isBpConcerning(currBp) })
+      result.push({ label: 'Blood Pressure', prev: `${prev.bp} (${prevClass.label})`, curr: `${curr.bp} (${currClass.label})`, direction: comparison, concern: isBpConcerning(currBp, config) })
     } else {
-      result.push({ label: 'Blood Pressure', prev: prev.bp!, curr: curr.bp!, direction: 'up', concern: isBpConcerning(currBp), extra: `still classified as ${currClass.label}` })
+      result.push({ label: 'Blood Pressure', prev: prev.bp!, curr: curr.bp!, direction: 'up', concern: isBpConcerning(currBp, config), extra: `still classified as ${currClass.label}` })
     }
   }
 
   if (curr.hr != null && prev.hr != null && curr.hr !== prev.hr)
-    result.push({ label: 'Heart Rate', prev: `${prev.hr} bpm`, curr: `${curr.hr} bpm`, direction: curr.hr > prev.hr ? 'up' : 'down', concern: curr.hr > 100 || curr.hr < 60 })
+    result.push({ label: 'Heart Rate', prev: `${prev.hr} bpm`, curr: `${curr.hr} bpm`, direction: curr.hr > prev.hr ? 'up' : 'down', concern: curr.hr > config.hr_high || curr.hr < config.hr_low })
 
   if (curr.temp != null && prev.temp != null && Math.abs(curr.temp - prev.temp) >= 0.1)
-    result.push({ label: 'Temperature', prev: `${prev.temp}°C`, curr: `${curr.temp}°C`, direction: curr.temp > prev.temp ? 'up' : 'down', concern: curr.temp > 37.5 || curr.temp < 36 })
+    result.push({ label: 'Temperature', prev: `${prev.temp}°C`, curr: `${curr.temp}°C`, direction: curr.temp > prev.temp ? 'up' : 'down', concern: curr.temp > config.temp_normal_max || curr.temp < config.temp_hypothermia })
 
   if (curr.spo2 != null && prev.spo2 != null && curr.spo2 !== prev.spo2)
-    result.push({ label: 'Oxygen Level', prev: `${prev.spo2}%`, curr: `${curr.spo2}%`, direction: curr.spo2 > prev.spo2 ? 'up' : 'down', concern: curr.spo2 < 95 })
+    result.push({ label: 'Oxygen Level', prev: `${prev.spo2}%`, curr: `${curr.spo2}%`, direction: curr.spo2 > prev.spo2 ? 'up' : 'down', concern: curr.spo2 < config.spo2_normal })
 
   if (curr.rr != null && prev.rr != null && curr.rr !== prev.rr)
-    result.push({ label: 'Breathing Rate', prev: `${prev.rr}/min`, curr: `${curr.rr}/min`, direction: curr.rr > prev.rr ? 'up' : 'down', concern: curr.rr > 20 || curr.rr < 12 })
+    result.push({ label: 'Breathing Rate', prev: `${prev.rr}/min`, curr: `${curr.rr}/min`, direction: curr.rr > prev.rr ? 'up' : 'down', concern: curr.rr > config.rr_high || curr.rr < config.rr_low })
 
   if (curr.blood_sugar != null && prev.blood_sugar != null && curr.blood_sugar !== prev.blood_sugar)
-    result.push({ label: 'Blood Sugar', prev: `${prev.blood_sugar} mg/dL`, curr: `${curr.blood_sugar} mg/dL`, direction: curr.blood_sugar > prev.blood_sugar ? 'up' : 'down', concern: curr.blood_sugar > 125 || curr.blood_sugar < 70 })
+    result.push({ label: 'Blood Sugar', prev: `${prev.blood_sugar} mg/dL`, curr: `${curr.blood_sugar} mg/dL`, direction: curr.blood_sugar > prev.blood_sugar ? 'up' : 'down', concern: curr.blood_sugar > config.bs_prediabetic || curr.blood_sugar < config.bs_hypoglycemia })
 
-  if (current.weight != null && previous.weight != null && current.weight !== previous.weight)
-    result.push({ label: 'Weight', prev: `${previous.weight} kg`, curr: `${current.weight} kg`, direction: current.weight > previous.weight ? 'up' : 'down', concern: false })
+  if (curr.weight != null && prev.weight != null && curr.weight !== prev.weight)
+    result.push({ label: 'Weight', prev: `${prev.weight} kg`, curr: `${curr.weight} kg`, direction: curr.weight > prev.weight ? 'up' : 'down', concern: false })
 
-  if (current.height != null && previous.height != null && current.height !== previous.height)
-    result.push({ label: 'Height', prev: `${previous.height} cm`, curr: `${current.height} cm`, direction: current.height > previous.height ? 'up' : 'down', concern: false })
+  if (curr.height != null && prev.height != null && curr.height !== prev.height)
+    result.push({ label: 'Height', prev: `${prev.height} cm`, curr: `${curr.height} cm`, direction: curr.height > prev.height ? 'up' : 'down', concern: false })
 
-  if (current.pain_score != null && previous.pain_score != null && current.pain_score !== previous.pain_score)
-    result.push({ label: 'Pain Level', prev: `${previous.pain_score}/10`, curr: `${current.pain_score}/10`, direction: current.pain_score > previous.pain_score ? 'up' : 'down', concern: current.pain_score >= 7 })
+  if (curr.pain_score != null && prev.pain_score != null && curr.pain_score !== prev.pain_score)
+    result.push({ label: 'Pain Level', prev: `${prev.pain_score}/10`, curr: `${curr.pain_score}/10`, direction: curr.pain_score > prev.pain_score ? 'up' : 'down', concern: curr.pain_score >= config.pain_high })
 
   return result
 }
@@ -271,9 +320,9 @@ function collectUnchanged(current: ConsultationTriage, previous: ConsultationTri
   if (curr.spo2 != null && prev.spo2 != null && curr.spo2 === prev.spo2) result.push('Oxygen Level')
   if (curr.rr != null && prev.rr != null && curr.rr === prev.rr) result.push('Breathing Rate')
   if (curr.blood_sugar != null && prev.blood_sugar != null && curr.blood_sugar === prev.blood_sugar) result.push('Blood Sugar')
-  if (current.weight != null && previous.weight != null && current.weight === previous.weight) result.push('Weight')
-  if (current.height != null && previous.height != null && current.height === previous.height) result.push('Height')
-  if (current.pain_score != null && previous.pain_score != null && current.pain_score === previous.pain_score) result.push('Pain Level')
+  if (curr.weight != null && prev.weight != null && curr.weight === prev.weight) result.push('Weight')
+  if (curr.height != null && prev.height != null && curr.height === prev.height) result.push('Height')
+  if (curr.pain_score != null && prev.pain_score != null && curr.pain_score === prev.pain_score) result.push('Pain Level')
 
   return result
 }
@@ -282,8 +331,8 @@ function collectUnchanged(current: ConsultationTriage, previous: ConsultationTri
  * Build a verbal narrative comparing vitals between two triage records.
  * Returns an HTML string, or empty string if nothing to compare.
  */
-export function buildVitalsNarrative(id: string, current: ConsultationTriage, previous: ConsultationTriage): string {
-  const changes = collectChanges(current, previous)
+export function buildVitalsNarrative(id: string, current: ConsultationTriage, previous: ConsultationTriage, config: VitalsConfig = DEFAULT_VITALS_CONFIG): string {
+  const changes = collectChanges(current, previous, config)
   const unchanged = collectUnchanged(current, previous)
 
   if (!changes.length && !unchanged.length) return ''
@@ -294,17 +343,17 @@ export function buildVitalsNarrative(id: string, current: ConsultationTriage, pr
     let sentence: string
 
     if (change.extra) {
-      const fn = sameCategoryPhrases[stableIndex(id + change.label, sameCategoryPhrases.length)]
+      const fn = sameCategoryPhrases[stableIndex(id + change.label, sameCategoryPhrases.length)]!
       sentence = fn(change.label, change.prev, change.curr, change.extra)
     } else if (change.direction === 'worsened') {
-      const fn = worsenedPhrases[stableIndex(id + change.label, worsenedPhrases.length)]
+      const fn = worsenedPhrases[stableIndex(id + change.label, worsenedPhrases.length)]!
       sentence = fn(change.label, change.prev, change.curr)
     } else if (change.direction === 'improved') {
-      const fn = improvedPhrases[stableIndex(id + change.label, improvedPhrases.length)]
+      const fn = improvedPhrases[stableIndex(id + change.label, improvedPhrases.length)]!
       sentence = fn(change.label, change.prev, change.curr)
     } else {
       const phrases = change.direction === 'up' ? increasePhrases : decreasePhrases
-      const fn = phrases[stableIndex(id + change.label, phrases.length)]
+      const fn = phrases[stableIndex(id + change.label, phrases.length)]!
       sentence = fn(change.label, change.prev, change.curr)
     }
 
@@ -330,9 +379,9 @@ export function buildVitalsNarrative(id: string, current: ConsultationTriage, pr
 
   if (unchanged.length) {
     const joined = joinList(unchanged)
-    const fn = unchangedPhrases[stableIndex(id + 'u', unchangedPhrases.length)]
+    const fn = unchangedPhrases[stableIndex(id + 'u', unchangedPhrases.length)]!
     result += (result ? ' ' : '') + fn(joined) + '.'
   }
 
-  return result
+  return result ? DOMPurify.sanitize(result, { ALLOWED_TAGS: ['strong'], ALLOWED_ATTR: [] }) : result
 }

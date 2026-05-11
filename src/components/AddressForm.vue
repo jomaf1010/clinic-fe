@@ -236,7 +236,7 @@ function onStreetChange() {
       <Select
         :model-value="selectedRegion"
         :disabled="disabled || loadingRegions"
-        @update:model-value="onRegionChange"
+        @update:model-value="(v) => onRegionChange(v as string)"
       >
         <SelectTrigger class="w-full min-w-0">
           <LoaderCircle v-if="loadingRegions" class="size-3.5 animate-spin text-muted-foreground" />
@@ -256,7 +256,7 @@ function onStreetChange() {
       <Select
         :model-value="selectedProvince"
         :disabled="disabled || !selectedRegion || loadingProvinces"
-        @update:model-value="onProvinceChange"
+        @update:model-value="(v) => onProvinceChange(v as string)"
       >
         <SelectTrigger class="w-full min-w-0">
           <LoaderCircle v-if="loadingProvinces" class="size-3.5 animate-spin text-muted-foreground" />
@@ -276,7 +276,7 @@ function onStreetChange() {
       <Select
         :model-value="selectedCity"
         :disabled="disabled || !selectedProvince || loadingCities"
-        @update:model-value="onCityChange"
+        @update:model-value="(v) => onCityChange(v as string)"
       >
         <SelectTrigger class="w-full min-w-0">
           <LoaderCircle v-if="loadingCities" class="size-3.5 animate-spin text-muted-foreground" />
@@ -296,7 +296,7 @@ function onStreetChange() {
       <Select
         :model-value="selectedBarangay"
         :disabled="disabled || !selectedCity || loadingBarangays"
-        @update:model-value="onBarangayChange"
+        @update:model-value="(v) => onBarangayChange(v as string)"
       >
         <SelectTrigger class="w-full min-w-0">
           <LoaderCircle v-if="loadingBarangays" class="size-3.5 animate-spin text-muted-foreground" />

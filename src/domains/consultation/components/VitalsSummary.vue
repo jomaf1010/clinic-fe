@@ -1,185 +1,51 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { AlertTriangle, CheckCircle2, ShieldAlert, HeartPulse, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
-import Button from '@/components/ui/button/Button.vue'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChartContainer, ChartCrosshair, type ChartConfig } from '@/components/ui/chart'
-import { VisXYContainer, VisLine, VisAxis, VisArea, VisScatter, VisTooltip } from '@unovis/vue'
+import { getAuthToken } from '@/lib/http'
+import { AlertTriangle, CheckCircle2, History, LoaderCircle, TrendingUp, FlaskConical, Info } from 'lucide-vue-next'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { http } from '@/lib/http'
-import type { ConsultationTriage, ConsultationResponse, LabOrderSummary } from '../types/consultation.types'
-import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar } from '@/lib/vitals'
+import type { ConsultationTriage, LabOrderSummary } from '../types/consultation.types'
+import type { EncounterResponse, EncounterTimelineItem } from '@/domains/encounter/types/encounter.types'
+import { classifyBpAsStatus, classifyHr, classifyTemp, classifySpo2, classifyRr, classifyBloodSugar, classifyBmi } from '@/lib/vitals'
+import { useVitalsConfigStore } from '@/stores/vitalsConfigStore'
 import { labOrderApi } from '../api/labOrderApi'
 import FinalizeModal from './FinalizeModal.vue'
+import ChronicTrendsDialog from '@/domains/patient/components/ChronicTrendsDialog.vue'
+import GrowthChartDialog from '@/domains/patient/components/specialties/pediatrics/GrowthChartDialog.vue'
 
 interface PastDiagnosis {
   description: string
   code: string | null
   date: string
-  consultationId: string
+  encounterId: string
 }
 
 const props = defineProps<{
   triage: ConsultationTriage
-  allergies?: string[]
-  conditions?: string[]
   patientId?: string
-  consultationId?: string
+  encounterId?: string
   showTrendsButton?: boolean
   labOrderSummary?: LabOrderSummary | null
+  /** Hide the vitals badges + past diagnoses panel — only render the lab + trends footer row. */
+  hideVitalsPanel?: boolean
+  /** Encounter specialty — swaps the Trends dialog for a specialty-appropriate chart. */
+  specialty?: string | null
 }>()
+
+// Pediatrics uses a Growth Chart (WHO percentiles) instead of the
+// chronic-trends dialog (BP / BS / weight / BMI), which is meant for
+// adult internal / family medicine.
+const isPediatrics = computed(() => props.specialty === 'pediatrics')
+
+const vitalsConfig = useVitalsConfigStore()
 
 const pastDiagnoses = ref<PastDiagnosis[]>([])
 const showTrends = ref(false)
-const isLoadingTrends = ref(false)
 
-interface WeightDataPoint {
-  date: string
-  weight: number
-}
-
-interface BPDataPoint {
-  date: string
-  systolic: number
-  diastolic: number
-}
-
-interface BSDataPoint {
-  date: string
-  blood_sugar: number
-}
-
-const weightData = ref<WeightDataPoint[]>([])
-const bpData = ref<BPDataPoint[]>([])
-const bsData = ref<BSDataPoint[]>([])
-
-function parseBPString(bp: string | null): { systolic: number; diastolic: number } | null {
-  if (!bp) return null
-  const match = bp.match(/^(\d+)\s*\/\s*(\d+)$/)
-  if (!match) return null
-  return { systolic: parseInt(match[1]), diastolic: parseInt(match[2]) }
-}
-
-async function openTrends() {
+function openTrends() {
   showTrends.value = true
-  if (weightData.value.length > 0 || bpData.value.length > 0 || bsData.value.length > 0) return
-  if (!props.patientId) return
-
-  isLoadingTrends.value = true
-  try {
-    const pages = [1, 2, 3, 4, 5]
-    const weightPoints: WeightDataPoint[] = []
-    const bpPoints: BPDataPoint[] = []
-    const bsPoints: BSDataPoint[] = []
-
-    for (const page of pages) {
-      if (weightPoints.length >= 50 && bpPoints.length >= 50 && bsPoints.length >= 50) break
-      const res = await http.get<{ data: ConsultationResponse[]; meta: { pagination: { last_page: number } } }>(
-        `/patients/${props.patientId}/consultations?per_page=10&page=${page}`,
-      )
-      for (const c of res.data) {
-        const date = (c.finalized_at ?? c.created_at).split('T')[0]
-        if (c.triage?.weight && c.triage.weight > 0 && weightPoints.length < 50) {
-          weightPoints.push({ date, weight: c.triage.weight })
-        }
-        const bp = parseBPString(c.triage?.vitals?.bp ?? null)
-        if (bp && bpPoints.length < 50) {
-          bpPoints.push({ date, systolic: bp.systolic, diastolic: bp.diastolic })
-        }
-        if (c.triage?.vitals?.blood_sugar && c.triage.vitals.blood_sugar > 0 && bsPoints.length < 50) {
-          bsPoints.push({ date, blood_sugar: c.triage.vitals.blood_sugar })
-        }
-      }
-      if (page >= res.meta.pagination.last_page) break
-    }
-
-    weightData.value = weightPoints.reverse()
-    bpData.value = bpPoints.reverse()
-    bsData.value = bsPoints.reverse()
-  } catch {
-    // silent
-  } finally {
-    isLoadingTrends.value = false
-  }
-}
-
-const weightChartConfig: ChartConfig = {
-  weight: { label: 'Weight (kg)', color: 'hsl(var(--chart-1))' },
-}
-const weightX = (_: WeightDataPoint, i: number) => i
-const weightY = (d: WeightDataPoint) => d.weight
-
-const bpChartConfig: ChartConfig = {
-  systolic: { label: 'Systolic', color: 'hsl(var(--chart-2))' },
-  diastolic: { label: 'Diastolic', color: 'hsl(var(--chart-3))' },
-}
-const bpX = (_: BPDataPoint, i: number) => i
-const bpSystolic = (d: BPDataPoint) => d.systolic
-const bpDiastolic = (d: BPDataPoint) => d.diastolic
-
-function bpStatusColor(systolic: number, diastolic: number): { label: string; color: string } {
-  const s = classifyBpAsStatus(`${systolic}/${diastolic}`)
-  if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
-  if (s.severity === 'elevated' || s.severity === 'low') return { label: s.label, color: '#d97706' }
-  return { label: s.label, color: '#dc2626' }
-}
-
-function bpTooltipTemplate(d: BPDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = bpStatusColor(d.systolic, d.diastolic)
-  return `<div style="background: var(--popover); border: 1px solid ${status.color}40; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${d.systolic}/${d.diastolic} mmHg</div>
-    <div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
-}
-
-function weightBmiStatus(weight: number): { label: string; color: string } | null {
-  const height = props.triage.height
-  if (!height) return null
-  const heightM = height / 100
-  const bmiVal = weight / (heightM * heightM)
-  if (bmiVal < 18.5) return { label: `BMI ${bmiVal.toFixed(1)} · Underweight`, color: '#2563eb' }
-  if (bmiVal < 25) return { label: `BMI ${bmiVal.toFixed(1)} · Normal`, color: '#16a34a' }
-  if (bmiVal < 30) return { label: `BMI ${bmiVal.toFixed(1)} · Overweight`, color: '#d97706' }
-  return { label: `BMI ${bmiVal.toFixed(1)} · Obese`, color: '#dc2626' }
-}
-
-const bsChartConfig: ChartConfig = {
-  blood_sugar: { label: 'Blood Sugar (mg/dL)', color: 'hsl(var(--chart-4))' },
-}
-const bsX = (_: BSDataPoint, i: number) => i
-const bsY = (d: BSDataPoint) => d.blood_sugar
-
-function bsStatusColor(val: number): { label: string; color: string } {
-  const s = classifyBloodSugar(val)
-  if (!s || s.severity === 'normal') return { label: 'Normal', color: '#16a34a' }
-  if (s.severity === 'low') return { label: s.label, color: '#2563eb' }
-  if (s.severity === 'elevated') return { label: s.label, color: '#d97706' }
-  return { label: s.label, color: '#dc2626' }
-}
-
-function bsTooltipTemplate(d: BSDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = bsStatusColor(d.blood_sugar)
-  return `<div style="background: var(--popover); border: 1px solid ${status.color}40; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${d.blood_sugar} mg/dL</div>
-    <div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
-}
-
-function weightTooltipTemplate(d: WeightDataPoint): string {
-  const date = new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const status = weightBmiStatus(d.weight)
-  const borderColor = status ? `${status.color}40` : 'var(--border)'
-  return `<div style="background: var(--popover); border: 1px solid ${borderColor}; border-radius: 6px; padding: 8px 12px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.1);">
-    <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${d.weight} kg</div>
-    ${status ? `<div style="color: ${status.color}; font-weight: 500; margin-top: 2px;">${status.label}</div>` : ''}
-    <div style="color: var(--muted-foreground); margin-top: 2px;">${date}</div>
-  </div>`
 }
 
 // Lab result preview
@@ -190,27 +56,29 @@ const labPreviewIndex = ref(0)
 const isLoadingLabPreview = ref(false)
 
 async function viewLabResult(description: string) {
-  if (!props.consultationId) return
+  if (!props.encounterId) return
   isLoadingLabPreview.value = true
   labPreviewTitle.value = description
   labPreviewIndex.value = 0
   labPreviewOpen.value = true
 
   try {
-    const res = await labOrderApi.getForConsultation(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.encounterId)
     const item = res.data?.items.find((i) => i.description === description && i.status === 'completed')
     if (!item?.result_files.length) {
       labPreviewOpen.value = false
       return
     }
 
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
     const files = await Promise.all(
       item.result_files.map(async (fileUrl) => {
         const res = await fetch(`${baseUrl}${fileUrl}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
         })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const blob = await res.blob()
         return {
           url: URL.createObjectURL(blob),
@@ -238,27 +106,27 @@ function onLabPreviewClose(open: boolean) {
 }
 
 const showPreview = ref(false)
-const previewConsultation = ref<ConsultationResponse | null>(null)
+const previewConsultation = ref<EncounterResponse | null>(null)
 const isLoadingPreview = ref(false)
 
 async function fetchPastDiagnoses() {
   if (!props.patientId) return
   try {
-    const res = await http.get<{ data: ConsultationResponse[]; meta: unknown }>(
-      `/patients/${props.patientId}/consultations?per_page=3&page=1`,
+    const res = await http.get<{ data: EncounterTimelineItem[]; meta: unknown }>(
+      `/patients/${props.patientId}/encounters?per_page=3&page=1`,
     )
     const diagnoses: PastDiagnosis[] = []
     let count = 0
     for (const c of res.data) {
-      if (c.id === props.consultationId) continue
+      if (c.id === props.encounterId) continue
       if (c.status !== 'finalized') continue
       if (count >= 2) break
-      for (const d of c.assessment?.diagnoses ?? []) {
+      for (const d of c.display_summary?.diagnoses ?? []) {
         diagnoses.push({
-          description: d.description,
-          code: d.code,
+          description: d,
+          code: null,
           date: c.finalized_at ?? c.created_at,
-          consultationId: c.id,
+          encounterId: c.id,
         })
       }
       count++
@@ -269,11 +137,11 @@ async function fetchPastDiagnoses() {
   }
 }
 
-async function openConsultationPreview(consultationId: string) {
+async function openConsultationPreview(encounterId: string) {
   isLoadingPreview.value = true
   showPreview.value = true
   try {
-    const res = await http.get<{ data: ConsultationResponse }>(`/consultations/${consultationId}`)
+    const res = await http.get<{ data: EncounterResponse }>(`/encounters/${encounterId}`)
     previewConsultation.value = res.data
   } catch {
     showPreview.value = false
@@ -282,64 +150,113 @@ async function openConsultationPreview(consultationId: string) {
   }
 }
 
-onMounted(fetchPastDiagnoses)
+onMounted(() => {
+  fetchPastDiagnoses()
+  loadLabThumbnails()
+})
+
+// ── Lab thumbnails ──────────────────────────────────────────────────────────
+const labItemThumbnails = ref<Record<string, string>>({})
+
+async function loadLabThumbnails() {
+  if (!props.encounterId || !props.labOrderSummary?.completed_items?.length) return
+  try {
+    const res = await labOrderApi.getForEncounter(props.encounterId)
+    const token = getAuthToken()
+    const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
+
+    for (const item of res.data?.items ?? []) {
+      if (item.status !== 'completed' || !item.result_files.length) continue
+      // Find first image file for thumbnail
+      for (const fileUrl of item.result_files) {
+        try {
+          const fileRes = await fetch(`${baseUrl}${fileUrl}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            credentials: 'include',
+          })
+          if (!fileRes.ok) continue
+          const blob = await fileRes.blob()
+          if (blob.type.startsWith('image/')) {
+            labItemThumbnails.value[item.description] = URL.createObjectURL(blob)
+            break
+          }
+        } catch {
+          // skip this file
+        }
+      }
+    }
+  } catch {
+    // silent
+  }
+}
 
 function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const bmi = computed(() => {
-  if (!props.triage.weight || !props.triage.height) return null
-  const heightM = props.triage.height / 100
-  return +(props.triage.weight / (heightM * heightM)).toFixed(1)
+  const w = props.triage.vitals?.weight as number | undefined
+  const h = props.triage.vitals?.height as number | undefined
+  if (!w || !h) return null
+  const heightM = h / 100
+  return +(w / (heightM * heightM)).toFixed(1)
 })
 
 const bmiCategory = computed(() => {
-  if (bmi.value === null) return null
-  if (bmi.value < 18.5) return { label: 'Underweight', color: 'text-blue-600' }
-  if (bmi.value < 25) return { label: 'Normal', color: 'text-green-600' }
-  if (bmi.value < 30) return { label: 'Overweight', color: 'text-amber-600' }
-  return { label: 'Obese', color: 'text-red-600' }
+  const result = classifyBmi(bmi.value, vitalsConfig.config)
+  if (!result) return null
+  return { label: result.label, color: result.color }
 })
 
+function toNum(v: string | number | null | undefined): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function toStr(v: string | number | null | undefined): string | null {
+  if (v == null || v === '') return null
+  return String(v)
+}
+
 const tempStatus = computed(() => {
-  const s = classifyTemp(props.triage.vitals?.temp)
+  const s = classifyTemp(toNum(props.triage.vitals?.temp), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bpStatus = computed(() => {
-  const s = classifyBpAsStatus(props.triage.vitals?.bp)
+  const s = classifyBpAsStatus(toStr(props.triage.vitals?.bp), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const hrStatus = computed(() => {
-  const s = classifyHr(props.triage.vitals?.hr)
+  const s = classifyHr(toNum(props.triage.vitals?.hr), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const spo2Status = computed(() => {
-  const s = classifySpo2(props.triage.vitals?.spo2)
+  const s = classifySpo2(toNum(props.triage.vitals?.spo2), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const rrStatus = computed(() => {
-  const s = classifyRr(props.triage.vitals?.rr)
+  const s = classifyRr(toNum(props.triage.vitals?.rr), vitalsConfig.config)
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
 
 const bsStatus = computed(() => {
-  const s = classifyBloodSugar(props.triage.vitals?.blood_sugar)
+  const s = classifyBloodSugar(
+    toNum(props.triage.vitals?.blood_sugar),
+    vitalsConfig.config,
+    toStr(props.triage.vitals?.blood_glucose_timing),
+  )
   if (!s) return null
   return { ...s, icon: s.severity === 'normal' ? CheckCircle2 : AlertTriangle }
 })
-
-const hasAllergies = computed(() => (props.allergies?.length ?? 0) > 0)
-const hasConditions = computed(() => (props.conditions?.length ?? 0) > 0)
 
 const hasAnyVital = computed(() =>
   bmi.value !== null || tempStatus.value !== null || bpStatus.value !== null ||
@@ -370,19 +287,20 @@ const vitalBadges = computed(() => {
   const badges: VitalBadge[] = []
 
   if (bmi.value !== null && bmiCategory.value) {
-    const isNormal = bmi.value >= 18.5 && bmi.value < 25
+    const cfg = vitalsConfig.config
+    const isNormal = bmi.value >= cfg.bmi_underweight && bmi.value < cfg.bmi_normal
     badges.push({
       label: 'BMI',
       value: `${bmi.value}`,
       status: bmiCategory.value.label,
-      badgeClass: isNormal ? BADGE_GREEN : bmi.value < 18.5 ? BADGE_BLUE : bmi.value < 30 ? BADGE_AMBER : BADGE_RED,
+      badgeClass: isNormal ? BADGE_GREEN : bmi.value < cfg.bmi_underweight ? BADGE_BLUE : bmi.value < cfg.bmi_overweight ? BADGE_AMBER : BADGE_RED,
     })
   }
 
   if (bpStatus.value) {
     badges.push({
       label: 'BP',
-      value: vitals.bp ?? '',
+      value: toStr(vitals.bp) ?? '',
       status: bpStatus.value.label,
       badgeClass: severityToBadge(bpStatus.value.severity),
     })
@@ -425,9 +343,12 @@ const vitalBadges = computed(() => {
   }
 
   if (bsStatus.value) {
+    const timing = typeof vitals.blood_glucose_timing === 'string'
+      ? vitals.blood_glucose_timing.replaceAll('_', ' ')
+      : null
     badges.push({
       label: 'Sugar',
-      value: `${vitals.blood_sugar} mg/dL`,
+      value: `${vitals.blood_sugar} mg/dL${timing ? ` · ${timing}` : ''}`,
       status: bsStatus.value.label,
       badgeClass: severityToBadge(bsStatus.value.severity),
     })
@@ -438,12 +359,12 @@ const vitalBadges = computed(() => {
 
 const showDisclaimer = ref(false)
 
-const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || hasConditions.value || hasPastDiagnoses.value || hasLabResults.value)
+const hasAnything = computed(() => hasAnyVital.value || hasPastDiagnoses.value || hasLabResults.value)
 </script>
 
 <template>
-  <TooltipProvider v-if="hasAnything" :delay-duration="200">
-    <div class="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2">
+  <TooltipProvider v-if="hasAnything || (hideVitalsPanel && (hasLabResults || showTrendsButton))" :delay-duration="200">
+    <div v-if="!hideVitalsPanel" class="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2">
     <div v-if="hasAnyVital" class="flex flex-wrap items-center gap-1.5">
       <span
         v-for="badge in vitalBadges"
@@ -478,25 +399,6 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
       </p>
     </div>
 
-    <!-- Allergies & Conditions -->
-    <div v-if="hasAllergies || hasConditions" class="flex flex-wrap gap-1.5">
-      <span
-        v-for="allergy in allergies"
-        :key="'a-' + allergy"
-        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-red-500 border-red-500 dark:bg-red-600 dark:border-red-600"
-      >
-        <ShieldAlert class="size-3" />
-        {{ allergy }}
-      </span>
-      <span
-        v-for="condition in conditions"
-        :key="'c-' + condition"
-        class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-white bg-amber-500 border-amber-500 dark:bg-amber-600 dark:border-amber-600"
-      >
-        <HeartPulse class="size-3" />
-        {{ condition }}
-      </span>
-    </div>
     <!-- Past Diagnoses -->
     <div v-if="hasPastDiagnoses" class="flex flex-col gap-1 text-xs">
       <span class="flex items-center gap-1 font-medium text-muted-foreground">
@@ -512,7 +414,7 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
           <button
             type="button"
             class="text-left transition-colors hover:text-foreground"
-            @click="openConsultationPreview(dx.consultationId)"
+            @click="openConsultationPreview(dx.encounterId)"
           >
             {{ dx.description }}<span v-if="dx.code" class="ml-0.5 opacity-60">({{ dx.code }})</span>
             <span class="ml-1 opacity-50">{{ formatShortDate(dx.date) }}</span>
@@ -522,236 +424,65 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
     </div>
     </div>
 
-    <!-- Lab results + Trends button row -->
-    <div v-if="hasLabResults || showTrendsButton" class="flex flex-wrap items-center gap-1.5 -mt-1 text-xs">
-      <template v-if="hasLabResults">
-        <span class="flex items-center gap-1 font-medium text-muted-foreground">
-          <FlaskConical class="size-3" />
-          Lab
-        </span>
-        <button
-          v-for="item in labOrderSummary!.completed_items"
-          :key="'done-' + item"
-          type="button"
-          class="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-700 transition-colors hover:bg-green-100 dark:border-green-800 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900"
-          @click="viewLabResult(item)"
-        >
-          {{ item }} ✓
-        </button>
-        <span
-          v-for="item in labOrderSummary!.pending_items"
-          :key="'pending-' + item"
-          class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-        >
-          {{ item }}
-        </span>
-      </template>
-      <Button
-        v-if="showTrendsButton"
-        variant="outline"
-        size="sm"
-        class="h-6 gap-1 px-2 text-xs"
-        @click="openTrends"
-      >
-        <TrendingUp class="size-3" />
-        Trends
-      </Button>
+    <!-- Lab results + Trends button row (square thumbnails) -->
+    <div v-if="hasLabResults || showTrendsButton" class="flex flex-wrap items-center gap-2">
+      <!-- Trends square button -->
+      <Tooltip v-if="showTrendsButton">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="flex size-24 flex-col items-center justify-center gap-1 rounded-xl border bg-gradient-to-br from-cyan-500 to-blue-500 text-white shadow-sm transition-transform hover:scale-105 hover:shadow-md"
+            @click="openTrends"
+          >
+            <TrendingUp class="size-8" />
+            <span class="text-xs font-medium">Trends</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Patient Trends</TooltipContent>
+      </Tooltip>
+
+      <!-- Completed lab thumbnails -->
+      <Tooltip v-for="item in labOrderSummary?.completed_items ?? []" :key="'done-' + item">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="group relative flex size-24 items-center justify-center overflow-hidden rounded-xl border border-green-200 bg-green-50 text-xs font-medium text-green-700 shadow-sm transition-transform hover:scale-105 hover:shadow-md dark:border-green-800 dark:bg-green-950 dark:text-green-400"
+            @click="viewLabResult(item)"
+          >
+            <img
+              v-if="labItemThumbnails[item]"
+              :src="labItemThumbnails[item]"
+              :alt="item"
+              class="size-full object-cover"
+            />
+            <div v-else class="flex flex-col items-center justify-center gap-1 px-2 text-center leading-tight">
+              <FlaskConical class="size-6" />
+              <span class="line-clamp-3 text-[11px]">{{ item }}</span>
+            </div>
+            <span class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-green-500 text-white shadow-sm">
+              <CheckCircle2 class="size-3.5" />
+            </span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ item }} — Result available</TooltipContent>
+      </Tooltip>
+
+      <!-- Pending lab items -->
+      <Tooltip v-for="item in labOrderSummary?.pending_items ?? []" :key="'pending-' + item">
+        <TooltipTrigger as-child>
+          <div class="flex size-24 flex-col items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-center text-[11px] font-medium leading-tight text-amber-700 shadow-sm dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
+            <FlaskConical class="size-6" />
+            <span class="line-clamp-3">{{ item }}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>{{ item }} — Pending result</TooltipContent>
+      </Tooltip>
     </div>
 
-    <!-- Trends Modal -->
-    <Dialog :open="showTrends" @update:open="showTrends = $event">
-      <DialogContent class="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle class="flex items-center gap-2">
-            <TrendingUp class="size-5 text-primary" />
-            Patient Trends
-          </DialogTitle>
-          <DialogDescription>
-            Weight trend over past consultations.
-          </DialogDescription>
-        </DialogHeader>
-
-        <!-- Loading -->
-        <div v-if="isLoadingTrends" class="flex items-center justify-center py-12">
-          <LoaderCircle class="size-6 animate-spin text-muted-foreground" />
-        </div>
-
-        <!-- No data -->
-        <div v-else-if="weightData.length === 0 && bpData.length === 0 && bsData.length === 0" class="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <div class="flex size-12 items-center justify-center rounded-full bg-muted">
-            <TrendingUp class="size-6 text-muted-foreground" />
-          </div>
-          <p class="text-sm font-medium text-muted-foreground">No vitals data available</p>
-          <p class="text-xs text-muted-foreground">Charts will appear once vitals are recorded in triage.</p>
-        </div>
-
-        <!-- Charts in tabs -->
-        <Tabs v-else default-value="weight" class="w-full">
-          <TabsList class="w-full">
-            <TabsTrigger v-if="weightData.length > 0" value="weight" class="flex-1">
-              Weight
-              <span class="ml-1 text-xs text-muted-foreground">({{ weightData.length }})</span>
-            </TabsTrigger>
-            <TabsTrigger v-if="bpData.length > 0" value="bp" class="flex-1">
-              Blood Pressure
-              <span class="ml-1 text-xs text-muted-foreground">({{ bpData.length }})</span>
-            </TabsTrigger>
-            <TabsTrigger v-if="bsData.length > 0" value="bs" class="flex-1">
-              Blood Sugar
-              <span class="ml-1 text-xs text-muted-foreground">({{ bsData.length }})</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <!-- Weight chart -->
-          <TabsContent v-if="weightData.length > 0" value="weight" class="mt-3">
-            <ChartContainer :config="weightChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="weightData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="weightX"
-                  :y="weightY"
-                  color="hsl(var(--chart-1))"
-                  :opacity="0.1"
-                />
-                <VisLine
-                  :x="weightX"
-                  :y="weightY"
-                  color="hsl(var(--chart-1))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="weightX"
-                  :y="weightY"
-                  color="hsl(var(--chart-1))"
-                  :size="5"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => weightData[i]?.date ? new Date(weightData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(weightData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :tick-format="(v: number) => `${v}kg`"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-1))" :template="weightTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-          </TabsContent>
-
-          <!-- Blood Pressure chart -->
-          <TabsContent v-if="bpData.length > 0" value="bp" class="mt-3">
-            <ChartContainer :config="bpChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="bpData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="bpX"
-                  :y="bpSystolic"
-                  color="hsl(var(--chart-2))"
-                  :opacity="0.08"
-                />
-                <VisLine
-                  :x="bpX"
-                  :y="bpSystolic"
-                  color="hsl(var(--chart-2))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bpX"
-                  :y="bpSystolic"
-                  color="hsl(var(--chart-2))"
-                  :size="4"
-                />
-                <VisArea
-                  :x="bpX"
-                  :y="bpDiastolic"
-                  color="hsl(var(--chart-3))"
-                  :opacity="0.08"
-                />
-                <VisLine
-                  :x="bpX"
-                  :y="bpDiastolic"
-                  color="hsl(var(--chart-3))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bpX"
-                  :y="bpDiastolic"
-                  color="hsl(var(--chart-3))"
-                  :size="4"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => bpData[i]?.date ? new Date(bpData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(bpData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-2))" :template="bpTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-            <div class="mt-2 flex items-center justify-center gap-4 text-xs text-muted-foreground">
-              <span class="flex items-center gap-1.5">
-                <span class="size-2 rounded-full" style="background: hsl(var(--chart-2))" />
-                Systolic
-              </span>
-              <span class="flex items-center gap-1.5">
-                <span class="size-2 rounded-full" style="background: hsl(var(--chart-3))" />
-                Diastolic
-              </span>
-            </div>
-          </TabsContent>
-
-          <!-- Blood Sugar chart -->
-          <TabsContent v-if="bsData.length > 0" value="bs" class="mt-3">
-            <ChartContainer :config="bsChartConfig" class="h-[300px] w-full">
-              <VisXYContainer :data="bsData" :margin="{ top: 10, right: 10, bottom: 30, left: 40 }">
-                <VisArea
-                  :x="bsX"
-                  :y="bsY"
-                  color="hsl(var(--chart-4))"
-                  :opacity="0.1"
-                />
-                <VisLine
-                  :x="bsX"
-                  :y="bsY"
-                  color="hsl(var(--chart-4))"
-                  :line-width="2"
-                />
-                <VisScatter
-                  :x="bsX"
-                  :y="bsY"
-                  color="hsl(var(--chart-4))"
-                  :size="5"
-                />
-                <VisAxis
-                  type="x"
-                  :tick-format="(i: number) => bsData[i]?.date ? new Date(bsData[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''"
-                  :num-ticks="Math.min(bsData.length, 8)"
-                  :grid-line="false"
-                />
-                <VisAxis
-                  type="y"
-                  :tick-format="(v: number) => `${v}`"
-                  :grid-line="true"
-                />
-                <ChartCrosshair color="hsl(var(--chart-4))" :template="bsTooltipTemplate" />
-                <VisTooltip :horizontal-shift="10" :vertical-shift="10" />
-              </VisXYContainer>
-            </ChartContainer>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter>
-          <Button variant="outline" @click="showTrends = false">Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <!-- Trends Dialog — specialty-aware. Pediatrics gets the Growth Chart
+         (WHO percentiles); everyone else gets ChronicTrends (BP / BS / weight / BMI). -->
+    <GrowthChartDialog v-if="isPediatrics" v-model:open="showTrends" />
+    <ChronicTrendsDialog v-else v-model:open="showTrends" />
 
     <!-- Lab Result Preview Modal -->
     <Dialog :open="labPreviewOpen" @update:open="onLabPreviewClose">
@@ -787,13 +518,13 @@ const hasAnything = computed(() => hasAnyVital.value || hasAllergies.value || ha
               </button>
             </div>
             <iframe
-              v-if="labPreviewFiles[labPreviewIndex].type === 'pdf'"
-              :src="labPreviewFiles[labPreviewIndex].url"
+              v-if="labPreviewFiles[labPreviewIndex]?.type === 'pdf'"
+              :src="labPreviewFiles[labPreviewIndex]?.url"
               class="h-[70vh] w-full rounded border"
             />
             <img
               v-else
-              :src="labPreviewFiles[labPreviewIndex].url"
+              :src="labPreviewFiles[labPreviewIndex]?.url"
               :alt="labPreviewTitle"
               class="w-full rounded"
             />

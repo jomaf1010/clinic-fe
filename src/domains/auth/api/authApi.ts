@@ -1,5 +1,5 @@
-import { http } from '@/lib/http'
-import type { LoginCredentials, LoginResponse, MeResponse, MessageResponse, RefreshResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
+import { http, getAuthToken } from '@/lib/http'
+import type { GoogleAuthResponse, LoginCredentials, LoginResponse, MeResponse, MessageResponse, RefreshResponse, SelectClinicResponse, SignupCredentials, SignupResponse, VerifyEmailPayload } from '../types/auth.types'
 
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
@@ -14,6 +14,18 @@ export const authApi = {
       ...credentials,
       password: btoa(credentials.password),
     })
+  },
+
+  async googleAuth(data: { credential: string; remember_me?: boolean }): Promise<GoogleAuthResponse> {
+    return http.post<GoogleAuthResponse>('/auth/google', data)
+  },
+
+  async requestGoogleLink(data: { credential: string }): Promise<MessageResponse> {
+    return http.post<MessageResponse>('/auth/google/link-request', data)
+  },
+
+  async confirmGoogleLink(data: { email: string; token: string; remember_me?: boolean }): Promise<GoogleAuthResponse> {
+    return http.post<GoogleAuthResponse>('/auth/google/link-confirm', data)
   },
 
   async verifyEmail(payload: VerifyEmailPayload): Promise<MessageResponse> {
@@ -32,7 +44,10 @@ export const authApi = {
     return http.post<SelectClinicResponse>('/auth/select-clinic', { clinic_id: clinicId })
   },
 
-  async updatePreferences(data: { theme: 'light' | 'dark' }): Promise<void> {
+  async updatePreferences(data: {
+    theme?: 'light' | 'dark'
+    tooth_numbering?: 'fdi' | 'universal' | 'palmer' | null
+  }): Promise<void> {
     await http.patch('/auth/preferences', data)
   },
 
@@ -65,7 +80,7 @@ export const authApi = {
 
   async logout(): Promise<void> {
     const BASE_URL = import.meta.env.VITE_API_URL as string
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`

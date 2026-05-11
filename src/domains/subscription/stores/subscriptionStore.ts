@@ -3,6 +3,17 @@ import { ref } from 'vue'
 import { subscriptionApi } from '../api/subscriptionApi'
 import type { PaymentRecord, SubscriptionStatus } from '../types/subscription.types'
 
+const TRUSTED_CHECKOUT_HOST = 'checkout.paymongo.com'
+
+export function isTrustedCheckoutUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && url.hostname === TRUSTED_CHECKOUT_HOST
+  } catch {
+    return false
+  }
+}
+
 export const useSubscriptionStore = defineStore('subscription', () => {
   const status = ref<SubscriptionStatus | null>(null)
   const payments = ref<PaymentRecord[]>([])
@@ -39,7 +50,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     checkoutLoading.value = true
     try {
       const response = await subscriptionApi.createCheckout()
-      window.location.href = response.data.checkout_url
+      const checkoutUrl = response.data.checkout_url
+      if (!isTrustedCheckoutUrl(checkoutUrl)) {
+        throw new Error('Invalid checkout URL returned from server')
+      }
+      window.location.href = checkoutUrl
     } finally {
       checkoutLoading.value = false
     }

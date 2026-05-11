@@ -7,11 +7,11 @@ import Input from '@/components/ui/input/Input.vue'
 import Label from '@/components/ui/label/Label.vue'
 import Textarea from '@/components/ui/textarea/Textarea.vue'
 import Separator from '@/components/ui/separator/Separator.vue'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -76,8 +76,6 @@ const notes = ref('')
 
 const error = ref<string | null>(null)
 
-const nativeSelectClass = "flex h-9 w-full appearance-none items-center rounded-md border border-input bg-transparent bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23888%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px] bg-[right_0.75rem_center] bg-no-repeat px-3 pr-9 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-
 const lineItemTypeOptions: { value: LineItemType; label: string }[] = [
   { value: 'consultation_fee', label: 'Consultation Fee' },
   { value: 'medicine', label: 'Medicine' },
@@ -112,6 +110,7 @@ function removeLineItem(index: number) {
 
 function onTypeChange(index: number) {
   const item = lineItems.value[index]
+  if (!item) return
   // Reset medicine fields when switching away from medicine
   if (item.type !== 'medicine') {
     item.reference_id = null
@@ -132,6 +131,7 @@ function onTypeChange(index: number) {
 function onMedicineInput(index: number, val: string) {
   medicineQueries.value[index] = val
   const item = lineItems.value[index]
+  if (!item) return
   // Clear previous selection
   item.reference_id = null
   item.description = ''
@@ -163,6 +163,7 @@ function onMedicineInput(index: number, val: string) {
 
 function selectMedicine(index: number, result: MedicineSearchResult) {
   const item = lineItems.value[index]
+  if (!item) return
   item.description = result.display_name
   item.reference_id = result.id
   item.price_per_piece = result.price_per_piece
@@ -420,20 +421,20 @@ async function handleSubmit() {
                     <!-- Type -->
                     <div class="flex flex-col gap-1">
                       <label class="text-xs text-muted-foreground">Type</label>
-                      <select
+                      <NativeSelect
                         v-model="item.type"
-                        :class="nativeSelectClass"
+                        class="h-9 rounded-xl px-3 text-sm"
                         :disabled="billingStore.isSaving"
                         @change="onTypeChange(index)"
                       >
-                        <option
+                        <NativeSelectOption
                           v-for="opt in lineItemTypeOptions"
                           :key="opt.value"
                           :value="opt.value"
                         >
                           {{ opt.label }}
-                        </option>
-                      </select>
+                        </NativeSelectOption>
+                      </NativeSelect>
                     </div>
 
                     <!-- Medicine search (when type is medicine) -->
@@ -558,15 +559,15 @@ async function handleSubmit() {
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div class="flex flex-col gap-1">
                 <label class="text-xs text-muted-foreground">Discount Type</label>
-                <select
+                <NativeSelect
                   v-model="discountType"
-                  :class="nativeSelectClass"
+                  class="h-9 rounded-xl px-3 text-sm"
                   :disabled="billingStore.isSaving"
                 >
-                  <option value="">None</option>
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="fixed">Fixed Amount (₱)</option>
-                </select>
+                  <NativeSelectOption value="">None</NativeSelectOption>
+                  <NativeSelectOption value="percentage">Percentage (%)</NativeSelectOption>
+                  <NativeSelectOption value="fixed">Fixed Amount (₱)</NativeSelectOption>
+                </NativeSelect>
               </div>
               <div class="flex flex-col gap-1">
                 <label class="text-xs text-muted-foreground">Discount Value</label>

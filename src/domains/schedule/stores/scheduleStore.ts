@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { HttpError } from '@/lib/http'
+import { appointmentApi } from '@/domains/appointment/api/appointmentApi'
+import type { AppointmentResponse } from '@/domains/appointment/types/appointment.types'
 import { scheduleApi } from '../api/scheduleApi'
 import type {
   CalendarBlock,
@@ -12,20 +14,30 @@ import type {
 } from '../types/schedule.types'
 
 export const useScheduleStore = defineStore('schedule', () => {
-  const selectedDoctorId = ref<string | null>(null)
   const schedule = ref<WorkingSchedule | null>(null)
-  const blocks = ref<CalendarBlock[]>([])
-  const availability = ref<{ slots: Slot[]; blocks: CalendarBlock[] } | null>(null)
+  const studioAppointments = ref<AppointmentResponse[]>([])
+  const studioMonthAppointments = ref<AppointmentResponse[]>([])
+  const studioSlots = ref<Slot[]>([])
+  const studioDayBlocks = ref<CalendarBlock[]>([])
+  const studioUpcomingBlocks = ref<CalendarBlock[]>([])
 
   const isLoadingSchedule = ref(false)
-  const isLoadingBlocks = ref(false)
-  const isLoadingAvailability = ref(false)
+  const isLoadingStudio = ref(false)
   const isSavingSchedule = ref(false)
+  const studioError = ref<string | null>(null)
+  let latestStudioLoadKey = ''
+  let inFlightStudioLoadKey = ''
 
-  // Track current block range to allow refreshing
-  let currentBlockUserId = ''
-  let currentBlockStart = ''
-  let currentBlockEnd = ''
+  function toLocalDate(date: Date): string {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  function isSameDay(iso: string, date: string): boolean {
+    return toLocalDate(new Date(iso)) === date
+  }
 
   async function fetchSchedule(userId: string): Promise<void> {
     isLoadingSchedule.value = true
@@ -53,68 +65,71 @@ export const useScheduleStore = defineStore('schedule', () => {
     }
   }
 
-  async function fetchBlocks(userId: string, start: string, end: string): Promise<void> {
-    isLoadingBlocks.value = true
-    currentBlockUserId = userId
-    currentBlockStart = start
-    currentBlockEnd = end
-    try {
-      const response = await scheduleApi.listBlocks(userId, start, end)
-      blocks.value = response.data
-    } finally {
-      isLoadingBlocks.value = false
-    }
-  }
-
   async function createBlock(payload: StoreCalendarBlockPayload): Promise<void> {
     await scheduleApi.createBlock(payload)
-    if (currentBlockUserId) {
-      await fetchBlocks(currentBlockUserId, currentBlockStart, currentBlockEnd)
-    }
   }
 
-  async function updateBlock(uuid: string, payload: UpdateCalendarBlockPayload): Promise<void> {
-    await scheduleApi.updateBlock(uuid, payload)
-    if (currentBlockUserId) {
-      await fetchBlocks(currentBlockUserId, currentBlockStart, currentBlockEnd)
-    }
+  async function updateBlock(uuid: string, payload: UpdateCalendarBlockPayload, expectedUpdatedAt?: string): Promise<void> {
+    await scheduleApi.updateBlock(uuid, payload, expectedUpdatedAt)
   }
 
-  async function deleteBlock(uuid: string): Promise<void> {
-    await scheduleApi.deleteBlock(uuid)
-    if (currentBlockUserId) {
-      await fetchBlocks(currentBlockUserId, currentBlockStart, currentBlockEnd)
-    }
-  }
+  async function fetchStudioData(params: {
+    userId: string
+    date: string
+    start: string
+    end: string
+    blockRangeEnd: string
+    refreshKey?: number
+  }): Promise<void> {
+    const loadKey = `${params.userId}:${params.date}:${params.start}:${params.end}:${params.blockRangeEnd}:${params.refreshKey ?? 0}`
+    if (inFlightStudioLoadKey === loadKey) return
+    latestStudioLoadKey = loadKey
+    inFlightStudioLoadKey = loadKey
+    isLoadingStudio.value = true
+    studioError.value = null
 
-  async function fetchAvailability(userId: string, date: string): Promise<void> {
-    isLoadingAvailability.value = true
     try {
-      const response = await scheduleApi.getAvailability(userId, date)
-      availability.value = {
-        slots: response.data.slots,
-        blocks: response.data.blocks,
-      }
+      const [monthAppointmentList, availability, upcomingBlockList] = await Promise.all([
+        appointmentApi.list(1, 300, { doctor_id: params.userId, start_date: params.start, end_date: params.end }),
+        scheduleApi.getAvailability(params.userId, params.date),
+        scheduleApi.listAllBlocks(params.date, params.blockRangeEnd),
+      ])
+
+      if (latestStudioLoadKey !== loadKey) return
+
+      studioMonthAppointments.value = monthAppointmentList.data
+      studioAppointments.value = monthAppointmentList.data.filter((appointment) => isSameDay(appointment.scheduled_at, params.date))
+      studioSlots.value = availability.data.slots
+      studioDayBlocks.value = availability.data.blocks
+      studioUpcomingBlocks.value = upcomingBlockList.data
+    } catch {
+      if (latestStudioLoadKey !== loadKey) return
+      studioError.value = 'Failed to load schedule view.'
     } finally {
-      isLoadingAvailability.value = false
+      if (inFlightStudioLoadKey === loadKey) {
+        inFlightStudioLoadKey = ''
+      }
+      if (latestStudioLoadKey === loadKey) {
+        isLoadingStudio.value = false
+      }
     }
   }
 
   return {
-    selectedDoctorId,
     schedule,
-    blocks,
-    availability,
+    studioAppointments,
+    studioMonthAppointments,
+    studioSlots,
+    studioDayBlocks,
+    studioUpcomingBlocks,
     isLoadingSchedule,
-    isLoadingBlocks,
-    isLoadingAvailability,
+    isLoadingStudio,
     isSavingSchedule,
+    studioError,
     fetchSchedule,
     saveSchedule,
-    fetchBlocks,
     createBlock,
     updateBlock,
-    deleteBlock,
-    fetchAvailability,
+    fetchStudioData,
   }
 })

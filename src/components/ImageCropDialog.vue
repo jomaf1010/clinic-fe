@@ -29,7 +29,6 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const containerRef = ref<HTMLDivElement | null>(null)
 
 const imageSrc = ref<string | null>(null)
 const image = ref<HTMLImageElement | null>(null)
@@ -236,7 +235,6 @@ onUnmounted(() => {
 
         <div
           v-else
-          ref="containerRef"
           class="relative cursor-grab active:cursor-grabbing"
           @pointerdown="onPointerDown"
           @pointermove="onPointerMove"
@@ -260,7 +258,7 @@ onUnmounted(() => {
             :max="getMaxZoom()"
             :step="0.01"
             class="flex-1"
-            @update:model-value="handleZoomChange"
+            @update:model-value="(e) => { if (e) handleZoomChange(e) }"
           />
           <ZoomIn class="size-4 shrink-0 text-muted-foreground" />
         </div>

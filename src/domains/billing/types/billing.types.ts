@@ -28,11 +28,21 @@ export interface InvoicePayment {
   paid_at: string
 }
 
+export interface InvoicePdfDocument {
+  id: string
+  type: string
+  status: 'pending' | 'generating' | 'completed' | 'failed'
+  download_url: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface InvoiceResponse {
   id: string
   clinic_id: string
   patient_id: string
-  consultation_id: string | null
+  encounter_id: string | null
   patient_name: string | null
   created_by: string
   created_by_name: string | null
@@ -56,6 +66,7 @@ export interface InvoiceResponse {
   medcert_requested_by: string | null
   medcert_requested_at: string | null
   medcert_document_id: string | null
+  invoice_pdf_document: InvoicePdfDocument | null
   created_at: string
   updated_at: string
 }
@@ -97,7 +108,7 @@ export interface CreateInvoiceLineItemPayload {
 
 export interface CreateInvoicePayload {
   patient_id: string
-  consultation_id?: string | null
+  encounter_id?: string | null
   line_items: CreateInvoiceLineItemPayload[]
   discount_type?: DiscountType | null
   discount_value?: number | null

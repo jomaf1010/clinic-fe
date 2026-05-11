@@ -3,9 +3,8 @@ import { onMounted, onUnmounted, ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FeatureGate from '@/components/shared/FeatureGate.vue'
 import { toast } from 'vue-sonner'
-import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date'
-import { AlertTriangle, CalendarCheck, CalendarIcon, ClipboardPlus, List, LoaderCircle, Plus, X } from 'lucide-vue-next'
-import { RouteNames } from '@/router/routeNames'
+import { CalendarDate, getLocalTimeZone, today, type DateValue } from '@internationalized/date'
+import { AlertTriangle, CalendarCheck, CalendarIcon, ClipboardPlus, LayoutDashboard, List, LoaderCircle, Plus, UserRound, X } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -35,13 +34,14 @@ import {
 } from '@/components/ui/select'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { useCentrifugo } from '@/composables/useCentrifugo'
-import { appointmentApi } from '../api/appointmentApi'
 import { useAppointmentStore } from '../stores/appointmentStore'
+import { buildAppointmentTriageRoute } from '../utils/triageRoute'
 import AppointmentBookingWizard from '../components/AppointmentBookingWizard.vue'
+import AppointmentBoard from '../components/AppointmentBoard.vue'
 import AppointmentCalendar from '../components/AppointmentCalendar.vue'
 import AppointmentCard from '../components/AppointmentCard.vue'
 import AppointmentDetailSheet from '../components/AppointmentDetailSheet.vue'
-import type { AppointmentResponse } from '../types/appointment.types'
+import type { AppointmentListFilters, AppointmentResponse, ClinicDoctor } from '../types/appointment.types'
 
 const router = useRouter()
 const route = useRoute()
@@ -49,29 +49,81 @@ const authStore = useAuthStore()
 const store = useAppointmentStore()
 const { connect, subscribe, getSubscription } = useCentrifugo()
 
-const viewMode = ref<'list' | 'calendar'>('calendar')
+const viewMode = ref<'board' | 'list' | 'calendar'>('board')
 const showBookingWizard = ref(false)
+const bookingMode = ref<'create' | 'reschedule'>('create')
+const rescheduleAppointmentId = ref<string | null>(null)
+const rescheduleExpectedUpdatedAt = ref<string | null>(null)
 const prefillDateTime = ref<string | null>(null)
+const prefillDoctorId = ref<string | null>(null)
+const prefillDoctorName = ref<string | null>(null)
+const prefillPatientId = ref<string | null>(null)
+const prefillPatientName = ref<string | null>(null)
 const showDetailSheet = ref(false)
 const selectedAppointment = ref<AppointmentResponse | null>(null)
 const currentPage = ref(Number(route.query.page) || 1)
 const error = ref<string | null>(null)
+const boardTotal = ref(0)
+const isLoadingDoctors = ref(false)
+const doctors = computed<ClinicDoctor[]>(() => store.boardDoctors)
 
 const calendarRef = ref<InstanceType<typeof AppointmentCalendar> | null>(null)
+const boardRef = ref<InstanceType<typeof AppointmentBoard> | null>(null)
 
 let savedScrollY = 0
 
 function onCalendarSlotSelect(dateTime: string) {
   savedScrollY = window.scrollY
-  prefillDateTime.value = dateTime
+  openBookingWizard({ dateTime })
+}
+
+function openBookingWizard(options?: {
+  dateTime?: string | null
+  doctorId?: string | null
+  doctorName?: string | null
+  patientId?: string | null
+  patientName?: string | null
+}) {
+  bookingMode.value = 'create'
+  rescheduleAppointmentId.value = null
+  rescheduleExpectedUpdatedAt.value = null
+  prefillDateTime.value = options?.dateTime ?? null
+  prefillDoctorId.value = options?.doctorId ?? null
+  prefillDoctorName.value = options?.doctorName ?? null
+  prefillPatientId.value = options?.patientId ?? null
+  prefillPatientName.value = options?.patientName ?? null
   showBookingWizard.value = true
+}
+
+function openRescheduleWizard(appointment: AppointmentResponse) {
+  savedScrollY = window.scrollY
+  bookingMode.value = 'reschedule'
+  rescheduleAppointmentId.value = appointment.id
+  rescheduleExpectedUpdatedAt.value = appointment.updated_at
+  prefillDateTime.value = appointment.scheduled_at
+  prefillDoctorId.value = appointment.doctor_id
+  prefillDoctorName.value = appointment.doctor_name ?? null
+  prefillPatientId.value = appointment.patient_id
+  prefillPatientName.value = appointment.patient_name ?? null
+  showBookingWizard.value = true
+}
+
+function clearBookingPrefill() {
+  bookingMode.value = 'create'
+  rescheduleAppointmentId.value = null
+  rescheduleExpectedUpdatedAt.value = null
+  prefillDateTime.value = null
+  prefillDoctorId.value = null
+  prefillDoctorName.value = null
+  prefillPatientId.value = null
+  prefillPatientName.value = null
 }
 
 async function onCalendarAppointmentClick(id: string) {
   savedScrollY = window.scrollY
   try {
-    const res = await appointmentApi.get(id)
-    selectedAppointment.value = res.data
+    await store.fetchAppointment(id)
+    selectedAppointment.value = store.current
     showDetailSheet.value = true
   } catch {
     // Fallback to cached data
@@ -84,12 +136,18 @@ async function onCalendarAppointmentClick(id: string) {
 }
 
 // Filters
-const statusFilter = ref<string>((route.query.status as string) || 'all')
-const rangeFilter = ref<string>((route.query.range as string) || 'upcoming')
-const dateFilter = ref<string>((route.query.date as string) || '')
+function queryString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+const doctorFilter = ref<string>(queryString(route.query.doctor_id) || 'all')
+const statusFilter = ref<string>(queryString(route.query.status) || 'all')
+const rangeFilter = ref<string>(queryString(route.query.range) || 'upcoming')
+const dateFilter = ref<string>(queryString(route.query.date))
 
 // When a specific date is picked, override range to 'date'
 const activeRange = computed(() => dateFilter.value ? 'date' : rangeFilter.value)
+const appointmentTotal = computed(() => viewMode.value === 'board' ? boardTotal.value : store.pagination.total)
 
 function todayIso(): string {
   const t = today(getLocalTimeZone())
@@ -125,7 +183,8 @@ const dateDisplay = computed(() => {
   })
 })
 
-function onDateSelect(date: CalendarDate) {
+function onDateSelect(date: DateValue | undefined) {
+  if (!date) return
   dateFilter.value = `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
   rangeFilter.value = 'date'
   onFilterChange()
@@ -145,6 +204,7 @@ function onRangeChange(value: string) {
 
 function buildFilters(): AppointmentListFilters {
   const f: AppointmentListFilters = {}
+  if (doctorFilter.value && doctorFilter.value !== 'all') f.doctor_id = doctorFilter.value
   if (statusFilter.value && statusFilter.value !== 'all') f.status = statusFilter.value as AppointmentListFilters['status']
 
   if (dateFilter.value) {
@@ -185,6 +245,19 @@ async function fetchData() {
   }
 }
 
+async function loadDoctors() {
+  if (store.boardDoctors.length > 0 || isLoadingDoctors.value) return
+
+  isLoadingDoctors.value = true
+  try {
+    await store.fetchDoctors()
+  } catch {
+    toast.error('Failed to load doctors')
+  } finally {
+    isLoadingDoctors.value = false
+  }
+}
+
 function goToPage(page: number) {
   if (page < 1 || page > store.pagination.last_page) return
   currentPage.value = page
@@ -193,6 +266,7 @@ function goToPage(page: number) {
 
 function syncQuery() {
   const q: Record<string, string> = { page: String(currentPage.value) }
+  if (doctorFilter.value && doctorFilter.value !== 'all') q.doctor_id = doctorFilter.value
   if (statusFilter.value && statusFilter.value !== 'all') q.status = statusFilter.value
   if (dateFilter.value) q.date = dateFilter.value
   if (rangeFilter.value !== 'upcoming') q.range = rangeFilter.value
@@ -202,33 +276,59 @@ function syncQuery() {
 function onFilterChange() {
   currentPage.value = 1
   syncQuery()
-  fetchData()
+  if (viewMode.value === 'list') fetchData()
 }
 
-function openDetail(id: string) {
-  selectedAppointment.value = store.appointments.find((a) => a.id === id) ?? null
-  showDetailSheet.value = true
+async function openDetail(id: string) {
+  savedScrollY = window.scrollY
+  const cached = store.appointments.find((a) => a.id === id)
+  if (cached) {
+    selectedAppointment.value = cached
+    showDetailSheet.value = true
+    return
+  }
+
+  try {
+    await store.fetchAppointment(id)
+    selectedAppointment.value = store.current
+    showDetailSheet.value = true
+  } catch {
+    toast.error('Failed to load appointment')
+  }
+}
+
+function refreshVisibleView() {
+  if (viewMode.value === 'board') {
+    boardRef.value?.refetch()
+    return
+  }
+
+  if (viewMode.value === 'calendar') {
+    calendarRef.value?.refetch()
+    return
+  }
+
+  fetchData()
 }
 
 // Triage prompt after check-in
 const showTriageDialog = ref(false)
 const triagePatientId = ref<string | null>(null)
 const triagePatientName = ref<string | null>(null)
+const triageEncounterId = ref<string | null>(null)
 
 async function handleCheckIn(id: string) {
   try {
-    await store.checkInAppointment(id)
+    const checkInData = await store.checkInAppointment(id)
     toast.success('Patient checked in')
     showDetailSheet.value = false
-    fetchData()
+    refreshVisibleView()
 
-    // Find the appointment to get patient info for triage prompt
-    const appointment = store.appointments.find((a) => a.id === id)
-    if (appointment) {
-      triagePatientId.value = appointment.patient_id
-      triagePatientName.value = appointment.patient_name
-      showTriageDialog.value = true
-    }
+    const appointment = checkInData.appointment
+    triagePatientId.value = appointment.patient_id
+    triagePatientName.value = appointment.patient_name
+    triageEncounterId.value = checkInData.queue_visit.encounter_id
+    showTriageDialog.value = true
   } catch {
     toast.error('Failed to check in')
   }
@@ -237,10 +337,7 @@ async function handleCheckIn(id: string) {
 function goToTriage() {
   if (!triagePatientId.value) return
   showTriageDialog.value = false
-  router.push({
-    name: RouteNames.CONSULTATION_NEW,
-    params: { patientId: triagePatientId.value },
-  })
+  router.push(buildAppointmentTriageRoute(triagePatientId.value, triageEncounterId.value))
 }
 
 // Cancel confirmation
@@ -261,7 +358,7 @@ async function confirmCancel() {
     toast.success('Appointment cancelled')
     showCancelDialog.value = false
     showDetailSheet.value = false
-    fetchData()
+    refreshVisibleView()
   } catch {
     toast.error('Failed to cancel appointment')
   } finally {
@@ -287,7 +384,7 @@ async function confirmNoShow() {
     toast.success('Marked as no-show')
     showNoShowDialog.value = false
     showDetailSheet.value = false
-    fetchData()
+    refreshVisibleView()
   } catch {
     toast.error('Failed to mark no-show')
   } finally {
@@ -297,10 +394,16 @@ async function confirmNoShow() {
 
 function onCreated() {
   currentPage.value = 1
-  fetchData()
+  refreshVisibleView()
 }
 
-watch(currentPage, () => fetchData())
+watch(currentPage, () => {
+  if (viewMode.value === 'list') fetchData()
+})
+
+watch(viewMode, (mode) => {
+  if (mode === 'list') fetchData()
+})
 
 // Restore scroll position after dialogs close
 watch(showBookingWizard, (open) => {
@@ -316,13 +419,12 @@ const appointmentChannel = computed(() => {
 })
 
 function onAppointmentEvent() {
-  // Refresh both list and calendar
-  fetchData()
-  calendarRef.value?.refetch()
+  refreshVisibleView()
 }
 
 onMounted(() => {
-  fetchData()
+  void loadDoctors()
+  if (viewMode.value === 'list') fetchData()
   if (appointmentChannel.value) {
     connect()
     subscribe(appointmentChannel.value, onAppointmentEvent)
@@ -339,17 +441,87 @@ onUnmounted(() => {
 
 <template>
   <FeatureGate feature="appointments" label="Appointments">
-  <div class="flex flex-1 flex-col gap-4 pt-4">
+  <div class="appointment-list-shell flex flex-1 flex-col gap-4 pt-6 md:pt-8">
     <!-- Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-center gap-3">
-        <h1 class="text-lg font-semibold">Appointments</h1>
-        <Badge variant="secondary" class="text-xs">{{ store.pagination.total }}</Badge>
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+          <h1 class="text-2xl font-semibold tracking-normal">Appointments</h1>
+          <Badge variant="secondary" class="rounded-full px-2.5 text-sm tabular-nums">{{ appointmentTotal }}</Badge>
+        </div>
+
+        <Button class="h-10 w-full gap-2 px-5 text-sm sm:w-auto" @click="openBookingWizard()">
+          <Plus class="size-4" />
+          <span>Book appointment</span>
+        </Button>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <!-- View toggle -->
+        <div class="appointment-view-tabs surface-muted flex h-10 w-full items-center rounded-full p-1 sm:w-fit">
+          <button
+            :class="['appointment-view-tab flex h-full flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-all sm:flex-none', viewMode === 'board' ? 'is-active' : 'text-muted-foreground hover:text-foreground']"
+            @click="viewMode = 'board'"
+          >
+            <LayoutDashboard class="size-4" />
+            <span><span class="hidden sm:inline">Today </span>Board</span>
+          </button>
+          <button
+            :class="['appointment-view-tab flex h-full flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-all sm:flex-none', viewMode === 'calendar' ? 'is-active' : 'text-muted-foreground hover:text-foreground']"
+            @click="viewMode = 'calendar'"
+          >
+            <CalendarCheck class="size-4" />
+            Calendar
+          </button>
+          <button
+            :class="['appointment-view-tab flex h-full flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-all sm:flex-none', viewMode === 'list' ? 'is-active' : 'text-muted-foreground hover:text-foreground']"
+            @click="viewMode = 'list'"
+          >
+            <List class="size-4" />
+            List
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+          <Select v-model="doctorFilter" @update:model-value="onFilterChange">
+            <SelectTrigger class="appointment-select-trigger h-10 w-full sm:w-[170px]">
+              <span class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                <UserRound class="size-4 shrink-0" />
+                <SelectValue class="min-w-0 flex-1 truncate" placeholder="All doctors" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All doctors</SelectItem>
+              <SelectItem
+                v-for="doctor in doctors"
+                :key="doctor.id"
+                :value="doctor.id"
+              >
+                Dr. {{ doctor.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <!-- Status filter -->
+          <Select v-model="statusFilter" @update:model-value="onFilterChange">
+            <SelectTrigger class="appointment-select-trigger h-10 w-full sm:w-[170px]">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="scheduled">Scheduled</SelectItem>
+              <SelectItem value="checked_in">Checked In</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="no_show">No Show</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div v-if="viewMode === 'list'" class="flex flex-wrap items-center gap-2">
         <!-- Range quick filters (list view only) -->
-        <div v-if="viewMode === 'list'" class="flex h-8 items-center rounded-md border text-xs">
+        <div class="appointment-range-tabs surface-muted flex h-9 w-full items-center overflow-x-auto rounded-full p-1 text-xs sm:w-fit">
           <button
             v-for="opt in [
               { value: 'today', label: 'Today' },
@@ -361,9 +533,9 @@ onUnmounted(() => {
             ]"
             :key="opt.value"
             :class="[
-              'h-full px-2.5 font-medium transition-colors first:rounded-l-md last:rounded-r-md',
+              'h-full shrink-0 rounded-full px-3 font-medium transition-all',
               activeRange === opt.value
-                ? 'bg-primary text-primary-foreground'
+                ? 'is-active'
                 : 'text-muted-foreground hover:text-foreground',
             ]"
             @click="onRangeChange(opt.value)"
@@ -373,13 +545,13 @@ onUnmounted(() => {
         </div>
 
         <!-- Date picker (list view only) -->
-        <div v-if="viewMode === 'list'" class="flex items-center gap-1">
+        <div class="flex items-center gap-1">
           <Popover>
             <PopoverTrigger as-child>
               <Button
                 variant="outline"
                 size="sm"
-                class="h-8 w-[160px] justify-start text-left font-normal"
+                class="appointment-date-trigger h-9 w-[160px] justify-start text-left font-normal"
                 :class="{ 'text-muted-foreground': !dateFilter }"
               >
                 <CalendarIcon class="mr-1.5 size-3.5" />
@@ -404,50 +576,31 @@ onUnmounted(() => {
           </Button>
         </div>
 
-        <!-- Status filter -->
-        <Select v-model="statusFilter" @update:model-value="onFilterChange">
-          <SelectTrigger class="h-8 w-[140px]">
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="scheduled">Scheduled</SelectItem>
-            <SelectItem value="checked_in">Checked In</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="no_show">No Show</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <!-- View toggle -->
-        <div class="flex h-8 items-center rounded-md border">
-          <button
-            :class="['flex h-full items-center gap-1 rounded-l-md px-2.5 text-xs font-medium transition-colors', viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
-            @click="viewMode = 'list'"
-          >
-            <List class="size-3.5" />
-            List
-          </button>
-          <button
-            :class="['flex h-full items-center gap-1 rounded-r-md px-2.5 text-xs font-medium transition-colors', viewMode === 'calendar' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground']"
-            @click="viewMode = 'calendar'"
-          >
-            <CalendarCheck class="size-3.5" />
-            Calendar
-          </button>
-        </div>
-
-        <Button size="sm" class="h-8" @click="prefillDateTime = null; showBookingWizard = true">
-          <Plus class="size-3.5" />
-          <span class="hidden sm:inline">Book</span>
-        </Button>
       </div>
     </div>
 
+    <!-- Board View -->
+    <template v-if="viewMode === 'board'">
+      <AppointmentBoard
+        ref="boardRef"
+        :doctor-filter="doctorFilter"
+        :status-filter="statusFilter"
+        :can-manage="authStore.hasPermission('appointments.manage')"
+        @appointment-click="openDetail"
+        @slot-select="(dateTime, options) => openBookingWizard({ dateTime, ...options })"
+        @reschedule="openRescheduleWizard"
+        @check-in="handleCheckIn"
+        @cancel="handleCancel"
+        @no-show="handleNoShow"
+        @summary-change="boardTotal = $event"
+      />
+    </template>
+
     <!-- Calendar View -->
-    <template v-if="viewMode === 'calendar'">
+    <template v-else-if="viewMode === 'calendar'">
       <AppointmentCalendar
         ref="calendarRef"
+        :doctor-filter="doctorFilter"
         :status-filter="statusFilter"
         @appointment-click="onCalendarAppointmentClick"
         @slot-select="onCalendarSlotSelect"
@@ -465,7 +618,7 @@ onUnmounted(() => {
       <div
         v-else-if="error"
         role="alert"
-        class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+        class="surface-card rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         {{ error }}
         <Button variant="outline" size="sm" class="mt-2" @click="fetchData">
@@ -476,23 +629,23 @@ onUnmounted(() => {
       <!-- Empty state -->
       <div
         v-else-if="store.appointments.length === 0"
-        class="flex flex-col items-center justify-center py-16 text-center"
+        class="surface-card flex flex-col items-center justify-center rounded-2xl py-16 text-center"
       >
-        <div class="mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10">
+        <div class="appointment-empty-icon mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
           <CalendarCheck class="size-6 text-primary" />
         </div>
         <p class="text-sm font-medium">No appointments found</p>
         <p class="mt-1 text-xs text-muted-foreground">
           {{ activeRange === 'upcoming' ? 'No upcoming appointments' : 'No appointments match your filters' }}
         </p>
-        <Button size="sm" class="mt-4" @click="prefillDateTime = null; showBookingWizard = true">
+        <Button size="sm" class="mt-4" @click="openBookingWizard()">
           <Plus class="size-3.5" />
           Book Appointment
         </Button>
       </div>
 
       <!-- List -->
-      <div v-else class="flex flex-col gap-2">
+      <div v-else class="appointment-list-stack flex flex-col gap-3">
         <AppointmentCard
           v-for="appt in store.appointments"
           :key="appt.id"
@@ -547,8 +700,15 @@ onUnmounted(() => {
     <!-- Booking wizard -->
     <AppointmentBookingWizard
       :open="showBookingWizard"
+      :mode="bookingMode"
+      :appointment-id="rescheduleAppointmentId"
+      :expected-updated-at="rescheduleExpectedUpdatedAt"
       :prefill-date-time="prefillDateTime"
-      @update:open="(val) => { showBookingWizard = val; if (!val) prefillDateTime = null }"
+      :prefill-doctor-id="prefillDoctorId"
+      :prefill-doctor-name="prefillDoctorName"
+      :prefill-patient-id="prefillPatientId"
+      :prefill-patient-name="prefillPatientName"
+      @update:open="(val) => { showBookingWizard = val; if (!val) clearBookingPrefill() }"
       @created="onCreated"
     />
 
@@ -626,3 +786,48 @@ onUnmounted(() => {
   </div>
   </FeatureGate>
 </template>
+
+<style scoped>
+.appointment-view-tabs,
+.appointment-range-tabs {
+  border: 0;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.appointment-view-tab.is-active,
+.appointment-range-tabs .is-active {
+  color: white;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166));
+  box-shadow:
+    0 12px 26px rgb(37 99 235 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+.appointment-select-trigger,
+.appointment-date-trigger {
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.appointment-empty-icon {
+  box-shadow: 0 14px 34px rgb(37 99 235 / 0.12);
+}
+
+:global(.dark .appointment-view-tabs),
+:global(.dark .appointment-range-tabs) {
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  background:
+    linear-gradient(135deg, rgb(15 23 42 / 0.62), rgb(15 23 42 / 0.28)),
+    rgb(15 23 42 / 0.2);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 16px 38px rgb(0 0 0 / 0.26);
+}
+
+:global(.dark .appointment-view-tab.is-active),
+:global(.dark .appointment-range-tabs .is-active) {
+  box-shadow:
+    0 0 0 1px rgb(125 211 252 / 0.14),
+    0 14px 34px rgb(56 189 248 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+</style>

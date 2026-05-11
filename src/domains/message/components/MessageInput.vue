@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { SendHorizontal, Smile, LoaderCircle, User } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import {
@@ -74,7 +74,7 @@ function detectMention() {
   if (match) {
     mentionTextNode = node as Text
     mentionStartOffset = beforeCursor.lastIndexOf('@')
-    mentionQuery.value = match[1]
+    mentionQuery.value = match[1] ?? null
     mentionRange = range.cloneRange()
   } else {
     closeMention()
@@ -218,7 +218,7 @@ function handleSend() {
   emit('send', text)
 
   if (editorRef.value) {
-    editorRef.value.innerHTML = ''
+    editorRef.value.textContent = ''
   }
   isEditorEmpty.value = true
 }

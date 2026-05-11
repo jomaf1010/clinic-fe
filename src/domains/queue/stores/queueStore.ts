@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { queueApi } from '../api/queueApi'
 import type { CreateWalkInPayload, QueueVisitResponse } from '../types/queue.types'
+import { mergeQueueRealtimeEvent } from '../utils/realtimeEvents'
 
 type QueueFilters = { doctor_id?: string; status?: string }
 
@@ -66,27 +67,7 @@ export const useQueueStore = defineStore('queue', () => {
   }
 
   function handleRealtimeEvent(event: { type: string; data: QueueVisitResponse }): void {
-    const { type, data } = event
-    const index = visits.value.findIndex((v) => v.id === data.id)
-
-    switch (type) {
-      case 'queue.visit.created':
-        if (index === -1) {
-          visits.value.push(data)
-        } else {
-          visits.value[index] = data
-        }
-        break
-      case 'queue.visit.called':
-      case 'queue.visit.completed':
-      case 'queue.visit.cancelled':
-        if (index !== -1) {
-          visits.value[index] = data
-        } else {
-          visits.value.push(data)
-        }
-        break
-    }
+    visits.value = mergeQueueRealtimeEvent(visits.value, event)
   }
 
   return {

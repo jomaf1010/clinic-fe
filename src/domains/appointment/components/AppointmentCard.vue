@@ -64,11 +64,11 @@ const relativeTime = computed(() => {
 
 <template>
   <div
-    class="flex cursor-pointer flex-col gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
+    class="appointment-list-card surface-card surface-interactive flex cursor-pointer flex-col gap-3 rounded-2xl p-4 transition-all hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between"
     @click="emit('click', appointment.id)"
   >
     <div class="flex min-w-0 items-center gap-3">
-      <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+      <div class="appointment-list-icon flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
         <CalendarCheck class="size-4 text-primary" />
       </div>
       <div class="min-w-0">
@@ -149,3 +149,52 @@ const relativeTime = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.appointment-list-card {
+  position: relative;
+  border: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    var(--surface-panel-strong);
+}
+
+.appointment-list-card:hover {
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.appointment-list-icon {
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.08);
+}
+
+:global(.dark .appointment-list-card) {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .appointment-list-card:hover) {
+  background:
+    linear-gradient(90deg, rgb(59 130 246 / 0.12), rgb(20 184 166 / 0.08)),
+    rgb(15 23 42 / 0.38);
+  box-shadow:
+    inset 3px 0 0 rgb(56 189 248 / 0.42),
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+:global(.dark .appointment-list-icon) {
+  border: 1px solid rgb(148 163 184 / 0.14);
+  background: rgb(15 23 42 / 0.58);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 0.24);
+}
+</style>

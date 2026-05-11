@@ -68,6 +68,45 @@ export function maxLength(label: string, max: number) {
   }
 }
 
+type ValidationRule = (value: unknown) => true | string
+type RuleSchema = Record<string, ValidationRule | ValidationRule[]>
+
+/**
+ * Converts the project's rule-array schema shape into the single-validator
+ * function shape expected by vee-validate's object validationSchema.
+ */
+export function toVeeSchema<T extends RuleSchema>(schema: T): Record<keyof T, ValidationRule> {
+  return Object.fromEntries(
+    Object.entries(schema).map(([field, rules]) => [
+      field,
+      (value: unknown) => {
+        for (const rule of Array.isArray(rules) ? rules : [rules]) {
+          const result = rule(value)
+          if (result !== true) return result
+        }
+        return true
+      },
+    ]),
+  ) as Record<keyof T, ValidationRule>
+}
+
+export function validateRuleSchema<T extends RuleSchema>(
+  schema: T,
+  values: Record<keyof T, unknown>,
+): Partial<Record<keyof T, string>> {
+  const errors: Partial<Record<keyof T, string>> = {}
+  for (const [field, rules] of Object.entries(schema) as [keyof T, ValidationRule | ValidationRule[]][]) {
+    for (const rule of Array.isArray(rules) ? rules : [rules]) {
+      const result = rule(values[field])
+      if (result !== true) {
+        errors[field] = result
+        break
+      }
+    }
+  }
+  return errors
+}
+
 /**
  * Returns a rule that fails when the value is not a valid number.
  * @param label - Human-readable field label used in the error message.
@@ -113,7 +152,7 @@ export function oneOf(label: string, options: string[]) {
  * Pass directly to `useForm({ validationSchema: loginSchema })`.
  */
 export const loginSchema = {
-  email: required('Email'),
+  email: [required('Email'), email('Email')],
   password: required('Password'),
 }
 
@@ -121,12 +160,15 @@ export const loginSchema = {
  * Validation schema for the signup form.
  * Pass directly to `useForm({ validationSchema: signupSchema })`.
  */
-export const signupSchema = {
-  email: [required('Email'), email('Email')],
-  password: [required('Password'), minLength('Password', 10)],
-  first_name: [maxLength('First name', 255)],
-  last_name: [maxLength('Last name', 255)],
+export function createSignupSchema(minPwLen = 10) {
+  return {
+    email: [required('Email'), email('Email')],
+    password: [required('Password'), minLength('Password', minPwLen)],
+    first_name: [maxLength('First name', 255)],
+    last_name: [maxLength('Last name', 255)],
+  }
 }
+export const signupSchema = createSignupSchema()
 
 /**
  * Validation schema for the clinic creation (onboarding) form.
@@ -179,11 +221,14 @@ export const credentialsSchema = {
  * Validation schema for the change password form.
  * Pass directly to `useForm({ validationSchema: changePasswordSchema })`.
  */
-export const changePasswordSchema = {
-  current_password: [required('Current password')],
-  new_password: [required('New password'), minLength('New password', 10)],
-  new_password_confirmation: [required('Password confirmation')],
+export function createChangePasswordSchema(minPwLen = 10) {
+  return {
+    current_password: [required('Current password')],
+    new_password: [required('New password'), minLength('New password', minPwLen)],
+    new_password_confirmation: [required('Password confirmation')],
+  }
 }
+export const changePasswordSchema = createChangePasswordSchema()
 
 /**
  * Validation schema for the forgot password form.
@@ -197,7 +242,10 @@ export const forgotPasswordSchema = {
  * Validation schema for the reset password form.
  * Pass directly to `useForm({ validationSchema: resetPasswordSchema })`.
  */
-export const resetPasswordSchema = {
-  password: [required('New password'), minLength('New password', 10)],
-  password_confirmation: [required('Confirm password')],
+export function createResetPasswordSchema(minPwLen = 10) {
+  return {
+    password: [required('New password'), minLength('New password', minPwLen)],
+    password_confirmation: [required('Confirm password')],
+  }
 }
+export const resetPasswordSchema = createResetPasswordSchema()

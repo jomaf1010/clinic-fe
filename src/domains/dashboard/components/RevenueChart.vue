@@ -44,7 +44,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative overflow-hidden rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+  <div class="surface-card relative overflow-hidden rounded-xl border p-6 text-card-foreground">
     <!-- Sparkline behind content -->
     <div
       v-if="!loading && data.length"

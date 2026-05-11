@@ -3,15 +3,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Stethoscope,
-  FileEdit,
   Users,
   Clock,
-  CalendarDays,
   RefreshCw,
-  UserRound,
-  Plus,
-  ListOrdered,
-  UserPlus,
   ChevronRight,
   AlertCircle,
   LoaderCircle,
@@ -28,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import Skeleton from '@/components/ui/skeleton/Skeleton.vue'
 import { RouteNames } from '@/router/routeNames'
 import { useCentrifugo } from '@/composables/useCentrifugo'
+import { createDebouncedRefresh, shouldRunFallbackRefresh } from '@/composables/realtimeRefresh'
 import { queueApi } from '@/domains/queue/api/queueApi'
 import { toast } from 'vue-sonner'
 
@@ -39,20 +34,6 @@ const hasAppointments = computed(() => authStore.hasFeature('appointments'))
 const stats = ref<DoctorDashboardStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
-}
-
-const greeting = computed(() => {
-  const name = authStore.user?.name ?? authStore.user?.email ?? ''
-  return `${getGreeting()}, ${name}`
-})
-
-const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? '')
 
 function formatDate(dateString: string): string {
   return new Intl.DateTimeFormat('en-PH', {
@@ -110,21 +91,21 @@ function formatStatus(status: string): string {
 
 const callingId = ref<string | null>(null)
 
-async function handleCall(item: { id: string; patient_id: string; consultation_id: string | null }) {
+async function handleCall(item: { id: string; patient_id: string; encounter_id: string | null }) {
   callingId.value = item.id
   try {
     const response = await queueApi.call(item.id)
     toast.success('Patient called')
 
-    const consultationId = response.data.consultation_id ?? item.consultation_id
-    if (consultationId) {
+    const encounterId = response.data.encounter_id ?? item.encounter_id
+    if (encounterId) {
       router.push({
-        name: RouteNames.CONSULTATION_DETAIL,
-        params: { patientId: item.patient_id, id: consultationId },
+        name: RouteNames.ENCOUNTER_DETAIL,
+        params: { patientId: item.patient_id, id: encounterId },
       })
     } else {
       router.push({
-        name: RouteNames.CONSULTATION_NEW,
+        name: RouteNames.ENCOUNTER_NEW,
         params: { patientId: item.patient_id },
       })
     }
@@ -149,7 +130,7 @@ async function fetchStats(): Promise<void> {
 }
 
 // Real-time updates
-const { subscribe, unsubscribe } = useCentrifugo()
+const { isConnected, subscribe, unsubscribe } = useCentrifugo()
 let pollInterval: ReturnType<typeof setInterval> | undefined
 
 function silentRefresh() {
@@ -157,6 +138,8 @@ function silentRefresh() {
     stats.value = response.data
   }).catch(() => {})
 }
+
+const refreshFromRealtime = createDebouncedRefresh(silentRefresh, 1_000)
 
 onMounted(() => {
   fetchStats()
@@ -166,12 +149,13 @@ onMounted(() => {
   if (clinicId) {
     const queueChannel = `clinic:${clinicId}:queue`
     subscribe(queueChannel, () => {
-      silentRefresh()
+      refreshFromRealtime()
     })
   }
 
-  // Poll every 30s for other changes (consultations, appointments, patients)
-  pollInterval = setInterval(silentRefresh, 30000)
+  pollInterval = setInterval(() => {
+    if (shouldRunFallbackRefresh(isConnected.value)) silentRefresh()
+  }, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
@@ -236,7 +220,7 @@ onUnmounted(() => {
       <!-- Widgets grid -->
       <div class="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <!-- Upcoming Schedule -->
-        <div v-if="hasAppointments && (loading || groupedAppointments.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
+        <div v-if="hasAppointments && (loading || groupedAppointments.length)" class="surface-card overflow-hidden rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Upcoming Schedule</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.APPOINTMENT_LIST })">
@@ -297,7 +281,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Queue Preview -->
-        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="hasAppointments && (loading || stats?.queue_list.length)" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-sm font-semibold">Queue</h2>
             <Button variant="ghost" size="sm" class="h-7 text-xs" @click="router.push({ name: RouteNames.QUEUE })">
@@ -318,7 +302,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="item in stats.queue_list"
+              v-for="item in stats?.queue_list ?? []"
               :key="item.id"
               class="flex items-center gap-3 py-3 first:pt-0 last:pb-0 -mx-2 px-2 rounded-lg"
             >
@@ -361,7 +345,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Draft Consultations -->
-        <div v-if="loading || stats?.draft_consultations_list.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.draft_consultations_list.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <div class="mb-4 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <h2 class="text-sm font-semibold">Draft Consultations</h2>
@@ -387,10 +371,10 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="draft in stats.draft_consultations_list"
+              v-for="draft in stats?.draft_consultations_list ?? []"
               :key="draft.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
-              @click="router.push({ name: RouteNames.CONSULTATION_DETAIL, params: { patientId: draft.patient_id, id: draft.id } })"
+              @click="router.push({ name: RouteNames.ENCOUNTER_DETAIL, params: { patientId: draft.patient_id, id: draft.id } })"
             >
               <PatientAvatar
                 :avatar-url="draft.patient_avatar_url"
@@ -416,7 +400,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Recent Patients -->
-        <div v-if="loading || stats?.recent_patients.length" class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div v-if="loading || stats?.recent_patients.length" class="surface-card rounded-xl border p-6 text-card-foreground">
           <h2 class="mb-4 text-sm font-semibold">Recent Patients</h2>
 
           <div v-if="loading" class="flex flex-col gap-3">
@@ -431,7 +415,7 @@ onUnmounted(() => {
 
           <ul v-else class="flex flex-col divide-y divide-border">
             <li
-              v-for="patient in stats.recent_patients"
+              v-for="patient in stats?.recent_patients ?? []"
               :key="patient.id"
               class="flex cursor-pointer items-center gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-muted/50 -mx-2 px-2 rounded-lg"
               @click="router.push({ name: RouteNames.PATIENT_DETAIL, params: { id: patient.id } })"

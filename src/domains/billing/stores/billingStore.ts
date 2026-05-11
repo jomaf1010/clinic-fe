@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { HttpError } from '@/lib/http'
 import { billingApi } from '../api/billingApi'
 import type {
   BillingSummary,
@@ -49,14 +50,19 @@ export const useBillingStore = defineStore('billing', () => {
     }
   }
 
-  async function fetchForConsultation(consultationId: string): Promise<InvoiceResponse | null> {
+  async function fetchForEncounter(encounterId: string): Promise<InvoiceResponse | null> {
     try {
-      const response = await billingApi.forConsultation(consultationId)
+      const response = await billingApi.forEncounter(encounterId)
       currentInvoice.value = response.data
       return response.data
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 404) {
+        currentInvoice.value = null
+        return null
+      }
+
       currentInvoice.value = null
-      return null
+      throw error
     }
   }
 
@@ -150,7 +156,7 @@ export const useBillingStore = defineStore('billing', () => {
     totalInvoices,
     fetchInvoices,
     fetchInvoice,
-    fetchForConsultation,
+    fetchForEncounter,
     fetchSummary,
     createInvoice,
     updateInvoice,

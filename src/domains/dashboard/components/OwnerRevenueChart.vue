@@ -58,11 +58,6 @@ const xTickFormat = (i: number) => {
   return point ? formatDateLabel(point.date) : ''
 }
 
-const yTickFormat = (v: number) => {
-  if (v >= 1000) return `${(v / 1000).toFixed(0)}k`
-  return `${v}`
-}
-
 const template = componentToString(chartConfig, ChartTooltipContent, {
   labelFormatter: (value: number | Date) => {
     const point = data.value[value as number]
@@ -87,7 +82,7 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+  <div class="surface-card rounded-xl border p-6 text-card-foreground">
     <div class="mb-4 flex items-center justify-between">
       <div>
         <h2 class="text-sm font-semibold">Clinic Revenue</h2>

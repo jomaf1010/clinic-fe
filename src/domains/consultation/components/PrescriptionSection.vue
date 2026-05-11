@@ -5,7 +5,6 @@ import { HttpError } from '@/lib/http'
 import {
   AlertTriangle,
   Calculator,
-  Pill,
   Plus,
   Pencil,
   X,
@@ -19,7 +18,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -52,7 +50,7 @@ import { FREQUENCIES, FREQUENCY_DOSES_PER_DAY, ROUTES } from '@/domains/medicine
 import type { MedicineSearchResult } from '@/domains/medicine/types/medicine.types'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   disabled: boolean
   realtimeUpdate?: PrescriptionResponse | null
   documentUpdate?: GeneratedDocumentResponse | null
@@ -80,7 +78,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function loadDocuments() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     pdfDoc.value = res.data.find((d) => d.type === 'prescription') ?? null
   } catch {
     // ignore
@@ -90,7 +88,7 @@ async function loadDocuments() {
 async function generatePdf() {
   isGeneratingPdf.value = true
   try {
-    const res = await documentApi.generate(props.consultationId, 'prescription')
+    const res = await documentApi.generate(props.encounterId, 'prescription')
     pdfDoc.value = res.data
     startPolling()
   } catch (err: unknown) {
@@ -130,7 +128,7 @@ async function downloadPdf() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(pdfDoc.value.id)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get download link')
@@ -347,7 +345,7 @@ function parseDuration(duration: string): { value: string; unit: string } {
 async function loadPrescription() {
   isLoading.value = true
   try {
-    const res = await prescriptionApi.getForConsultation(props.consultationId)
+    const res = await prescriptionApi.getForEncounter(props.encounterId)
     prescription.value = res.data ?? null
   } catch {
     // silent
@@ -393,6 +391,7 @@ function openEditModal(item: PrescriptionItem) {
     quantity: item.quantity ?? null,
     is_multi_dose: item.is_multi_dose ?? false,
     doses_per_unit: item.doses_per_unit ?? null,
+    out_of_stock: item.out_of_stock ?? false,
   }
   durationWarning.value = false
   showModal.value = true
@@ -474,7 +473,7 @@ async function doCreate() {
 
   isSaving.value = true
   try {
-    const res = await prescriptionApi.create(props.consultationId, validItems)
+    const res = await prescriptionApi.create(props.encounterId, validItems)
     prescription.value = res.data
     closeModal()
     toast.success('Prescription created')
@@ -589,21 +588,16 @@ const canSave = () => {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header -->
+    <!-- Actions -->
     <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2">
-        <Label class="flex items-center gap-1.5">
-          <Pill class="size-3.5 text-muted-foreground" />
-          Prescription
-        </Label>
-        <Badge
-          v-if="prescription"
-          variant="outline"
-          class="border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-400"
-        >
-          {{ prescription.items.length }} {{ prescription.items.length === 1 ? 'medicine' : 'medicines' }}
-        </Badge>
-      </div>
+      <Badge
+        v-if="prescription"
+        variant="outline"
+        class="border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-400"
+      >
+        {{ prescription.items.length }} {{ prescription.items.length === 1 ? 'medicine' : 'medicines' }}
+      </Badge>
+      <div v-else />
 
       <!-- PDF actions -->
       <div v-if="prescription && prescription.items.length > 0" class="flex items-center gap-1.5">

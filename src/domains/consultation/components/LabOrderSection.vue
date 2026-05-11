@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { toast } from 'vue-sonner'
+import { getAuthToken } from '@/lib/http'
 import {
-  FlaskConical,
   Plus,
   Pencil,
   X,
@@ -22,7 +22,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { Dialog, DialogScrollContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -40,7 +39,7 @@ import { openNewTab, printPdf } from '@/lib/utils'
 import LabRequestDialog from './LabRequestDialog.vue'
 
 const props = defineProps<{
-  consultationId: string
+  encounterId: string
   disabled: boolean
   realtimeUpdate?: LabOrderResponse | null
   documentUpdate?: GeneratedDocumentResponse | null
@@ -97,7 +96,7 @@ let activeRow: { description: string; instruction: string } | null = null
 // --- Cache helper ---
 async function cacheCurrentLabOrder() {
   if (labOrder.value) {
-    await cacheLabOrder(props.consultationId, labOrder.value as unknown as Record<string, unknown>)
+    await cacheLabOrder(props.encounterId, labOrder.value as unknown as Record<string, unknown>)
   }
 }
 
@@ -105,12 +104,12 @@ async function cacheCurrentLabOrder() {
 async function loadLabOrder() {
   isLoading.value = true
   try {
-    const res = await labOrderApi.getForConsultation(props.consultationId)
+    const res = await labOrderApi.getForEncounter(props.encounterId)
     labOrder.value = res.data ?? null
     if (res.data) await cacheCurrentLabOrder()
   } catch {
     // Offline fallback
-    const cached = await getCachedLabOrder(props.consultationId)
+    const cached = await getCachedLabOrder(props.encounterId)
     if (cached) {
       labOrder.value = cached as unknown as LabOrderResponse
       toast.info('Lab orders loaded from offline cache')
@@ -206,8 +205,11 @@ function onSearchKeydown(e: KeyboardEvent) {
     }
   } else if (e.key === 'Enter') {
     if (showSuggestions.value && highlightedIndex.value >= 0 && highlightedIndex.value < suggestions.value.length) {
-      e.preventDefault()
-      selectSuggestion(suggestions.value[highlightedIndex.value])
+      const suggestion = suggestions.value[highlightedIndex.value]
+      if (suggestion) {
+        e.preventDefault()
+        selectSuggestion(suggestion)
+      }
     }
   } else if (e.key === 'Escape') {
     showSuggestions.value = false
@@ -234,7 +236,7 @@ const groupedSuggestions = computed(() => {
   const groups: Record<string, SystemLabItem[]> = {}
   for (const item of suggestions.value) {
     if (!groups[item.category]) groups[item.category] = []
-    groups[item.category].push(item)
+    groups[item.category]!.push(item)
   }
   return groups
 })
@@ -256,7 +258,7 @@ async function handleCreate() {
 
   isCreating.value = true
   try {
-    const res = await labOrderApi.create(props.consultationId, validItems)
+    const res = await labOrderApi.create(props.encounterId, validItems)
     labOrder.value = res.data
     await cacheCurrentLabOrder()
     showCreateForm.value = false
@@ -445,13 +447,16 @@ async function viewResult(item: LabOrderItem) {
   previewOpen.value = true
 
   try {
-    const token = localStorage.getItem('auth_token')
-    const baseUrl = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
+    const apiBase = (import.meta.env.VITE_API_URL as string).replace(/\/api$/, '')
     const files = await Promise.all(
       item.result_files.map(async (fileUrl) => {
-        const res = await fetch(`${baseUrl}${fileUrl}`, {
+        const url = `${apiBase}${fileUrl}`
+        const token = getAuthToken()
+        const res = await fetch(url, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: 'include',
         })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const blob = await res.blob()
         return {
           url: URL.createObjectURL(blob),
@@ -499,7 +504,7 @@ const labRequestReady = computed(() => labRequestDoc.value?.status === 'complete
 
 async function loadLabRequestDoc() {
   try {
-    const res = await documentApi.list(props.consultationId)
+    const res = await documentApi.list(props.encounterId)
     labRequestDoc.value = res.data.find((d) => d.type === 'lab-request') ?? null
   } catch {
     // ignore
@@ -521,7 +526,7 @@ async function downloadLabRequest() {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(labRequestDoc.value.id)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
     toast.error('Failed to get download link')
@@ -558,24 +563,19 @@ function cancelAddForm() {
 
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Header row -->
+    <!-- Actions -->
     <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2">
-        <Label class="flex items-center gap-1.5">
-          <FlaskConical class="size-3.5 text-muted-foreground" />
-          Lab Orders
-        </Label>
-        <Badge
-          v-if="labOrder"
-          variant="outline"
-          class="capitalize"
-          :class="labOrderStatusClass"
-        >
-          <CheckCircle2 v-if="labOrder.status === 'completed'" class="size-3" />
-          <Clock v-else class="size-3" />
-          {{ labOrder.status }}
-        </Badge>
-      </div>
+      <Badge
+        v-if="labOrder"
+        variant="outline"
+        class="capitalize"
+        :class="labOrderStatusClass"
+      >
+        <CheckCircle2 v-if="labOrder.status === 'completed'" class="size-3" />
+        <Clock v-else class="size-3" />
+        {{ labOrder.status }}
+      </Badge>
+      <div v-else />
 
       <div class="flex items-center gap-1.5">
         <template v-if="labOrder && labOrder.items.some(i => i.status === 'pending')">
@@ -1055,13 +1055,13 @@ function cancelAddForm() {
           </div>
           <template v-else-if="previewFiles.length">
             <iframe
-              v-if="previewFiles[previewIndex].type === 'pdf'"
-              :src="previewFiles[previewIndex].url"
+              v-if="previewFiles[previewIndex]?.type === 'pdf'"
+              :src="previewFiles[previewIndex]?.url"
               class="h-[80vh] w-full rounded border"
             />
             <img
               v-else
-              :src="previewFiles[previewIndex].url"
+              :src="previewFiles[previewIndex]?.url"
               :alt="`${previewTitle} - ${previewIndex + 1} of ${previewFiles.length}`"
               class="w-full rounded"
             />
@@ -1074,7 +1074,7 @@ function cancelAddForm() {
     <LabRequestDialog
       v-if="labOrder && labOrder.items.some(i => i.status === 'pending')"
       :open="showLabRequestDialog"
-      :consultation-id="consultationId"
+      :encounter-id="encounterId"
       :document-update="documentUpdate"
       @update:open="showLabRequestDialog = $event"
       @generated="labRequestDoc = $event"

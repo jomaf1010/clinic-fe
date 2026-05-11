@@ -5,7 +5,8 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import type { CalendarOptions, EventSourceFuncArg, EventDropArg, EventResizeDoneArg } from '@fullcalendar/core'
+import type { CalendarOptions, EventSourceFuncArg, EventDropArg } from '@fullcalendar/core'
+import type { EventResizeDoneArg } from '@fullcalendar/interaction'
 import { HttpError } from '@/lib/http'
 import { appointmentApi } from '../api/appointmentApi'
 import { scheduleApi } from '@/domains/schedule/api/scheduleApi'
@@ -42,6 +43,7 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 }
 
 const props = defineProps<{
+  doctorFilter?: string
   statusFilter?: string
 }>()
 
@@ -60,7 +62,7 @@ const appointments = ref<AppointmentResponse[]>([])
 const doctorColorIndex = new Map<string, string>()
 function getDoctorColor(doctorId: string): string {
   if (!doctorColorIndex.has(doctorId)) {
-    doctorColorIndex.set(doctorId, DOCTOR_BORDER_COLORS[doctorColorIndex.size % DOCTOR_BORDER_COLORS.length])
+    doctorColorIndex.set(doctorId, DOCTOR_BORDER_COLORS[doctorColorIndex.size % DOCTOR_BORDER_COLORS.length]!)
   }
   return doctorColorIndex.get(doctorId)!
 }
@@ -119,6 +121,9 @@ async function eventSourceFn(
     const start = info.startStr.slice(0, 10)
     const end = info.endStr.slice(0, 10)
     const filters: AppointmentListFilters = { start_date: start, end_date: end }
+    if (props.doctorFilter && props.doctorFilter !== 'all') {
+      filters.doctor_id = props.doctorFilter
+    }
     if (props.statusFilter && props.statusFilter !== 'all') {
       filters.status = props.statusFilter as AppointmentListFilters['status']
     }
@@ -132,7 +137,7 @@ async function eventSourceFn(
 
     // Appointment events
     for (const appt of apptRes.data) {
-      const statusColors = STATUS_COLORS[appt.status] ?? STATUS_COLORS.scheduled
+      const statusColors = STATUS_COLORS[appt.status] ?? STATUS_COLORS.scheduled!
       const doctorBorder = getDoctorColor(appt.doctor_id)
       const startDate = new Date(appt.scheduled_at)
       const endDate = new Date(startDate.getTime() + appt.duration * 60000)
@@ -163,13 +168,18 @@ async function eventSourceFn(
           patientName: appt.patient_name ?? 'Patient',
           statusLabel,
           duration: appt.duration,
+          updatedAt: appt.updated_at,
         },
       })
     }
 
     // Calendar block events
     for (const block of blocksRes.data) {
-      const colors = BLOCK_TYPE_COLORS[block.type] ?? BLOCK_TYPE_COLORS.unavailable
+      if (props.doctorFilter && props.doctorFilter !== 'all' && block.user_id !== props.doctorFilter) {
+        continue
+      }
+
+      const colors = BLOCK_TYPE_COLORS[block.type] ?? BLOCK_TYPE_COLORS.unavailable!
       const typeLabel = BLOCK_TYPE_LABELS[block.type] ?? block.type
       const doctorLabel = block.user_name ? `Dr. ${block.user_name}` : ''
       const doctorColor = getDoctorColor(block.user_id)
@@ -199,8 +209,8 @@ async function eventSourceFn(
   }
 }
 
-// Refetch when status filter changes
-watch(() => props.statusFilter, () => {
+// Refetch when filters change
+watch(() => [props.doctorFilter, props.statusFilter], () => {
   calendarRef.value?.getApi()?.refetchEvents()
 })
 
@@ -232,15 +242,15 @@ async function handleEventDrop(info: EventDropArg) {
   }
 
   try {
-    await appointmentApi.reschedule(apptId, newStart.toISOString())
+    const expectedUpdatedAt = info.event.extendedProps.updatedAt as string | undefined
+    await appointmentApi.reschedule(apptId, newStart.toISOString(), expectedUpdatedAt)
     toast.success('Appointment rescheduled')
     // Refresh to get updated data
     calendarRef.value?.getApi()?.refetchEvents()
   } catch (err) {
     info.revert()
-    const msg = err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0]
-      ? (err.data as { errors: Record<string, string[]> }).errors.scheduled_at[0]
-      : 'Failed to reschedule — slot may not be available'
+    const msg = (err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.scheduled_at?.[0])
+      || 'Failed to reschedule — slot may not be available'
     toast.error(msg)
   }
 }
@@ -261,14 +271,14 @@ async function handleEventResize(info: EventResizeDoneArg) {
   }
 
   try {
-    await appointmentApi.resize(apptId, durationMin)
+    const expectedUpdatedAt = info.event.extendedProps.updatedAt as string | undefined
+    await appointmentApi.resize(apptId, durationMin, expectedUpdatedAt)
     toast.success('Appointment duration updated')
     calendarRef.value?.getApi()?.refetchEvents()
   } catch (err) {
     info.revert()
-    const msg = err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.duration?.[0]
-      ? (err.data as { errors: Record<string, string[]> }).errors.duration[0]
-      : 'Failed to resize — slots may not be available'
+    const msg = (err instanceof HttpError && (err.data as { message?: string; errors?: Record<string, string[]> })?.errors?.duration?.[0])
+      || 'Failed to resize — slots may not be available'
     toast.error(msg)
   }
 }
@@ -365,10 +375,10 @@ const calendarOptions: CalendarOptions = {
 </script>
 
 <template>
-  <div class="appointment-calendar">
+  <div class="appointment-calendar appointment-calendar-shell surface-card rounded-2xl p-4">
     <!-- Doctor legend -->
     <div v-if="doctorLegend.length" class="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-      <div v-for="doc in doctorLegend" :key="doc.name" class="flex items-center gap-1.5">
+      <div v-for="doc in doctorLegend" :key="doc.name" class="appointment-calendar-legend-pill flex items-center gap-1.5 rounded-full px-2.5 py-1">
         <div class="relative flex items-center">
           <div class="h-4 w-1 rounded-full" :style="{ backgroundColor: doc.color }" />
           <img v-if="doc.avatarUrl" :src="doc.avatarUrl" alt="" class="ml-1 size-5 rounded-full object-cover" />
@@ -382,12 +392,12 @@ const calendarOptions: CalendarOptions = {
 
     <!-- Status legend -->
     <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-      <div v-for="(colors, status) in STATUS_COLORS" :key="status" class="flex items-center gap-1.5">
+      <div v-for="(colors, status) in STATUS_COLORS" :key="status" class="appointment-calendar-legend-pill flex items-center gap-1.5 rounded-full px-2.5 py-1">
         <div class="size-2.5 rounded-sm border" :style="{ backgroundColor: colors.bg, borderColor: colors.border }" />
         {{ status === 'checked_in' ? 'Checked In' : status === 'no_show' ? 'No Show' : status.charAt(0).toUpperCase() + status.slice(1) }}
       </div>
       <span class="text-border">|</span>
-      <div v-for="(colors, btype) in BLOCK_TYPE_COLORS" :key="btype" class="flex items-center gap-1.5">
+      <div v-for="(colors, btype) in BLOCK_TYPE_COLORS" :key="btype" class="appointment-calendar-legend-pill flex items-center gap-1.5 rounded-full px-2.5 py-1">
         <div class="size-2.5 rounded-sm border" :style="{ backgroundColor: colors.bg, borderColor: colors.border }" />
         {{ BLOCK_TYPE_LABELS[btype] ?? btype }}
       </div>
@@ -398,6 +408,19 @@ const calendarOptions: CalendarOptions = {
 </template>
 
 <style>
+.appointment-calendar-shell {
+  border: 0;
+  background:
+    radial-gradient(circle at 18% 0%, rgb(59 130 246 / 0.08), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgb(20 184 166 / 0.08), transparent 30%),
+    var(--surface-panel-strong);
+}
+
+.appointment-calendar-legend-pill {
+  background: rgb(255 255 255 / 0.36);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28);
+}
+
 .appointment-calendar .fc {
   --fc-border-color: var(--border);
   --fc-today-bg-color: oklch(0.97 0.005 253.827 / 0.3);
@@ -416,12 +439,14 @@ const calendarOptions: CalendarOptions = {
   padding: 0.3rem 0.7rem;
   font-size: 0.8rem;
   font-weight: 500;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  background: var(--background);
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  background: var(--surface-muted);
   color: var(--foreground);
   text-transform: capitalize;
-  box-shadow: none;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .appointment-calendar .fc .fc-button:hover {
@@ -430,9 +455,12 @@ const calendarOptions: CalendarOptions = {
 
 .appointment-calendar .fc .fc-button-active,
 .appointment-calendar .fc .fc-button:active {
-  background: var(--primary) !important;
-  color: var(--primary-foreground) !important;
-  border-color: var(--primary) !important;
+  background: linear-gradient(135deg, rgb(37 99 235), rgb(20 184 166)) !important;
+  color: white !important;
+  border-color: rgb(255 255 255 / 0.28) !important;
+  box-shadow:
+    0 12px 26px rgb(37 99 235 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
 }
 
 .appointment-calendar .fc .fc-button:focus {
@@ -444,7 +472,7 @@ const calendarOptions: CalendarOptions = {
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--muted-foreground);
-  background: var(--muted);
+  background: rgb(255 255 255 / 0.28);
 }
 
 .appointment-calendar .fc .fc-timegrid-slot {
@@ -495,8 +523,26 @@ const calendarOptions: CalendarOptions = {
 }
 
 .appointment-calendar .fc .fc-scrollgrid {
-  border-radius: 0.5rem;
+  border-radius: 1rem;
   overflow: hidden;
+}
+
+.dark .appointment-calendar-shell {
+  background:
+    radial-gradient(circle at 86% 88%, rgb(20 184 166 / 0.12), transparent 34%),
+    radial-gradient(circle at 18% 10%, rgb(59 130 246 / 0.12), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.58), rgb(15 23 42 / 0.28) 54%, rgb(15 23 42 / 0.42)),
+    rgb(15 23 42 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 1px 0 0 rgb(255 255 255 / 0.035),
+    0 24px 80px -38px rgb(0 0 0 / 0.82);
+}
+
+.dark .appointment-calendar-legend-pill {
+  background: rgb(15 23 42 / 0.46);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
 
 .dark .appointment-calendar .fc .fc-day-past {
@@ -508,12 +554,19 @@ const calendarOptions: CalendarOptions = {
 }
 
 .dark .appointment-calendar .fc .fc-button {
-  background: var(--background);
+  background: rgb(15 23 42 / 0.58);
   color: var(--foreground);
-  border-color: var(--border);
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 14px 32px rgb(0 0 0 / 0.22);
 }
 
 .dark .appointment-calendar .fc .fc-button:hover {
-  background: var(--accent);
+  background: rgb(255 255 255 / 0.1);
+}
+
+.dark .appointment-calendar .fc .fc-col-header-cell {
+  background: rgb(15 23 42 / 0.38);
 }
 </style>

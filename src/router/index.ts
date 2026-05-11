@@ -1,9 +1,33 @@
 import { createRouter, createWebHistory } from 'vue-router'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    requiresClinicContext?: boolean
+    requiresGuest?: boolean
+    requiredPermission?: string | string[]
+    requiredFeature?: string
+    usesCustomTopbar?: boolean
+    devOnly?: boolean
+  }
+}
 import DashboardLayout from '@/components/layout/DashboardLayout.vue'
 import HomeView from '@/views/HomeView.vue'
 import { RouteNames } from './routeNames'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import { HttpError } from '@/lib/http'
+import { storeQueueDisplayToken } from '@/domains/queue/utils/displayTokenLaunch'
+
+export function canAccessRequiredPermission(
+  requiredPermission: string | string[] | undefined,
+  hasPermission: (permission: string) => boolean,
+): boolean {
+  if (!requiredPermission) return true
+  if (Array.isArray(requiredPermission)) {
+    return requiredPermission.some((permission) => hasPermission(permission))
+  }
+  return hasPermission(requiredPermission)
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -22,28 +46,55 @@ const router = createRouter({
           path: 'patients',
           name: RouteNames.PATIENT_LIST,
           component: () => import('@/domains/patient/views/PatientListView.vue'),
+          meta: { requiredPermission: 'patients.view' },
         },
         {
           path: 'patients/:id',
           name: RouteNames.PATIENT_DETAIL,
           component: () => import('@/domains/patient/views/PatientDetailView.vue'),
+          meta: { requiredPermission: 'patients.view' },
         },
         {
-          path: 'patients/:patientId/consultations/new',
-          name: RouteNames.CONSULTATION_NEW,
-          component: () => import('@/domains/consultation/views/ConsultationFormView.vue'),
-          meta: { requiresAuth: true, requiresClinicContext: true },
+          path: 'patients/:patientId/encounters/new',
+          name: RouteNames.ENCOUNTER_NEW,
+          component: () => import('@/domains/encounter/views/EncounterFormRouter.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true, requiredPermission: 'patients.view' },
         },
         {
-          path: 'patients/:patientId/consultations/:id',
-          name: RouteNames.CONSULTATION_DETAIL,
-          component: () => import('@/domains/consultation/views/ConsultationFormView.vue'),
-          meta: { requiresAuth: true, requiresClinicContext: true },
+          path: 'patients/:patientId/encounters/:id',
+          name: RouteNames.ENCOUNTER_DETAIL,
+          component: () => import('@/domains/encounter/views/EncounterFormRouter.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true, requiredPermission: 'patients.view' },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/new',
+          name: RouteNames.PREGNANCY_CREATE,
+          component: () => import('@/domains/obgyn/views/PregnancyDetailView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true, requiredPermission: 'patients.view' },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/:pregnancyId',
+          name: RouteNames.PREGNANCY_DETAIL,
+          component: () => import('@/domains/obgyn/views/PregnancyDetailView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true, requiredPermission: 'patients.view', usesCustomTopbar: true },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/:pregnancyId/visits/new',
+          name: RouteNames.PRENATAL_VISIT_CREATE,
+          component: () => import('@/domains/obgyn/views/PrenatalVisitView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true, requiredPermission: 'patients.view' },
+        },
+        {
+          path: 'patients/:patientId/pregnancies/:pregnancyId/visits/:visitId',
+          name: RouteNames.PRENATAL_VISIT_DETAIL,
+          component: () => import('@/domains/obgyn/views/PrenatalVisitView.vue'),
+          meta: { requiresAuth: true, requiresClinicContext: true, requiredPermission: 'patients.view' },
         },
         {
           path: 'appointments',
           name: RouteNames.APPOINTMENT_LIST,
           component: () => import('@/domains/appointment/views/AppointmentListView.vue'),
+          meta: { requiredPermission: 'appointments.view', requiredFeature: 'appointments' },
         },
         {
           path: 'clinic',
@@ -63,41 +114,55 @@ const router = createRouter({
               path: 'settings',
               name: RouteNames.CLINIC_SETTINGS,
               component: () => import('@/domains/clinic/views/ClinicSettingsView.vue'),
+              meta: { requiredPermission: 'clinic.manage' },
             },
             {
               path: 'medicines',
               name: RouteNames.CLINIC_MEDICINES,
               component: () => import('@/domains/medicine/views/MedicineListView.vue'),
+              meta: { requiredPermission: 'medicines.manage' },
             },
             {
               path: 'consumables',
               name: RouteNames.CLINIC_CONSUMABLES,
               component: () => import('@/domains/consumable/views/ConsumableListView.vue'),
+              meta: { requiredPermission: 'consumables.view', requiredFeature: 'consumables' },
             },
             {
               path: 'lab-services',
               name: RouteNames.CLINIC_LAB_SERVICES,
               component: () => import('@/domains/labService/views/LabServiceListView.vue'),
+              meta: { requiredPermission: 'lab-services.view', requiredFeature: 'lab_services' },
+            },
+            {
+              path: 'services',
+              name: RouteNames.CLINIC_SERVICES,
+              component: () => import('@/domains/service/views/ServiceListView.vue'),
+              meta: { requiredPermission: 'lab-services.view' },
             },
             {
               path: 'templates',
               name: RouteNames.CLINIC_TEMPLATES,
               component: () => import('@/domains/template/views/TemplateListView.vue'),
+              meta: { requiredPermission: 'clinic.manage' },
             },
             {
               path: 'team',
               name: RouteNames.TEAM,
               component: () => import('@/domains/team/views/TeamManagementView.vue'),
+              meta: { requiredPermission: 'team.manage' },
             },
             {
               path: 'roles',
               name: RouteNames.ROLES,
               component: () => import('@/domains/roles/views/RoleManagementView.vue'),
+              meta: { requiredPermission: 'roles.manage' },
             },
             {
               path: 'logs',
               name: RouteNames.AUDIT_LOG_LIST,
               component: () => import('@/domains/audit-log/views/AuditLogListView.vue'),
+              meta: { requiredPermission: 'audit-logs.view', requiredFeature: 'audit_logs' },
             },
           ],
         },
@@ -105,31 +170,37 @@ const router = createRouter({
           path: 'clinic/templates/:category/:variation',
           name: RouteNames.TEMPLATE_EDITOR,
           component: () => import('@/domains/template/views/TemplateEditorView.vue'),
+          meta: { requiredPermission: 'clinic.manage' },
         },
         {
           path: 'schedule',
           name: RouteNames.SCHEDULE,
           component: () => import('@/domains/schedule/views/ScheduleView.vue'),
+          meta: { requiredPermission: 'schedule.view', requiredFeature: 'schedule' },
         },
         {
           path: 'queue',
           name: RouteNames.QUEUE,
           component: () => import('@/domains/queue/views/QueueView.vue'),
+          meta: { requiredPermission: 'queue.view' },
         },
         {
           path: 'messages',
           name: RouteNames.MESSAGES,
           component: () => import('@/domains/message/views/MessagesView.vue'),
+          meta: { requiredPermission: 'messages.view', requiredFeature: 'messages' },
         },
         {
           path: 'billing',
           name: RouteNames.BILLING,
           component: () => import('@/domains/billing/views/BillingView.vue'),
+          meta: { requiredPermission: ['billing.view', 'billing.view-own'] },
         },
         {
           path: 'subscription',
           name: RouteNames.SUBSCRIPTION,
           component: () => import('@/domains/subscription/views/SubscriptionView.vue'),
+          meta: { requiredPermission: 'clinic.manage' },
         },
         {
           path: 'account',
@@ -137,14 +208,16 @@ const router = createRouter({
           component: () => import('@/domains/auth/views/AccountView.vue'),
         },
         {
-          path: 'components',
-          name: RouteNames.COMPONENTS,
+          path: 'design-system',
+          name: RouteNames.DESIGN_SYSTEM,
           component: () => import('@/views/ComponentsView.vue'),
+          meta: { devOnly: true },
         },
         {
           path: 'logs/:id',
           name: RouteNames.AUDIT_LOG_DETAIL,
           component: () => import('@/domains/audit-log/views/AuditLogDetailView.vue'),
+          meta: { requiredPermission: 'audit-logs.view', requiredFeature: 'audit_logs' },
         },
       ],
     },
@@ -170,6 +243,12 @@ const router = createRouter({
       path: '/verify-email',
       name: RouteNames.VERIFY_EMAIL,
       component: () => import('@/domains/auth/views/VerifyEmailView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/link-google',
+      name: RouteNames.LINK_GOOGLE,
+      component: () => import('@/domains/auth/views/LinkGoogleView.vue'),
       meta: { requiresAuth: false },
     },
     {
@@ -209,7 +288,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/queue-display/:token',
+      path: '/queue-display/:token?',
       name: RouteNames.QUEUE_DISPLAY,
       component: () => import('@/domains/queue/views/QueueDisplayView.vue'),
       meta: { requiresAuth: false },
@@ -230,8 +309,20 @@ router.onError((error) => {
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
+  // Legacy queue-display links may carry a bearer token in the path. Move the
+  // token into tab-scoped storage and strip it before any guard-triggered API
+  // calls, including authenticated refreshes that fetch /auth/me.
+  if (to.name === RouteNames.QUEUE_DISPLAY && typeof to.params.token === 'string' && to.params.token.trim() !== '') {
+    storeQueueDisplayToken(to.params.token)
+    return { name: RouteNames.QUEUE_DISPLAY, replace: true }
+  }
+
+  if (to.meta.devOnly && !import.meta.env.DEV) {
+    return { name: RouteNames.HOME }
+  }
+
   // Page refresh: token exists but user not yet loaded
-  if (authStore.isAuthenticated && !authStore.user) {
+  if (authStore.isAuthenticated && !authStore.user && to.name !== RouteNames.QUEUE_DISPLAY) {
     try {
       await authStore.fetchUser()
     } catch (error) {
@@ -251,8 +342,14 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // Authenticated on auth pages → redirect based on state
-  if ((to.name === RouteNames.LOGIN || to.name === RouteNames.SIGNUP || to.name === RouteNames.VERIFY_EMAIL_NOTICE || to.name === RouteNames.VERIFY_EMAIL) && authStore.isAuthenticated) {
+  const isAuthPage =
+    to.name === RouteNames.LOGIN ||
+    to.name === RouteNames.SIGNUP ||
+    to.name === RouteNames.VERIFY_EMAIL_NOTICE ||
+    to.name === RouteNames.VERIFY_EMAIL
+
+  // Authenticated on guest-only pages → redirect based on state
+  if ((to.meta.requiresGuest || isAuthPage) && authStore.isAuthenticated) {
     if (authStore.needsOnboarding) {
       return { name: RouteNames.ONBOARDING_CREATE_CLINIC }
     }
@@ -280,6 +377,16 @@ router.beforeEach(async (to) => {
   // Already has context (or has memberships) trying to visit onboarding → HOME
   if (to.name === RouteNames.ONBOARDING_CREATE_CLINIC && authStore.isAuthenticated && !authStore.needsOnboarding) {
     return { name: RouteNames.HOME }
+  }
+
+  // Permission/feature guards — only apply when authenticated with clinic context
+  if (authStore.isAuthenticated && authStore.hasClinicContext) {
+    if (to.meta.requiredFeature && !authStore.hasFeature(to.meta.requiredFeature)) {
+      return { name: RouteNames.HOME }
+    }
+    if (!canAccessRequiredPermission(to.meta.requiredPermission, authStore.hasPermission)) {
+      return { name: RouteNames.HOME }
+    }
   }
 })
 

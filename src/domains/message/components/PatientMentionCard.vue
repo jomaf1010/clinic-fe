@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Calendar, ExternalLink, MapPin, Phone, AlertTriangle, Activity, User } from 'lucide-vue-next'
+import { Calendar, ExternalLink, MapPin, Phone, User } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { RouteNames } from '@/router/routeNames'
 import { patientApi } from '@/domains/patient/api/patientApi'
@@ -98,27 +98,6 @@ onMounted(async () => {
             </span>
           </div>
 
-          <!-- Conditions & Allergies -->
-          <div v-if="patient.allergies.length > 0 || patient.chronic_conditions.length > 0" class="mt-1.5 flex flex-wrap gap-1">
-            <Badge
-              v-for="allergy in patient.allergies.slice(0, 3)"
-              :key="'a-' + allergy"
-              variant="outline"
-              class="border-red-200 px-1.5 py-0 text-[10px] text-red-600 dark:border-red-800 dark:text-red-400"
-            >
-              <AlertTriangle class="mr-0.5 size-2.5" />
-              {{ allergy }}
-            </Badge>
-            <Badge
-              v-for="condition in patient.chronic_conditions.slice(0, 3)"
-              :key="'c-' + condition"
-              variant="outline"
-              class="px-1.5 py-0 text-[10px]"
-            >
-              <Activity class="mr-0.5 size-2.5" />
-              {{ condition }}
-            </Badge>
-          </div>
         </div>
 
         <!-- Open link icon -->

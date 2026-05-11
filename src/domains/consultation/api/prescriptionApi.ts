@@ -2,14 +2,14 @@ import { http } from '@/lib/http'
 import type { PrescriptionResponse } from '../types/prescription.types'
 
 export const prescriptionApi = {
-  getForConsultation(consultationId: string): Promise<{ data: PrescriptionResponse }> {
+  getForEncounter(encounterId: string): Promise<{ data: PrescriptionResponse }> {
     return http.get<{ data: PrescriptionResponse }>(
-      `/consultations/${consultationId}/prescription`,
+      `/encounters/${encounterId}/prescription`,
     )
   },
 
   create(
-    consultationId: string,
+    encounterId: string,
     items: {
       drug_name: string
       dose: string
@@ -22,7 +22,7 @@ export const prescriptionApi = {
     }[],
   ): Promise<{ data: PrescriptionResponse }> {
     return http.post<{ data: PrescriptionResponse }>(
-      `/consultations/${consultationId}/prescription`,
+      `/encounters/${encounterId}/prescription`,
       { items },
     )
   },
@@ -38,6 +38,9 @@ export const prescriptionApi = {
       instructions?: string
       medicine_id?: string | null
       unit_price?: number | null
+      quantity?: number | null
+      is_multi_dose?: boolean
+      doses_per_unit?: number | null
     },
   ): Promise<{ data: PrescriptionResponse }> {
     return http.post<{ data: PrescriptionResponse }>(
@@ -58,6 +61,9 @@ export const prescriptionApi = {
       instructions: string | null
       medicine_id: string | null
       unit_price: number | null
+      quantity: number | null
+      is_multi_dose: boolean
+      doses_per_unit: number | null
     }>,
   ): Promise<{ data: PrescriptionResponse }> {
     return http.patch<{ data: PrescriptionResponse }>(

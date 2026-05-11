@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bell, Check, CheckCheck, FileText, FileCheck, AlertCircle, UserRound, CalendarDays, Download, Printer } from 'lucide-vue-next'
+import { Bell, CheckCheck, FileText, FileCheck, UserRound, CalendarDays, Download, Printer } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useNotificationStore } from '@/domains/notification/stores/notificationStore'
 import { RouteNames } from '@/router/routeNames'
@@ -47,11 +47,11 @@ function handleClick(notification: typeof store.notifications[number]) {
 
   // Navigate based on type
   const data = notification.data
-  if (notification.type === 'document.generated' && data.consultation_id) {
+  if (notification.type === 'document.generated' && data.encounter_id) {
     if (data.patient_id) {
       router.push({
-        name: RouteNames.CONSULTATION_DETAIL,
-        params: { patientId: data.patient_id as string, id: data.consultation_id as string },
+        name: RouteNames.ENCOUNTER_DETAIL,
+        params: { patientId: data.patient_id as string, id: data.encounter_id as string },
       })
     }
   } else if (notification.type === 'queue.patient_assigned' && data.patient_id) {
@@ -64,10 +64,10 @@ function handleClick(notification: typeof store.notifications[number]) {
       name: RouteNames.PATIENT_DETAIL,
       params: { id: data.patient_id as string },
     })
-  } else if (notification.type === 'medcert.requested' && data.consultation_id && data.patient_id) {
+  } else if (notification.type === 'medcert.requested' && data.encounter_id && data.patient_id) {
     router.push({
-      name: RouteNames.CONSULTATION_DETAIL,
-      params: { patientId: data.patient_id as string, id: data.consultation_id as string },
+      name: RouteNames.ENCOUNTER_DETAIL,
+      params: { patientId: data.patient_id as string, id: data.encounter_id as string },
       query: { openMedCert: '1' },
     })
   } else if (notification.type === 'medcert.completed' && data.patient_id) {
@@ -89,7 +89,7 @@ async function handleDownload(documentId: string) {
   const tab = openNewTab()
   try {
     const url = await documentApi.getSignedUrl(documentId)
-    tab.navigate(url)
+    await tab.navigate(url)
   } catch {
     tab.close()
   }
