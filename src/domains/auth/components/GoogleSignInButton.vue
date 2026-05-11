@@ -1,29 +1,19 @@
-<script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-
-const props = withDefaults(defineProps<{
-  disabled?: boolean
-  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
-  text?: 'signin_with' | 'signup_with' | 'continue_with'
-  width?: number
-}>(), {
-  disabled: false,
-  shape: 'rectangular',
-  text: 'continue_with',
-  width: 400,
-})
-
-const emit = defineEmits<{
-  credential: [credential: string]
-}>()
-
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-const containerRef = ref<HTMLElement | null>(null)
-const buttonRef = ref<HTMLElement | null>(null)
-const ready = ref(false)
-
+<script lang="ts">
 let scriptPromise: Promise<void> | null = null
-let resizeObserver: ResizeObserver | null = null
+let googleIdentityInitialized = false
+let activeCredentialCallback: ((response: GoogleCredentialResponse) => void) | null = null
+
+function initializeGoogleIdentity(clientId: string): void {
+  if (googleIdentityInitialized || !window.google?.accounts?.id) {
+    return
+  }
+
+  window.google.accounts.id.initialize({
+    client_id: clientId,
+    callback: (response) => activeCredentialCallback?.(response),
+  })
+  googleIdentityInitialized = true
+}
 
 function loadGoogleIdentityScript(): Promise<void> {
   if (window.google?.accounts?.id) {
@@ -53,9 +43,45 @@ function loadGoogleIdentityScript(): Promise<void> {
 
   return scriptPromise
 }
+</script>
+
+<script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+const props = withDefaults(defineProps<{
+  disabled?: boolean
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+  text?: 'signin_with' | 'signup_with' | 'continue_with'
+  width?: number
+}>(), {
+  disabled: false,
+  shape: 'rectangular',
+  text: 'continue_with',
+  width: 400,
+})
+
+const emit = defineEmits<{
+  credential: [credential: string]
+}>()
+
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
+const containerRef = ref<HTMLElement | null>(null)
+const buttonRef = ref<HTMLElement | null>(null)
+const ready = ref(false)
+const handleCredential = (response: GoogleCredentialResponse) => {
+  if (response.credential) {
+    emit('credential', response.credential)
+  }
+}
+
+let resizeObserver: ResizeObserver | null = null
 
 async function renderButton(): Promise<void> {
   if (!clientId || !buttonRef.value || props.disabled) {
+    ready.value = false
+    if (activeCredentialCallback === handleCredential) {
+      activeCredentialCallback = null
+    }
     return
   }
 
@@ -66,15 +92,10 @@ async function renderButton(): Promise<void> {
     return
   }
 
+  activeCredentialCallback = handleCredential
+  initializeGoogleIdentity(clientId)
+
   buttonRef.value.innerHTML = ''
-  window.google.accounts.id.initialize({
-    client_id: clientId,
-    callback: (response) => {
-      if (response.credential) {
-        emit('credential', response.credential)
-      }
-    },
-  })
   window.google.accounts.id.renderButton(buttonRef.value, {
     theme: 'outline',
     size: 'large',
@@ -103,6 +124,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
+  if (activeCredentialCallback === handleCredential) {
+    activeCredentialCallback = null
+  }
 })
 
 watch(() => [props.disabled, props.shape, props.text, props.width], () => {
