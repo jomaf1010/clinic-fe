@@ -95,6 +95,7 @@ export interface User {
   title_prefix: string | null
   email: string
   contact_number: string | null
+  contact_number_verified: boolean
   date_of_birth: string | null
   prc_license_number: string | null
   ptr_number: string | null
