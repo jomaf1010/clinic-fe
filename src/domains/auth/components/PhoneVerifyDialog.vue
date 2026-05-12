@@ -228,11 +228,8 @@ async function onCodeComplete(value: string): Promise<void> {
   codeErrorCode.value = null
   confirmLoading.value = true
   try {
-    await phoneVerificationApi.confirmCode(value)
-    // Refetch the authenticated user via /auth/me so the store gets the full
-    // payload (memberships, current clinic, etc.) — the confirm endpoint
-    // only returns the phone fields.
-    await authStore.fetchUser()
+    const response = await phoneVerificationApi.confirmCode(value)
+    authStore.setUser(response.user)
     stopTicking()
     step.value = 'success'
     setTimeout(() => {
