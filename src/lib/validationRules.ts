@@ -200,9 +200,10 @@ export const editPatientSchema = createPatientSchema
 
 /**
  * Validation schema for the account personal information form.
+ * contact_number is managed via the phone verification flow, not this form.
  */
 export const updateProfileSchema = {
-  contact_number: [phoneNumberPH('Contact number')],
+  title_prefix: [],
   date_of_birth: [],
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,8 @@ import { HttpError } from '@/lib/http'
 import { toast } from 'vue-sonner'
 import DateOfBirthPicker from '@/components/DateOfBirthPicker.vue'
 import NameForm from '@/components/NameForm.vue'
-import { User, Mail, Phone, CalendarDays, LoaderCircle } from 'lucide-vue-next'
+import PhoneVerifyDialog from './PhoneVerifyDialog.vue'
+import { User, Mail, Phone, CalendarDays, LoaderCircle, ShieldCheck } from 'lucide-vue-next'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../api/authApi'
 import { updateProfileSchema } from '@/lib/validationRules'
@@ -24,7 +25,6 @@ const { handleSubmit, setFieldError } = useForm({
   validationSchema: updateProfileSchema,
   initialValues: {
     title_prefix: authStore.user?.title_prefix ?? '',
-    contact_number: authStore.user?.contact_number ?? '',
     date_of_birth: authStore.user?.date_of_birth ?? '',
   },
 })
@@ -39,11 +39,26 @@ const name = ref<PatientName | null>(
 )
 
 const { value: titlePrefix } = useField<string>('title_prefix')
-const { value: contactNumber, errorMessage: contactNumberError } = useField<string>('contact_number')
 const { value: dateOfBirth, errorMessage: dateOfBirthError } = useField<string>('date_of_birth')
 
 const isLoading = ref(false)
 const generalError = ref<string | null>(null)
+
+const phoneDialogOpen = ref(false)
+const phoneDialogMode = ref<'add' | 'change'>('add')
+
+const phoneVerified = computed<boolean>(() => authStore.user?.contact_number_verified === true)
+const hasPhone = computed<boolean>(() => !!authStore.user?.contact_number)
+
+function openAddPhone(): void {
+  phoneDialogMode.value = 'add'
+  phoneDialogOpen.value = true
+}
+
+function openChangePhone(): void {
+  phoneDialogMode.value = 'change'
+  phoneDialogOpen.value = true
+}
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
@@ -61,7 +76,6 @@ const onSubmit = handleSubmit(async (values) => {
       last_name: name.value.last_name,
       suffix: name.value.suffix,
       title_prefix: values.title_prefix && values.title_prefix !== 'none' ? values.title_prefix : null,
-      contact_number: values.contact_number || null,
       date_of_birth: values.date_of_birth || null,
     })
     await authStore.fetchUser()
@@ -137,16 +151,48 @@ const onSubmit = handleSubmit(async (values) => {
           </div>
         </div>
 
-        <!-- Row 3: Contact + DOB -->
+        <!-- Row 3: Phone (verified flow) + DOB -->
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="flex flex-col gap-2">
-            <Label for="profile-contact" class="flex items-center gap-1.5">
+            <Label class="flex items-center gap-1.5">
               <Phone class="size-3.5 text-muted-foreground" />
-              Contact number
-              <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
+              Mobile number
             </Label>
-            <Input id="profile-contact" v-model="contactNumber" type="tel" placeholder="09XXXXXXXXX" :disabled="isLoading" :aria-invalid="!!contactNumberError" />
-            <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
+
+            <div
+              v-if="hasPhone && phoneVerified"
+              class="flex flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="truncate text-sm font-medium">{{ authStore.user?.contact_number }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <ShieldCheck class="size-3" />
+                  Verified
+                </span>
+              </div>
+              <button
+                type="button"
+                class="self-start text-sm text-primary underline-offset-4 hover:underline sm:self-auto"
+                @click="openChangePhone"
+              >
+                Change
+              </button>
+            </div>
+
+            <button
+              v-else
+              type="button"
+              class="flex items-center justify-between gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2.5 text-left text-sm hover:bg-muted/40"
+              @click="openAddPhone"
+            >
+              <span class="flex items-center gap-2 text-muted-foreground">
+                <Phone class="size-4" />
+                {{ hasPhone ? 'Verify phone number' : 'Add phone number' }}
+              </span>
+              <span class="text-xs font-medium text-primary">{{ hasPhone ? 'Verify' : 'Add' }}</span>
+            </button>
+
+            <p v-if="!hasPhone" class="text-xs text-muted-foreground">We verify your number by SMS.</p>
           </div>
 
           <div class="flex flex-col gap-2">
@@ -171,5 +217,11 @@ const onSubmit = handleSubmit(async (values) => {
         {{ isLoading ? 'Saving...' : 'Save changes' }}
       </Button>
     </CardFooter>
+
+    <PhoneVerifyDialog
+      v-model:open="phoneDialogOpen"
+      :mode="phoneDialogMode"
+      :current-phone="authStore.user?.contact_number ?? null"
+    />
   </Card>
 </template>

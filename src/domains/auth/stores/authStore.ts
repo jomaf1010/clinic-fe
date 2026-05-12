@@ -81,6 +81,10 @@ export const useAuthStore = defineStore('auth', () => {
     setAuthToken(newToken)
   }
 
+  function setUser(updated: User): void {
+    user.value = updated
+  }
+
   async function fetchUser(): Promise<void> {
     const response = await authApi.me()
     user.value = response.data
@@ -247,6 +251,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasFeature,
     getLimit,
     setToken,
+    setUser,
     syncExternalSession,
     fetchUser,
     login,
