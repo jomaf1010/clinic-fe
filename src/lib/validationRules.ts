@@ -211,10 +211,17 @@ export const createPatientSchema = {
 }
 
 /**
- * Validation schema for the edit patient form.
- * Same rules as create — all required fields stay required on edit.
+ * Validation schema for the edit patient form. Excludes `first_name`,
+ * `last_name`, and `address` because EditPatientDialog drives those via
+ * composite NameForm/AddressForm refs rather than vee-validate fields.
  */
-export const editPatientSchema = createPatientSchema
+export const editPatientSchema = {
+  date_of_birth: createPatientSchema.date_of_birth,
+  sex: createPatientSchema.sex,
+  contact_number: createPatientSchema.contact_number,
+  email: createPatientSchema.email,
+  note: createPatientSchema.note,
+}
 
 /**
  * Validation schema for the account personal information form.
