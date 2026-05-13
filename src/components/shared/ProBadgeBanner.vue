@@ -8,11 +8,18 @@ import { RouteNames } from '@/router/routeNames'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const isPro = computed(() => authStore.isPro)
+const isPaidPlan = computed(() => authStore.isPaidPlan)
 const isOnTrial = computed(() => authStore.isOnTrial)
 const trialDaysLeft = computed(() => authStore.trialDaysLeft)
 const clinicName = computed(() => authStore.currentClinic?.clinic_name ?? 'Your Clinic')
 const isOwner = computed(() => authStore.currentRole === 'owner')
+
+const planLabel = computed(() => {
+  const plan = authStore.currentClinic?.plan
+  if (plan === 'max') return 'Max'
+  if (plan === 'custom') return 'Custom'
+  return 'Pro'
+})
 
 const billingEndFormatted = computed(() => {
   const endsAt = authStore.billingPeriodEnd
@@ -26,16 +33,16 @@ const billingEndFormatted = computed(() => {
 </script>
 
 <template>
-  <!-- Pro (paid) -->
-  <div v-if="isPro && !isOnTrial" class="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 dark:border-amber-800/40 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-amber-950/40">
+  <!-- Paid (Pro/Max/Custom) -->
+  <div v-if="isPaidPlan && !isOnTrial" class="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 dark:border-amber-800/40 dark:from-amber-950/40 dark:via-yellow-950/30 dark:to-amber-950/40">
     <div class="flex items-center gap-4 px-5 py-3">
-      <img src="/images/pro-badge.svg" alt="Pro" class="size-9 shrink-0 drop-shadow-sm" />
+      <img src="/images/pro-badge.svg" :alt="planLabel" class="size-9 shrink-0 drop-shadow-sm" />
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
         <div class="flex items-center gap-2">
           <span class="text-sm font-semibold text-amber-900 dark:text-amber-100">{{ clinicName }}</span>
           <span class="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
             <Sparkles class="size-2.5" />
-            Pro
+            {{ planLabel }}
           </span>
         </div>
         <div class="flex items-center gap-3 text-xs text-amber-600/80 dark:text-amber-400/70">
@@ -59,8 +66,8 @@ const billingEndFormatted = computed(() => {
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent dark:via-white/5" />
   </div>
 
-  <!-- Trial -->
-  <div v-else-if="isPro && isOnTrial" class="rounded-xl border border-sky-200/60 bg-gradient-to-r from-sky-50/80 to-indigo-50/50 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-indigo-950/20">
+  <!-- Trial (Pro) -->
+  <div v-else-if="isOnTrial" class="rounded-xl border border-sky-200/60 bg-gradient-to-r from-sky-50/80 to-indigo-50/50 dark:border-sky-800/40 dark:from-sky-950/30 dark:to-indigo-950/20">
     <div class="flex items-center gap-4 px-5 py-3">
       <img src="/images/pro-badge.svg" alt="Pro" class="size-9 shrink-0 opacity-70" />
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">

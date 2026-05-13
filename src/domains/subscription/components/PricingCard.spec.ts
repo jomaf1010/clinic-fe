@@ -47,9 +47,24 @@ describe('PricingCard', () => {
     const wrapper = mountCard()
 
     expect(wrapper.text()).toContain('MediFlow Pro')
-    expect(wrapper.text()).toContain('PHP 1,299')
-    expect(wrapper.text()).toContain('Messages & Chat')
-    expect(wrapper.text()).toContain('Unlimited Team Members')
+    expect(wrapper.text()).toContain('PHP 1,499')
+    expect(wrapper.text()).toContain('Messages, appointments')
+    expect(wrapper.text()).toContain('Up to 2 practising doctors')
+  })
+
+  it('renders Max price and feature list when variant=max', () => {
+    const authStore = useAuthStore()
+    authStore.user = { current_clinic: { is_trial: false, trial_ends_at: null } } as any
+    const wrapper = mountWithDeps(PricingCard, {
+      noPinia: true,
+      props: { variant: 'max' },
+      global: { stubs: STUBS },
+    })
+
+    expect(wrapper.text()).toContain('MediFlow Max')
+    expect(wrapper.text()).toContain('PHP 4,999')
+    expect(wrapper.text()).toContain('Up to 6 practising doctors')
+    expect(wrapper.text()).toContain('Upgrade to Max')
   })
 
   it('emits upgrade when the upgrade button is clicked', async () => {

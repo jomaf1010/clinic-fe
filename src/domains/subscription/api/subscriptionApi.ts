@@ -1,5 +1,6 @@
 import { http } from '@/lib/http'
 import type {
+  CheckoutPlan,
   CheckoutResponse,
   MessageResponse,
   PaymentHistoryResponse,
@@ -7,8 +8,8 @@ import type {
 } from '../types/subscription.types'
 
 export const subscriptionApi = {
-  createCheckout(): Promise<CheckoutResponse> {
-    return http.post<CheckoutResponse>('/subscription/checkout', { plan: 'pro' })
+  createCheckout(plan: CheckoutPlan = 'pro'): Promise<CheckoutResponse> {
+    return http.post<CheckoutResponse>('/subscription/checkout', { plan })
   },
 
   getStatus(): Promise<SubscriptionStatusResponse> {

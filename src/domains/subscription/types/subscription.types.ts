@@ -5,8 +5,12 @@ export interface CheckoutResponse {
   }
 }
 
+import type { ClinicPlan } from '@/domains/auth/types/auth.types'
+
+export type CheckoutPlan = 'pro' | 'max'
+
 export interface SubscriptionStatus {
-  plan: 'free' | 'pro'
+  plan: ClinicPlan
   is_trial: boolean
   trial_ends_at: string | null
   trial_days_left: number | null

@@ -38,7 +38,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const hasAppointments = computed(() => authStore.hasFeature('appointments'))
-const isPro = computed(() => authStore.isPro)
+const isPro = computed(() => authStore.isPaidPlan)
 const todayCount = computed(() => stats.value?.my_upcoming_appointments.filter(a => a.date === todayDate).length ?? 0)
 
 const stats = ref<OwnerDashboardStats | null>(null)
