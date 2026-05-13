@@ -32,6 +32,14 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   const isPro = computed(() => currentClinic.value?.plan === 'pro')
+  const isMax = computed(() => currentClinic.value?.plan === 'max')
+  const isCustom = computed(() => currentClinic.value?.plan === 'custom')
+  // True for any paid tier (or trial, which carries pro features). Use this
+  // for feature-availability checks; use isPro/isMax for plan-specific UI.
+  const isPaidPlan = computed(() => {
+    const plan = currentClinic.value?.plan
+    return plan === 'pro' || plan === 'max' || plan === 'custom'
+  })
 
   const isOnTrial = computed(() => currentClinic.value?.is_trial ?? false)
 
@@ -59,7 +67,7 @@ export const useAuthStore = defineStore('auth', () => {
     return currentClinic.value?.features?.includes(feature) ?? false
   }
 
-  function getLimit(key: 'team_members' | 'pdf_generation_daily') {
+  function getLimit(key: 'doctors' | 'pdf_generation_daily') {
     const limit = currentClinic.value?.limits?.[key]
     const max = limit?.max ?? null
     const used = limit?.used ?? 0
@@ -240,6 +248,9 @@ export const useAuthStore = defineStore('auth', () => {
     currentClinic,
     currentRole,
     isPro,
+    isMax,
+    isCustom,
+    isPaidPlan,
     isOnTrial,
     trialDaysLeft,
     billingPeriodEnd,

@@ -95,7 +95,7 @@ function makeClinicContext(overrides: Partial<ClinicContext> = {}): ClinicContex
     is_in_grace_period: false,
     features: ['messages'],
     limits: {
-      team_members: { max: 10, used: 1 },
+      doctors: { max: 10, used: 1 },
       pdf_generation_daily: { max: null, used: 0 },
     },
     ...overrides,
@@ -391,7 +391,7 @@ describe('authStore — permission + feature helpers', () => {
       data: makeUser({
         current_clinic: makeClinicContext({
           limits: {
-            team_members: { max: 10, used: 3 },
+            doctors: { max: 10, used: 3 },
             pdf_generation_daily: { max: null, used: 5 },
           },
         }),
@@ -403,7 +403,7 @@ describe('authStore — permission + feature helpers', () => {
     const store = useAuthStore()
     await store.fetchUser()
 
-    expect(store.getLimit('team_members')).toEqual({ max: 10, used: 3, remaining: 7 })
+    expect(store.getLimit('doctors')).toEqual({ max: 10, used: 3, remaining: 7 })
     // null max → unlimited (remaining null)
     expect(store.getLimit('pdf_generation_daily')).toEqual({ max: null, used: 5, remaining: null })
   })
@@ -413,7 +413,7 @@ describe('authStore — permission + feature helpers', () => {
       data: makeUser({
         current_clinic: makeClinicContext({
           limits: {
-            team_members: { max: 2, used: 5 },
+            doctors: { max: 2, used: 5 },
           } as ClinicContext['limits'],
         }),
       }),
@@ -424,7 +424,7 @@ describe('authStore — permission + feature helpers', () => {
     const store = useAuthStore()
     await store.fetchUser()
 
-    expect(store.getLimit('team_members')).toEqual({ max: 2, used: 5, remaining: 0 })
+    expect(store.getLimit('doctors')).toEqual({ max: 2, used: 5, remaining: 0 })
     expect(store.getLimit('pdf_generation_daily')).toEqual({ max: null, used: 0, remaining: null })
   })
 })
@@ -468,6 +468,37 @@ describe('authStore — trial / grace / cancel derivations', () => {
     await store.fetchUser()
 
     expect(store.isPro).toBe(false)
+    expect(store.isMax).toBe(false)
+    expect(store.isPaidPlan).toBe(false)
+  })
+
+  it('isMax / isPaidPlan reflect Max tier', async () => {
+    const meResp: MeResponse = {
+      data: makeUser({ current_clinic: makeClinicContext({ plan: 'max' }) }),
+      meta: { memberships: [makeMembership()] },
+    }
+    const api = makeAuthApi({ me: vi.fn().mockResolvedValue(meResp) })
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+    await store.fetchUser()
+
+    expect(store.isPro).toBe(false)
+    expect(store.isMax).toBe(true)
+    expect(store.isPaidPlan).toBe(true)
+  })
+
+  it('isCustom / isPaidPlan reflect Custom tier', async () => {
+    const meResp: MeResponse = {
+      data: makeUser({ current_clinic: makeClinicContext({ plan: 'custom' }) }),
+      meta: { memberships: [makeMembership()] },
+    }
+    const api = makeAuthApi({ me: vi.fn().mockResolvedValue(meResp) })
+    const { useAuthStore } = await loadStore(api)
+    const store = useAuthStore()
+    await store.fetchUser()
+
+    expect(store.isCustom).toBe(true)
+    expect(store.isPaidPlan).toBe(true)
   })
 
   it('trialDaysLeft computes ceil(diff/day) and clamps at zero', async () => {
