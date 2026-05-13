@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,11 +55,18 @@ const { handleSubmit, setFieldError, resetForm } = useForm({
   validationSchema: createPatientSchema,
 })
 
+// vee-validate fields registered for everything the backend requires, so
+// frontend rules match `CreatePatientRequest`. NameForm and AddressForm
+// continue to own their UI state via v-model; we mirror their output into
+// these fields below so vee-validate runs (and surfaces) the right errors.
+const { errorMessage: firstNameError, setValue: setFirstName } = useField<string>('first_name')
+const { errorMessage: lastNameError, setValue: setLastName } = useField<string>('last_name')
 const { value: dateOfBirth, errorMessage: dateOfBirthError } = useField<string>('date_of_birth')
 const { value: sex, errorMessage: sexError } = useField<string>('sex')
 const { value: contactNumber, errorMessage: contactNumberError } = useField<string>('contact_number')
 const { value: email, errorMessage: emailError } = useField<string>('email')
 const { value: note, errorMessage: noteError } = useField<string>('note')
+const { errorMessage: addressFieldError, setValue: setAddressFieldValue } = useField<unknown>('address')
 
 const authStore = useAuthStore()
 const clinicAddress = authStore.currentClinic?.address
@@ -105,64 +112,107 @@ watch(
   },
 )
 
-const onSubmit = handleSubmit(async (values) => {
-  generalError.value = null
+// Push NameForm + AddressForm output into vee-validate so schema validation
+// runs over them on submit. Composite fields tracked by reference identity,
+// so deep watch is required for address.
+watch(
+  name,
+  (val) => {
+    setFirstName(val?.first_name ?? '')
+    setLastName(val?.last_name ?? '')
+  },
+  { immediate: true },
+)
 
-  if (!name.value?.first_name || !name.value?.last_name) {
-    generalError.value = 'Please enter first and last name.'
-    return
-  }
+watch(
+  address,
+  (val) => {
+    setAddressFieldValue(val)
+  },
+  { immediate: true, deep: true },
+)
 
-  if (!address.value) {
-    generalError.value = 'Please complete the address fields.'
-    return
-  }
+/**
+ * Find the first inline field error inside the form and bring it into view +
+ * focus the nearest input. Called after both client-side and server-side
+ * validation failures so the user lands on the field they need to fix.
+ */
+async function focusFirstError(): Promise<void> {
+  await nextTick()
+  const form = document.querySelector<HTMLElement>('[data-create-patient-form]')
+  if (!form) return
 
-  isLoading.value = true
+  const errorMarker = form.querySelector<HTMLElement>('[data-field-error]')
+  if (!errorMarker) return
 
-  try {
-    await patientApi.create({
-      first_name: name.value.first_name,
-      middle_name: name.value.middle_name,
-      last_name: name.value.last_name,
-      suffix: name.value.suffix,
-      address: address.value,
-      date_of_birth: values.date_of_birth,
-      sex: values.sex,
-      blood_type: bloodType.value || null,
-      ...(values.contact_number ? { contact_number: values.contact_number } : {}),
-      ...(values.email ? { email: values.email } : {}),
-      ...(values.note ? { note: values.note } : {}),
-    })
+  const anchor = errorMarker.closest<HTMLElement>('[data-field-anchor]') ?? errorMarker.parentElement
+  ;(anchor ?? errorMarker).scrollIntoView({ behavior: 'smooth', block: 'center' })
 
-    clearDraft()
-    resetForm()
-    name.value = null
-    address.value = null
-    bloodType.value = ''
-    emit('created')
-    emit('update:open', false)
-  } catch (err) {
-    if (err instanceof HttpError) {
-      if (err.status === 422) {
-        const body = err.data as ValidationError
-        const serverErrors = body.errors ?? {}
+  const focusable = (anchor ?? errorMarker).querySelector<HTMLElement>(
+    'input:not([type=hidden]):not([disabled]), textarea:not([disabled]), [role=combobox]:not([disabled])',
+  )
+  // Delay slightly so the smooth scroll doesn't fight the focus jump.
+  setTimeout(() => focusable?.focus?.(), 280)
+}
 
-        for (const [field, messages] of Object.entries(serverErrors)) {
-          setFieldError(field, messages[0])
+const onSubmit = handleSubmit(
+  async (values) => {
+    generalError.value = null
+    isLoading.value = true
+
+    try {
+      await patientApi.create({
+        first_name: values.first_name,
+        middle_name: name.value?.middle_name ?? null,
+        last_name: values.last_name,
+        suffix: name.value?.suffix ?? null,
+        address: address.value!,
+        date_of_birth: values.date_of_birth,
+        sex: values.sex,
+        blood_type: bloodType.value || null,
+        ...(values.contact_number ? { contact_number: values.contact_number } : {}),
+        ...(values.email ? { email: values.email } : {}),
+        ...(values.note ? { note: values.note } : {}),
+      })
+
+      clearDraft()
+      resetForm()
+      name.value = null
+      address.value = null
+      bloodType.value = ''
+      emit('created')
+      emit('update:open', false)
+    } catch (err) {
+      if (err instanceof HttpError) {
+        if (err.status === 422) {
+          const body = err.data as ValidationError
+          const serverErrors = body.errors ?? {}
+
+          for (const [field, messages] of Object.entries(serverErrors)) {
+            // Backend reports nested address errors as e.g. `address.region_code`.
+            // Surface those as a single message on the composite address field
+            // since AddressForm doesn't render per-subfield errors today.
+            const target = field.startsWith('address.') ? 'address' : field
+            setFieldError(target, messages[0])
+          }
+
+          generalError.value = body.message ?? 'Validation failed.'
+        } else {
+          generalError.value = 'An unexpected error occurred. Please try again.'
         }
-
-        generalError.value = body.message ?? 'Validation failed.'
       } else {
-        generalError.value = 'An unexpected error occurred. Please try again.'
+        generalError.value = 'Unable to connect to the server. Please try again.'
       }
-    } else {
-      generalError.value = 'Unable to connect to the server. Please try again.'
+      focusFirstError()
+    } finally {
+      isLoading.value = false
     }
-  } finally {
-    isLoading.value = false
-  }
-})
+  },
+  () => {
+    // Schema validation failure (frontend caught it before hitting the API).
+    focusFirstError()
+  },
+)
 </script>
 
 <template>
@@ -173,7 +223,12 @@ const onSubmit = handleSubmit(async (values) => {
         <DialogDescription>Register a new patient in the clinic.</DialogDescription>
       </DialogHeader>
 
-      <form class="flex flex-col gap-4" novalidate @submit.prevent="onSubmit">
+      <form
+        data-create-patient-form
+        class="flex flex-col gap-4"
+        novalidate
+        @submit.prevent="onSubmit"
+      >
         <div
           v-if="generalError"
           role="alert"
@@ -183,26 +238,28 @@ const onSubmit = handleSubmit(async (values) => {
         </div>
 
         <!-- Patient Name (full width) -->
-        <div>
+        <div data-field-anchor="name">
           <Label class="mb-2 flex items-center gap-1.5">
             <User class="size-3.5 text-muted-foreground" />
             Patient Name
           </Label>
           <NameForm v-model="name" :disabled="isLoading" />
+          <p v-if="firstNameError" data-field-error="first_name" class="mt-1.5 text-xs text-destructive">{{ firstNameError }}</p>
+          <p v-if="lastNameError" data-field-error="last_name" class="mt-1 text-xs text-destructive">{{ lastNameError }}</p>
         </div>
 
         <!-- DOB / Sex -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div class="flex flex-col gap-2">
+          <div data-field-anchor="date_of_birth" class="flex flex-col gap-2">
             <Label class="flex items-center gap-1.5">
               <CalendarDays class="size-3.5 text-muted-foreground" />
               Date of birth
             </Label>
             <DateOfBirthPicker v-model="dateOfBirth" />
-            <p v-if="dateOfBirthError" class="text-xs text-destructive">{{ dateOfBirthError }}</p>
+            <p v-if="dateOfBirthError" data-field-error="date_of_birth" class="text-xs text-destructive">{{ dateOfBirthError }}</p>
           </div>
 
-          <div class="flex flex-col gap-2">
+          <div data-field-anchor="sex" class="flex flex-col gap-2">
             <Label for="dlg_sex" class="flex items-center gap-1.5">
               <User class="size-3.5 text-muted-foreground" />
               Sex
@@ -216,7 +273,7 @@ const onSubmit = handleSubmit(async (values) => {
                 <SelectItem value="female">Female</SelectItem>
               </SelectContent>
             </Select>
-            <p v-if="sexError" class="text-xs text-destructive">{{ sexError }}</p>
+            <p v-if="sexError" data-field-error="sex" class="text-xs text-destructive">{{ sexError }}</p>
           </div>
         </div>
 
@@ -241,7 +298,7 @@ const onSubmit = handleSubmit(async (values) => {
         </div>
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div class="flex flex-col gap-2">
+          <div data-field-anchor="contact_number" class="flex flex-col gap-2">
             <Label for="dlg_contact_number" class="flex items-center gap-1.5">
               <Phone class="size-3.5 text-muted-foreground" />
               Contact number <span class="text-muted-foreground">(optional)</span>
@@ -254,10 +311,10 @@ const onSubmit = handleSubmit(async (values) => {
               :disabled="isLoading"
               :aria-invalid="!!contactNumberError"
             />
-            <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
+            <p v-if="contactNumberError" data-field-error="contact_number" class="text-xs text-destructive">{{ contactNumberError }}</p>
           </div>
 
-          <div class="flex flex-col gap-2">
+          <div data-field-anchor="email" class="flex flex-col gap-2">
             <Label for="dlg_email" class="flex items-center gap-1.5">
               <Mail class="size-3.5 text-muted-foreground" />
               Email <span class="text-muted-foreground">(optional)</span>
@@ -270,22 +327,23 @@ const onSubmit = handleSubmit(async (values) => {
               :disabled="isLoading"
               :aria-invalid="!!emailError"
             />
-            <p v-if="emailError" class="text-xs text-destructive">{{ emailError }}</p>
+            <p v-if="emailError" data-field-error="email" class="text-xs text-destructive">{{ emailError }}</p>
           </div>
         </div>
 
         <!-- Address -->
-        <div>
+        <div data-field-anchor="address">
           <Label class="mb-2 flex items-center gap-1.5">
             <MapPin class="size-3.5 text-muted-foreground" />
             Address
           </Label>
           <AddressForm v-model="address" :disabled="isLoading" :prefill="addressPrefill" />
+          <p v-if="addressFieldError" data-field-error="address" class="mt-1.5 text-xs text-destructive">{{ addressFieldError }}</p>
         </div>
 
         <Separator />
 
-        <div class="flex flex-col gap-2">
+        <div data-field-anchor="note" class="flex flex-col gap-2">
           <Label for="dlg_note" class="flex items-center gap-1.5">
             <StickyNote class="size-3.5 text-muted-foreground" />
             Note <span class="text-muted-foreground">(optional)</span>
@@ -298,7 +356,7 @@ const onSubmit = handleSubmit(async (values) => {
             :aria-invalid="!!noteError"
             rows="3"
           />
-          <p v-if="noteError" class="text-xs text-destructive">{{ noteError }}</p>
+          <p v-if="noteError" data-field-error="note" class="text-xs text-destructive">{{ noteError }}</p>
         </div>
 
         <DialogFooter>

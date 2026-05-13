@@ -183,13 +183,31 @@ export const createClinicSchema = {
 /**
  * Validation schema for the create patient form.
  * Pass directly to `useForm({ validationSchema: createPatientSchema })`.
+ * Mirrors backend `CreatePatientRequest` so the user never has to round-trip.
  */
 export const createPatientSchema = {
+  first_name: [required('First name'), maxLength('First name', 255)],
+  last_name: [required('Last name'), maxLength('Last name', 255)],
   date_of_birth: [required('Date of birth')],
   sex: [required('Sex'), oneOf('Sex', ['male', 'female'])],
   contact_number: [phoneNumberPH('Contact number')],
   email: [email('Email'), maxLength('Email', 255)],
   note: [maxLength('Note', 2000)],
+  // Composite: one error message per missing chunk of the cascading Philippine
+  // address picker (street is optional).
+  address: [
+    (value: unknown) => {
+      if (!value || typeof value !== 'object') {
+        return 'Please complete the address.'
+      }
+      const addr = value as Record<string, unknown>
+      const requiredKeys = ['region_code', 'province_code', 'city_code', 'barangay_code'] as const
+      if (requiredKeys.some((k) => !addr[k])) {
+        return 'Please pick region, province, city, and barangay.'
+      }
+      return true
+    },
+  ],
 }
 
 /**
