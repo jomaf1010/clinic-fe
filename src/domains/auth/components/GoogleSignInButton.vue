@@ -75,6 +75,11 @@ const handleCredential = (response: GoogleCredentialResponse) => {
 }
 
 let resizeObserver: ResizeObserver | null = null
+let lastRenderedWidth = -1
+
+function currentContainerWidth(): number {
+  return Math.floor(containerRef.value?.clientWidth ?? props.width ?? 320)
+}
 
 async function renderButton(): Promise<void> {
   if (!clientId || !buttonRef.value || props.disabled) {
@@ -95,6 +100,7 @@ async function renderButton(): Promise<void> {
   activeCredentialCallback = handleCredential
   initializeGoogleIdentity(clientId)
 
+  const width = currentContainerWidth()
   buttonRef.value.innerHTML = ''
   window.google.accounts.id.renderButton(buttonRef.value, {
     theme: 'outline',
@@ -102,8 +108,9 @@ async function renderButton(): Promise<void> {
     type: 'standard',
     text: props.text,
     shape: props.shape,
-    width: Math.floor(containerRef.value?.clientWidth ?? props.width ?? 320),
+    width,
   })
+  lastRenderedWidth = width
   ready.value = true
 }
 
@@ -114,6 +121,9 @@ onMounted(() => {
 
   if (containerRef.value) {
     resizeObserver = new ResizeObserver(() => {
+      if (currentContainerWidth() === lastRenderedWidth) {
+        return
+      }
       renderButton().catch(() => {
         ready.value = false
       })
