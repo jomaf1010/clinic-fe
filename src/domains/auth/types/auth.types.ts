@@ -4,6 +4,7 @@ export interface LoginCredentials {
   email: string
   password: string
   remember_me?: boolean
+  recaptcha_token: string
 }
 
 export interface SignupCredentials {
