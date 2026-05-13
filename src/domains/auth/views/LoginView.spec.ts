@@ -1,9 +1,11 @@
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 
 const push = vi.fn()
 const login = vi.fn()
+const loadRecaptcha = vi.fn()
+const executeRecaptcha = vi.fn()
 
 async function mountLoginView() {
   vi.doMock('vue-router', () => ({
@@ -19,6 +21,9 @@ async function mountLoginView() {
   vi.doMock('@/lib/http', () => ({ HttpError: class HttpError extends Error {} }))
   vi.doMock('@/composables/useNeuralNetwork', () => ({ useNeuralNetwork: () => ({ canvasRef: ref(null) }) }))
   vi.doMock('@/composables/useTheme', () => ({ useTheme: () => ({ isDark: false, toggleTheme: vi.fn() }) }))
+  vi.doMock('@/composables/useRecaptcha', () => ({
+    useRecaptcha: () => ({ load: loadRecaptcha, execute: executeRecaptcha }),
+  }))
   vi.doMock('../components/GoogleSignInButton.vue', () => ({ default: { template: '<button type="button">Google</button>' } }))
   vi.doMock('../components/AuthFeedbackAlert.vue', () => ({ default: { template: '<div><slot /></div>' } }))
 
@@ -28,7 +33,7 @@ async function mountLoginView() {
     global: {
       stubs: {
         AppLogo: { template: '<div />' },
-        Button: { template: '<button><slot /></button>' },
+        Button: { template: '<button type="submit"><slot /></button>' },
         Checkbox: { template: '<input type="checkbox" />' },
         RouterLink: {
           props: ['to'],
@@ -74,6 +79,7 @@ async function mountLoginView() {
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
+  executeRecaptcha.mockResolvedValue('recaptcha-token')
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
     cb(0)
     return 1
@@ -92,5 +98,31 @@ describe('LoginView verification UX', () => {
     expect(link).toBeTruthy()
     expect(link?.attributes('data-to')).toContain('verify-email-notice')
     expect(link?.attributes('data-to')).toContain('doctor@example.test')
+  })
+})
+
+describe('LoginView reCAPTCHA', () => {
+  it('loads recaptcha on mount and forwards the token to authStore.login', async () => {
+    // Bypass vee-validate so the submit handler runs unconditionally — this
+    // test cares about the recaptcha pipeline, not validation behaviour.
+    vi.doMock('vee-validate', () => ({
+      useForm: () => ({
+        handleSubmit: (cb: (v: { email: string; password: string }) => Promise<void>) => () =>
+          cb({ email: 'doctor@example.test', password: 'secret-password' }),
+        setFieldError: vi.fn(),
+      }),
+      useField: () => ({ value: ref(''), errorMessage: ref('') }),
+    }))
+
+    const wrapper = await mountLoginView()
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(loadRecaptcha).toHaveBeenCalledOnce()
+    expect(executeRecaptcha).toHaveBeenCalledWith('login')
+    expect(login).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'doctor@example.test',
+      recaptcha_token: 'recaptcha-token',
+    }))
   })
 })

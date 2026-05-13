@@ -40,7 +40,7 @@ describe('authApi', () => {
     const http = makeHttp()
     const { authApi } = await loadApi(http)
 
-    await authApi.login({ email: 'doctor@example.test', password: 'secret', remember_me: true })
+    await authApi.login({ email: 'doctor@example.test', password: 'secret', remember_me: true, recaptcha_token: 'login-captcha-token' })
     await authApi.signup({
       first_name: 'Doc',
       last_name: 'Tor',
@@ -59,6 +59,7 @@ describe('authApi', () => {
       email: 'doctor@example.test',
       password: btoa('secret'),
       remember_me: true,
+      recaptcha_token: 'login-captcha-token',
     })
     expect(http.post).toHaveBeenNthCalledWith(2, '/auth/signup', expect.objectContaining({
       password: btoa('secret'),

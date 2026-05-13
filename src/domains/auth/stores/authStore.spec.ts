@@ -174,9 +174,9 @@ describe('authStore — login flow', () => {
 
     const { useAuthStore } = await loadStore(api)
     const store = useAuthStore()
-    await store.login({ email: 't@example.com', password: 'secret' })
+    await store.login({ email: 't@example.com', password: 'secret', recaptcha_token: 'recaptcha-token' })
 
-    expect(api.login).toHaveBeenCalledWith({ email: 't@example.com', password: 'secret' })
+    expect(api.login).toHaveBeenCalledWith({ email: 't@example.com', password: 'secret', recaptcha_token: 'recaptcha-token' })
     expect(api.selectClinic).toHaveBeenCalledWith('c1')
     expect(api.me).toHaveBeenCalled()
     expect(store.isAuthenticated).toBe(true)
@@ -200,7 +200,7 @@ describe('authStore — login flow', () => {
 
     const { useAuthStore } = await loadStore(api)
     const store = useAuthStore()
-    await store.login({ email: 't@example.com', password: 'secret' })
+    await store.login({ email: 't@example.com', password: 'secret', recaptcha_token: 'recaptcha-token' })
 
     expect(api.selectClinic).not.toHaveBeenCalled()
     expect(store.needsOnboarding).toBe(true)
@@ -228,7 +228,7 @@ describe('authStore — login flow', () => {
 
     const { useAuthStore } = await loadStore(api)
     const store = useAuthStore()
-    await store.login({ email: 't@example.com', password: 'secret' })
+    await store.login({ email: 't@example.com', password: 'secret', recaptcha_token: 'recaptcha-token' })
 
     expect(api.selectClinic).not.toHaveBeenCalled()
     expect(store.memberships).toHaveLength(2)
