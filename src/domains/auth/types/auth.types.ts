@@ -4,6 +4,7 @@ export interface LoginCredentials {
   email: string
   password: string
   remember_me?: boolean
+  recaptcha_token: string
 }
 
 export interface SignupCredentials {
@@ -25,6 +26,8 @@ export interface ValidationError {
   errors: Record<string, string[]>
 }
 
+export type ClinicPlan = 'free' | 'pro' | 'max' | 'custom'
+
 export interface Membership {
   id: string
   clinic_id: string
@@ -32,7 +35,7 @@ export interface Membership {
   logo_url: string | null
   role: string
   status: string
-  plan: 'free' | 'pro'
+  plan: ClinicPlan
   is_trial: boolean
 }
 
@@ -72,7 +75,7 @@ export interface ClinicContext {
   role: string
   membership_id: string
   permissions: string[]
-  plan: 'free' | 'pro'
+  plan: ClinicPlan
   is_trial: boolean
   trial_ends_at: string | null
   billing_period_ends_at: string | null
@@ -80,7 +83,7 @@ export interface ClinicContext {
   is_in_grace_period: boolean
   features: string[]
   limits: {
-    team_members: PlanLimit
+    doctors: PlanLimit
     pdf_generation_daily: PlanLimit
   }
 }

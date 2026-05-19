@@ -21,7 +21,7 @@ async function pollForConfirmation() {
 
     try {
       await authStore.fetchUser()
-      if (authStore.isPro && !authStore.isOnTrial) {
+      if (authStore.isPaidPlan && !authStore.isOnTrial) {
         confirmed.value = true
         processing.value = false
         return
@@ -32,7 +32,8 @@ async function pollForConfirmation() {
 
     try {
       const statusRes = await subscriptionApi.getStatus()
-      if (statusRes.data.plan === 'pro' && !statusRes.data.is_trial) {
+      const plan = statusRes.data.plan
+      if ((plan === 'pro' || plan === 'max') && !statusRes.data.is_trial) {
         confirmed.value = true
         processing.value = false
         await authStore.fetchUser()
@@ -75,7 +76,7 @@ onMounted(() => {
           </h2>
           <p class="mt-1 text-sm text-muted-foreground">
             <template v-if="confirmed">
-              Your clinic is now on the Pro plan. All premium features are unlocked.
+              Your clinic is now on a paid plan. All premium features are unlocked.
             </template>
             <template v-else>
               Your payment is being processed. Your plan will be updated shortly.

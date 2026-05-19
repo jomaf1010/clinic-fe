@@ -32,6 +32,7 @@ import { loginSchema } from '@/lib/validationRules'
 import { RouteNames } from '@/router/routeNames'
 import { useTheme } from '@/composables/useTheme'
 import { useNeuralNetwork } from '@/composables/useNeuralNetwork'
+import { useRecaptcha } from '@/composables/useRecaptcha'
 import GoogleSignInButton from '../components/GoogleSignInButton.vue'
 import AuthFeedbackAlert from '../components/AuthFeedbackAlert.vue'
 import type { GoogleLinkRequiredResponse, ValidationError } from '../types/auth.types'
@@ -40,6 +41,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const { canvasRef } = useNeuralNetwork()
 const { isDark, toggleTheme } = useTheme()
+const { load: loadRecaptcha, execute: executeRecaptcha } = useRecaptcha()
 const hasGoogleSignIn = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
 
 const { handleSubmit, setFieldError } = useForm({
@@ -61,6 +63,7 @@ const linkRequestLoading = ref(false)
 const ready = ref(false)
 onMounted(() => {
   void canvasRef.value
+  loadRecaptcha()
   requestAnimationFrame(() => {
     ready.value = true
   })
@@ -72,7 +75,13 @@ const onSubmit = handleSubmit(async (values) => {
   isLoading.value = true
 
   try {
-    await authStore.login({ email: values.email, password: values.password, remember_me: rememberMe.value })
+    const recaptchaToken = await executeRecaptcha('login')
+    await authStore.login({
+      email: values.email,
+      password: values.password,
+      remember_me: rememberMe.value,
+      recaptcha_token: recaptchaToken,
+    })
     router.push({ name: RouteNames.HOME })
   } catch (err) {
     if (err instanceof HttpError) {

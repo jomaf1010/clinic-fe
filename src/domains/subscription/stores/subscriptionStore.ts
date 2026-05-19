@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { subscriptionApi } from '../api/subscriptionApi'
-import type { PaymentRecord, SubscriptionStatus } from '../types/subscription.types'
+import type { CheckoutPlan, PaymentRecord, SubscriptionStatus } from '../types/subscription.types'
 
 const TRUSTED_CHECKOUT_HOST = 'checkout.paymongo.com'
 
@@ -46,10 +46,10 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     }
   }
 
-  async function initiateCheckout(): Promise<void> {
+  async function initiateCheckout(plan: CheckoutPlan = 'pro'): Promise<void> {
     checkoutLoading.value = true
     try {
-      const response = await subscriptionApi.createCheckout()
+      const response = await subscriptionApi.createCheckout(plan)
       const checkoutUrl = response.data.checkout_url
       if (!isTrustedCheckoutUrl(checkoutUrl)) {
         throw new Error('Invalid checkout URL returned from server')
