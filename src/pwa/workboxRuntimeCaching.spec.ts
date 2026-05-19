@@ -19,6 +19,8 @@ describe('PWA runtime caching', () => {
     expect(rules).toHaveLength(1)
     const [catalogRule] = rules
 
+    expect(catalogRule.urlPattern.toString()).not.toContain('isCatalogApiPath')
+
     expect(matches(catalogRule.urlPattern, '/api/icd10/search?q=flu')).toBe(true)
     expect(matches(catalogRule.urlPattern, '/api/system-medicines')).toBe(true)
     expect(matches(catalogRule.urlPattern, '/api/specialties')).toBe(true)
