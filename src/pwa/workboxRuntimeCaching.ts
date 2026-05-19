@@ -18,19 +18,20 @@ type RuntimeCacheRule = {
   }
 }
 
-function isCatalogApiPath(pathname: string): boolean {
-  return (
-    pathname.startsWith('/api/icd10') ||
-    pathname.startsWith('/api/system-medicines') ||
-    pathname.startsWith('/api/specialties')
-  )
-}
-
 export const runtimeCaching: RuntimeCacheRule[] = [
   {
     // Read-only public catalogs only. Authenticated clinic/PHI API responses
     // must not be persisted in Workbox Cache Storage.
-    urlPattern: ({ url, request }) => request.method === 'GET' && isCatalogApiPath(url.pathname),
+    urlPattern: ({ url, request }) => {
+      const pathname = url.pathname
+
+      return (
+        request.method === 'GET' &&
+        (pathname.startsWith('/api/icd10') ||
+          pathname.startsWith('/api/system-medicines') ||
+          pathname.startsWith('/api/specialties'))
+      )
+    },
     handler: 'StaleWhileRevalidate',
     options: {
       cacheName: 'mediflow-catalogs',
