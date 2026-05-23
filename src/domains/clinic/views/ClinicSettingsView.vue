@@ -114,14 +114,24 @@ async function toggleQueueSmsNotifications(val: boolean) {
     await clinicApi.update({
       settings: { queue_sms_notifications_enabled: val },
     })
-    await authStore.fetchUser()
-    toast.success('Setting saved')
   } catch {
     queueSmsNotificationsEnabled.value = previous
     toast.error('Failed to save setting')
-  } finally {
     isSaving.value = false
+    return
   }
+
+  // PATCH succeeded — the backend already persisted the new value, so do
+  // NOT revert the toggle or surface a save error if the auth refresh
+  // fails (e.g. a transient refresh-token network blip). The next page
+  // load will hydrate the up-to-date settings.
+  try {
+    await authStore.fetchUser()
+  } catch {
+    // Swallow: save is real, refresh is best-effort.
+  }
+  toast.success('Setting saved')
+  isSaving.value = false
 }
 
 function saveFeeSetting(key: string, value: string) {

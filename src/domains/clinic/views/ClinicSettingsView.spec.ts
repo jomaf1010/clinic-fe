@@ -161,4 +161,24 @@ describe('ClinicSettingsView — queue SMS notifications toggle', () => {
     expect(mocks.fetchUser).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="queue-sms-toggle"]').attributes('aria-checked')).toBe('false')
   })
+
+  it('keeps the toggle and reports success when the save succeeds but the auth refresh fails', async () => {
+    // Transient refresh-token / network blip on fetchUser must NOT roll back
+    // a real backend save or surface a save error — the value is already
+    // persisted server-side.
+    mocks.features = ['queue_sms_notifications']
+    mocks.fetchUser.mockRejectedValueOnce(new Error('refresh failed'))
+
+    const wrapper = await mountSettingsView()
+
+    await wrapper.find('[data-test="queue-sms-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.update).toHaveBeenCalledWith({
+      settings: { queue_sms_notifications_enabled: true },
+    })
+    expect(mocks.toastSuccess).toHaveBeenCalled()
+    expect(mocks.toastError).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="queue-sms-toggle"]').attributes('aria-checked')).toBe('true')
+  })
 })
