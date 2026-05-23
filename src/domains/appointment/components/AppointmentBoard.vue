@@ -530,6 +530,7 @@ onMounted(() => {
   currentTimeTimer = setInterval(() => {
     currentTime.value = new Date()
   }, 1000)
+  scrollSelectedMonthDay()
   void fetchBoard()
 })
 
