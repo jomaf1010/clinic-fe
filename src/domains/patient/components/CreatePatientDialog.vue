@@ -36,7 +36,7 @@ import AddressForm from '@/components/AddressForm.vue'
 import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
 import { HttpError } from '@/lib/http'
-import { createPatientSchema } from '@/lib/validationRules'
+import { createPatientSchema, formatPHMobile } from '@/lib/validationRules'
 import { useFormDraft } from '@/composables/useFormDraft'
 import { useAuthStore } from '@/domains/auth/stores/authStore'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
@@ -114,23 +114,27 @@ watch(
 
 // Push NameForm + AddressForm output into vee-validate so schema validation
 // runs over them on submit. Composite fields tracked by reference identity,
-// so deep watch is required for address.
-watch(
-  name,
-  (val) => {
-    setFirstName(val?.first_name ?? '')
-    setLastName(val?.last_name ?? '')
-  },
-  { immediate: true },
-)
+// so deep watch is required for address. No `immediate: true` — otherwise
+// vee-validate validates empty strings on mount and shows required errors
+// before the user has typed anything.
+watch(name, (val) => {
+  setFirstName(val?.first_name ?? '')
+  setLastName(val?.last_name ?? '')
+})
 
-watch(
-  address,
-  (val) => {
-    setAddressFieldValue(val)
-  },
-  { immediate: true, deep: true },
-)
+watch(address, (val) => {
+  setAddressFieldValue(val)
+}, { deep: true })
+
+const contactNumberModel = computed<string>({
+  get: () => contactNumber.value ?? '',
+  set: (val) => { contactNumber.value = formatPHMobile(String(val ?? '')) },
+})
+
+function onContactNumberPaste(e: ClipboardEvent): void {
+  e.preventDefault()
+  contactNumber.value = formatPHMobile(e.clipboardData?.getData('text') ?? '')
+}
 
 /**
  * Find the first inline field error inside the form and bring it into view +
@@ -243,9 +247,12 @@ const onSubmit = handleSubmit(
             <User class="size-3.5 text-muted-foreground" />
             Patient Name
           </Label>
-          <NameForm v-model="name" :disabled="isLoading" />
-          <p v-if="firstNameError" data-field-error="first_name" class="mt-1.5 text-xs text-destructive">{{ firstNameError }}</p>
-          <p v-if="lastNameError" data-field-error="last_name" class="mt-1 text-xs text-destructive">{{ lastNameError }}</p>
+          <NameForm
+            v-model="name"
+            :disabled="isLoading"
+            :first-name-error="firstNameError"
+            :last-name-error="lastNameError"
+          />
         </div>
 
         <!-- DOB / Sex -->
@@ -255,7 +262,7 @@ const onSubmit = handleSubmit(
               <CalendarDays class="size-3.5 text-muted-foreground" />
               Date of birth
             </Label>
-            <DateOfBirthPicker v-model="dateOfBirth" />
+            <DateOfBirthPicker v-model="dateOfBirth" :invalid="!!dateOfBirthError" />
             <p v-if="dateOfBirthError" data-field-error="date_of_birth" class="text-xs text-destructive">{{ dateOfBirthError }}</p>
           </div>
 
@@ -305,11 +312,15 @@ const onSubmit = handleSubmit(
             </Label>
             <Input
               id="dlg_contact_number"
-              v-model="contactNumber"
+              v-model="contactNumberModel"
               type="tel"
+              inputmode="numeric"
+              autocomplete="tel"
+              maxlength="11"
               placeholder="09171234567"
               :disabled="isLoading"
               :aria-invalid="!!contactNumberError"
+              @paste="onContactNumberPaste"
             />
             <p v-if="contactNumberError" data-field-error="contact_number" class="text-xs text-destructive">{{ contactNumberError }}</p>
           </div>

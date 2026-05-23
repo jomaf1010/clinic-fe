@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useForm, useField } from 'vee-validate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,7 +36,7 @@ import AddressForm from '@/components/AddressForm.vue'
 import NameForm from '@/components/NameForm.vue'
 import { patientApi } from '../api/patientApi'
 import { HttpError } from '@/lib/http'
-import { editPatientSchema, validateRuleSchema } from '@/lib/validationRules'
+import { editPatientSchema, validateRuleSchema, formatPHMobile } from '@/lib/validationRules'
 import type { PatientResponse, PatientAddress, PatientName } from '../types/patient.types'
 import type { ValidationError } from '@/domains/auth/types/auth.types'
 
@@ -103,6 +103,16 @@ watch(
   },
   { immediate: true },
 )
+
+const contactNumberModel = computed<string>({
+  get: () => contactNumber.value ?? '',
+  set: (val) => { contactNumber.value = formatPHMobile(String(val ?? '')) },
+})
+
+function onContactNumberPaste(e: ClipboardEvent): void {
+  e.preventDefault()
+  contactNumber.value = formatPHMobile(e.clipboardData?.getData('text') ?? '')
+}
 
 const onSubmit = handleSubmit(async (values) => {
   generalError.value = null
@@ -207,7 +217,7 @@ const onSubmit = handleSubmit(async (values) => {
               <CalendarDays class="size-3.5 text-muted-foreground" />
               Date of birth
             </Label>
-            <DateOfBirthPicker v-model="dateOfBirth" />
+            <DateOfBirthPicker v-model="dateOfBirth" :invalid="!!dateOfBirthError" />
             <p v-if="dateOfBirthError" class="text-xs text-destructive">{{ dateOfBirthError }}</p>
           </div>
 
@@ -257,11 +267,15 @@ const onSubmit = handleSubmit(async (values) => {
             </Label>
             <Input
               id="edit_contact_number"
-              v-model="contactNumber"
+              v-model="contactNumberModel"
               type="tel"
+              inputmode="numeric"
+              autocomplete="tel"
+              maxlength="11"
               placeholder="09171234567"
               :disabled="isLoading"
               :aria-invalid="!!contactNumberError"
+              @paste="onContactNumberPaste"
             />
             <p v-if="contactNumberError" class="text-xs text-destructive">{{ contactNumberError }}</p>
           </div>
