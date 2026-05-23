@@ -16,6 +16,12 @@ import { Calendar } from '@/components/ui/calendar'
 
 const model = defineModel<string | undefined>()
 
+const props = withDefaults(defineProps<{
+  invalid?: boolean
+}>(), {
+  invalid: false,
+})
+
 const months = [
   { value: '1', label: 'Jan' },
   { value: '2', label: 'Feb' },
@@ -136,7 +142,7 @@ const minDate = new CalendarDate(1900, 1, 1)
   <div class="dob-picker flex flex-wrap items-center gap-2">
     <div class="flex items-center gap-1.5">
       <Select v-model="selectedMonth">
-        <SelectTrigger class="h-10 w-[84px] rounded-xl px-3" size="sm">
+        <SelectTrigger class="h-10 w-[84px] rounded-xl px-3" size="sm" :aria-invalid="props.invalid">
           <SelectValue placeholder="Mon" />
         </SelectTrigger>
         <SelectContent>
@@ -147,7 +153,7 @@ const minDate = new CalendarDate(1900, 1, 1)
       </Select>
 
       <Select v-model="selectedDay">
-        <SelectTrigger class="h-10 w-[74px] rounded-xl px-3" size="sm">
+        <SelectTrigger class="h-10 w-[74px] rounded-xl px-3" size="sm" :aria-invalid="props.invalid">
           <SelectValue placeholder="Day" />
         </SelectTrigger>
         <SelectContent>
@@ -158,7 +164,7 @@ const minDate = new CalendarDate(1900, 1, 1)
       </Select>
 
       <Select v-model="selectedYear">
-        <SelectTrigger class="h-10 w-[92px] rounded-xl px-3" size="sm">
+        <SelectTrigger class="h-10 w-[92px] rounded-xl px-3" size="sm" :aria-invalid="props.invalid">
           <SelectValue placeholder="Year" />
         </SelectTrigger>
         <SelectContent>

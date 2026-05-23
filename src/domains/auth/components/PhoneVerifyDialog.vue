@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { OtpInput } from '@/components/ui/otp-input'
 import { LoaderCircle, Phone, ShieldCheck, MailWarning } from 'lucide-vue-next'
 import { HttpError } from '@/lib/http'
-import { phoneNumberPH } from '@/lib/validationRules'
+import { phoneNumberPH, formatPHMobile } from '@/lib/validationRules'
 import { useAuthStore } from '../stores/authStore'
 import { phoneVerificationApi, type ConfirmErrorCode } from '../api/phoneVerificationApi'
 import type { ValidationError } from '../types/auth.types'
@@ -50,6 +50,16 @@ const { handleSubmit: handlePhoneSubmit, setFieldError: setPhoneFieldError, rese
 })
 
 const { value: phoneValue, errorMessage: phoneError } = useField<string>('phone')
+
+const phoneModel = computed<string>({
+  get: () => phoneValue.value ?? '',
+  set: (val) => { phoneValue.value = formatPHMobile(String(val ?? '')) },
+})
+
+function onPhonePaste(e: ClipboardEvent): void {
+  e.preventDefault()
+  phoneValue.value = formatPHMobile(e.clipboardData?.getData('text') ?? '')
+}
 
 // Step 2 — code state
 const phoneMasked = ref<string>('')
@@ -293,13 +303,15 @@ const headerDescription = computed<string>(() => {
           </Label>
           <Input
             id="phone-verify-input"
-            v-model="phoneValue"
+            v-model="phoneModel"
             type="tel"
-            inputmode="tel"
+            inputmode="numeric"
             autocomplete="tel"
+            maxlength="11"
             placeholder="09XXXXXXXXX"
             :disabled="requestLoading"
             :aria-invalid="!!phoneError"
+            @paste="onPhonePaste"
           />
           <p v-if="phoneError" class="text-xs text-destructive">{{ phoneError }}</p>
           <p v-else class="text-xs text-muted-foreground">Philippine mobile (09XXXXXXXXX or +639XXXXXXXXX).</p>
