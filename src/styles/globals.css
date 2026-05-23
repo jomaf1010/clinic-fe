@@ -345,8 +345,8 @@
 
   .surface-overlay {
     background: var(--surface-overlay);
-    backdrop-filter: blur(24px) saturate(1.1);
-    -webkit-backdrop-filter: blur(24px) saturate(1.1);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
 
   .surface-interactive {

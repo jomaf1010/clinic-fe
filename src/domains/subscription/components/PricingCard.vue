@@ -33,7 +33,6 @@ const meta = computed(() => {
         'Everything in Pro',
         'Up to 6 practising doctors (owner + 5)',
         'Multi-doctor scheduling and queue routing',
-        'Per-doctor activity and revenue reports',
         'Priority email and chat support',
       ],
     }
@@ -64,9 +63,10 @@ const ctaLabel = computed(() => {
 
 <template>
   <Card
-    :class="featured
-      ? 'border-amber-200 dark:border-amber-800/50 shadow-md'
-      : ''"
+    :class="[
+      'h-full flex flex-col',
+      featured ? 'border-amber-200 dark:border-amber-800/50 shadow-md' : '',
+    ]"
   >
     <CardHeader class="text-center pb-2">
       <div
@@ -80,7 +80,7 @@ const ctaLabel = computed(() => {
       <CardTitle class="text-xl">{{ meta.title }}</CardTitle>
       <CardDescription>{{ meta.tagline }}</CardDescription>
     </CardHeader>
-    <CardContent class="space-y-6">
+    <CardContent class="flex-1 flex flex-col gap-6">
       <div class="text-center">
         <span class="text-4xl font-bold">{{ meta.price }}</span>
         <span class="text-muted-foreground">/month</span>
@@ -93,7 +93,7 @@ const ctaLabel = computed(() => {
         </div>
       </div>
 
-      <div class="text-center">
+      <div class="mt-auto text-center">
         <p
           v-if="authStore.isOnTrial && variant === 'pro'"
           class="mb-3 text-sm text-amber-600 dark:text-amber-400 font-medium"
