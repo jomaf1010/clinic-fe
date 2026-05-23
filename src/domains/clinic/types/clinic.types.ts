@@ -35,5 +35,6 @@ export interface UpdateClinicPayload {
     auto_generate_prescription_pdf?: boolean
     prescription_quantity_mode?: 'absolute' | 'adjusted'
     auto_regenerate_pdf_on_qty_change?: boolean
+    queue_sms_notifications_enabled?: boolean
   }
 }
