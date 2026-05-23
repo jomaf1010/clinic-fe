@@ -151,7 +151,10 @@ describe('EditPatientDialog', () => {
     const wrapper = mount()
     await flushPromises()
 
-    await wrapper.find('#edit_contact_number').setValue('not-a-phone')
+    // formatPHMobile strips non-digits, so feed digits that don't form a
+    // valid PH mobile (10 digits starting with 1) — the schema then catches
+    // them on submit.
+    await wrapper.find('#edit_contact_number').setValue('1234567890')
     await flushPromises()
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
@@ -160,7 +163,7 @@ describe('EditPatientDialog', () => {
     expect(wrapper.text()).toContain('Contact number must be a valid Philippine mobile number.')
   })
 
-  it('accepts a +639XXXXXXXXX formatted phone and submits', async () => {
+  it('normalises a +639XXXXXXXXX paste to 09XXXXXXXXX and submits', async () => {
     const wrapper = mount()
     await flushPromises()
 
@@ -171,7 +174,7 @@ describe('EditPatientDialog', () => {
 
     expect(updatePatientSpy).toHaveBeenCalledOnce()
     const payload = updatePatientSpy.mock.calls[0]?.[1] as Record<string, unknown>
-    expect(payload.contact_number).toBe('+639171112222')
+    expect(payload.contact_number).toBe('09171112222')
     expect(wrapper.emitted('updated')).toEqual([[]])
     expect(wrapper.emitted('update:open')).toEqual([[false]])
   })

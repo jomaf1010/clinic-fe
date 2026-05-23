@@ -14,8 +14,12 @@ import type { PatientName } from '@/domains/patient/types/patient.types'
 const props = withDefaults(defineProps<{
   modelValue: PatientName | null
   disabled?: boolean
+  firstNameError?: string
+  lastNameError?: string
 }>(), {
   disabled: false,
+  firstNameError: '',
+  lastNameError: '',
 })
 
 const emit = defineEmits<{
@@ -60,8 +64,10 @@ function emitValue() {
         type="text"
         placeholder="Juan"
         :disabled="disabled"
+        :aria-invalid="!!props.firstNameError"
         @input="emitValue"
       />
+      <p v-if="props.firstNameError" data-field-error="first_name" class="text-xs text-destructive">{{ props.firstNameError }}</p>
     </div>
 
     <div class="flex flex-col gap-2">
@@ -71,8 +77,10 @@ function emitValue() {
         type="text"
         placeholder="Dela Cruz"
         :disabled="disabled"
+        :aria-invalid="!!props.lastNameError"
         @input="emitValue"
       />
+      <p v-if="props.lastNameError" data-field-error="last_name" class="text-xs text-destructive">{{ props.lastNameError }}</p>
     </div>
 
     <div class="flex flex-col gap-2">

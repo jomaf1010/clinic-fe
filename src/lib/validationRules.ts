@@ -132,6 +132,19 @@ export function phoneNumberPH(label: string) {
 }
 
 /**
+ * Normalises arbitrary phone input to the canonical PH mobile format `09XXXXXXXXX`.
+ * Strips non-digits, converts `+639`/`639` prefix to `09`, prepends `0` if the user
+ * starts typing with `9`, then caps at 11 digits. Use on @input to prevent invalid
+ * characters and over-length input at the keystroke level.
+ */
+export function formatPHMobile(value: string): string {
+  let digits = (value ?? '').replace(/\D/g, '')
+  if (digits.startsWith('63')) digits = '0' + digits.slice(2)
+  else if (digits.startsWith('9')) digits = '0' + digits
+  return digits.slice(0, 11)
+}
+
+/**
  * Returns a rule that fails when the value is not in the allowed list.
  * @param label   - Human-readable field label used in the error message.
  * @param options - Allowed values.

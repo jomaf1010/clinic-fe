@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { FileText, Receipt, LoaderCircle, Banknote, Stethoscope } from 'lucide-vue-next'
+import { FileText, Receipt, LoaderCircle, Banknote, Stethoscope, MessageSquare } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,9 @@ const autoRegenOnQtyChange = ref(true)
 const suppliesAsClinicRevenue = ref(true)
 const defaultConsultationFee = ref('')
 const defaultFollowUpFee = ref('')
+const queueSmsNotificationsEnabled = ref(false)
+
+const showQueueSmsToggle = computed(() => authStore.hasFeature('queue_sms_notifications'))
 
 // ── Specialties ────────────────────────────────────────────────────
 // One tab per specialty. Future specialties get their own tab + ref +
@@ -58,6 +61,7 @@ onMounted(async () => {
     suppliesAsClinicRevenue.value = settings.billing_supplies_as_clinic_revenue !== false
     defaultConsultationFee.value = settings.default_consultation_fee != null ? String(settings.default_consultation_fee) : ''
     defaultFollowUpFee.value = settings.default_follow_up_fee != null ? String(settings.default_follow_up_fee) : ''
+    queueSmsNotificationsEnabled.value = settings.queue_sms_notifications_enabled === true
     const tn = (settings as { tooth_numbering?: ToothNumberingPreference | null }).tooth_numbering
     dentalToothNumbering.value = tn === 'universal' || tn === 'palmer' ? tn : 'fdi'
   } catch {
@@ -100,6 +104,34 @@ function toggleAutoRegen(val: boolean) {
 function toggleSuppliesRevenue(val: boolean) {
   suppliesAsClinicRevenue.value = val
   saveSetting('billing_supplies_as_clinic_revenue', val)
+}
+
+async function toggleQueueSmsNotifications(val: boolean) {
+  const previous = queueSmsNotificationsEnabled.value
+  queueSmsNotificationsEnabled.value = val
+  isSaving.value = true
+  try {
+    await clinicApi.update({
+      settings: { queue_sms_notifications_enabled: val },
+    })
+  } catch {
+    queueSmsNotificationsEnabled.value = previous
+    toast.error('Failed to save setting')
+    isSaving.value = false
+    return
+  }
+
+  // PATCH succeeded — the backend already persisted the new value, so do
+  // NOT revert the toggle or surface a save error if the auth refresh
+  // fails (e.g. a transient refresh-token network blip). The next page
+  // load will hydrate the up-to-date settings.
+  try {
+    await authStore.fetchUser()
+  } catch {
+    // Swallow: save is real, refresh is best-effort.
+  }
+  toast.success('Setting saved')
+  isSaving.value = false
 }
 
 function saveFeeSetting(key: string, value: string) {
@@ -186,6 +218,39 @@ function saveFeeSetting(key: string, value: string) {
                 :disabled="isSaving"
                 @blur="saveFeeSetting('default_follow_up_fee', defaultFollowUpFee)"
               />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card v-if="showQueueSmsToggle" class="clinic-card overflow-hidden rounded-2xl border-0 py-0" data-test="queue-notifications-card">
+        <CardHeader class="px-5 pt-5 sm:px-6 sm:pt-6">
+          <div class="flex items-center gap-2">
+            <span class="clinic-section-icon clinic-section-icon--sky flex size-9 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 text-white">
+              <MessageSquare class="size-4" />
+            </span>
+            <CardTitle class="text-base">Queue Notifications</CardTitle>
+          </div>
+          <CardDescription>Automated SMS messages to patients while they wait in your queue</CardDescription>
+        </CardHeader>
+
+        <CardContent class="flex flex-col gap-6 px-5 pb-5 sm:px-6 sm:pb-6">
+          <div class="clinic-setting-row surface-muted flex items-start gap-4 rounded-2xl p-4">
+            <Switch
+              :model-value="queueSmsNotificationsEnabled"
+              :disabled="isSaving"
+              class="mt-0.5 shrink-0"
+              data-test="queue-sms-toggle"
+              @update:model-value="toggleQueueSmsNotifications"
+            />
+            <div>
+              <Label class="text-sm font-medium">SMS rank notifications</Label>
+              <p class="mt-0.5 text-xs text-muted-foreground">
+                Send SMS to patients when they're 3rd and 2nd in line for their doctor. Uses clinic SMS quota.
+              </p>
+              <p class="mt-2 text-[11px] text-muted-foreground/80">
+                Messages only include your clinic name and patient first name — no clinical details.
+              </p>
             </div>
           </div>
         </CardContent>
@@ -334,6 +399,12 @@ function saveFeeSetting(key: string, value: string) {
 .clinic-section-icon--blue {
   box-shadow:
     0 16px 32px rgb(37 99 235 / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.clinic-section-icon--sky {
+  box-shadow:
+    0 16px 32px rgb(14 165 233 / 0.22),
     inset 0 1px 0 rgb(255 255 255 / 0.28);
 }
 

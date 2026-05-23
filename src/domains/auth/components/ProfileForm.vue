@@ -201,7 +201,7 @@ const onSubmit = handleSubmit(async (values) => {
               Date of birth
               <span class="ml-auto text-xs font-normal text-muted-foreground">Optional</span>
             </Label>
-            <DateOfBirthPicker v-model="dateOfBirth" />
+            <DateOfBirthPicker v-model="dateOfBirth" :invalid="!!dateOfBirthError" />
             <p v-if="dateOfBirthError" class="text-xs text-destructive">{{ dateOfBirthError }}</p>
           </div>
         </div>
