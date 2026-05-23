@@ -274,7 +274,6 @@
     border-color: var(--surface-border);
     box-shadow: var(--surface-shadow);
     backdrop-filter: var(--surface-blur);
-    -webkit-backdrop-filter: var(--surface-blur);
   }
 
   .surface-card {
@@ -282,7 +281,6 @@
     border-color: var(--surface-border);
     box-shadow: var(--surface-shadow);
     backdrop-filter: var(--surface-blur);
-    -webkit-backdrop-filter: var(--surface-blur);
   }
 
   .surface-card-lite {
@@ -305,7 +303,6 @@
 
   :root[data-surface-mode='full'] .surface-card-lite {
     backdrop-filter: var(--surface-blur);
-    -webkit-backdrop-filter: var(--surface-blur);
   }
 
   .surface-floating {
@@ -315,7 +312,6 @@
     border-color: var(--surface-border-strong);
     box-shadow: var(--surface-shadow-strong), inset 0 1px 0 oklch(1 0 0 / 0.4);
     backdrop-filter: blur(30px) saturate(1.35);
-    -webkit-backdrop-filter: blur(30px) saturate(1.35);
   }
 
   .dark .surface-floating {
@@ -330,7 +326,6 @@
     border-color: var(--surface-border);
     box-shadow: var(--surface-shadow);
     backdrop-filter: var(--surface-blur);
-    -webkit-backdrop-filter: var(--surface-blur);
   }
 
   .surface-solid {
@@ -346,7 +341,6 @@
   .surface-overlay {
     background: var(--surface-overlay);
     backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
   }
 
   .surface-interactive {
