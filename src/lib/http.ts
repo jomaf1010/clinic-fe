@@ -75,6 +75,15 @@ async function handleUnauthorized(): Promise<boolean> {
   return refreshPromise
 }
 
+/**
+ * Single-flight access-token refresh, shared with the Apollo error link so
+ * GraphQL recovers from an expired token exactly like REST does. Returns true
+ * if a fresh token is now available.
+ */
+export function refreshAccessToken(): Promise<boolean> {
+  return handleUnauthorized()
+}
+
 // Multi-tab sync
 const authChannel = new BroadcastChannel('auth_token_sync')
 authChannel.addEventListener('message', (event) => {

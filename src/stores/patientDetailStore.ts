@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { patientApi } from '@/domains/patient/api/patientApi'
+import { fetchPatientDetail } from '@/domains/patient/graphql/patientDetail'
 import type {
   PatientResponse,
   Problem,
@@ -85,6 +86,16 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
   const isLoading = ref(false)
   const isLoadingCore = ref(false)
   const isLoadingFM = ref(false)
+  // True once the FM sections are loaded (via the GraphQL aggregate OR loadFM),
+  // independent of whether any individual record (e.g. lifestyle) exists — so
+  // child sections don't re-trigger the REST fan-out for a null-record patient.
+  const fmLoaded = ref(false)
+  // Same idea for the pediatric sections (loaded via the aggregate OR loadPediatrics).
+  const pedsLoaded = ref(false)
+  // ...and the OB-GYN sections (loaded via the aggregate OR loadObgyn).
+  const obgynLoaded = ref(false)
+  // ...and the Dental sections (loaded via the aggregate OR loadDental).
+  const dentalLoaded = ref(false)
   const isLoadingPeds = ref(false)
   const isLoadingObgyn = ref(false)
   const isSavingObgyn = ref(false)
@@ -150,6 +161,109 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       throw new Error('Failed to load patient')
     } finally {
       isLoading.value = false
+    }
+  }
+
+  /**
+   * Single GraphQL query for patient core + FM medical-record sections,
+   * replacing the loadPatient + loadCore + loadFM REST fan-out. pastDiagnoses
+   * and chronicTrends are computed/separate and stay on REST.
+   */
+  async function loadAggregate(id: string, specialtyKey?: string): Promise<void> {
+    const aggregateSpecialty = specialtyKey === 'pediatrics' || specialtyKey === 'obgyn' || specialtyKey === 'dental'
+      ? specialtyKey
+      : null
+    isLoading.value = true
+    isLoadingCore.value = true
+    isLoadingFM.value = true
+    fmLoaded.value = false
+    if (aggregateSpecialty === 'pediatrics') {
+      isLoadingPeds.value = true
+      pedsLoaded.value = false
+    }
+    if (aggregateSpecialty === 'obgyn') {
+      isLoadingObgyn.value = true
+      obgynLoaded.value = false
+    }
+    if (aggregateSpecialty === 'dental') {
+      isLoadingDental.value = true
+      dentalLoaded.value = false
+    }
+    patientId.value = id
+    try {
+      const [detail, diagnosesRes, trendsRes] = await Promise.all([
+        fetchPatientDetail(id, aggregateSpecialty),
+        patientApi.getPastDiagnoses(id).catch(() => ({ data: [] })),
+        patientApi.getChronicTrends(id).catch(() => ({ data: null })),
+      ])
+
+      if (!detail) {
+        patient.value = null
+        throw new Error('Failed to load patient')
+      }
+
+      patient.value = {
+        id: detail.uuid,
+        first_name: detail.first_name,
+        middle_name: detail.middle_name,
+        last_name: detail.last_name,
+        suffix: detail.suffix,
+        formal_name: detail.formal_name,
+        full_name: detail.full_name,
+        address: detail.address,
+        formatted_address: detail.formatted_address,
+        date_of_birth: detail.date_of_birth ?? '',
+        sex: detail.sex,
+        blood_type: detail.blood_type,
+        contact_number: detail.contact_number,
+        email: detail.email,
+        note: detail.note,
+        avatar_url: detail.avatar_url,
+        status: (detail.status ?? 'new') as PatientResponse['status'], // mirror PatientResource default
+        created_at: detail.created_at,
+        updated_at: detail.updated_at,
+      }
+
+      const mr = detail.medicalRecord
+      problems.value = mr?.problem_list ?? []
+      allergies.value = mr?.structured_allergies ?? []
+      medications.value = mr?.medication_list ?? []
+      familyHistory.value = mr?.family_history ?? []
+      lifestyle.value = mr?.lifestyle ?? null
+      preventiveCare.value = mr?.preventive_care ?? []
+      fmLoaded.value = true
+
+      if (aggregateSpecialty === 'pediatrics') {
+        const peds = detail.pediatrics
+        birthHistory.value = peds?.birth_history ?? null
+        immunizations.value = peds?.immunizations ?? null
+        growthHistory.value = peds?.growth_history ?? []
+        milestones.value = peds?.developmental_milestones ?? null
+        pedsLoaded.value = true
+      }
+
+      if (aggregateSpecialty === 'obgyn') {
+        gynProfile.value = detail.obgyn?.gyn_profile ?? null
+        pregnancies.value = detail.obgyn?.pregnancies ?? []
+        obgynLoaded.value = true
+      }
+
+      if (aggregateSpecialty === 'dental') {
+        dentalProfile.value = detail.dental?.profile ?? null
+        dentalTreatmentPlans.value = detail.dental?.treatment_plans ?? []
+        dentalVisits.value = detail.dental?.visits ?? []
+        dentalLoaded.value = true
+      }
+
+      pastDiagnoses.value = diagnosesRes.data
+      chronicTrends.value = trendsRes.data as ChronicTrendsData | null
+    } finally {
+      isLoading.value = false
+      isLoadingCore.value = false
+      isLoadingFM.value = false
+      if (aggregateSpecialty === 'pediatrics') isLoadingPeds.value = false
+      if (aggregateSpecialty === 'obgyn') isLoadingObgyn.value = false
+      if (aggregateSpecialty === 'dental') isLoadingDental.value = false
     }
   }
 
@@ -271,6 +385,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       medications.value = medsRes.data as Medication[]
       preventiveCare.value = preventiveRes.data as PreventiveCareItem[]
       chronicTrends.value = trendsRes.data as ChronicTrendsData | null
+      fmLoaded.value = true
     } finally {
       isLoadingFM.value = false
     }
@@ -379,6 +494,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       dentalProfile.value = profileRes.data
       dentalTreatmentPlans.value = plansRes.data
       dentalVisits.value = visitsRes.data
+      dentalLoaded.value = true
     } finally {
       isLoadingDental.value = false
     }
@@ -458,6 +574,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       ])
       gynProfile.value = gynRes.data as GynProfile | null
       pregnancies.value = pregRes.data as Pregnancy[]
+      obgynLoaded.value = true
     } finally {
       isLoadingObgyn.value = false
     }
@@ -588,6 +705,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
       immunizations.value = immuneRes.data as ImmunizationTieredResponse | null
       growthHistory.value = (growthRes.data ?? []) as GrowthMeasurement[]
       milestones.value = milestoneRes.data as MilestoneScheduleResponse | null
+      pedsLoaded.value = true
     } finally {
       isLoadingPeds.value = false
     }
@@ -666,6 +784,10 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     isLoading.value = false
     isLoadingCore.value = false
     isLoadingFM.value = false
+    fmLoaded.value = false
+    pedsLoaded.value = false
+    obgynLoaded.value = false
+    dentalLoaded.value = false
     isLoadingPeds.value = false
     isLoadingObgyn.value = false
     isSavingObgyn.value = false
@@ -690,6 +812,7 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
 
     // Actions — core
     loadPatient,
+    loadAggregate,
     loadCore,
     loadSpecialty,
     uploadAvatar,
@@ -713,6 +836,10 @@ export const usePatientDetailStore = defineStore('patientDetail', () => {
     preventiveCare,
     chronicTrends,
     isLoadingFM,
+    fmLoaded,
+    pedsLoaded,
+    obgynLoaded,
+    dentalLoaded,
 
     // State — OB-GYN
     gynProfile,

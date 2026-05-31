@@ -416,7 +416,8 @@ const { clinicalSummary: gynNarrativeSummary } = useClinicalSummary(gynProfile, 
 // ── Load ──────────────────────────────────────────────────────────────────
 onMounted(async () => {
   if (!patientId.value) return
-  if (!pdStore.gynProfile) await pdStore.loadObgyn()
+  // Fall back to the REST OB-GYN load only if the aggregate didn't already load it.
+  if (!pdStore.obgynLoaded && !pdStore.isLoadingObgyn) await pdStore.loadObgyn()
 })
 </script>
 
