@@ -36,7 +36,7 @@ watch(
     // Lazy-load peds data on first open — skip if the patient-detail page
     // already hydrated it, otherwise the button on a fresh Assessment tab
     // would show an empty chart.
-    if (pdStore.growthHistory.length === 0 && !pdStore.isLoadingPeds) {
+    if (!pdStore.pedsLoaded && !pdStore.isLoadingPeds) {
       pdStore.loadPediatrics()
     }
   },

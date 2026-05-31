@@ -21,7 +21,8 @@ const pdStore = usePatientDetailStore()
 const router = useRouter()
 
 onMounted(() => {
-  if (!pdStore.dentalProfile && !pdStore.isLoadingDental) {
+  // Fall back to the REST dental load only if the aggregate didn't already load it.
+  if (!pdStore.dentalLoaded && !pdStore.isLoadingDental) {
     pdStore.loadDental()
   }
 })

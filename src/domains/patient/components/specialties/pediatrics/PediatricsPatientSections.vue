@@ -517,7 +517,8 @@ async function deleteMilestoneAssessment(assessmentUuid: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  if (!pdStore.birthHistory && !pdStore.isLoadingPeds) {
+  // Fall back to the REST peds fan-out only if the aggregate didn't already load it.
+  if (!pdStore.pedsLoaded && !pdStore.isLoadingPeds) {
     await pdStore.loadPediatrics()
   }
 })

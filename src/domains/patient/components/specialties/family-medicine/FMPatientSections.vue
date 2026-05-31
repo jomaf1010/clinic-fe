@@ -624,7 +624,9 @@ const showPreventiveModal = ref<boolean>(false)
 // ── Load ──────────────────────────────────────────────────────────────────
 onMounted(async () => {
   if (!pdStore.patientId) return
-  if (!pdStore.lifestyle && !pdStore.isLoadingFM) {
+  // Only fall back to the REST FM fan-out if FM data wasn't already loaded
+  // (the GraphQL aggregate sets fmLoaded even when individual records are null).
+  if (!pdStore.fmLoaded && !pdStore.isLoadingFM) {
     await pdStore.loadFM()
   }
 })

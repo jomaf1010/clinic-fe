@@ -193,14 +193,16 @@ async function fetchPatient() {
 
   try {
     const id = route.params.id as string
-    await pdStore.loadPatient(id)
+    const key = specialtyStore.config?.key
+    // Patient core + FM medical record (+ pediatrics when applicable) in one
+    // GraphQL query. Encounters stay on their own REST call.
     await Promise.all([
+      pdStore.loadAggregate(id, key),
       encounterStore.loadForPatient(id),
-      pdStore.loadCore(),
     ])
-    // Load specialty-specific data
-    if (specialtyStore.config?.key) {
-      pdStore.loadSpecialty(specialtyStore.config.key)
+    // These specialties are already covered by the aggregate; only load the rest.
+    if (key && !['family_medicine', 'internal_medicine', 'pediatrics', 'obgyn', 'dental'].includes(key)) {
+      pdStore.loadSpecialty(key)
     }
   } catch {
     error.value = 'Failed to load patient details. Please try again.'
